@@ -1,3 +1,10 @@
+import type {
+  UserBalance,
+  Crystal,
+  TechProgress,
+  CommandHistoryEntry,
+} from '@/app/(game)/terminal/actions/data'
+
 export interface TerminalLine {
   id: string
   type: 'input' | 'output' | 'error' | 'system' | 'ascii'
@@ -13,6 +20,21 @@ export interface Command {
   execute: (args: string[], context: CommandContext) => Promise<CommandResult>
 }
 
+export interface DataFetchers {
+  fetchBalance: () => Promise<UserBalance | null>
+  fetchCrystals: () => Promise<Crystal[]>
+  fetchResearchProgress: () => Promise<TechProgress[]>
+  fetchCommandHistory: (limit?: number) => Promise<CommandHistoryEntry[]>
+  fetchVolatility: () => Promise<{ tps: number; tier: string; block_time_ms: number } | null>
+  logCommand: (
+    command: string,
+    args: string[],
+    output: string,
+    success: boolean,
+    executionTimeMs: number
+  ) => Promise<void>
+}
+
 export interface CommandContext {
   userId: string
   username: string | null
@@ -20,6 +42,7 @@ export interface CommandContext {
   addOutput: (content: string, type?: TerminalLine['type']) => void
   clearScreen: () => void
   setTyping: (typing: boolean) => void
+  data: DataFetchers
 }
 
 export interface CommandResult {

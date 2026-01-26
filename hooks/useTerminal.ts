@@ -1,8 +1,16 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
-import type { TerminalLine, TerminalState, CommandContext } from '@/lib/terminal/types'
+import type { TerminalLine, TerminalState, CommandContext, DataFetchers } from '@/lib/terminal/types'
 import { executeCommand, getWelcomeMessage } from '@/lib/terminal/commands'
+import {
+  fetchBalance,
+  fetchCrystals,
+  fetchResearchProgress,
+  fetchCommandHistory,
+  fetchVolatility,
+  logCommand,
+} from '@/app/(game)/terminal/actions/data'
 
 interface UseTerminalProps {
   userId: string
@@ -63,6 +71,16 @@ export function useTerminal({ userId, username, balance }: UseTerminalProps) {
     }))
   }, [])
 
+  // Data fetchers for commands
+  const dataFetchers: DataFetchers = {
+    fetchBalance,
+    fetchCrystals,
+    fetchResearchProgress,
+    fetchCommandHistory,
+    fetchVolatility,
+    logCommand,
+  }
+
   // Initialize with welcome message
   useEffect(() => {
     if (!initializedRef.current) {
@@ -94,6 +112,7 @@ export function useTerminal({ userId, username, balance }: UseTerminalProps) {
         addOutput,
         clearScreen,
         setTyping,
+        data: dataFetchers,
       }
 
       // Execute command
@@ -106,7 +125,7 @@ export function useTerminal({ userId, username, balance }: UseTerminalProps) {
         result.output.forEach((line) => addLine(line, 'output'))
       }
     },
-    [userId, username, balance, addLine, addOutput, clearScreen, setTyping]
+    [userId, username, balance, addLine, addOutput, clearScreen, setTyping, dataFetchers]
   )
 
   const navigateHistory = useCallback(
