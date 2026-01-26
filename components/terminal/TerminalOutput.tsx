@@ -27,7 +27,7 @@ export function TerminalOutput({ lines, isTyping }: TerminalOutputProps) {
       case 'system':
         return 'text-green-500'
       case 'ascii':
-        return 'text-green-500 whitespace-pre'
+        return 'text-green-500'
       default:
         return 'text-green-500/80'
     }
@@ -36,20 +36,22 @@ export function TerminalOutput({ lines, isTyping }: TerminalOutputProps) {
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto overflow-x-hidden font-mono text-sm leading-relaxed scrollbar-thin scrollbar-thumb-green-500/30 scrollbar-track-transparent"
+      className="flex-1 overflow-y-auto overflow-x-auto font-mono text-sm leading-tight"
+      style={{ fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace' }}
     >
-      {lines.map((line) => (
-        <div key={line.id} className={`${getLineClass(line.type)} break-words`}>
-          {line.content || '\u00A0'}
-        </div>
-      ))}
+      <pre className="whitespace-pre">
+        {lines.map((line) => (
+          <div key={line.id} className={getLineClass(line.type)}>
+            {line.content || ' '}
+          </div>
+        ))}
 
-      {isTyping && (
-        <div className="text-green-500/80 flex items-center gap-1">
-          <span>Processing</span>
-          <span className="animate-pulse">...</span>
-        </div>
-      )}
+        {isTyping && (
+          <div className="text-green-500/80">
+            Processing...
+          </div>
+        )}
+      </pre>
     </div>
   )
 }

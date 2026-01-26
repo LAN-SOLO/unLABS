@@ -1,12 +1,13 @@
 import type { Command, CommandContext, CommandResult } from './types'
 
-// Simple ASCII Logo
+// Simple text banner - no fancy ASCII art to avoid font issues
 const ASCII_LOGO = `
-        _       _       _    ____  ____
-  _   _| |__   | |     / \\  | __ )/ ___|
- | | | | '_ \\  | |    / _ \\ |  _ \\\\___ \\
- | |_| | | | | | |___/ ___ \\| |_) |___) |
-  \\__,_|_| |_| |_____/_/   \\_\\____/|____/
+ =============================================================
+ |                                                           |
+ |   U N S T A B L E   L A B O R A T O R I E S              |
+ |                        unLABS                             |
+ |                                                           |
+ =============================================================
 `
 
 // Command definitions
