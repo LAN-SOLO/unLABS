@@ -1,65 +1,93 @@
-import Image from "next/image";
+import Link from 'next/link'
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
+    <div className="min-h-screen bg-black text-green-500 font-mono flex flex-col">
+      {/* Scanline overlay */}
+      <div
+        className="pointer-events-none fixed inset-0 z-50"
+        style={{
+          background:
+            'repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 2px)',
+        }}
+      />
+
+      {/* CRT glow */}
+      <div
+        className="pointer-events-none fixed inset-0 z-40"
+        style={{
+          boxShadow: 'inset 0 0 150px rgba(34, 197, 94, 0.1)',
+        }}
+      />
+
+      <main className="flex-1 flex flex-col items-center justify-center p-8">
+        {/* ASCII Logo */}
+        <pre className="text-green-500 text-xs sm:text-sm mb-8 leading-tight text-center">
+{`
+ _   _ _   _ _        _    ____  ____
+| | | | \\ | | |      / \\  | __ )/ ___|
+| | | |  \\| | |     / _ \\ |  _ \\\\___ \\
+| |_| | |\\  | |___ / ___ \\| |_) |___) |
+ \\___/|_| \\_|_____/_/   \\_\\____/|____/
+`}
+        </pre>
+
+        {/* Title */}
+        <div className="text-center mb-12">
+          <h1 className="text-2xl sm:text-3xl mb-2 text-green-400">
+            UNSTABLE LABORATORIES
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-green-500/70 text-sm">
+            Quantum Crystal Research Facility
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Terminal box */}
+        <div className="w-full max-w-lg border border-green-500/30 rounded-lg overflow-hidden shadow-[0_0_30px_rgba(34,197,94,0.15)]">
+          <div className="bg-green-900/20 border-b border-green-500/30 px-4 py-2 flex items-center gap-2">
+            <div className="flex gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
+              <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
+              <div className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
+            </div>
+            <span className="text-green-500/50 text-xs ml-2">system://init</span>
+          </div>
+
+          <div className="bg-black/90 p-6 space-y-4">
+            <div className="text-sm space-y-1">
+              <p className="text-green-500/70">&gt; SYSTEM ONLINE</p>
+              <p className="text-green-500/70">&gt; QUANTUM CORES: STABLE</p>
+              <p className="text-green-500/70">&gt; AWAITING OPERATOR...</p>
+            </div>
+
+            <div className="pt-4 space-y-3">
+              <Link
+                href="/login"
+                className="block w-full bg-green-500/20 border border-green-500 text-green-400 px-4 py-3 text-center hover:bg-green-500/30 transition-colors"
+              >
+                &gt; AUTHENTICATE
+              </Link>
+              <Link
+                href="/register"
+                className="block w-full bg-transparent border border-green-500/50 text-green-500/70 px-4 py-3 text-center hover:border-green-500 hover:text-green-400 transition-colors"
+              >
+                &gt; REQUEST ACCESS
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Info */}
+        <div className="mt-12 text-center text-green-500/40 text-xs space-y-2">
+          <p>Manage NFT crystals through a retro terminal interface</p>
+          <p>Earn _unSC tokens through research and cultivation</p>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="p-4 text-center text-green-500/30 text-xs">
+        <p>v0.1.0-alpha | SOLANA DEVNET</p>
+      </footer>
     </div>
-  );
+  )
 }
