@@ -24,16 +24,29 @@ const helpCommand: Command = {
       '|  HELP      - Display this help message                     |',
       '|  CLEAR     - Clear terminal screen                         |',
       '|  STATUS    - Display system status                         |',
+      '+------------------------------------------------------------+',
+      '|                      CRYSTALS                              |',
+      '+------------------------------------------------------------+',
       '|  INV       - View crystal inventory                        |',
+      '|  MINT      - Mint a new crystal (50 _unSC)                 |',
+      '|  CRYSTAL   - View detailed crystal info                    |',
+      '|  RENAME    - Rename a crystal                              |',
+      '+------------------------------------------------------------+',
+      '|                      ECONOMY                               |',
+      '+------------------------------------------------------------+',
       '|  BALANCE   - Check _unSC token balance                     |',
       '|  RESEARCH  - View tech tree progress                       |',
       '|  SCAN      - Scan for volatility data                      |',
+      '+------------------------------------------------------------+',
+      '|                       OTHER                                |',
+      '+------------------------------------------------------------+',
       '|  HISTORY   - View command history                          |',
       '|  WHOAMI    - Display operator information                  |',
       '|  ECHO      - Echo text back                                |',
       '|  ABOUT     - About UnstableLabs                            |',
       '+------------------------------------------------------------+',
       '',
+      'Usage: MINT <name> | CRYSTAL <name> | RENAME <old> <new>',
       'Type a command and press ENTER to execute.',
       '',
     ]
@@ -317,6 +330,211 @@ const aboutCommand: Command = {
   },
 }
 
+// Crystal ASCII art generator
+function generateCrystalArt(color: string, era: string): string[] {
+  const colorSymbol = color.charAt(0).toUpperCase()
+  const eraPrefix = era.replace('-bit', '')
+
+  return [
+    '              /\\',
+    '             /  \\',
+    `            / ${colorSymbol}  \\`,
+    '           /______\\',
+    '          /\\      /\\',
+    `         /  \\${eraPrefix.padStart(2)}  /  \\`,
+    '        /    \\  /    \\',
+    '       /______\\/______\\',
+    '       \\      /\\      /',
+    '        \\    /  \\    /',
+    `         \\  / ${colorSymbol}  \\  /`,
+    '          \\/______\\/',
+    '           \\      /',
+    '            \\    /',
+    '             \\  /',
+    '              \\/',
+  ]
+}
+
+const mintCommand: Command = {
+  name: 'mint',
+  aliases: ['m'],
+  description: 'Mint a new crystal',
+  usage: 'mint <name>',
+  execute: async (args, ctx) => {
+    const name = args[0]
+
+    if (!name) {
+      return {
+        success: false,
+        error: 'Usage: MINT <name>\nExample: MINT my-crystal',
+      }
+    }
+
+    ctx.setTyping(true)
+    const result = await ctx.data.mintCrystal(name)
+    ctx.setTyping(false)
+
+    if (!result.success) {
+      return { success: false, error: result.error }
+    }
+
+    const crystal = result.crystal!
+    const art = generateCrystalArt(crystal.color, crystal.era)
+
+    const output = [
+      '',
+      '+---------------------------------------------------------------+',
+      '|                    CRYSTAL MINTED                             |',
+      '+---------------------------------------------------------------+',
+      '',
+      ...art.map(line => `  ${line}`),
+      '',
+      '+---------------------------------------------------------------+',
+      `|  NAME       : ${crystal.name.padEnd(46)} |`,
+      `|  COLOR      : ${crystal.color.toUpperCase().padEnd(46)} |`,
+      `|  ERA        : ${crystal.era.padEnd(46)} |`,
+      `|  VOLATILITY : TIER ${crystal.volatility.padEnd(41)} |`,
+      `|  ROTATION   : ${crystal.rotation.padEnd(46)} |`,
+      `|  STATE      : ${crystal.state.toUpperCase().padEnd(46)} |`,
+      '+---------------------------------------------------------------+',
+      `|  NEW BALANCE: ${(result.newBalance || 0).toFixed(2).padStart(10)} _unSC                         |`,
+      '+---------------------------------------------------------------+',
+      '',
+      '30 slices initialized. Use CRYSTAL <name> for detailed view.',
+      '',
+    ]
+
+    return { success: true, output }
+  },
+}
+
+const crystalCommand: Command = {
+  name: 'crystal',
+  aliases: ['cr', 'view'],
+  description: 'View detailed crystal info',
+  usage: 'crystal <name>',
+  execute: async (args, ctx) => {
+    const name = args[0]
+
+    if (!name) {
+      return {
+        success: false,
+        error: 'Usage: CRYSTAL <name>\nExample: CRYSTAL my-crystal',
+      }
+    }
+
+    ctx.setTyping(true)
+    const crystal = await ctx.data.fetchCrystalByName(name)
+    ctx.setTyping(false)
+
+    if (!crystal) {
+      return { success: false, error: `Crystal "${name}" not found.` }
+    }
+
+    const art = generateCrystalArt(crystal.color, crystal.era)
+
+    // Calculate slice stats
+    const activeSlices = crystal.slices.filter(s => s.is_active).length
+    const avgPower = crystal.slices.length > 0
+      ? crystal.slices.reduce((sum, s) => sum + s.power, 0) / crystal.slices.length
+      : 0
+
+    const genesisTag = crystal.is_genesis ? ' [GENESIS]' : ''
+    const createdDate = new Date(crystal.created_at).toLocaleDateString()
+
+    const output = [
+      '',
+      '+---------------------------------------------------------------+',
+      `|                    CRYSTAL: ${(crystal.name.toUpperCase() + genesisTag).padEnd(32)} |`,
+      '+---------------------------------------------------------------+',
+      '',
+      ...art.map(line => `  ${line}`),
+      '',
+      '+---------------------------------------------------------------+',
+      '|                        ATTRIBUTES                             |',
+      '+---------------------------------------------------------------+',
+      `|  COLOR      : ${crystal.color.toUpperCase().padEnd(46)} |`,
+      `|  ERA        : ${crystal.era.padEnd(46)} |`,
+      `|  VOLATILITY : TIER ${crystal.volatility.padEnd(41)} |`,
+      `|  ROTATION   : ${crystal.rotation.padEnd(46)} |`,
+      `|  STATE      : ${crystal.state.toUpperCase().padEnd(46)} |`,
+      '+---------------------------------------------------------------+',
+      '|                         SLICES                                |',
+      '+---------------------------------------------------------------+',
+      `|  TOTAL      : ${crystal.slice_count.toString().padEnd(2)}/30                                           |`,
+      `|  ACTIVE     : ${activeSlices.toString().padEnd(2)}/30                                           |`,
+      `|  AVG POWER  : ${avgPower.toFixed(2).padStart(6)}                                        |`,
+      `|  TOTAL PWR  : ${crystal.total_power.toFixed(2).padStart(6)}                                        |`,
+      '+---------------------------------------------------------------+',
+      `|  CREATED    : ${createdDate.padEnd(46)} |`,
+      '+---------------------------------------------------------------+',
+      '',
+    ]
+
+    // Add slice visualization (simplified bar representation)
+    output.push('  SLICE POWER DISTRIBUTION:')
+    output.push('')
+
+    // Show 3 rows of 10 slices each
+    for (let row = 0; row < 3; row++) {
+      let rowStr = '  '
+      for (let col = 0; col < 10; col++) {
+        const idx = row * 10 + col
+        const slice = crystal.slices[idx]
+        if (slice) {
+          // Use power to determine bar height (1-5 blocks)
+          const height = Math.min(5, Math.max(1, Math.round(slice.power)))
+          const bar = '#'.repeat(height).padEnd(5, '-')
+          rowStr += `[${bar}] `
+        }
+      }
+      output.push(rowStr)
+    }
+
+    output.push('')
+
+    return { success: true, output }
+  },
+}
+
+const renameCommand: Command = {
+  name: 'rename',
+  aliases: ['rn'],
+  description: 'Rename a crystal',
+  usage: 'rename <old-name> <new-name>',
+  execute: async (args, ctx) => {
+    const [oldName, newName] = args
+
+    if (!oldName || !newName) {
+      return {
+        success: false,
+        error: 'Usage: RENAME <old-name> <new-name>\nExample: RENAME my-crystal new-name',
+      }
+    }
+
+    ctx.setTyping(true)
+    const result = await ctx.data.renameCrystal(oldName, newName)
+    ctx.setTyping(false)
+
+    if (!result.success) {
+      return { success: false, error: result.error }
+    }
+
+    const output = [
+      '',
+      '+-------------------------------------+',
+      '|         CRYSTAL RENAMED             |',
+      '+-------------------------------------+',
+      `|  OLD NAME : ${(result.oldName || '').padEnd(22)} |`,
+      `|  NEW NAME : ${(result.newName || '').padEnd(22)} |`,
+      '+-------------------------------------+',
+      '',
+    ]
+
+    return { success: true, output }
+  },
+}
+
 const historyCommand: Command = {
   name: 'history',
   aliases: ['hist'],
@@ -357,6 +575,9 @@ export const commands: Command[] = [
   clearCommand,
   statusCommand,
   invCommand,
+  mintCommand,
+  crystalCommand,
+  renameCommand,
   balanceCommand,
   researchCommand,
   scanCommand,

@@ -11,6 +11,11 @@ import {
   fetchVolatility,
   logCommand,
 } from '@/app/(game)/terminal/actions/data'
+import {
+  mintCrystal,
+  fetchCrystalByName,
+  renameCrystal,
+} from '@/app/(game)/terminal/actions/crystals'
 
 interface UseTerminalProps {
   userId: string
@@ -79,6 +84,9 @@ export function useTerminal({ userId, username, balance }: UseTerminalProps) {
     fetchCommandHistory,
     fetchVolatility,
     logCommand,
+    mintCrystal,
+    fetchCrystalByName,
+    renameCrystal,
   }
 
   // Initialize with welcome message

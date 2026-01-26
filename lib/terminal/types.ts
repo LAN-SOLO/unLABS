@@ -4,6 +4,11 @@ import type {
   TechProgress,
   CommandHistoryEntry,
 } from '@/app/(game)/terminal/actions/data'
+import type {
+  MintResult,
+  CrystalDetails,
+  RenameResult,
+} from '@/app/(game)/terminal/actions/crystals'
 
 export interface TerminalLine {
   id: string
@@ -33,6 +38,9 @@ export interface DataFetchers {
     success: boolean,
     executionTimeMs: number
   ) => Promise<void>
+  mintCrystal: (name: string) => Promise<MintResult>
+  fetchCrystalByName: (name: string) => Promise<CrystalDetails | null>
+  renameCrystal: (oldName: string, newName: string) => Promise<RenameResult>
 }
 
 export interface CommandContext {
