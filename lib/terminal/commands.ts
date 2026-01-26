@@ -1,16 +1,13 @@
 import type { Command, CommandContext, CommandResult } from './types'
 
-// ASCII Art for various commands
+// Simple ASCII Logo
 const ASCII_LOGO = `
- _   _ _   _ _        _    ____  ____
-| | | | \\ | | |      / \\  | __ )/ ___|
-| | | |  \\| | |     / _ \\ |  _ \\\\___ \\
-| |_| | |\\  | |___ / ___ \\| |_) |___) |
- \\___/|_| \\_|_____/_/   \\_\\____/|____/
+        _       _       _    ____  ____
+  _   _| |__   | |     / \\  | __ )/ ___|
+ | | | | '_ \\  | |    / _ \\ |  _ \\\\___ \\
+ | |_| | | | | | |___/ ___ \\| |_) |___) |
+  \\__,_|_| |_| |_____/_/   \\_\\____/|____/
 `
-
-// Reserved for future use
-// const ASCII_CRYSTAL = `...`
 
 // Command definitions
 const helpCommand: Command = {
@@ -20,21 +17,21 @@ const helpCommand: Command = {
   execute: async (_args, _ctx) => {
     const output = [
       '',
-      '╔════════════════════════════════════════════════════════════╗',
-      '║                    AVAILABLE COMMANDS                      ║',
-      '╠════════════════════════════════════════════════════════════╣',
-      '║  HELP      - Display this help message                     ║',
-      '║  CLEAR     - Clear terminal screen                         ║',
-      '║  STATUS    - Display system status                         ║',
-      '║  INV       - View crystal inventory                        ║',
-      '║  BALANCE   - Check _unSC token balance                     ║',
-      '║  RESEARCH  - View tech tree progress                       ║',
-      '║  SCAN      - Scan for volatility data                      ║',
-      '║  HISTORY   - View command history                          ║',
-      '║  WHOAMI    - Display operator information                  ║',
-      '║  ECHO      - Echo text back                                ║',
-      '║  ABOUT     - About UnstableLabs                            ║',
-      '╚════════════════════════════════════════════════════════════╝',
+      '+------------------------------------------------------------+',
+      '|                    AVAILABLE COMMANDS                      |',
+      '+------------------------------------------------------------+',
+      '|  HELP      - Display this help message                     |',
+      '|  CLEAR     - Clear terminal screen                         |',
+      '|  STATUS    - Display system status                         |',
+      '|  INV       - View crystal inventory                        |',
+      '|  BALANCE   - Check _unSC token balance                     |',
+      '|  RESEARCH  - View tech tree progress                       |',
+      '|  SCAN      - Scan for volatility data                      |',
+      '|  HISTORY   - View command history                          |',
+      '|  WHOAMI    - Display operator information                  |',
+      '|  ECHO      - Echo text back                                |',
+      '|  ABOUT     - About UnstableLabs                            |',
+      '+------------------------------------------------------------+',
       '',
       'Type a command and press ENTER to execute.',
       '',
@@ -47,7 +44,7 @@ const clearCommand: Command = {
   name: 'clear',
   aliases: ['cls', 'c'],
   description: 'Clear terminal screen',
-  execute: async (args, ctx) => {
+  execute: async (_args, ctx) => {
     ctx.clearScreen()
     return { success: true }
   },
@@ -57,20 +54,20 @@ const statusCommand: Command = {
   name: 'status',
   aliases: ['stat', 's'],
   description: 'Display system status',
-  execute: async (args, ctx) => {
+  execute: async (_args, ctx) => {
     const now = new Date()
     const output = [
       '',
-      '┌─────────────────────────────────────┐',
-      '│         SYSTEM STATUS               │',
-      '├─────────────────────────────────────┤',
-      `│  OPERATOR  : ${(ctx.username || 'UNKNOWN').padEnd(20)} │`,
-      `│  SESSION   : ${ctx.userId.slice(0, 8)}...             │`,
-      `│  BALANCE   : ${ctx.balance.toFixed(2).padStart(10)} _unSC    │`,
-      `│  NETWORK   : SOLANA DEVNET          │`,
-      `│  STATUS    : OPERATIONAL            │`,
-      `│  TIME      : ${now.toISOString().slice(11, 19)}              │`,
-      '└─────────────────────────────────────┘',
+      '+-------------------------------------+',
+      '|           SYSTEM STATUS             |',
+      '+-------------------------------------+',
+      `|  OPERATOR  : ${(ctx.username || 'UNKNOWN').padEnd(20)} |`,
+      `|  SESSION   : ${ctx.userId.slice(0, 8)}...             |`,
+      `|  BALANCE   : ${ctx.balance.toFixed(2).padStart(10)} _unSC    |`,
+      '|  NETWORK   : SOLANA DEVNET          |',
+      '|  STATUS    : OPERATIONAL            |',
+      `|  TIME      : ${now.toISOString().slice(11, 19)}              |`,
+      '+-------------------------------------+',
       '',
     ]
     return { success: true, output }
@@ -82,18 +79,17 @@ const invCommand: Command = {
   aliases: ['inventory', 'i'],
   description: 'View crystal inventory',
   execute: async (_args, _ctx) => {
-    // Placeholder - will fetch from database
     const output = [
       '',
-      '┌─────────────────────────────────────┐',
-      '│       CRYSTAL INVENTORY             │',
-      '├─────────────────────────────────────┤',
-      '│  No crystals found.                 │',
-      '│                                     │',
-      '│  Use MINT to create your first      │',
-      '│  crystal, or acquire one from       │',
-      '│  the marketplace.                   │',
-      '└─────────────────────────────────────┘',
+      '+-------------------------------------+',
+      '|         CRYSTAL INVENTORY           |',
+      '+-------------------------------------+',
+      '|  No crystals found.                 |',
+      '|                                     |',
+      '|  Use MINT to create your first      |',
+      '|  crystal, or acquire one from       |',
+      '|  the marketplace.                   |',
+      '+-------------------------------------+',
       '',
     ]
     return { success: true, output }
@@ -104,18 +100,18 @@ const balanceCommand: Command = {
   name: 'balance',
   aliases: ['bal', 'b'],
   description: 'Check _unSC token balance',
-  execute: async (args, ctx) => {
+  execute: async (_args, ctx) => {
     const output = [
       '',
-      '┌─────────────────────────────────────┐',
-      '│         _unSC BALANCE               │',
-      '├─────────────────────────────────────┤',
-      `│  AVAILABLE : ${ctx.balance.toFixed(2).padStart(15)} _unSC │`,
-      '│  STAKED    :            0.00 _unSC │',
-      '│  LOCKED    :            0.00 _unSC │',
-      '├─────────────────────────────────────┤',
-      `│  TOTAL     : ${ctx.balance.toFixed(2).padStart(15)} _unSC │`,
-      '└─────────────────────────────────────┘',
+      '+-------------------------------------+',
+      '|           _unSC BALANCE             |',
+      '+-------------------------------------+',
+      `|  AVAILABLE : ${ctx.balance.toFixed(2).padStart(15)} _unSC |`,
+      '|  STAKED    :            0.00 _unSC |',
+      '|  LOCKED    :            0.00 _unSC |',
+      '+-------------------------------------+',
+      `|  TOTAL     : ${ctx.balance.toFixed(2).padStart(15)} _unSC |`,
+      '+-------------------------------------+',
       '',
     ]
     return { success: true, output }
@@ -129,26 +125,26 @@ const researchCommand: Command = {
   execute: async (_args, _ctx) => {
     const output = [
       '',
-      '╔═══════════════════════════════════════════════════════════════╗',
-      '║                     TECH TREE PROGRESS                        ║',
-      '╠═══════════════════════════════════════════════════════════════╣',
-      '║  DEVICES                                                      ║',
-      '║    ├─ Oscilloscope      [█░░░░] Tier 1/5                     ║',
-      '║    ├─ Spectrometer      [█░░░░] Tier 1/5                     ║',
-      '║    └─ Synthesizer       [█░░░░] Tier 1/5                     ║',
-      '║  OPTICS                                                       ║',
-      '║    ├─ Optics Array      [█░░░░] Tier 1/5                     ║',
-      '║    ├─ Prism Matrix      [█░░░░] Tier 1/5                     ║',
-      '║    └─ Lens Chamber      [█░░░░] Tier 1/5                     ║',
-      '║  ADAPTERS                                                     ║',
-      '║    ├─ Signal Adapter    [█░░░░] Tier 1/5                     ║',
-      '║    ├─ Freq Modulator    [█░░░░] Tier 1/5                     ║',
-      '║    └─ Phase Shifter     [█░░░░] Tier 1/5                     ║',
-      '║  SYNTHESIZERS                                                 ║',
-      '║    ├─ Wave Synthesizer  [█░░░░] Tier 1/5                     ║',
-      '║    ├─ Harmonic Gen      [█░░░░] Tier 1/5                     ║',
-      '║    └─ Resonance Chamber [█░░░░] Tier 1/5                     ║',
-      '╚═══════════════════════════════════════════════════════════════╝',
+      '+---------------------------------------------------------------+',
+      '|                     TECH TREE PROGRESS                        |',
+      '+---------------------------------------------------------------+',
+      '|  DEVICES                                                      |',
+      '|    - Oscilloscope      [#----] Tier 1/5                       |',
+      '|    - Spectrometer      [#----] Tier 1/5                       |',
+      '|    - Synthesizer       [#----] Tier 1/5                       |',
+      '|  OPTICS                                                       |',
+      '|    - Optics Array      [#----] Tier 1/5                       |',
+      '|    - Prism Matrix      [#----] Tier 1/5                       |',
+      '|    - Lens Chamber      [#----] Tier 1/5                       |',
+      '|  ADAPTERS                                                     |',
+      '|    - Signal Adapter    [#----] Tier 1/5                       |',
+      '|    - Freq Modulator    [#----] Tier 1/5                       |',
+      '|    - Phase Shifter     [#----] Tier 1/5                       |',
+      '|  SYNTHESIZERS                                                 |',
+      '|    - Wave Synthesizer  [#----] Tier 1/5                       |',
+      '|    - Harmonic Gen      [#----] Tier 1/5                       |',
+      '|    - Resonance Chamber [#----] Tier 1/5                       |',
+      '+---------------------------------------------------------------+',
       '',
     ]
     return { success: true, output }
@@ -159,7 +155,7 @@ const scanCommand: Command = {
   name: 'scan',
   aliases: ['v'],
   description: 'Scan for volatility data',
-  execute: async (args, ctx) => {
+  execute: async (_args, ctx) => {
     ctx.setTyping(true)
     await new Promise((resolve) => setTimeout(resolve, 1000))
     ctx.setTyping(false)
@@ -169,17 +165,17 @@ const scanCommand: Command = {
 
     const output = [
       '',
-      '┌─────────────────────────────────────┐',
-      '│       VOLATILITY SCAN               │',
-      '├─────────────────────────────────────┤',
-      '│  Scanning Solana network...         │',
-      '│  ████████████████████ 100%          │',
-      '├─────────────────────────────────────┤',
-      `│  NETWORK TPS  : ${tps.toString().padStart(4)}                │`,
-      `│  VOLATILITY   : TIER ${tier}               │`,
-      `│  BLOCK TIME   : ${(400 + Math.random() * 100).toFixed(0)}ms              │`,
-      '│  STATUS       : STABLE               │',
-      '└─────────────────────────────────────┘',
+      '+-------------------------------------+',
+      '|         VOLATILITY SCAN             |',
+      '+-------------------------------------+',
+      '|  Scanning Solana network...         |',
+      '|  [####################] 100%        |',
+      '+-------------------------------------+',
+      `|  NETWORK TPS  : ${tps.toString().padStart(4)}                |`,
+      `|  VOLATILITY   : TIER ${tier}               |`,
+      `|  BLOCK TIME   : ${(400 + Math.random() * 100).toFixed(0)}ms              |`,
+      '|  STATUS       : STABLE              |',
+      '+-------------------------------------+',
       '',
     ]
     return { success: true, output }
@@ -190,7 +186,7 @@ const whoamiCommand: Command = {
   name: 'whoami',
   aliases: ['who'],
   description: 'Display operator information',
-  execute: async (args, ctx) => {
+  execute: async (_args, ctx) => {
     const output = [
       '',
       `OPERATOR: ${ctx.username || 'UNKNOWN'}`,
@@ -218,21 +214,22 @@ const aboutCommand: Command = {
   execute: async (_args, _ctx) => {
     const output = [
       ASCII_LOGO,
-      '╔═══════════════════════════════════════════════════════════════╗',
-      '║                    UNSTABLE LABORATORIES                      ║',
-      '║              Quantum Crystal Research Facility                ║',
-      '╠═══════════════════════════════════════════════════════════════╣',
-      '║  UnstableLabs is an idle laboratory game where operators      ║',
-      '║  research and cultivate quantum crystals through a retro      ║',
-      '║  terminal interface.                                          ║',
-      '║                                                               ║',
-      '║  TOKENS:                                                      ║',
-      '║    _unSC  - UnstableCoin (utility token)                     ║',
-      '║    _unITM - Crystal NFTs                                      ║',
-      '║    _unSLC - Crystal Slices (30 per crystal)                  ║',
-      '║                                                               ║',
-      '║  VERSION: 0.1.0-alpha                                         ║',
-      '╚═══════════════════════════════════════════════════════════════╝',
+      '+---------------------------------------------------------------+',
+      '|                    UNSTABLE LABORATORIES                      |',
+      '|              Quantum Crystal Research Facility                |',
+      '+---------------------------------------------------------------+',
+      '|                                                               |',
+      '|  UnstableLabs is an idle laboratory game where operators      |',
+      '|  research and cultivate quantum crystals through a retro      |',
+      '|  terminal interface.                                          |',
+      '|                                                               |',
+      '|  TOKENS:                                                      |',
+      '|    _unSC  - UnstableCoin (utility token)                      |',
+      '|    _unITM - Crystal NFTs                                      |',
+      '|    _unSLC - Crystal Slices (30 per crystal)                   |',
+      '|                                                               |',
+      '|  VERSION: 0.1.0-alpha                                         |',
+      '+---------------------------------------------------------------+',
       '',
     ]
     return { success: true, output }
@@ -244,7 +241,6 @@ const historyCommand: Command = {
   aliases: ['hist'],
   description: 'View command history',
   execute: async (_args, _ctx) => {
-    // History is handled by the terminal component
     return { success: true, output: ['Use UP/DOWN arrows to navigate command history.'] }
   },
 }
@@ -308,10 +304,10 @@ export async function executeCommand(
 export function getWelcomeMessage(username: string | null): string[] {
   return [
     ASCII_LOGO,
-    '╔══════════════════════════════════════════════════════════════╗',
-    '║       UNSTABLE LABORATORIES TERMINAL v0.1.0                  ║',
-    '║       Quantum Crystal Research Interface                     ║',
-    '╚══════════════════════════════════════════════════════════════╝',
+    '+------------------------------------------------------------+',
+    '|       UNSTABLE LABORATORIES TERMINAL v0.1.0                |',
+    '|       Quantum Crystal Research Interface                   |',
+    '+------------------------------------------------------------+',
     '',
     `> OPERATOR ${username || 'UNKNOWN'} authenticated.`,
     '> System initialized. All subsystems operational.',
