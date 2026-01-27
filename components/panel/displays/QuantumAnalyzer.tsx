@@ -1,13 +1,18 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { PanelFrame } from '../PanelFrame'
 import { LED } from '../controls/LED'
 import { Knob } from '../controls/Knob'
 
+type DeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type TestPhase = 'quantum-core' | 'sensors' | 'neural-net' | 'calibration' | 'complete' | null
+
 interface QuantumAnalyzerProps {
   className?: string
+  onTest?: () => void
+  onReset?: () => void
 }
 
 type AnalysisMode = 'ANOMALY' | 'RESOURCE' | 'DECRYPT' | 'DIAGNOSE' | 'SIMULATE' | 'SCAN'
@@ -19,11 +24,15 @@ interface ScanResult {
   status: 'normal' | 'warning' | 'critical' | 'optimal'
 }
 
-export function QuantumAnalyzer({ className }: QuantumAnalyzerProps) {
-  // Power state
-  const [isPowered, setIsPowered] = useState(false)
+export function QuantumAnalyzer({ className, onTest, onReset }: QuantumAnalyzerProps) {
+  // Device state machine
+  const [deviceState, setDeviceState] = useState<DeviceState>('booting')
+  const [testPhase, setTestPhase] = useState<TestPhase>(null)
+
+  // Power state (derived from device state)
+  const isPowered = deviceState === 'online' || deviceState === 'testing'
+  const isBooting = deviceState === 'booting'
   const [bootProgress, setBootProgress] = useState(0)
-  const [isBooting, setIsBooting] = useState(false)
 
   // Analysis mode
   const [mode, setMode] = useState<AnalysisMode>('ANOMALY')
@@ -55,47 +64,111 @@ export function QuantumAnalyzer({ className }: QuantumAnalyzerProps) {
     SCAN: { color: 'var(--neon-lime)', icon: '◐', description: 'Deep scan for hidden objects' },
   }
 
-  // Boot sequence
+  // Company logo position (random on mount)
+  const [logoPosition] = useState(() => {
+    const positions = ['header-right', 'footer-left', 'footer-right'] as const
+    return positions[Math.floor(Math.random() * positions.length)]
+  })
+
+  // Boot sequence effect
+  useEffect(() => {
+    if (deviceState !== 'booting') return
+
+    setBootProgress(0)
+    setOutputLog(['QUANTUM ANALYZER v3.7.2', '─────────────────────────────'])
+
+    let progress = 0
+    const bootInterval = setInterval(() => {
+      progress += Math.random() * 15 + 5
+      if (progress >= 100) {
+        progress = 100
+        clearInterval(bootInterval)
+        setDeviceState('online')
+        setOutputLog(prev => [
+          ...prev,
+          'QUANTUM CORE: INITIALIZED',
+          'SENSOR ARRAY: CALIBRATED',
+          'NEURAL NETWORK: ONLINE',
+          'ANALYSIS ENGINE: READY',
+          '─────────────────────────────',
+          '> System ready. Select analysis mode.'
+        ])
+      }
+      setBootProgress(progress)
+    }, 150)
+
+    return () => clearInterval(bootInterval)
+  }, [deviceState])
+
+  // Power toggle
   const handlePowerToggle = () => {
     if (isPowered) {
       // Shutdown
-      setIsPowered(false)
+      setDeviceState('offline')
       setBootProgress(0)
       setOutputLog([])
       setScanResults([])
       setAnalysisProgress(0)
     } else {
       // Boot
-      setIsBooting(true)
-      setBootProgress(0)
-      setOutputLog(['QUANTUM ANALYZER v3.7.2', '─────────────────────────────'])
-
-      let progress = 0
-      const bootInterval = setInterval(() => {
-        progress += Math.random() * 15 + 5
-        if (progress >= 100) {
-          progress = 100
-          clearInterval(bootInterval)
-          setIsBooting(false)
-          setIsPowered(true)
-          setOutputLog(prev => [
-            ...prev,
-            'QUANTUM CORE: INITIALIZED',
-            'SENSOR ARRAY: CALIBRATED',
-            'NEURAL NETWORK: ONLINE',
-            'ANALYSIS ENGINE: READY',
-            '─────────────────────────────',
-            '> System ready. Select analysis mode.'
-          ])
-        }
-        setBootProgress(progress)
-      }, 150)
+      setDeviceState('booting')
     }
+  }
+
+  // Test sequence
+  const handleTest = () => {
+    if (deviceState !== 'online') return
+    setDeviceState('testing')
+    onTest?.()
+
+    const runTest = async () => {
+      setOutputLog(prev => [...prev, '', '> INITIATING SYSTEM TEST...'])
+      setTestPhase('quantum-core')
+      setOutputLog(prev => [...prev, '  [TEST] Quantum core integrity...'])
+      await new Promise(r => setTimeout(r, 500))
+      setTestPhase('sensors')
+      setOutputLog(prev => [...prev, '  [TEST] Sensor array response...'])
+      await new Promise(r => setTimeout(r, 400))
+      setTestPhase('neural-net')
+      setOutputLog(prev => [...prev, '  [TEST] Neural network paths...'])
+      await new Promise(r => setTimeout(r, 450))
+      setTestPhase('calibration')
+      setOutputLog(prev => [...prev, '  [TEST] Calibration verification...'])
+      await new Promise(r => setTimeout(r, 400))
+      setTestPhase('complete')
+      setOutputLog(prev => [...prev, '  └─ ALL TESTS PASSED', '> System test complete.'])
+      await new Promise(r => setTimeout(r, 300))
+      setTestPhase(null)
+      setDeviceState('online')
+    }
+    runTest()
+  }
+
+  // Reboot sequence
+  const handleReboot = () => {
+    onReset?.()
+    setDeviceState('rebooting')
+    setTestPhase(null)
+    setOutputLog(prev => [...prev, '', '> SYSTEM REBOOT INITIATED...'])
+
+    setTimeout(() => {
+      setOutputLog(prev => [...prev, '  [SHUTDOWN] Saving state...'])
+    }, 200)
+    setTimeout(() => {
+      setOutputLog(prev => [...prev, '  [SHUTDOWN] Releasing resources...'])
+    }, 400)
+    setTimeout(() => {
+      setOutputLog([])
+      setScanResults([])
+      setAnalysisProgress(0)
+      setBootProgress(0)
+      setDeviceState('booting')
+    }, 800)
   }
 
   // Run analysis
   const runAnalysis = () => {
-    if (!isPowered || isAnalyzing) return
+    if (deviceState !== 'online' || isAnalyzing) return
 
     setIsAnalyzing(true)
     setAnalysisProgress(0)
@@ -251,21 +324,30 @@ export function QuantumAnalyzer({ className }: QuantumAnalyzerProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Company logo - header-right position */}
+          {logoPosition === 'header-right' && (
+            <span
+              className="font-mono text-[6px] font-bold mr-1"
+              style={{ color: 'var(--neon-cyan)', opacity: 0.5, textShadow: '0 0 3px var(--neon-cyan)' }}
+            >
+              QNTX
+            </span>
+          )}
           <LED on={isPowered} color="green" size="sm" />
-          <LED on={isAnalyzing} color="amber" size="sm" />
+          <LED on={isAnalyzing || deviceState === 'testing'} color="amber" size="sm" />
           <LED on={scanResults.length > 0 && scanResults.some(r => r.status === 'critical')} color="red" size="sm" />
         </div>
       </div>
 
       {/* Boot screen or main content */}
-      {!isPowered && !isBooting ? (
+      {deviceState === 'offline' ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="font-mono text-[24px] text-[#1a1a2a] font-bold">QA</div>
             <div className="font-mono text-[8px] text-white/15 mt-1">PRESS POWER TO ACTIVATE</div>
           </div>
         </div>
-      ) : isBooting ? (
+      ) : deviceState === 'booting' || deviceState === 'rebooting' ? (
         <div className="flex-1 flex flex-col items-center justify-center p-4">
           <div className="font-mono text-[10px] text-[var(--neon-cyan)] mb-2">INITIALIZING QUANTUM CORE</div>
           <div className="w-48 h-2 bg-[#0a0a0a] rounded overflow-hidden border border-[#2a2a4a]">
@@ -511,11 +593,20 @@ export function QuantumAnalyzer({ className }: QuantumAnalyzerProps) {
         </div>
       )}
 
-      {/* Footer status bar */}
+      {/* Footer status bar with test/reset buttons */}
       <div className="flex items-center justify-between px-2 py-1 bg-[#0a0a1a] border-t border-[#2a2a4a]">
         <div className="flex items-center gap-2">
           <span className="font-mono text-[6px] text-white/30">MODE:</span>
           <span className="font-mono text-[7px]" style={{ color: currentConfig.color }}>{mode}</span>
+          {/* Company logo - footer-left position */}
+          {logoPosition === 'footer-left' && (
+            <span
+              className="font-mono text-[5px] font-bold ml-1"
+              style={{ color: 'var(--neon-cyan)', opacity: 0.4, textShadow: '0 0 2px var(--neon-cyan)' }}
+            >
+              QNTX
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <span className="font-mono text-[6px] text-white/30">QUANTUM COHERENCE</span>
@@ -523,7 +614,115 @@ export function QuantumAnalyzer({ className }: QuantumAnalyzerProps) {
             <div className="h-full bg-[var(--neon-cyan)]" style={{ width: isPowered ? '87%' : '0%' }} />
           </div>
           <span className="font-mono text-[6px] text-[var(--neon-cyan)]">{isPowered ? '87%' : '0%'}</span>
+          {/* Company logo - footer-right position */}
+          {logoPosition === 'footer-right' && (
+            <span
+              className="font-mono text-[5px] font-bold"
+              style={{ color: 'var(--neon-cyan)', opacity: 0.4, textShadow: '0 0 2px var(--neon-cyan)' }}
+            >
+              QNTX
+            </span>
+          )}
         </div>
+      </div>
+
+      {/* Bottom control bar with metal knurled buttons */}
+      <div className="flex items-center justify-center gap-3 px-2 py-1.5 bg-gradient-to-t from-[#0a0a0a] to-[#0a0a1a] border-t border-[#1a1a2a]">
+        {/* Test button - metal knurled square */}
+        <button
+          onClick={handleTest}
+          disabled={deviceState !== 'online'}
+          className={cn(
+            'w-6 h-6 rounded-[3px] border transition-all duration-200 relative overflow-hidden',
+            'flex items-center justify-center',
+            deviceState === 'online'
+              ? 'border-white/30 cursor-pointer hover:border-[var(--neon-cyan)]/60'
+              : 'border-white/10 cursor-not-allowed opacity-50'
+          )}
+          style={{
+            background: deviceState === 'online'
+              ? 'linear-gradient(145deg, #4a4a5a 0%, #2a2a3a 40%, #3a3a4a 100%)'
+              : 'linear-gradient(145deg, #2a2a2a 0%, #1a1a1a 100%)',
+            boxShadow: deviceState === 'testing'
+              ? '0 0 8px var(--neon-cyan), inset 0 1px 0 rgba(255,255,255,0.15)'
+              : 'inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3)',
+          }}
+          title="RUN TEST"
+        >
+          {/* Knurl pattern - cross-hatch */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: `
+                repeating-linear-gradient(45deg, transparent 0px, transparent 2px, rgba(255,255,255,0.08) 2px, rgba(255,255,255,0.08) 3px),
+                repeating-linear-gradient(-45deg, transparent 0px, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 3px)
+              `,
+            }}
+          />
+          {/* Inner indicator */}
+          <div
+            className="w-2.5 h-2.5 rounded-[2px] relative z-10"
+            style={{
+              background: deviceState === 'testing'
+                ? 'var(--neon-cyan)'
+                : 'linear-gradient(145deg, #5a5a6a 0%, #3a3a4a 100%)',
+              boxShadow: deviceState === 'testing'
+                ? '0 0 6px var(--neon-cyan)'
+                : 'inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
+            }}
+          />
+        </button>
+
+        <span className="font-mono text-[5px] text-white/20">TEST</span>
+
+        <div className="w-px h-4 bg-white/10" />
+
+        <span className="font-mono text-[5px] text-white/20">RESET</span>
+
+        {/* Reset button - metal knurled square */}
+        <button
+          onClick={handleReboot}
+          disabled={deviceState === 'booting' || deviceState === 'rebooting'}
+          className={cn(
+            'w-6 h-6 rounded-[3px] border transition-all duration-200 relative overflow-hidden',
+            'flex items-center justify-center',
+            deviceState !== 'booting' && deviceState !== 'rebooting'
+              ? 'border-white/30 cursor-pointer hover:border-red-500/60'
+              : 'border-white/10 cursor-not-allowed opacity-50'
+          )}
+          style={{
+            background: deviceState !== 'booting' && deviceState !== 'rebooting'
+              ? 'linear-gradient(145deg, #4a4a5a 0%, #2a2a3a 40%, #3a3a4a 100%)'
+              : 'linear-gradient(145deg, #2a2a2a 0%, #1a1a1a 100%)',
+            boxShadow: deviceState === 'rebooting'
+              ? '0 0 8px var(--neon-amber), inset 0 1px 0 rgba(255,255,255,0.15)'
+              : 'inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3)',
+          }}
+          title="REBOOT SYSTEM"
+        >
+          {/* Knurl pattern - diamond */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              backgroundImage: `
+                repeating-linear-gradient(60deg, transparent 0px, transparent 2px, rgba(255,255,255,0.08) 2px, rgba(255,255,255,0.08) 3px),
+                repeating-linear-gradient(-60deg, transparent 0px, transparent 2px, rgba(0,0,0,0.15) 2px, rgba(0,0,0,0.15) 3px)
+              `,
+            }}
+          />
+          {/* Inner indicator */}
+          <div
+            className="w-2.5 h-2.5 rounded-[2px] relative z-10"
+            style={{
+              background: deviceState === 'rebooting'
+                ? 'var(--neon-amber)'
+                : 'linear-gradient(145deg, #5a5a6a 0%, #3a3a4a 100%)',
+              boxShadow: deviceState === 'rebooting'
+                ? '0 0 6px var(--neon-amber)'
+                : 'inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
+            }}
+          />
+        </button>
       </div>
     </div>
   )

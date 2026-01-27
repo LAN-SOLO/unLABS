@@ -5,8 +5,13 @@ import { cn } from '@/lib/utils'
 import { LED } from '../controls/LED'
 import { Knob } from '../controls/Knob'
 
+type DeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type TestPhase = 'memory' | 'systems' | 'network' | 'devices' | 'complete' | null
+
 interface DiagnosticsConsoleProps {
   className?: string
+  onTest?: () => void
+  onReset?: () => void
 }
 
 type DiagnosticCategory = 'SYSTEMS' | 'DEVICES' | 'ENERGY' | 'NETWORK' | 'CRYSTALS' | 'PROCESS'
@@ -89,11 +94,15 @@ const CATEGORY_CONFIGS: Record<DiagnosticCategory, { color: string; icon: string
   PROCESS: { color: 'var(--neon-green)', icon: '▶' },
 }
 
-export function DiagnosticsConsole({ className }: DiagnosticsConsoleProps) {
-  // Power state
-  const [isPowered, setIsPowered] = useState(false)
+export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsConsoleProps) {
+  // Device state machine
+  const [deviceState, setDeviceState] = useState<DeviceState>('booting')
+  const [testPhase, setTestPhase] = useState<TestPhase>(null)
   const [bootProgress, setBootProgress] = useState(0)
-  const [isBooting, setIsBooting] = useState(false)
+
+  // Derived states
+  const isPowered = deviceState === 'online' || deviceState === 'testing'
+  const isBooting = deviceState === 'booting'
 
   // Diagnostic state
   const [category, setCategory] = useState<DiagnosticCategory>('SYSTEMS')
@@ -103,6 +112,12 @@ export function DiagnosticsConsole({ className }: DiagnosticsConsoleProps) {
 
   // Control values
   const [scanDepth, setScanDepth] = useState(75)
+
+  // Company logo position (random on mount)
+  const [logoPosition] = useState(() => {
+    const positions = ['header-left', 'header-right', 'footer-left'] as const
+    return positions[Math.floor(Math.random() * positions.length)]
+  })
 
   // Component statuses
   const [componentStatuses, setComponentStatuses] = useState<Record<DiagnosticCategory, ComponentStatus[]>>(LAB_SYSTEMS)
@@ -138,37 +153,93 @@ export function DiagnosticsConsole({ className }: DiagnosticsConsoleProps) {
     setAlerts(prev => [alert, ...prev].slice(0, 10))
   }, [])
 
-  // Boot sequence
+  // Boot sequence effect
+  useEffect(() => {
+    if (deviceState !== 'booting') return
+
+    setBootProgress(0)
+    setLogOutput(['UNIVERSAL DIAGNOSTICS v2.0.4', ''])
+
+    let progress = 0
+    const bootInterval = setInterval(() => {
+      progress += Math.random() * 20 + 10
+      if (progress >= 100) {
+        progress = 100
+        clearInterval(bootInterval)
+        setDeviceState('online')
+        setLogOutput(['UDC v2.0.4 READY', 'Select category and run diagnostics.'])
+      }
+      setBootProgress(progress)
+    }, 100)
+
+    return () => clearInterval(bootInterval)
+  }, [deviceState])
+
+  // Power toggle
   const handlePowerToggle = () => {
     if (isPowered) {
-      setIsPowered(false)
+      setDeviceState('offline')
       setBootProgress(0)
       setLogOutput([])
       setAlerts([])
       setDiagProgress(0)
     } else {
-      setIsBooting(true)
-      setBootProgress(0)
-      setLogOutput(['UNIVERSAL DIAGNOSTICS v2.0.4', ''])
-
-      let progress = 0
-      const bootInterval = setInterval(() => {
-        progress += Math.random() * 20 + 10
-        if (progress >= 100) {
-          progress = 100
-          clearInterval(bootInterval)
-          setIsBooting(false)
-          setIsPowered(true)
-          setLogOutput(['UDC v2.0.4 READY', 'Select category and run diagnostics.'])
-        }
-        setBootProgress(progress)
-      }, 100)
+      setDeviceState('booting')
     }
+  }
+
+  // System test sequence
+  const handleSystemTest = () => {
+    if (deviceState !== 'online') return
+    setDeviceState('testing')
+    onTest?.()
+
+    const runTest = async () => {
+      addLog('')
+      addLog('━ SYSTEM TEST ━')
+      setTestPhase('memory')
+      addLog('[TEST] Memory integrity...')
+      await new Promise(r => setTimeout(r, 400))
+      setTestPhase('systems')
+      addLog('[TEST] Core systems...')
+      await new Promise(r => setTimeout(r, 350))
+      setTestPhase('network')
+      addLog('[TEST] Network stack...')
+      await new Promise(r => setTimeout(r, 400))
+      setTestPhase('devices')
+      addLog('[TEST] Device interfaces...')
+      await new Promise(r => setTimeout(r, 350))
+      setTestPhase('complete')
+      addLog('[PASS] All tests passed')
+      await new Promise(r => setTimeout(r, 300))
+      setTestPhase(null)
+      setDeviceState('online')
+    }
+    runTest()
+  }
+
+  // Reboot sequence
+  const handleReboot = () => {
+    onReset?.()
+    setDeviceState('rebooting')
+    setTestPhase(null)
+    addLog('')
+    addLog('━ REBOOT ━')
+
+    setTimeout(() => addLog('[STOP] Services...'), 100)
+    setTimeout(() => addLog('[STOP] Interfaces...'), 300)
+    setTimeout(() => {
+      setLogOutput([])
+      setAlerts([])
+      setDiagProgress(0)
+      setBootProgress(0)
+      setDeviceState('booting')
+    }, 700)
   }
 
   // Run diagnostics
   const runDiagnostics = async () => {
-    if (!isPowered || isRunningDiag) return
+    if (deviceState !== 'online' || isRunningDiag) return
 
     setIsRunningDiag(true)
     setDiagProgress(0)
@@ -308,6 +379,119 @@ export function DiagnosticsConsole({ className }: DiagnosticsConsoleProps) {
       'flex flex-col h-full bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a] rounded-lg border border-[#2a2a3a] overflow-hidden',
       className
     )}>
+      {/* Top control bar with round nano buttons */}
+      <div className="flex items-center justify-center gap-4 px-2 py-1 bg-gradient-to-b from-[#0a0a0a] to-[#0a0a12] border-b border-[#1a1a2a]">
+        {/* Test button - round nano with illuminated edge */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleSystemTest}
+            disabled={deviceState !== 'online'}
+            className={cn(
+              'w-5 h-5 rounded-full transition-all duration-200 relative',
+              'flex items-center justify-center',
+              deviceState === 'online'
+                ? 'cursor-pointer'
+                : 'cursor-not-allowed opacity-50'
+            )}
+            style={{
+              background: 'radial-gradient(circle at 30% 30%, #4a4a5a 0%, #2a2a3a 50%, #1a1a2a 100%)',
+              boxShadow: deviceState === 'testing'
+                ? '0 0 8px var(--neon-lime), inset 0 0 3px rgba(0,0,0,0.5)'
+                : 'inset 0 1px 2px rgba(255,255,255,0.1), inset 0 -1px 2px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.4)',
+            }}
+            title="SYSTEM TEST"
+          >
+            {/* Illuminated edge ring */}
+            <div
+              className="absolute inset-0 rounded-full pointer-events-none"
+              style={{
+                border: deviceState === 'testing'
+                  ? '1.5px solid var(--neon-lime)'
+                  : deviceState === 'online'
+                  ? '1.5px solid rgba(200,255,200,0.3)'
+                  : '1.5px solid rgba(100,100,100,0.2)',
+                boxShadow: deviceState === 'testing'
+                  ? '0 0 6px var(--neon-lime), inset 0 0 4px var(--neon-lime)'
+                  : deviceState === 'online'
+                  ? '0 0 3px rgba(200,255,200,0.2)'
+                  : 'none',
+              }}
+            />
+            {/* Center dot */}
+            <div
+              className="w-1.5 h-1.5 rounded-full"
+              style={{
+                background: deviceState === 'testing'
+                  ? 'var(--neon-lime)'
+                  : 'linear-gradient(135deg, #5a5a6a 0%, #3a3a4a 100%)',
+                boxShadow: deviceState === 'testing' ? '0 0 4px var(--neon-lime)' : 'none',
+              }}
+            />
+          </button>
+          <span className="font-mono text-[5px] text-white/30">TEST</span>
+        </div>
+
+        {/* Company logo - header position */}
+        {(logoPosition === 'header-left' || logoPosition === 'header-right') && (
+          <span
+            className="font-mono text-[6px] font-bold"
+            style={{ color: 'var(--neon-lime)', opacity: 0.4, textShadow: '0 0 3px var(--neon-lime)' }}
+          >
+            UDEX
+          </span>
+        )}
+
+        {/* Reset button - round nano with illuminated edge */}
+        <div className="flex items-center gap-1">
+          <span className="font-mono text-[5px] text-white/30">RESET</span>
+          <button
+            onClick={handleReboot}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting'}
+            className={cn(
+              'w-5 h-5 rounded-full transition-all duration-200 relative',
+              'flex items-center justify-center',
+              deviceState !== 'booting' && deviceState !== 'rebooting'
+                ? 'cursor-pointer'
+                : 'cursor-not-allowed opacity-50'
+            )}
+            style={{
+              background: 'radial-gradient(circle at 30% 30%, #5a4a4a 0%, #3a2a2a 50%, #2a1a1a 100%)',
+              boxShadow: deviceState === 'rebooting'
+                ? '0 0 8px var(--neon-amber), inset 0 0 3px rgba(0,0,0,0.5)'
+                : 'inset 0 1px 2px rgba(255,255,255,0.1), inset 0 -1px 2px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.4)',
+            }}
+            title="REBOOT SYSTEM"
+          >
+            {/* Illuminated edge ring */}
+            <div
+              className="absolute inset-0 rounded-full pointer-events-none"
+              style={{
+                border: deviceState === 'rebooting'
+                  ? '1.5px solid var(--neon-amber)'
+                  : deviceState !== 'booting'
+                  ? '1.5px solid rgba(255,200,150,0.3)'
+                  : '1.5px solid rgba(100,100,100,0.2)',
+                boxShadow: deviceState === 'rebooting'
+                  ? '0 0 6px var(--neon-amber), inset 0 0 4px var(--neon-amber)'
+                  : deviceState !== 'booting'
+                  ? '0 0 3px rgba(255,200,150,0.2)'
+                  : 'none',
+              }}
+            />
+            {/* Center dot */}
+            <div
+              className="w-1.5 h-1.5 rounded-full"
+              style={{
+                background: deviceState === 'rebooting'
+                  ? 'var(--neon-amber)'
+                  : 'linear-gradient(135deg, #6a5a5a 0%, #4a3a3a 100%)',
+                boxShadow: deviceState === 'rebooting' ? '0 0 4px var(--neon-amber)' : 'none',
+              }}
+            />
+          </button>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between px-2 py-1.5 bg-[#0a0a12] border-b border-[#2a2a3a]">
         <div className="flex items-center gap-2">
@@ -317,7 +501,7 @@ export function DiagnosticsConsole({ className }: DiagnosticsConsoleProps) {
               'w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all',
               isPowered
                 ? 'bg-[#1a3a1a] border-[var(--neon-green)] shadow-[0_0_10px_var(--neon-green)]'
-                : isBooting
+                : isBooting || deviceState === 'rebooting'
                 ? 'bg-[#2a2a1a] border-[var(--neon-amber)] animate-pulse'
                 : 'bg-[#1a1a1a] border-[#3a3a3a] hover:border-[#5a5a5a]'
             )}
@@ -336,22 +520,24 @@ export function DiagnosticsConsole({ className }: DiagnosticsConsoleProps) {
         </div>
         <div className="flex items-center gap-1">
           <LED on={isPowered} color="green" size="sm" />
-          <LED on={isRunningDiag} color="amber" size="sm" />
+          <LED on={isRunningDiag || deviceState === 'testing'} color="amber" size="sm" />
           <LED on={alerts.some(a => a.severity === 'critical')} color="red" size="sm" />
         </div>
       </div>
 
       {/* Boot/Off Screen */}
-      {!isPowered && !isBooting ? (
+      {deviceState === 'offline' ? (
         <div className="flex-1 flex items-center justify-center bg-[#050508]">
           <div className="text-center">
             <div className="font-mono text-[24px] text-[#151518] font-bold">UDC</div>
             <div className="font-mono text-[7px] text-white/10 mt-1">PRESS POWER</div>
           </div>
         </div>
-      ) : isBooting ? (
+      ) : deviceState === 'booting' || deviceState === 'rebooting' ? (
         <div className="flex-1 flex flex-col items-center justify-center p-3 bg-[#050508]">
-          <div className="font-mono text-[9px] text-[var(--neon-lime)] mb-2">INITIALIZING</div>
+          <div className="font-mono text-[9px] text-[var(--neon-lime)] mb-2">
+            {deviceState === 'rebooting' ? 'REBOOTING' : 'INITIALIZING'}
+          </div>
           <div className="w-32 h-2 bg-[#0a0a0a] rounded overflow-hidden border border-[#2a2a3a]">
             <div
               className="h-full bg-gradient-to-r from-[var(--neon-lime)] to-[var(--neon-green)] transition-all"
@@ -518,6 +704,15 @@ export function DiagnosticsConsole({ className }: DiagnosticsConsoleProps) {
         <div className="flex items-center gap-1">
           <span className="font-mono text-[5px] text-white/30">{CATEGORY_CONFIGS[category].icon}</span>
           <span className="font-mono text-[6px]" style={{ color: currentConfig.color }}>{category}</span>
+          {/* Company logo - footer-left position */}
+          {logoPosition === 'footer-left' && (
+            <span
+              className="font-mono text-[5px] font-bold ml-1"
+              style={{ color: 'var(--neon-lime)', opacity: 0.4, textShadow: '0 0 2px var(--neon-lime)' }}
+            >
+              UDEX
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <div className="w-12 h-1 bg-[#1a1a2a] rounded overflow-hidden">

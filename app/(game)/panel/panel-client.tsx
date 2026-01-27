@@ -47,6 +47,7 @@ import {
   DimensionMonitor,
   CpuMonitor,
   LabClock,
+  MemoryMonitor,
 } from '@/components/panel/modules/EquipmentTile'
 import { ResourceBar } from '@/components/panel/modules/ResourceBar'
 import { VentilationFan } from '@/components/panel/modules/VentilationFan'
@@ -383,13 +384,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                 <MaterialScanner scanProgress={78} detectedMaterials={5} />
                 <LabClock />
                 <CpuMonitor cores={8} utilization={67} frequency={4.2} />
-                <PanelFrame variant="military" className="p-1.5">
-                  <div className="font-mono text-[8px] text-[var(--neon-amber)] mb-0.5">MEM</div>
-                  <div className="h-5 bg-black/40 rounded p-0.5">
-                    <div className="h-full bg-[var(--neon-amber)]/60 rounded" style={{ width: '72%' }} />
-                  </div>
-                  <div className="font-mono text-[6px] text-white/40">4.2G</div>
-                </PanelFrame>
+                <MemoryMonitor totalMemory={16} usedMemory={11.5} />
               </div>
             </div>
 
@@ -640,7 +635,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
             {/* Section: SCANNING */}
             <div className="border-r-2 border-[var(--neon-magenta,#e91e8c)]/40 pr-1">
               <div className="font-mono text-[7px] text-[var(--neon-magenta,#e91e8c)]/60 mb-1 text-right">SCANNING</div>
-              <AnomalyDetector signalStrength={67} anomaliesFound={3} isScanning={true} />
+              <AnomalyDetector signalStrength={67} anomaliesFound={3} />
               <div className="mt-1">
                 <QuantumCompass anomalyDirection={127} anomalyDistance={42} />
               </div>
@@ -648,14 +643,14 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
             {/* Section: TRANSPORT */}
             <div className="border-r-2 border-[var(--neon-blue)]/40 pr-1">
               <div className="font-mono text-[7px] text-[var(--neon-blue)]/60 mb-1 text-right">TRANSPORT</div>
-              <TeleportPad chargeLevel={85} lastDestination="LAB-α" isReady={true} />
+              <TeleportPad chargeLevel={65} lastDestination="LAB-Ω" />
             </div>
             {/* Section: FABRICATION */}
             <div className="border-r-2 border-[var(--neon-red)]/40 pr-1">
               <div className="font-mono text-[7px] text-[var(--neon-red)]/60 mb-1 text-right">FABRICATION</div>
-              <LaserCutter power={450} precision={0.01} isActive={true} />
+              <LaserCutter power={450} precision={0.01} />
               <div className="mt-1">
-                <Printer3D progress={67} layerCount={234} isPrinting={true} />
+                <Printer3D progress={67} layerCount={234} />
               </div>
             </div>
           </div>

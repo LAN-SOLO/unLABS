@@ -2523,43 +2523,227 @@ export function ResourceMagnet({
 
 // ==================================================
 // QUANTUM COMPASS - Anomaly detection device
+// Device ID: QCP-001 | Version: 1.5.0
+// Compatible: AND-001, DIM-001, QSM-001, EMC-001
+// unOS Commands: DEVICE COMPASS [TEST|RESET|STATUS]
 // ==================================================
+type CompassState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type CompassTestPhase = 'gyro' | 'magnetometer' | 'quantum-link' | 'calibrate' | 'verify' | 'complete' | null
+
 interface QuantumCompassProps {
   anomalyDirection?: number // 0-360 degrees
   anomalyDistance?: number // 0-100
   className?: string
+  onTest?: () => void
+  onReset?: () => void
 }
 
 export function QuantumCompass({
   anomalyDirection = 45,
-  anomalyDistance = 72,
+  anomalyDistance = 42,
   className,
+  onTest,
+  onReset,
 }: QuantumCompassProps) {
-  const hasAnomaly = anomalyDistance < 100
+  const [deviceState, setDeviceState] = useState<CompassState>('booting')
+  const [bootPhase, setBootPhase] = useState(0)
+  const [testPhase, setTestPhase] = useState<CompassTestPhase>(null)
+  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
+  const [statusMessage, setStatusMessage] = useState('Init...')
+  const [displayDirection, setDisplayDirection] = useState(0)
+  const [displayDistance, setDisplayDistance] = useState(999)
+  const [needleWobble, setNeedleWobble] = useState(0)
+
+  // Animate needle wobble
+  useEffect(() => {
+    if (deviceState === 'offline') return
+    const interval = setInterval(() => {
+      const wobbleAmount = deviceState === 'testing' ? 15 : 3
+      setNeedleWobble((Math.random() - 0.5) * wobbleAmount)
+    }, 150)
+    return () => clearInterval(interval)
+  }, [deviceState])
+
+  // Boot sequence
+  useEffect(() => {
+    const bootSequence = async () => {
+      setDeviceState('booting')
+      setStatusMessage('Gyro init...')
+      setBootPhase(1)
+      await new Promise(r => setTimeout(r, 300))
+
+      setStatusMessage('Magnetometer...')
+      setBootPhase(2)
+      setDisplayDirection(180)
+      await new Promise(r => setTimeout(r, 350))
+
+      setStatusMessage('Quantum link...')
+      setBootPhase(3)
+      setDisplayDirection(90)
+      setDisplayDistance(500)
+      await new Promise(r => setTimeout(r, 400))
+
+      setStatusMessage('Calibrating...')
+      setBootPhase(4)
+      setDisplayDirection(anomalyDirection)
+      setDisplayDistance(200)
+      await new Promise(r => setTimeout(r, 350))
+
+      setStatusMessage('Locking target...')
+      setBootPhase(5)
+      setDisplayDistance(anomalyDistance)
+      await new Promise(r => setTimeout(r, 300))
+
+      setBootPhase(6)
+      setDeviceState('online')
+      setStatusMessage('ANOMALY DETECTED')
+    }
+    bootSequence()
+  }, [])
+
+  useEffect(() => {
+    if (deviceState === 'online') {
+      setDisplayDirection(anomalyDirection)
+      setDisplayDistance(anomalyDistance)
+    }
+  }, [anomalyDirection, anomalyDistance, deviceState])
+
+  const handleTest = async () => {
+    if (deviceState !== 'online') return
+    setDeviceState('testing')
+    setTestResult(null)
+
+    const phases: NonNullable<CompassTestPhase>[] = ['gyro', 'magnetometer', 'quantum-link', 'calibrate', 'verify', 'complete']
+    const msgs: Record<NonNullable<CompassTestPhase>, string> = {
+      gyro: 'Testing gyro...',
+      magnetometer: 'Magnetometer...',
+      'quantum-link': 'Quantum link...',
+      calibrate: 'Calibrating...',
+      verify: 'Verifying...',
+      complete: 'Test complete',
+    }
+
+    for (const phase of phases) {
+      setTestPhase(phase)
+      setStatusMessage(msgs[phase])
+      if (phase === 'quantum-link') {
+        // Spin the needle during quantum link test
+        for (let i = 0; i < 8; i++) {
+          setDisplayDirection(prev => (prev + 45) % 360)
+          await new Promise(r => setTimeout(r, 100))
+        }
+      } else {
+        await new Promise(r => setTimeout(r, 350))
+      }
+    }
+
+    setTestResult('pass')
+    setTestPhase(null)
+    setDeviceState('online')
+    setDisplayDirection(anomalyDirection)
+    setStatusMessage('PASSED')
+    onTest?.()
+
+    setTimeout(() => {
+      setTestResult(null)
+      setStatusMessage('ANOMALY DETECTED')
+    }, 2500)
+  }
+
+  const handleReboot = async () => {
+    if (deviceState === 'booting' || deviceState === 'rebooting') return
+    setDeviceState('rebooting')
+    setTestResult(null)
+
+    setStatusMessage('Shutdown...')
+    setDisplayDirection(0)
+    setDisplayDistance(999)
+    await new Promise(r => setTimeout(r, 300))
+
+    setStatusMessage('Reset...')
+    setBootPhase(0)
+    await new Promise(r => setTimeout(r, 350))
+
+    // Boot
+    setDeviceState('booting')
+    setStatusMessage('Gyro init...')
+    setBootPhase(1)
+    await new Promise(r => setTimeout(r, 250))
+
+    setStatusMessage('Quantum link...')
+    setBootPhase(3)
+    setDisplayDirection(anomalyDirection)
+    await new Promise(r => setTimeout(r, 300))
+
+    setStatusMessage('Locking...')
+    setBootPhase(5)
+    setDisplayDistance(anomalyDistance)
+    await new Promise(r => setTimeout(r, 250))
+
+    setBootPhase(6)
+    setDeviceState('online')
+    setStatusMessage('ANOMALY DETECTED')
+    onReset?.()
+  }
+
+  const isActive = deviceState === 'online' || deviceState === 'testing'
+  const hasAnomaly = displayDistance < 100
 
   return (
-    <PanelFrame variant="default" className={cn('p-2', className)}>
+    <PanelFrame variant="default" className={cn('p-1.5', className)}>
+      {/* Header with logo */}
       <div className="flex items-center justify-between mb-1">
-        <div className="font-mono text-[9px] text-[var(--neon-purple, #9d00ff)]">
+        <div className="font-mono text-[8px] text-[var(--neon-amber)]">
           QUANTUM COMPASS
         </div>
-        <LED on={hasAnomaly} color="amber" size="sm" />
+        <div className="flex items-center gap-1">
+          {/* QNTM logo */}
+          <div
+            className="font-mono text-[3px] text-[#ffaa00] px-0.5 leading-none"
+            style={{
+              background: 'linear-gradient(180deg, #2a2a1a 0%, #1a1a0a 100%)',
+              border: '0.5px solid #3a3a2a',
+              borderRadius: '1px',
+            }}
+          >
+            QNTM
+          </div>
+        </div>
       </div>
 
       {/* Compass visualization */}
-      <div className="relative h-10 bg-black/40 rounded flex items-center justify-center">
+      <div className={cn(
+        'relative h-12 bg-black/40 rounded flex items-center justify-center',
+        deviceState === 'testing' && 'ring-1 ring-[var(--neon-amber)]/30'
+      )}>
         {/* Compass ring */}
-        <div className="relative w-8 h-8 rounded-full border border-[var(--neon-purple, #9d00ff)]/40">
+        <div className="relative w-10 h-10 rounded-full border border-[var(--neon-amber)]/40">
+          {/* Tick marks */}
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-px bg-[var(--neon-amber)]/30"
+              style={{
+                height: i % 3 === 0 ? '4px' : '2px',
+                left: '50%',
+                top: '0',
+                transformOrigin: '50% 20px',
+                transform: `translateX(-50%) rotate(${i * 30}deg)`,
+              }}
+            />
+          ))}
           {/* Cardinal points */}
           {['N', 'E', 'S', 'W'].map((dir, i) => (
             <div
               key={dir}
-              className="absolute font-mono text-[6px] text-white/40"
+              className="absolute font-mono text-[5px]"
               style={{
-                top: i === 0 ? '-2px' : i === 2 ? 'auto' : '50%',
-                bottom: i === 2 ? '-2px' : 'auto',
-                left: i === 3 ? '-4px' : i === 1 ? 'auto' : '50%',
-                right: i === 1 ? '-4px' : 'auto',
+                color: dir === 'N' ? 'var(--neon-red)' : 'var(--neon-amber)',
+                opacity: isActive ? 0.8 : 0.3,
+                top: i === 0 ? '1px' : i === 2 ? 'auto' : '50%',
+                bottom: i === 2 ? '1px' : 'auto',
+                left: i === 3 ? '1px' : i === 1 ? 'auto' : '50%',
+                right: i === 1 ? '1px' : 'auto',
                 transform: i % 2 === 0 ? 'translateX(-50%)' : 'translateY(-50%)',
               }}
             >
@@ -2567,32 +2751,101 @@ export function QuantumCompass({
             </div>
           ))}
           {/* Anomaly indicator needle */}
-          {hasAnomaly && (
+          {isActive && hasAnomaly && (
             <div
-              className="absolute w-0.5 h-3 bg-[var(--neon-amber)] origin-bottom"
+              className="absolute w-0.5 origin-bottom transition-transform duration-150"
               style={{
+                height: '14px',
                 left: '50%',
                 bottom: '50%',
-                transform: `translateX(-50%) rotate(${anomalyDirection}deg)`,
-                boxShadow: '0 0 4px var(--neon-amber)',
+                transform: `translateX(-50%) rotate(${displayDirection + needleWobble}deg)`,
+                background: 'linear-gradient(to top, var(--neon-amber) 0%, var(--neon-red) 100%)',
+                boxShadow: '0 0 6px var(--neon-amber)',
+                borderRadius: '1px',
               }}
             />
           )}
           {/* Center dot */}
           <div
-            className="absolute w-1.5 h-1.5 rounded-full bg-[var(--neon-purple, #9d00ff)] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-            style={{ boxShadow: '0 0 4px var(--neon-purple, #9d00ff)' }}
+            className="absolute w-2 h-2 rounded-full top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+            style={{
+              background: isActive
+                ? 'radial-gradient(circle, var(--neon-amber) 0%, #664400 100%)'
+                : '#333',
+              boxShadow: isActive ? '0 0 6px var(--neon-amber)' : 'none',
+            }}
           />
         </div>
 
         {/* Distance indicator */}
-        <div className="absolute right-1 font-mono text-[8px] text-[var(--neon-amber)]">
-          {anomalyDistance}m
+        <div className="absolute right-1.5 top-1 font-mono text-[8px] text-[var(--neon-amber)]">
+          {isActive ? `${displayDistance}m` : '--'}
         </div>
+
+        {/* Boot overlay */}
+        {(deviceState === 'booting' || deviceState === 'rebooting') && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded">
+            <span className="font-mono text-[6px] text-[var(--neon-amber)] animate-pulse">
+              {statusMessage}
+            </span>
+          </div>
+        )}
       </div>
 
-      <div className="font-mono text-[7px] text-white/40 text-center mt-1">
-        {hasAnomaly ? 'ANOMALY DETECTED' : 'SCANNING...'}
+      {/* Status bar with shiny buttons */}
+      <div className="flex items-center justify-between font-mono text-[6px] mt-1">
+        {/* Shiny test button - bottom left */}
+        <button
+          onClick={handleTest}
+          disabled={deviceState !== 'online'}
+          className="group relative disabled:opacity-30"
+          title="Test"
+        >
+          <div
+            className="w-3 h-3 rounded-full transition-all group-active:scale-95"
+            style={{
+              background: deviceState === 'testing'
+                ? 'radial-gradient(circle at 30% 30%, #ffffaa 0%, var(--neon-amber) 40%, #886600 80%, #443300 100%)'
+                : testResult === 'pass'
+                ? 'radial-gradient(circle at 30% 30%, #aaffaa 0%, var(--neon-green) 40%, #006600 80%, #003300 100%)'
+                : 'radial-gradient(circle at 30% 30%, #666666 0%, #444444 40%, #222222 80%, #111111 100%)',
+              boxShadow: deviceState === 'testing'
+                ? '0 0 8px var(--neon-amber), 0 0 16px var(--neon-amber), inset 0 -2px 4px rgba(0,0,0,0.5)'
+                : testResult === 'pass'
+                ? '0 0 8px var(--neon-green), inset 0 -2px 4px rgba(0,0,0,0.5)'
+                : 'inset 0 2px 4px rgba(255,255,255,0.1), inset 0 -2px 4px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.5)',
+              border: '1px solid #555',
+            }}
+          />
+        </button>
+
+        <span className={cn(
+          'text-[5px] flex-1 text-center',
+          isActive && hasAnomaly ? 'text-[var(--neon-amber)]' : 'text-white/40'
+        )}>
+          {statusMessage}
+        </span>
+
+        {/* Shiny reset button - bottom right */}
+        <button
+          onClick={handleReboot}
+          disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+          className="group relative disabled:opacity-30"
+          title="Reboot"
+        >
+          <div
+            className="w-3 h-3 rounded-full transition-all group-active:scale-95"
+            style={{
+              background: (deviceState === 'rebooting' || deviceState === 'booting')
+                ? 'radial-gradient(circle at 30% 30%, #ffaaaa 0%, var(--neon-red) 40%, #880000 80%, #440000 100%)'
+                : 'radial-gradient(circle at 30% 30%, #555555 0%, #333333 40%, #1a1a1a 80%, #0a0a0a 100%)',
+              boxShadow: (deviceState === 'rebooting' || deviceState === 'booting')
+                ? '0 0 8px var(--neon-red), 0 0 16px var(--neon-red), inset 0 -2px 4px rgba(0,0,0,0.5)'
+                : 'inset 0 2px 4px rgba(255,255,255,0.1), inset 0 -2px 4px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.5)',
+              border: '1px solid #444',
+            }}
+          />
+        </button>
       </div>
     </PanelFrame>
   )
@@ -4260,66 +4513,337 @@ export function ExplorerDrone({
 
 // ==================================================
 // ANOMALY DETECTOR - Tier 2 Gadget scanner
+// Device ID: AND-001 | Version: 2.3.0
+// Compatible: QSM-001, DIM-001, EMC-001, QAN-001
+// unOS Commands: DEVICE ANOMALY [TEST|RESET|STATUS]
 // ==================================================
+type AnomalyState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type AnomalyTestPhase = 'sensors' | 'calibrate' | 'sweep' | 'analyze' | 'verify' | 'complete' | null
+
 interface AnomalyDetectorProps {
   signalStrength?: number
   anomaliesFound?: number
-  isScanning?: boolean
   className?: string
+  onTest?: () => void
+  onReset?: () => void
 }
 
 export function AnomalyDetector({
   signalStrength = 67,
   anomaliesFound = 3,
-  isScanning = true,
   className,
+  onTest,
+  onReset,
 }: AnomalyDetectorProps) {
+  const [deviceState, setDeviceState] = useState<AnomalyState>('booting')
+  const [bootPhase, setBootPhase] = useState(0)
+  const [testPhase, setTestPhase] = useState<AnomalyTestPhase>(null)
+  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
+  const [statusMessage, setStatusMessage] = useState('Init...')
+  const [displaySignal, setDisplaySignal] = useState(0)
+  const [displayAnomalies, setDisplayAnomalies] = useState(0)
+  const [waveOffset, setWaveOffset] = useState(0)
+
+  // Animate waveform
+  useEffect(() => {
+    if (deviceState === 'offline') return
+    const interval = setInterval(() => {
+      setWaveOffset(prev => (prev + 1) % 100)
+      if (deviceState === 'online') {
+        // Slight signal fluctuation
+        setDisplaySignal(prev => {
+          const target = signalStrength
+          return prev + (target - prev) * 0.1 + (Math.random() - 0.5) * 5
+        })
+      }
+    }, 100)
+    return () => clearInterval(interval)
+  }, [deviceState, signalStrength])
+
+  // Boot sequence
+  useEffect(() => {
+    const bootSequence = async () => {
+      setDeviceState('booting')
+      setStatusMessage('Sensor init...')
+      setBootPhase(1)
+      await new Promise(r => setTimeout(r, 300))
+
+      setStatusMessage('Calibrating...')
+      setBootPhase(2)
+      setDisplaySignal(20)
+      await new Promise(r => setTimeout(r, 350))
+
+      setStatusMessage('Freq sweep...')
+      setBootPhase(3)
+      setDisplaySignal(40)
+      await new Promise(r => setTimeout(r, 400))
+
+      setStatusMessage('Scanning...')
+      setBootPhase(4)
+      setDisplaySignal(signalStrength)
+      setDisplayAnomalies(1)
+      await new Promise(r => setTimeout(r, 350))
+
+      setStatusMessage('Analysis...')
+      setBootPhase(5)
+      setDisplayAnomalies(anomaliesFound)
+      await new Promise(r => setTimeout(r, 300))
+
+      setBootPhase(6)
+      setDeviceState('online')
+      setStatusMessage('SCANNING')
+    }
+    bootSequence()
+  }, [])
+
+  useEffect(() => {
+    if (deviceState === 'online') {
+      setDisplayAnomalies(anomaliesFound)
+    }
+  }, [anomaliesFound, deviceState])
+
+  const handleTest = async () => {
+    if (deviceState !== 'online') return
+    setDeviceState('testing')
+    setTestResult(null)
+
+    const phases: NonNullable<AnomalyTestPhase>[] = ['sensors', 'calibrate', 'sweep', 'analyze', 'verify', 'complete']
+    const msgs: Record<NonNullable<AnomalyTestPhase>, string> = {
+      sensors: 'Testing sensors...',
+      calibrate: 'Calibration...',
+      sweep: 'Full sweep...',
+      analyze: 'Deep analysis...',
+      verify: 'Verifying...',
+      complete: 'Test complete',
+    }
+
+    for (const phase of phases) {
+      setTestPhase(phase)
+      setStatusMessage(msgs[phase])
+      if (phase === 'sweep') {
+        setDisplaySignal(95)
+        await new Promise(r => setTimeout(r, 500))
+      } else {
+        await new Promise(r => setTimeout(r, 350))
+      }
+    }
+
+    setTestResult('pass')
+    setTestPhase(null)
+    setDeviceState('online')
+    setDisplaySignal(signalStrength)
+    setStatusMessage('PASSED')
+    onTest?.()
+
+    setTimeout(() => {
+      setTestResult(null)
+      setStatusMessage('SCANNING')
+    }, 2500)
+  }
+
+  const handleReboot = async () => {
+    if (deviceState === 'booting' || deviceState === 'rebooting') return
+    setDeviceState('rebooting')
+    setTestResult(null)
+
+    setStatusMessage('Shutdown...')
+    setDisplaySignal(0)
+    setDisplayAnomalies(0)
+    await new Promise(r => setTimeout(r, 300))
+
+    setStatusMessage('Reset...')
+    setBootPhase(0)
+    await new Promise(r => setTimeout(r, 350))
+
+    // Boot
+    setDeviceState('booting')
+    setStatusMessage('Sensor init...')
+    setBootPhase(1)
+    await new Promise(r => setTimeout(r, 250))
+
+    setStatusMessage('Calibrating...')
+    setBootPhase(2)
+    setDisplaySignal(30)
+    await new Promise(r => setTimeout(r, 300))
+
+    setStatusMessage('Scanning...')
+    setBootPhase(4)
+    setDisplaySignal(signalStrength)
+    setDisplayAnomalies(anomaliesFound)
+    await new Promise(r => setTimeout(r, 300))
+
+    setBootPhase(6)
+    setDeviceState('online')
+    setStatusMessage('SCANNING')
+    onReset?.()
+  }
+
+  const isActive = deviceState === 'online' || deviceState === 'testing'
+
   return (
-    <PanelFrame variant="teal" className={cn('p-2', className)}>
+    <PanelFrame variant="teal" className={cn('p-1.5', className)}>
+      {/* Header with logo */}
       <div className="flex items-center justify-between mb-1">
-        <div className="font-mono text-[9px] text-[var(--neon-magenta, #e91e8c)]">
+        <div className="font-mono text-[8px] text-[var(--neon-magenta,#e91e8c)]">
           ANOMALY DETECTOR
         </div>
         <div className="flex items-center gap-1">
-          <div className="font-mono text-[7px] text-white/30">T2</div>
-          <LED on={isScanning} color="amber" size="sm" />
+          {/* HALO logo (Halo Plane reference) */}
+          <div
+            className="font-mono text-[3px] text-[#ff66cc] px-0.5 leading-none"
+            style={{
+              background: 'linear-gradient(180deg, #3a1a2a 0%, #2a0a1a 100%)',
+              border: '0.5px solid #4a2a3a',
+              borderRadius: '1px',
+            }}
+          >
+            HALO
+          </div>
+          <div className="font-mono text-[6px] text-white/30">T2</div>
         </div>
       </div>
 
       {/* Signal visualization */}
-      <div className="relative h-8 bg-black/40 rounded overflow-hidden">
+      <div className={cn(
+        'relative h-10 bg-black/40 rounded overflow-hidden',
+        deviceState === 'testing' && 'ring-1 ring-[var(--neon-magenta,#e91e8c)]/30'
+      )}>
         {/* Waveform */}
-        <div className="absolute inset-0 flex items-center">
-          {Array.from({ length: 20 }).map((_, i) => (
-            <div
-              key={i}
-              className="flex-1 mx-px"
-              style={{
-                height: `${20 + Math.sin(i * 0.5) * signalStrength * 0.5}%`,
-                background: 'var(--neon-magenta, #e91e8c)',
-                opacity: isScanning ? 0.6 : 0.2,
-                animation: isScanning ? `wave ${0.3 + i * 0.02}s ease-in-out infinite alternate` : 'none',
-              }}
-            />
-          ))}
+        <div className="absolute inset-0 flex items-center justify-center">
+          {Array.from({ length: 24 }).map((_, i) => {
+            const waveHeight = isActive
+              ? 15 + Math.sin((i + waveOffset) * 0.4) * (displaySignal * 0.4) + Math.random() * 5
+              : 5
+            return (
+              <div
+                key={i}
+                className="flex-1 mx-px rounded-sm transition-all duration-100"
+                style={{
+                  height: `${Math.max(5, Math.min(90, waveHeight))}%`,
+                  background: deviceState === 'testing'
+                    ? 'var(--neon-cyan)'
+                    : 'var(--neon-magenta,#e91e8c)',
+                  opacity: isActive ? 0.7 : 0.2,
+                }}
+              />
+            )
+          })}
         </div>
+
         {/* Anomaly markers */}
-        {Array.from({ length: anomaliesFound }).map((_, i) => (
+        {isActive && Array.from({ length: displayAnomalies }).map((_, i) => (
           <div
             key={i}
-            className="absolute top-1 w-1 h-1 rounded-full bg-[var(--neon-red)]"
+            className="absolute top-1 w-1.5 h-1.5 rounded-full"
             style={{
-              left: `${20 + i * 30}%`,
-              boxShadow: '0 0 4px var(--neon-red)',
+              left: `${15 + i * 28}%`,
+              background: 'var(--neon-red)',
+              boxShadow: '0 0 6px var(--neon-red), 0 0 12px var(--neon-red)',
               animation: 'pulse 1s ease-in-out infinite',
             }}
           />
         ))}
+
+        {/* Scan line */}
+        {isActive && (
+          <div
+            className="absolute top-0 bottom-0 w-px"
+            style={{
+              left: `${(waveOffset * 1.5) % 100}%`,
+              background: 'var(--neon-magenta,#e91e8c)',
+              boxShadow: '0 0 4px var(--neon-magenta,#e91e8c)',
+              opacity: 0.8,
+            }}
+          />
+        )}
+
+        {/* Boot overlay */}
+        {(deviceState === 'booting' || deviceState === 'rebooting') && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+            <span className="font-mono text-[6px] text-[var(--neon-magenta,#e91e8c)] animate-pulse">
+              {statusMessage}
+            </span>
+          </div>
+        )}
       </div>
 
-      <div className="flex justify-between font-mono text-[7px] mt-1">
-        <span className="text-[var(--neon-magenta, #e91e8c)]">SIG: {signalStrength}%</span>
-        <span className="text-[var(--neon-red)]">{anomaliesFound} DETECTED</span>
+      {/* Status bar */}
+      <div className="flex items-center justify-between font-mono text-[6px] mt-1">
+        <span className="text-[var(--neon-magenta,#e91e8c)]">
+          SIG: {isActive ? Math.round(displaySignal) : '--'}%
+        </span>
+
+        {/* LED buttons - bottom center */}
+        <div className="flex items-center gap-1">
+          {/* Worn round test LED with magenta glow */}
+          <button
+            onClick={handleTest}
+            disabled={deviceState !== 'online'}
+            className="group relative disabled:opacity-30"
+            title="Test"
+          >
+            <div
+              className="w-2.5 h-2.5 rounded-full p-[1px] transition-all group-active:scale-95"
+              style={{
+                background: 'linear-gradient(180deg, #3a2a3a 0%, #2a1a2a 30%, #1a0a1a 70%, #0a000a 100%)',
+                boxShadow: 'inset 0 -1px 2px rgba(255,100,200,0.1), inset 0 1px 1px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.6)',
+                border: '1px solid #4a3a4a',
+              }}
+            >
+              <div
+                className="w-full h-full rounded-full transition-all"
+                style={{
+                  background: deviceState === 'testing'
+                    ? 'radial-gradient(circle at 30% 30%, #ff88cc 0%, var(--neon-magenta,#e91e8c) 50%, #660033 100%)'
+                    : testResult === 'pass'
+                    ? 'radial-gradient(circle at 30% 30%, #88ff88 0%, var(--neon-green) 50%, #006600 100%)'
+                    : 'radial-gradient(circle at 30% 30%, #3a2a3a 0%, #2a1a2a 50%, #1a0a1a 100%)',
+                  boxShadow: deviceState === 'testing'
+                    ? '0 0 8px var(--neon-magenta,#e91e8c), 0 0 16px var(--neon-magenta,#e91e8c)'
+                    : testResult === 'pass'
+                    ? '0 0 8px var(--neon-green), 0 0 16px var(--neon-green)'
+                    : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                }}
+              />
+            </div>
+          </button>
+
+          {/* Worn round reset LED with red glow */}
+          <button
+            onClick={handleReboot}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+            className="group relative disabled:opacity-30"
+            title="Reboot"
+          >
+            <div
+              className="w-2.5 h-2.5 rounded-full p-[1px] transition-all group-active:scale-95"
+              style={{
+                background: 'linear-gradient(180deg, #3a2a2a 0%, #2a1a1a 30%, #1a0a0a 70%, #0a0000 100%)',
+                boxShadow: 'inset 0 -1px 2px rgba(255,100,100,0.1), inset 0 1px 1px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.6)',
+                border: '1px solid #4a3a3a',
+              }}
+            >
+              <div
+                className="w-full h-full rounded-full transition-all"
+                style={{
+                  background: (deviceState === 'rebooting' || deviceState === 'booting')
+                    ? 'radial-gradient(circle at 30% 30%, #ff8888 0%, var(--neon-red) 50%, #660000 100%)'
+                    : 'radial-gradient(circle at 30% 30%, #3a2a2a 0%, #2a1a1a 50%, #1a0a0a 100%)',
+                  boxShadow: (deviceState === 'rebooting' || deviceState === 'booting')
+                    ? '0 0 8px var(--neon-red), 0 0 16px var(--neon-red)'
+                    : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                }}
+              />
+            </div>
+          </button>
+        </div>
+
+        <span className={cn(
+          'transition-colors',
+          displayAnomalies > 0 ? 'text-[var(--neon-red)]' : 'text-white/40'
+        )}>
+          {isActive ? displayAnomalies : '-'} DETECTED
+        </span>
       </div>
     </PanelFrame>
   )
@@ -4327,64 +4851,321 @@ export function AnomalyDetector({
 
 // ==================================================
 // TELEPORT PAD - Tier 2 Gadget transport
+// Device ID: TLP-001 | Version: 2.2.0
+// Compatible: UEC-001, MFR-001, DIM-001, QSM-001
+// unOS Commands: DEVICE TELEPORT [TEST|RESET|STATUS]
 // ==================================================
+type TeleportState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type TeleportTestPhase = 'capacitor' | 'matrix' | 'quantum-lock' | 'coordinates' | 'stabilize' | 'complete' | null
+
 interface TeleportPadProps {
   chargeLevel?: number
   lastDestination?: string
-  isReady?: boolean
   className?: string
+  onTest?: () => void
+  onReset?: () => void
 }
 
 export function TeleportPad({
-  chargeLevel = 85,
-  lastDestination = 'LAB-α',
-  isReady = true,
+  chargeLevel = 65,
+  lastDestination = 'LAB-Ω',
   className,
+  onTest,
+  onReset,
 }: TeleportPadProps) {
+  const [deviceState, setDeviceState] = useState<TeleportState>('booting')
+  const [bootPhase, setBootPhase] = useState(0)
+  const [testPhase, setTestPhase] = useState<TeleportTestPhase>(null)
+  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
+  const [statusMessage, setStatusMessage] = useState('Init...')
+  const [displayCharge, setDisplayCharge] = useState(0)
+  const [ringPulse, setRingPulse] = useState(0)
+
+  // Animate portal rings
+  useEffect(() => {
+    if (deviceState === 'offline') return
+    const interval = setInterval(() => {
+      setRingPulse(prev => (prev + 1) % 100)
+    }, 50)
+    return () => clearInterval(interval)
+  }, [deviceState])
+
+  // Boot sequence
+  useEffect(() => {
+    const bootSequence = async () => {
+      setDeviceState('booting')
+      setStatusMessage('Capacitor charge...')
+      setBootPhase(1)
+      await new Promise(r => setTimeout(r, 350))
+
+      setStatusMessage('Matrix align...')
+      setBootPhase(2)
+      setDisplayCharge(20)
+      await new Promise(r => setTimeout(r, 400))
+
+      setStatusMessage('Quantum lock...')
+      setBootPhase(3)
+      setDisplayCharge(45)
+      await new Promise(r => setTimeout(r, 350))
+
+      setStatusMessage('Loading coords...')
+      setBootPhase(4)
+      setDisplayCharge(70)
+      await new Promise(r => setTimeout(r, 300))
+
+      setStatusMessage('Stabilizing...')
+      setBootPhase(5)
+      setDisplayCharge(chargeLevel)
+      await new Promise(r => setTimeout(r, 300))
+
+      setBootPhase(6)
+      setDeviceState('online')
+      setStatusMessage('READY')
+    }
+    bootSequence()
+  }, [])
+
+  useEffect(() => {
+    if (deviceState === 'online') {
+      setDisplayCharge(chargeLevel)
+    }
+  }, [chargeLevel, deviceState])
+
+  const handleTest = async () => {
+    if (deviceState !== 'online') return
+    setDeviceState('testing')
+    setTestResult(null)
+
+    const phases: NonNullable<TeleportTestPhase>[] = ['capacitor', 'matrix', 'quantum-lock', 'coordinates', 'stabilize', 'complete']
+    const msgs: Record<NonNullable<TeleportTestPhase>, string> = {
+      capacitor: 'Capacitor test...',
+      matrix: 'Matrix verify...',
+      'quantum-lock': 'Quantum lock...',
+      coordinates: 'Coord check...',
+      stabilize: 'Stabilizing...',
+      complete: 'Test complete',
+    }
+
+    for (const phase of phases) {
+      setTestPhase(phase)
+      setStatusMessage(msgs[phase])
+      if (phase === 'quantum-lock') {
+        setDisplayCharge(100)
+        await new Promise(r => setTimeout(r, 500))
+      } else {
+        await new Promise(r => setTimeout(r, 350))
+      }
+    }
+
+    setTestResult('pass')
+    setTestPhase(null)
+    setDeviceState('online')
+    setDisplayCharge(chargeLevel)
+    setStatusMessage('PASSED')
+    onTest?.()
+
+    setTimeout(() => {
+      setTestResult(null)
+      setStatusMessage('READY')
+    }, 2500)
+  }
+
+  const handleReboot = async () => {
+    if (deviceState === 'booting' || deviceState === 'rebooting') return
+    setDeviceState('rebooting')
+    setTestResult(null)
+
+    setStatusMessage('Discharge...')
+    setDisplayCharge(0)
+    await new Promise(r => setTimeout(r, 350))
+
+    setStatusMessage('Reset matrix...')
+    setBootPhase(0)
+    await new Promise(r => setTimeout(r, 400))
+
+    // Boot
+    setDeviceState('booting')
+    setStatusMessage('Capacitor charge...')
+    setBootPhase(1)
+    await new Promise(r => setTimeout(r, 300))
+
+    setStatusMessage('Quantum lock...')
+    setBootPhase(3)
+    setDisplayCharge(50)
+    await new Promise(r => setTimeout(r, 350))
+
+    setStatusMessage('Stabilizing...')
+    setBootPhase(5)
+    setDisplayCharge(chargeLevel)
+    await new Promise(r => setTimeout(r, 300))
+
+    setBootPhase(6)
+    setDeviceState('online')
+    setStatusMessage('READY')
+    onReset?.()
+  }
+
+  const isActive = deviceState === 'online' || deviceState === 'testing'
+  const portalIntensity = deviceState === 'testing' ? 1 : displayCharge / 100
+
   return (
-    <PanelFrame variant="default" className={cn('p-2', className)}>
+    <PanelFrame variant="default" className={cn('p-1.5', className)}>
+      {/* Header with logo */}
       <div className="flex items-center justify-between mb-1">
-        <div className="font-mono text-[9px] text-[var(--neon-blue)]">
+        <div className="font-mono text-[8px] text-[var(--neon-blue)]">
           TELEPORT PAD
         </div>
         <div className="flex items-center gap-1">
-          <div className="font-mono text-[7px] text-white/30">T2</div>
-          <LED on={isReady} color="cyan" size="sm" />
+          {/* WARP logo */}
+          <div
+            className="font-mono text-[3px] text-[#66aaff] px-0.5 leading-none"
+            style={{
+              background: 'linear-gradient(180deg, #1a2a4a 0%, #0a1a3a 100%)',
+              border: '0.5px solid #2a3a5a',
+              borderRadius: '1px',
+            }}
+          >
+            WARP
+          </div>
+          <div className="font-mono text-[6px] text-white/30">T2</div>
         </div>
       </div>
 
       {/* Pad visualization */}
-      <div className="relative h-10 bg-black/40 rounded overflow-hidden flex items-center justify-center">
+      <div className={cn(
+        'relative h-12 bg-black/40 rounded overflow-hidden flex items-center justify-center',
+        deviceState === 'testing' && 'ring-1 ring-[var(--neon-blue)]/30'
+      )}>
         {/* Portal rings */}
-        {[1, 2, 3].map((ring) => (
-          <div
-            key={ring}
-            className="absolute rounded-full border-2"
-            style={{
-              width: `${ring * 25}%`,
-              height: `${ring * 60}%`,
-              borderColor: isReady ? 'var(--neon-blue)' : '#333',
-              opacity: isReady ? 0.2 + ring * 0.15 : 0.1,
-              animation: isReady ? `pulse ${1 + ring * 0.3}s ease-in-out infinite` : 'none',
-            }}
-          />
-        ))}
+        {[1, 2, 3, 4].map((ring) => {
+          const pulseOffset = (ringPulse + ring * 25) % 100
+          const scale = isActive ? 1 + Math.sin(pulseOffset * 0.063) * 0.1 : 1
+          return (
+            <div
+              key={ring}
+              className="absolute rounded-full border transition-all"
+              style={{
+                width: `${ring * 20}%`,
+                height: `${ring * 50}%`,
+                borderWidth: ring === 1 ? '2px' : '1px',
+                borderColor: isActive ? 'var(--neon-blue)' : '#333',
+                opacity: isActive ? (0.15 + ring * 0.12) * portalIntensity : 0.1,
+                transform: `scale(${scale})`,
+                boxShadow: isActive && ring <= 2 ? `0 0 ${ring * 4}px var(--neon-blue)` : 'none',
+              }}
+            />
+          )
+        })}
+
         {/* Center portal */}
         <div
-          className="w-4 h-4 rounded-full"
+          className="w-5 h-5 rounded-full transition-all duration-300"
           style={{
-            background: isReady
-              ? 'radial-gradient(circle, var(--neon-blue) 0%, transparent 70%)'
+            background: isActive
+              ? `radial-gradient(circle, rgba(100,200,255,${portalIntensity}) 0%, var(--neon-blue) 30%, transparent 70%)`
               : '#222',
-            boxShadow: isReady ? '0 0 20px var(--neon-blue)' : 'none',
+            boxShadow: isActive
+              ? `0 0 ${15 * portalIntensity}px var(--neon-blue), 0 0 ${30 * portalIntensity}px var(--neon-blue)`
+              : 'none',
           }}
         />
+
+        {/* Destination indicator */}
+        <div className="absolute right-1.5 top-1 font-mono text-[6px] text-white/40">
+          → {lastDestination}
+        </div>
+
+        {/* Boot overlay */}
+        {(deviceState === 'booting' || deviceState === 'rebooting') && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded">
+            <span className="font-mono text-[6px] text-[var(--neon-blue)] animate-pulse">
+              {statusMessage}
+            </span>
+          </div>
+        )}
+
+        {/* Test effect - energy surge */}
+        {deviceState === 'testing' && (
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: 'radial-gradient(circle at center, var(--neon-blue) 0%, transparent 60%)',
+              animation: 'teleport-surge 0.5s ease-out infinite',
+              opacity: 0.3,
+            }}
+          />
+        )}
       </div>
 
-      <div className="flex justify-between font-mono text-[7px] mt-1">
-        <span className="text-[var(--neon-blue)]">{chargeLevel}%</span>
-        <span className="text-white/40">→ {lastDestination}</span>
+      {/* Status bar with square nano buttons */}
+      <div className="flex items-center justify-between font-mono text-[6px] mt-1">
+        {/* Square nano test button - bottom left */}
+        <button
+          onClick={handleTest}
+          disabled={deviceState !== 'online'}
+          className="group relative disabled:opacity-30"
+          title="Test"
+        >
+          <div
+            className="w-2.5 h-2.5 rounded-sm transition-all group-active:scale-95"
+            style={{
+              background: deviceState === 'testing'
+                ? 'linear-gradient(135deg, #88ccff 0%, var(--neon-blue) 50%, #004488 100%)'
+                : testResult === 'pass'
+                ? 'linear-gradient(135deg, #88ff88 0%, var(--neon-green) 50%, #004400 100%)'
+                : 'linear-gradient(135deg, #3a3a4a 0%, #2a2a3a 50%, #1a1a2a 100%)',
+              boxShadow: deviceState === 'testing'
+                ? '0 0 6px var(--neon-blue), 0 0 12px var(--neon-blue), inset 0 1px 0 rgba(255,255,255,0.3)'
+                : testResult === 'pass'
+                ? '0 0 6px var(--neon-green), inset 0 1px 0 rgba(255,255,255,0.3)'
+                : 'inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.4)',
+              border: '1px solid #4a4a5a',
+            }}
+          />
+        </button>
+
+        <div className="flex-1 flex items-center justify-center gap-2">
+          <span className="text-[var(--neon-blue)]">
+            {isActive ? `${displayCharge}%` : '--%'}
+          </span>
+          <span className={cn(
+            'text-[5px]',
+            deviceState === 'testing' ? 'text-[var(--neon-blue)]' :
+            testResult === 'pass' ? 'text-[var(--neon-green)]' :
+            'text-white/30'
+          )}>
+            {statusMessage}
+          </span>
+        </div>
+
+        {/* Square nano reset button - bottom right */}
+        <button
+          onClick={handleReboot}
+          disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+          className="group relative disabled:opacity-30"
+          title="Reboot"
+        >
+          <div
+            className="w-2.5 h-2.5 rounded-sm transition-all group-active:scale-95"
+            style={{
+              background: (deviceState === 'rebooting' || deviceState === 'booting')
+                ? 'linear-gradient(135deg, #ffaa88 0%, var(--neon-amber) 50%, #884400 100%)'
+                : 'linear-gradient(135deg, #3a3a3a 0%, #2a2a2a 50%, #1a1a1a 100%)',
+              boxShadow: (deviceState === 'rebooting' || deviceState === 'booting')
+                ? '0 0 6px var(--neon-amber), 0 0 12px var(--neon-amber), inset 0 1px 0 rgba(255,255,255,0.3)'
+                : 'inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.4)',
+              border: '1px solid #4a4a4a',
+            }}
+          />
+        </button>
       </div>
+
+      <style jsx global>{`
+        @keyframes teleport-surge {
+          0% { transform: scale(0.5); opacity: 0.5; }
+          100% { transform: scale(1.5); opacity: 0; }
+        }
+      `}</style>
     </PanelFrame>
   )
 }
@@ -4392,64 +5173,291 @@ export function TeleportPad({
 // ==================================================
 // PRECISION LASER CUTTER - Tier 2 Tools fabrication
 // ==================================================
+type LaserState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type LaserTestPhase = 'alignment' | 'power' | 'calibration' | 'focus' | 'complete' | null
+
 interface LaserCutterProps {
   power?: number
   precision?: number
-  isActive?: boolean
   className?: string
+  onTest?: () => void
+  onReset?: () => void
 }
 
 export function LaserCutter({
   power = 450,
   precision = 0.01,
-  isActive = true,
   className,
+  onTest,
+  onReset,
 }: LaserCutterProps) {
-  return (
-    <PanelFrame variant="default" className={cn('p-2', className)}>
-      <div className="flex items-center justify-between mb-1">
-        <div className="font-mono text-[9px] text-[var(--neon-red)]">
-          PRECISION LASER
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="font-mono text-[7px] text-white/30">T2</div>
-          <LED on={isActive} color="red" size="sm" />
-        </div>
-      </div>
+  const [deviceState, setDeviceState] = useState<LaserState>('booting')
+  const [testPhase, setTestPhase] = useState<LaserTestPhase>(null)
+  const [bootStatus, setBootStatus] = useState('INITIALIZING...')
+  const [laserPosition, setLaserPosition] = useState(50)
+  const [currentPower, setCurrentPower] = useState(0)
 
-      {/* Laser beam visualization */}
-      <div className="relative h-8 bg-black/40 rounded overflow-hidden">
-        {/* Target grid */}
-        <div className="absolute inset-0 grid grid-cols-4 grid-rows-2 gap-px opacity-20">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="border border-white/20" />
-          ))}
-        </div>
-        {/* Laser beam */}
-        {isActive && (
+  // Boot sequence
+  useEffect(() => {
+    const bootSequence = async () => {
+      setBootStatus('INITIALIZING...')
+      await new Promise(r => setTimeout(r, 300))
+      setBootStatus('LOADING FIRMWARE...')
+      await new Promise(r => setTimeout(r, 400))
+      setBootStatus('OPTICS CHECK...')
+      await new Promise(r => setTimeout(r, 350))
+      setBootStatus('LASER INIT...')
+      setCurrentPower(100)
+      await new Promise(r => setTimeout(r, 300))
+      setCurrentPower(250)
+      await new Promise(r => setTimeout(r, 200))
+      setCurrentPower(power)
+      setBootStatus('CALIBRATING...')
+      await new Promise(r => setTimeout(r, 400))
+      setBootStatus('READY')
+      setDeviceState('online')
+    }
+    if (deviceState === 'booting') {
+      bootSequence()
+    }
+  }, [deviceState, power])
+
+  // Laser animation when online
+  useEffect(() => {
+    if (deviceState !== 'online' && deviceState !== 'testing') return
+    const interval = setInterval(() => {
+      setLaserPosition(prev => {
+        const delta = (Math.random() - 0.5) * 8
+        return Math.min(90, Math.max(10, prev + delta))
+      })
+    }, 100)
+    return () => clearInterval(interval)
+  }, [deviceState])
+
+  // Test sequence
+  const handleTest = () => {
+    if (deviceState !== 'online') return
+    setDeviceState('testing')
+    onTest?.()
+
+    const runTest = async () => {
+      setTestPhase('alignment')
+      for (let i = 0; i < 5; i++) {
+        setLaserPosition(20 + i * 15)
+        await new Promise(r => setTimeout(r, 200))
+      }
+      setTestPhase('power')
+      setCurrentPower(100)
+      await new Promise(r => setTimeout(r, 300))
+      setCurrentPower(250)
+      await new Promise(r => setTimeout(r, 300))
+      setCurrentPower(450)
+      await new Promise(r => setTimeout(r, 300))
+      setCurrentPower(power)
+      setTestPhase('calibration')
+      await new Promise(r => setTimeout(r, 500))
+      setTestPhase('focus')
+      setLaserPosition(50)
+      await new Promise(r => setTimeout(r, 400))
+      setTestPhase('complete')
+      await new Promise(r => setTimeout(r, 300))
+      setTestPhase(null)
+      setDeviceState('online')
+    }
+    runTest()
+  }
+
+  // Reboot sequence
+  const handleReboot = () => {
+    onReset?.()
+    setDeviceState('rebooting')
+    setTestPhase(null)
+    setCurrentPower(0)
+
+    setTimeout(() => {
+      setBootStatus('SHUTDOWN...')
+    }, 100)
+    setTimeout(() => {
+      setBootStatus('POWER OFF')
+    }, 400)
+    setTimeout(() => {
+      setDeviceState('booting')
+    }, 800)
+  }
+
+  const isActive = deviceState === 'online' || deviceState === 'testing'
+  const isTesting = deviceState === 'testing'
+
+  // Company logo position (random on mount)
+  const [logoPosition] = useState(() => {
+    const positions = ['top-right', 'bottom-right', 'top-left'] as const
+    return positions[Math.floor(Math.random() * positions.length)]
+  })
+
+  const logoPositionClass = {
+    'top-right': 'top-0.5 right-0.5',
+    'bottom-right': 'bottom-0.5 right-0.5',
+    'top-left': 'top-0.5 left-8',
+  }[logoPosition]
+
+  return (
+    <PanelFrame variant="default" className={cn('p-2 flex', className)}>
+      {/* Left side - Square nano buttons */}
+      <div className="flex flex-col gap-1.5 mr-2 justify-center shrink-0">
+        {/* Test button - lightly illuminated nano */}
+        <button
+          onClick={handleTest}
+          disabled={deviceState !== 'online'}
+          className={cn(
+            'w-3 h-3 rounded-[2px] border transition-all duration-200',
+            'flex items-center justify-center',
+            deviceState === 'online'
+              ? 'border-[var(--neon-red)]/50 bg-[var(--neon-red)]/10 hover:bg-[var(--neon-red)]/30 cursor-pointer'
+              : 'border-white/10 bg-black/30 cursor-not-allowed opacity-50'
+          )}
+          style={{
+            boxShadow: deviceState === 'online'
+              ? '0 0 4px rgba(255,100,100,0.3), inset 0 0 2px rgba(255,100,100,0.2)'
+              : 'none',
+          }}
+          title="TEST"
+        >
           <div
-            className="absolute top-0 w-0.5 bg-[var(--neon-red)]"
+            className="w-1 h-1 rounded-[1px]"
             style={{
-              left: '50%',
-              height: '100%',
-              boxShadow: '0 0 8px var(--neon-red), 0 0 16px var(--neon-red)',
-              animation: 'laser-pulse 0.1s ease-in-out infinite',
+              background: isTesting ? 'var(--neon-red)' : (deviceState === 'online' ? 'rgba(255,100,100,0.5)' : '#333'),
+              boxShadow: isTesting ? '0 0 4px var(--neon-red)' : 'none',
             }}
           />
-        )}
-        {/* Focus point */}
-        <div
-          className="absolute bottom-2 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full"
+        </button>
+
+        {/* Reset button - lightly illuminated nano */}
+        <button
+          onClick={handleReboot}
+          disabled={deviceState === 'booting' || deviceState === 'rebooting'}
+          className={cn(
+            'w-3 h-3 rounded-[2px] border transition-all duration-200',
+            'flex items-center justify-center',
+            deviceState !== 'booting' && deviceState !== 'rebooting'
+              ? 'border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/30 cursor-pointer'
+              : 'border-white/10 bg-black/30 cursor-not-allowed opacity-50'
+          )}
           style={{
-            background: isActive ? 'var(--neon-red)' : '#333',
-            boxShadow: isActive ? '0 0 10px var(--neon-red)' : 'none',
+            boxShadow: deviceState !== 'booting' && deviceState !== 'rebooting'
+              ? '0 0 4px rgba(255,180,100,0.3), inset 0 0 2px rgba(255,180,100,0.2)'
+              : 'none',
           }}
-        />
+          title="RESET"
+        >
+          <div
+            className="w-1 h-1 rounded-[1px]"
+            style={{
+              background: deviceState === 'rebooting' ? 'var(--neon-amber)' : (deviceState !== 'booting' ? 'rgba(255,180,100,0.5)' : '#333'),
+              boxShadow: deviceState === 'rebooting' ? '0 0 4px var(--neon-amber)' : 'none',
+            }}
+          />
+        </button>
       </div>
 
-      <div className="flex justify-between font-mono text-[7px] mt-1">
-        <span className="text-[var(--neon-red)]">{power}W</span>
-        <span className="text-white/40">±{precision}mm</span>
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex items-center justify-between mb-1">
+          <div className="font-mono text-[9px] text-[var(--neon-red)]">
+            PRECISION LASER
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="font-mono text-[7px] text-white/30">T2</div>
+            <LED
+              on={isActive}
+              color="red"
+              size="sm"
+              className={isTesting ? 'animate-pulse' : ''}
+            />
+          </div>
+        </div>
+
+        {/* Laser beam visualization */}
+        <div className="relative flex-1 min-h-[2rem] bg-black/40 rounded overflow-hidden">
+          {/* Company logo */}
+          <div
+            className={cn(
+              'absolute font-mono text-[5px] font-bold z-10',
+              logoPositionClass
+            )}
+            style={{
+              color: 'rgba(255,100,100,0.4)',
+              textShadow: '0 0 2px rgba(255,100,100,0.3)',
+            }}
+          >
+            OPTX
+          </div>
+
+          {/* Target grid */}
+          <div className="absolute inset-0 grid grid-cols-4 grid-rows-2 gap-px opacity-20">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="border border-white/20" />
+            ))}
+          </div>
+
+          {/* Status display when booting/rebooting */}
+          {(deviceState === 'booting' || deviceState === 'rebooting') && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span
+                className="font-mono text-[7px] animate-pulse"
+                style={{ color: 'var(--neon-red)' }}
+              >
+                {bootStatus}
+              </span>
+            </div>
+          )}
+
+          {/* Test phase indicator */}
+          {testPhase && testPhase !== 'complete' && (
+            <div className="absolute top-0.5 left-0.5 font-mono text-[6px] text-[var(--neon-red)] bg-black/60 px-0.5 rounded">
+              {testPhase.toUpperCase()}
+            </div>
+          )}
+
+          {/* Laser beam */}
+          {isActive && (
+            <div
+              className="absolute top-0 w-0.5 bg-[var(--neon-red)]"
+              style={{
+                left: `${laserPosition}%`,
+                height: '100%',
+                boxShadow: '0 0 8px var(--neon-red), 0 0 16px var(--neon-red)',
+                opacity: isTesting ? 1 : 0.9,
+                transition: isTesting ? 'left 0.2s ease-out' : 'left 0.1s ease-out',
+              }}
+            />
+          )}
+
+          {/* Focus point */}
+          <div
+            className="absolute bottom-1.5 -translate-x-1/2 w-2 h-2 rounded-full transition-all duration-200"
+            style={{
+              left: `${laserPosition}%`,
+              background: isActive ? 'var(--neon-red)' : '#333',
+              boxShadow: isActive ? '0 0 10px var(--neon-red), 0 0 20px var(--neon-red)' : 'none',
+            }}
+          />
+
+          {/* Scan line effect during testing */}
+          {isTesting && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: 'linear-gradient(to bottom, transparent 0%, rgba(255,100,100,0.1) 50%, transparent 100%)',
+                animation: 'scan-line 1s linear infinite',
+              }}
+            />
+          )}
+        </div>
+
+        <div className="flex justify-between font-mono text-[7px] mt-1">
+          <span className="text-[var(--neon-red)]">{currentPower}W</span>
+          <span className="text-white/40">±{precision}mm</span>
+        </div>
       </div>
     </PanelFrame>
   )
@@ -4458,63 +5466,345 @@ export function LaserCutter({
 // ==================================================
 // 3D PRINTER - Tier 2 Tools fabrication
 // ==================================================
+type PrinterState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type PrinterTestPhase = 'bed' | 'nozzle' | 'extrusion' | 'layer' | 'complete' | null
+
 interface Printer3DProps {
   progress?: number
   layerCount?: number
-  isPrinting?: boolean
   className?: string
+  onTest?: () => void
+  onReset?: () => void
 }
 
 export function Printer3D({
   progress = 67,
   layerCount = 234,
-  isPrinting = true,
   className,
+  onTest,
+  onReset,
 }: Printer3DProps) {
+  const [deviceState, setDeviceState] = useState<PrinterState>('booting')
+  const [testPhase, setTestPhase] = useState<PrinterTestPhase>(null)
+  const [bootStatus, setBootStatus] = useState('INITIALIZING...')
+  const [currentProgress, setCurrentProgress] = useState(0)
+  const [currentLayer, setCurrentLayer] = useState(0)
+  const [headPosition, setHeadPosition] = useState(50)
+  const [bedTemp, setBedTemp] = useState(0)
+
+  // Boot sequence
+  useEffect(() => {
+    const bootSequence = async () => {
+      setBootStatus('INITIALIZING...')
+      await new Promise(r => setTimeout(r, 300))
+      setBootStatus('FIRMWARE v3.2.1')
+      await new Promise(r => setTimeout(r, 350))
+      setBootStatus('HEATING BED...')
+      setBedTemp(25)
+      await new Promise(r => setTimeout(r, 200))
+      setBedTemp(45)
+      await new Promise(r => setTimeout(r, 200))
+      setBedTemp(60)
+      await new Promise(r => setTimeout(r, 150))
+      setBootStatus('HOMING AXES...')
+      setHeadPosition(0)
+      await new Promise(r => setTimeout(r, 200))
+      setHeadPosition(100)
+      await new Promise(r => setTimeout(r, 200))
+      setHeadPosition(50)
+      setBootStatus('CALIBRATING...')
+      await new Promise(r => setTimeout(r, 400))
+      setBootStatus('READY')
+      setCurrentProgress(progress)
+      setCurrentLayer(layerCount)
+      setDeviceState('online')
+    }
+    if (deviceState === 'booting') {
+      bootSequence()
+    }
+  }, [deviceState, progress, layerCount])
+
+  // Print head animation when online
+  useEffect(() => {
+    if (deviceState !== 'online') return
+    const interval = setInterval(() => {
+      setHeadPosition(prev => {
+        const delta = (Math.random() - 0.5) * 6
+        return Math.min(95, Math.max(5, prev + delta))
+      })
+    }, 150)
+    return () => clearInterval(interval)
+  }, [deviceState])
+
+  // Test sequence
+  const handleTest = () => {
+    if (deviceState !== 'online') return
+    setDeviceState('testing')
+    onTest?.()
+
+    const runTest = async () => {
+      setTestPhase('bed')
+      setBedTemp(40)
+      await new Promise(r => setTimeout(r, 300))
+      setBedTemp(55)
+      await new Promise(r => setTimeout(r, 300))
+      setBedTemp(60)
+      setTestPhase('nozzle')
+      setHeadPosition(10)
+      await new Promise(r => setTimeout(r, 250))
+      setHeadPosition(90)
+      await new Promise(r => setTimeout(r, 250))
+      setHeadPosition(50)
+      setTestPhase('extrusion')
+      await new Promise(r => setTimeout(r, 400))
+      setTestPhase('layer')
+      for (let i = 0; i <= 100; i += 20) {
+        setCurrentProgress(i)
+        await new Promise(r => setTimeout(r, 150))
+      }
+      setCurrentProgress(progress)
+      setTestPhase('complete')
+      await new Promise(r => setTimeout(r, 300))
+      setTestPhase(null)
+      setDeviceState('online')
+    }
+    runTest()
+  }
+
+  // Reboot sequence
+  const handleReboot = () => {
+    onReset?.()
+    setDeviceState('rebooting')
+    setTestPhase(null)
+    setCurrentProgress(0)
+    setCurrentLayer(0)
+    setBedTemp(0)
+
+    setTimeout(() => {
+      setBootStatus('COOLING...')
+    }, 100)
+    setTimeout(() => {
+      setBootStatus('SHUTDOWN')
+    }, 400)
+    setTimeout(() => {
+      setDeviceState('booting')
+    }, 800)
+  }
+
+  const isActive = deviceState === 'online' || deviceState === 'testing'
+  const isTesting = deviceState === 'testing'
+
+  // Company logo position (random on mount)
+  const [logoPosition] = useState(() => {
+    const positions = ['top-left', 'top-right', 'bottom-left'] as const
+    return positions[Math.floor(Math.random() * positions.length)]
+  })
+
+  const logoPositionClass = {
+    'top-left': 'top-0.5 left-0.5',
+    'top-right': 'top-0.5 right-0.5',
+    'bottom-left': 'bottom-0.5 left-0.5',
+  }[logoPosition]
+
   return (
-    <PanelFrame variant="military" className={cn('p-2', className)}>
-      <div className="flex items-center justify-between mb-1">
-        <div className="font-mono text-[9px] text-[var(--neon-amber)]">
-          3D FABRICATOR
-        </div>
-        <div className="flex items-center gap-1">
-          <div className="font-mono text-[7px] text-white/30">T2</div>
-          <LED on={isPrinting} color="amber" size="sm" />
-        </div>
-      </div>
-
-      {/* Print bed visualization */}
-      <div className="relative h-10 bg-black/40 rounded overflow-hidden">
-        {/* Build layers */}
-        <div
-          className="absolute bottom-0 left-2 right-2 bg-[var(--neon-amber)]/30 transition-all duration-300"
-          style={{ height: `${progress}%` }}
-        >
-          {/* Layer lines */}
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div
-              key={i}
-              className="absolute left-0 right-0 h-px bg-[var(--neon-amber)]/50"
-              style={{ bottom: `${i * 20}%` }}
+    <PanelFrame variant="military" className={cn('p-2 flex', className)}>
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex items-center justify-between mb-1">
+          <div className="font-mono text-[9px] text-[var(--neon-amber)]">
+            3D FABRICATOR
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="font-mono text-[7px] text-white/30">T2</div>
+            <LED
+              on={isActive}
+              color="amber"
+              size="sm"
+              className={isTesting ? 'animate-pulse' : ''}
             />
-          ))}
+          </div>
         </div>
-        {/* Print head */}
-        {isPrinting && (
+
+        {/* Print bed visualization */}
+        <div className="relative flex-1 min-h-[2.5rem] bg-black/40 rounded overflow-hidden">
+          {/* Company logo */}
           <div
-            className="absolute w-full h-0.5 bg-[var(--neon-amber)]"
+            className={cn(
+              'absolute font-mono text-[5px] font-bold z-10',
+              logoPositionClass
+            )}
             style={{
-              bottom: `${progress}%`,
-              boxShadow: '0 0 4px var(--neon-amber)',
-              animation: 'print-head 0.5s ease-in-out infinite',
+              color: 'rgba(255,180,100,0.4)',
+              textShadow: '0 0 2px rgba(255,180,100,0.3)',
             }}
-          />
-        )}
+          >
+            PRSA
+          </div>
+
+          {/* Status display when booting/rebooting */}
+          {(deviceState === 'booting' || deviceState === 'rebooting') && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span
+                className="font-mono text-[7px] animate-pulse"
+                style={{ color: 'var(--neon-amber)' }}
+              >
+                {bootStatus}
+              </span>
+            </div>
+          )}
+
+          {/* Test phase indicator */}
+          {testPhase && testPhase !== 'complete' && (
+            <div className="absolute top-0.5 left-0.5 font-mono text-[6px] text-[var(--neon-amber)] bg-black/60 px-0.5 rounded z-20">
+              {testPhase.toUpperCase()}
+            </div>
+          )}
+
+          {/* Build layers */}
+          {isActive && (
+            <div
+              className="absolute bottom-0 left-2 right-2 bg-[var(--neon-amber)]/30 transition-all duration-300"
+              style={{ height: `${currentProgress}%` }}
+            >
+              {/* Layer lines */}
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute left-0 right-0 h-px bg-[var(--neon-amber)]/50"
+                  style={{ bottom: `${i * 20}%` }}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Print head */}
+          {isActive && (
+            <div
+              className="absolute h-0.5 bg-[var(--neon-amber)] transition-all"
+              style={{
+                bottom: `${currentProgress}%`,
+                left: `${headPosition - 10}%`,
+                width: '20%',
+                boxShadow: '0 0 4px var(--neon-amber)',
+                transitionDuration: isTesting ? '200ms' : '150ms',
+              }}
+            />
+          )}
+
+          {/* Bed temperature indicator */}
+          {isActive && (
+            <div
+              className="absolute bottom-0.5 right-0.5 font-mono text-[5px]"
+              style={{ color: 'rgba(255,180,100,0.6)' }}
+            >
+              {bedTemp}°C
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-between font-mono text-[7px] mt-1">
+          <span className="text-[var(--neon-amber)]">{currentProgress}%</span>
+          <span className="text-white/40">L:{currentLayer}</span>
+        </div>
       </div>
 
-      <div className="flex justify-between font-mono text-[7px] mt-1">
-        <span className="text-[var(--neon-amber)]">{progress}%</span>
-        <span className="text-white/40">L:{layerCount}</span>
+      {/* Right side - Square metal knurled buttons at bottom edge */}
+      <div className="flex flex-col justify-end ml-1.5 shrink-0 pb-0">
+        <div className="flex flex-col gap-1">
+          {/* Test button - metal knurled */}
+          <button
+            onClick={handleTest}
+            disabled={deviceState !== 'online'}
+            className={cn(
+              'w-3.5 h-3.5 rounded-[2px] border transition-all duration-200',
+              'flex items-center justify-center relative overflow-hidden',
+              deviceState === 'online'
+                ? 'border-white/30 cursor-pointer hover:border-[var(--neon-amber)]/60'
+                : 'border-white/10 cursor-not-allowed opacity-50'
+            )}
+            style={{
+              background: deviceState === 'online'
+                ? 'linear-gradient(135deg, #4a4a5a 0%, #2a2a3a 50%, #3a3a4a 100%)'
+                : 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)',
+              boxShadow: isTesting
+                ? '0 0 4px var(--neon-amber), inset 0 1px 0 rgba(255,255,255,0.1)'
+                : 'inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.3)',
+            }}
+            title="TEST"
+          >
+            {/* Knurl pattern - diagonal lines */}
+            <div
+              className="absolute inset-0 pointer-events-none opacity-40"
+              style={{
+                backgroundImage: `repeating-linear-gradient(
+                  45deg,
+                  transparent 0px,
+                  transparent 1px,
+                  rgba(255,255,255,0.1) 1px,
+                  rgba(255,255,255,0.1) 2px
+                )`,
+              }}
+            />
+            <div
+              className="w-1.5 h-1.5 rounded-[1px] relative z-10"
+              style={{
+                background: isTesting
+                  ? 'var(--neon-amber)'
+                  : 'linear-gradient(135deg, #5a5a6a 0%, #3a3a4a 100%)',
+                boxShadow: isTesting
+                  ? '0 0 4px var(--neon-amber)'
+                  : 'inset 0 1px 0 rgba(255,255,255,0.2)',
+              }}
+            />
+          </button>
+
+          {/* Reset button - metal knurled */}
+          <button
+            onClick={handleReboot}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting'}
+            className={cn(
+              'w-3.5 h-3.5 rounded-[2px] border transition-all duration-200',
+              'flex items-center justify-center relative overflow-hidden',
+              deviceState !== 'booting' && deviceState !== 'rebooting'
+                ? 'border-white/30 cursor-pointer hover:border-red-500/60'
+                : 'border-white/10 cursor-not-allowed opacity-50'
+            )}
+            style={{
+              background: deviceState !== 'booting' && deviceState !== 'rebooting'
+                ? 'linear-gradient(135deg, #4a4a5a 0%, #2a2a3a 50%, #3a3a4a 100%)'
+                : 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)',
+              boxShadow: deviceState === 'rebooting'
+                ? '0 0 4px var(--neon-red), inset 0 1px 0 rgba(255,255,255,0.1)'
+                : 'inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.3)',
+            }}
+            title="RESET"
+          >
+            {/* Knurl pattern - diagonal lines */}
+            <div
+              className="absolute inset-0 pointer-events-none opacity-40"
+              style={{
+                backgroundImage: `repeating-linear-gradient(
+                  -45deg,
+                  transparent 0px,
+                  transparent 1px,
+                  rgba(255,255,255,0.1) 1px,
+                  rgba(255,255,255,0.1) 2px
+                )`,
+              }}
+            />
+            <div
+              className="w-1.5 h-1.5 rounded-[1px] relative z-10"
+              style={{
+                background: deviceState === 'rebooting'
+                  ? 'var(--neon-red)'
+                  : 'linear-gradient(135deg, #5a5a6a 0%, #3a3a4a 100%)',
+                boxShadow: deviceState === 'rebooting'
+                  ? '0 0 4px var(--neon-red)'
+                  : 'inset 0 1px 0 rgba(255,255,255,0.2)',
+              }}
+            />
+          </button>
+        </div>
       </div>
     </PanelFrame>
   )
@@ -7524,6 +8814,517 @@ export function LabClock({
         @keyframes clock-scan {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
+        }
+      `}</style>
+    </PanelFrame>
+  )
+}
+
+// ==================================================
+// MEMORY MONITOR - Multi-mode RAM/memory display
+// Device ID: MEM-001 | Version: 3.1.0
+// Compatible: CPU-001, SCA-001, DGN-001
+// unOS Commands: DEVICE MEM [TEST|RESET|STATUS|MODE]
+// ==================================================
+type MemState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type MemTestPhase = 'modules' | 'timing' | 'integrity' | 'bandwidth' | 'stress' | 'complete' | null
+type MemMode = 'usage' | 'heap' | 'cache' | 'swap' | 'processes' | 'allocation'
+
+interface MemoryMonitorProps {
+  totalMemory?: number // in GB
+  usedMemory?: number // in GB
+  className?: string
+  onTest?: () => void
+  onReset?: () => void
+}
+
+export function MemoryMonitor({
+  totalMemory = 16,
+  usedMemory = 11.5,
+  className,
+  onTest,
+  onReset,
+}: MemoryMonitorProps) {
+  const [deviceState, setDeviceState] = useState<MemState>('booting')
+  const [bootPhase, setBootPhase] = useState(0)
+  const [testPhase, setTestPhase] = useState<MemTestPhase>(null)
+  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
+  const [statusMessage, setStatusMessage] = useState('Init...')
+  const [displayMode, setDisplayMode] = useState<MemMode>('usage')
+  const [displayUsed, setDisplayUsed] = useState(0)
+  const [fluctuation, setFluctuation] = useState(0)
+
+  // Simulated memory data for different modes
+  const [memData, setMemData] = useState({
+    heap: { used: 2.8, total: 4.0 },
+    cache: { used: 3.2, total: 4.0 },
+    swap: { used: 0.5, total: 8.0 },
+    processes: [
+      { name: 'quantum-sim', mem: 2.4 },
+      { name: 'crystal-idx', mem: 1.8 },
+      { name: 'nft-sync', mem: 1.2 },
+      { name: 'ui-render', mem: 0.9 },
+      { name: 'network-io', mem: 0.6 },
+    ],
+    allocation: { kernel: 1.2, user: 8.5, buffers: 1.8 },
+  })
+
+  // Memory fluctuation animation
+  useEffect(() => {
+    if (deviceState === 'offline') return
+    const interval = setInterval(() => {
+      const variance = deviceState === 'testing' ? 0.5 : 0.2
+      setFluctuation((Math.random() - 0.5) * variance)
+      // Fluctuate process memory slightly
+      if (deviceState === 'online') {
+        setMemData(prev => ({
+          ...prev,
+          processes: prev.processes.map(p => ({
+            ...p,
+            mem: Math.max(0.1, p.mem + (Math.random() - 0.5) * 0.1)
+          }))
+        }))
+      }
+    }, 500)
+    return () => clearInterval(interval)
+  }, [deviceState])
+
+  // Boot sequence
+  useEffect(() => {
+    const bootSequence = async () => {
+      setDeviceState('booting')
+      setStatusMessage('Detecting DIMMs...')
+      setBootPhase(1)
+      await new Promise(r => setTimeout(r, 300))
+
+      setStatusMessage('SPD read...')
+      setBootPhase(2)
+      setDisplayUsed(totalMemory * 0.3)
+      await new Promise(r => setTimeout(r, 350))
+
+      setStatusMessage('Timing config...')
+      setBootPhase(3)
+      setDisplayUsed(totalMemory * 0.5)
+      await new Promise(r => setTimeout(r, 300))
+
+      setStatusMessage('Memory test...')
+      setBootPhase(4)
+      setDisplayUsed(totalMemory * 0.7)
+      await new Promise(r => setTimeout(r, 400))
+
+      setStatusMessage('Mapping...')
+      setBootPhase(5)
+      setDisplayUsed(usedMemory)
+      await new Promise(r => setTimeout(r, 250))
+
+      setBootPhase(6)
+      setDeviceState('online')
+      setStatusMessage('READY')
+    }
+    bootSequence()
+  }, [])
+
+  useEffect(() => {
+    if (deviceState === 'online') {
+      setDisplayUsed(usedMemory)
+    }
+  }, [usedMemory, deviceState])
+
+  const handleTest = async () => {
+    if (deviceState !== 'online') return
+    setDeviceState('testing')
+    setTestResult(null)
+
+    const phases: NonNullable<MemTestPhase>[] = ['modules', 'timing', 'integrity', 'bandwidth', 'stress', 'complete']
+    const msgs: Record<NonNullable<MemTestPhase>, string> = {
+      modules: 'Testing modules...',
+      timing: 'Timing check...',
+      integrity: 'Data integrity...',
+      bandwidth: 'Bandwidth test...',
+      stress: 'Stress test...',
+      complete: 'Test complete',
+    }
+
+    for (const phase of phases) {
+      setTestPhase(phase)
+      setStatusMessage(msgs[phase])
+      if (phase === 'stress') {
+        setDisplayUsed(totalMemory * 0.95)
+        await new Promise(r => setTimeout(r, 600))
+      } else {
+        await new Promise(r => setTimeout(r, 350))
+      }
+    }
+
+    setTestResult('pass')
+    setTestPhase(null)
+    setDeviceState('online')
+    setDisplayUsed(usedMemory)
+    setStatusMessage('PASSED')
+    onTest?.()
+
+    setTimeout(() => {
+      setTestResult(null)
+      setStatusMessage('READY')
+    }, 2500)
+  }
+
+  const handleReboot = async () => {
+    if (deviceState === 'booting' || deviceState === 'rebooting') return
+    setDeviceState('rebooting')
+    setTestResult(null)
+
+    setStatusMessage('Flushing...')
+    setDisplayUsed(0)
+    await new Promise(r => setTimeout(r, 300))
+
+    setStatusMessage('Reset controller...')
+    setBootPhase(0)
+    await new Promise(r => setTimeout(r, 350))
+
+    // Boot
+    setDeviceState('booting')
+    setStatusMessage('Detecting DIMMs...')
+    setBootPhase(1)
+    await new Promise(r => setTimeout(r, 250))
+
+    setStatusMessage('SPD read...')
+    setBootPhase(2)
+    setDisplayUsed(totalMemory * 0.4)
+    await new Promise(r => setTimeout(r, 300))
+
+    setStatusMessage('Mapping...')
+    setBootPhase(4)
+    setDisplayUsed(usedMemory)
+    await new Promise(r => setTimeout(r, 250))
+
+    setBootPhase(6)
+    setDeviceState('online')
+    setStatusMessage('READY')
+    onReset?.()
+  }
+
+  const cycleMode = () => {
+    if (deviceState !== 'online') return
+    const modes: MemMode[] = ['usage', 'heap', 'cache', 'swap', 'processes', 'allocation']
+    const currentIndex = modes.indexOf(displayMode)
+    setDisplayMode(modes[(currentIndex + 1) % modes.length])
+  }
+
+  const isActive = deviceState === 'online' || deviceState === 'testing'
+  const currentUsed = displayUsed + fluctuation
+  const usagePercent = (currentUsed / totalMemory) * 100
+  const usageColor = usagePercent > 85 ? 'var(--neon-red)' : usagePercent > 70 ? 'var(--neon-amber)' : 'var(--neon-amber)'
+
+  const getModeLabel = () => {
+    switch (displayMode) {
+      case 'usage': return 'RAM USAGE'
+      case 'heap': return 'HEAP'
+      case 'cache': return 'CACHE'
+      case 'swap': return 'SWAP'
+      case 'processes': return 'TOP PROC'
+      case 'allocation': return 'ALLOC'
+    }
+  }
+
+  return (
+    <PanelFrame variant="military" className={cn('p-1 flex flex-col', className)}>
+      {/* Header with mode button and logo */}
+      <div className="flex items-center justify-between mb-0.5">
+        <div className="flex items-center gap-1">
+          <div className="font-mono text-[5px] text-[var(--neon-amber)]">MEM</div>
+          {/* Mode cycle button */}
+          <button
+            onClick={cycleMode}
+            disabled={!isActive}
+            className="group disabled:opacity-30"
+            title="Cycle Mode"
+          >
+            <div
+              className="px-1 py-0.5 rounded transition-all group-active:scale-95"
+              style={{
+                background: 'linear-gradient(180deg, #3a2a1a 0%, #2a1a0a 100%)',
+                border: '0.5px solid #4a3a2a',
+                fontSize: '4px',
+                color: 'var(--neon-amber)',
+              }}
+            >
+              MODE
+            </div>
+          </button>
+        </div>
+
+        {/* CRSR logo (Corsair-style) - top right */}
+        <div className="flex items-center gap-0.5">
+          <div
+            className="font-mono text-[3px] text-[#ffaa00] px-0.5 leading-none font-bold"
+            style={{
+              background: 'linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%)',
+              border: '0.5px solid #3a3a3a',
+              borderRadius: '1px',
+            }}
+          >
+            CRSR
+          </div>
+        </div>
+      </div>
+
+      {/* Memory display - expanded to fill space */}
+      <div className={cn(
+        'relative flex-1 min-h-[2.5rem] bg-black/60 rounded overflow-hidden',
+        deviceState === 'testing' && 'ring-1 ring-[var(--neon-amber)]/30'
+      )}>
+        {/* Mode label */}
+        <div className="absolute top-1 left-1 font-mono text-[4px] text-white/30">
+          {getModeLabel()}
+        </div>
+
+        {/* Mode-specific content */}
+        {displayMode === 'usage' && (
+          <>
+            {/* Main usage bar */}
+            <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 h-3 bg-black/40 rounded overflow-hidden">
+              <div
+                className="h-full transition-all duration-300 rounded"
+                style={{
+                  width: isActive ? `${usagePercent}%` : '0%',
+                  background: `linear-gradient(90deg, var(--neon-amber) 0%, ${usageColor} 100%)`,
+                  boxShadow: isActive ? `0 0 6px ${usageColor}` : 'none',
+                }}
+              />
+              {/* Grid markers */}
+              <div className="absolute inset-0 flex justify-between px-1">
+                {[0, 1, 2, 3, 4].map(i => (
+                  <div key={i} className="w-px h-full bg-white/20" />
+                ))}
+              </div>
+            </div>
+            {/* Usage text */}
+            <div className="absolute bottom-1 left-2 font-mono text-[5px]" style={{ color: usageColor }}>
+              {isActive ? `${currentUsed.toFixed(1)}G` : '--'}
+            </div>
+            <div className="absolute bottom-1 right-2 font-mono text-[5px] text-white/40">
+              / {totalMemory}G
+            </div>
+          </>
+        )}
+
+        {displayMode === 'heap' && (
+          <div className="absolute inset-2 flex flex-col justify-center gap-1">
+            <div className="flex items-center gap-1">
+              <span className="font-mono text-[4px] text-white/40 w-6">HEAP</span>
+              <div className="flex-1 h-2 bg-black/40 rounded overflow-hidden">
+                <div
+                  className="h-full bg-[var(--neon-cyan)] transition-all"
+                  style={{ width: isActive ? `${(memData.heap.used / memData.heap.total) * 100}%` : '0%' }}
+                />
+              </div>
+              <span className="font-mono text-[4px] text-[var(--neon-cyan)]">
+                {isActive ? `${memData.heap.used.toFixed(1)}G` : '--'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="font-mono text-[4px] text-white/40 w-6">STACK</span>
+              <div className="flex-1 h-2 bg-black/40 rounded overflow-hidden">
+                <div className="h-full bg-[var(--neon-green)] transition-all" style={{ width: isActive ? '35%' : '0%' }} />
+              </div>
+              <span className="font-mono text-[4px] text-[var(--neon-green)]">{isActive ? '1.4G' : '--'}</span>
+            </div>
+          </div>
+        )}
+
+        {displayMode === 'cache' && (
+          <div className="absolute inset-2 flex flex-col justify-center gap-1">
+            <div className="flex items-center gap-1">
+              <span className="font-mono text-[4px] text-white/40 w-6">L1</span>
+              <div className="flex-1 h-1.5 bg-black/40 rounded overflow-hidden">
+                <div className="h-full bg-[var(--neon-pink)] transition-all" style={{ width: isActive ? '78%' : '0%' }} />
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="font-mono text-[4px] text-white/40 w-6">L2</span>
+              <div className="flex-1 h-1.5 bg-black/40 rounded overflow-hidden">
+                <div className="h-full bg-[var(--neon-purple,#9d00ff)] transition-all" style={{ width: isActive ? '65%' : '0%' }} />
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="font-mono text-[4px] text-white/40 w-6">L3</span>
+              <div className="flex-1 h-1.5 bg-black/40 rounded overflow-hidden">
+                <div className="h-full bg-[var(--neon-cyan)] transition-all" style={{ width: isActive ? '52%' : '0%' }} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {displayMode === 'swap' && (
+          <div className="absolute inset-2 flex flex-col justify-center">
+            <div className="font-mono text-[4px] text-white/40 mb-1">SWAP USAGE</div>
+            <div className="h-2.5 bg-black/40 rounded overflow-hidden">
+              <div
+                className="h-full bg-[var(--neon-red)] transition-all"
+                style={{ width: isActive ? `${(memData.swap.used / memData.swap.total) * 100}%` : '0%' }}
+              />
+            </div>
+            <div className="flex justify-between mt-1">
+              <span className="font-mono text-[4px] text-[var(--neon-red)]">
+                {isActive ? `${memData.swap.used.toFixed(1)}G` : '--'}
+              </span>
+              <span className="font-mono text-[4px] text-white/40">/ {memData.swap.total}G</span>
+            </div>
+          </div>
+        )}
+
+        {displayMode === 'processes' && (
+          <div className="absolute inset-1 flex flex-col justify-center gap-0.5 overflow-hidden">
+            {memData.processes.slice(0, 5).map((proc, i) => (
+              <div key={i} className="flex items-center gap-1">
+                <span className="font-mono text-[3px] text-white/40 w-8 truncate">{proc.name}</span>
+                <div className="flex-1 h-1 bg-black/40 rounded overflow-hidden">
+                  <div
+                    className="h-full transition-all"
+                    style={{
+                      width: isActive ? `${(proc.mem / 3) * 100}%` : '0%',
+                      background: i === 0 ? 'var(--neon-red)' : i === 1 ? 'var(--neon-amber)' : 'var(--neon-cyan)',
+                    }}
+                  />
+                </div>
+                <span className="font-mono text-[3px] text-white/40">{isActive ? `${proc.mem.toFixed(1)}G` : '--'}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {displayMode === 'allocation' && (
+          <div className="absolute inset-2 flex items-center justify-center">
+            {/* Stacked bar showing allocation */}
+            <div className="w-full h-4 bg-black/40 rounded overflow-hidden flex">
+              <div
+                className="h-full bg-[var(--neon-red)] transition-all"
+                style={{ width: isActive ? `${(memData.allocation.kernel / totalMemory) * 100}%` : '0%' }}
+              />
+              <div
+                className="h-full bg-[var(--neon-amber)] transition-all"
+                style={{ width: isActive ? `${(memData.allocation.user / totalMemory) * 100}%` : '0%' }}
+              />
+              <div
+                className="h-full bg-[var(--neon-cyan)] transition-all"
+                style={{ width: isActive ? `${(memData.allocation.buffers / totalMemory) * 100}%` : '0%' }}
+              />
+            </div>
+          </div>
+        )}
+
+        {displayMode === 'allocation' && isActive && (
+          <div className="absolute bottom-1 inset-x-2 flex justify-between font-mono text-[3px]">
+            <span className="text-[var(--neon-red)]">KRN {memData.allocation.kernel}G</span>
+            <span className="text-[var(--neon-amber)]">USR {memData.allocation.user}G</span>
+            <span className="text-[var(--neon-cyan)]">BUF {memData.allocation.buffers}G</span>
+          </div>
+        )}
+
+        {/* Boot overlay */}
+        {(deviceState === 'booting' || deviceState === 'rebooting') && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+            <span className="font-mono text-[6px] text-[var(--neon-amber)] animate-pulse">{statusMessage}</span>
+          </div>
+        )}
+
+        {/* Test overlay */}
+        {deviceState === 'testing' && (
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 2px, var(--neon-amber) 2px, var(--neon-amber) 3px)',
+              animation: 'mem-scan 0.4s linear infinite',
+              opacity: 0.1,
+            }}
+          />
+        )}
+      </div>
+
+      {/* Status bar with LED buttons at bottom right center */}
+      <div className="flex items-center justify-between font-mono text-[5px] mt-0.5">
+        <span className={cn(
+          'text-[4px]',
+          deviceState === 'testing' ? 'text-[var(--neon-amber)]' :
+          testResult === 'pass' ? 'text-[var(--neon-green)]' :
+          'text-white/20'
+        )}>
+          {statusMessage}
+        </span>
+
+        {/* LED buttons - bottom right center */}
+        <div className="flex items-center gap-1">
+          {/* Worn round test LED with amber glow */}
+          <button
+            onClick={handleTest}
+            disabled={deviceState !== 'online'}
+            className="group relative disabled:opacity-30"
+            title="Test"
+          >
+            <div
+              className="w-2.5 h-2.5 rounded-full p-[1px] transition-all group-active:scale-95"
+              style={{
+                background: 'linear-gradient(180deg, #3a3a2a 0%, #2a2a1a 30%, #1a1a0a 70%, #0a0a00 100%)',
+                boxShadow: 'inset 0 -1px 2px rgba(255,180,0,0.1), inset 0 1px 1px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.6)',
+                border: '1px solid #4a4a3a',
+              }}
+            >
+              <div
+                className="w-full h-full rounded-full transition-all"
+                style={{
+                  background: deviceState === 'testing'
+                    ? 'radial-gradient(circle at 30% 30%, #ffdd88 0%, var(--neon-amber) 50%, #664400 100%)'
+                    : testResult === 'pass'
+                    ? 'radial-gradient(circle at 30% 30%, #88ff88 0%, var(--neon-green) 50%, #006600 100%)'
+                    : 'radial-gradient(circle at 30% 30%, #3a3a2a 0%, #2a2a1a 50%, #1a1a0a 100%)',
+                  boxShadow: deviceState === 'testing'
+                    ? '0 0 8px var(--neon-amber), 0 0 16px var(--neon-amber)'
+                    : testResult === 'pass'
+                    ? '0 0 8px var(--neon-green), 0 0 16px var(--neon-green)'
+                    : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                }}
+              />
+            </div>
+          </button>
+
+          {/* Worn round reset LED with red glow */}
+          <button
+            onClick={handleReboot}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+            className="group relative disabled:opacity-30"
+            title="Reboot"
+          >
+            <div
+              className="w-2.5 h-2.5 rounded-full p-[1px] transition-all group-active:scale-95"
+              style={{
+                background: 'linear-gradient(180deg, #3a2a2a 0%, #2a1a1a 30%, #1a0a0a 70%, #0a0000 100%)',
+                boxShadow: 'inset 0 -1px 2px rgba(255,100,100,0.1), inset 0 1px 1px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.6)',
+                border: '1px solid #4a3a3a',
+              }}
+            >
+              <div
+                className="w-full h-full rounded-full transition-all"
+                style={{
+                  background: (deviceState === 'rebooting' || deviceState === 'booting')
+                    ? 'radial-gradient(circle at 30% 30%, #ff8888 0%, var(--neon-red) 50%, #660000 100%)'
+                    : 'radial-gradient(circle at 30% 30%, #3a2a2a 0%, #2a1a1a 50%, #1a0a0a 100%)',
+                  boxShadow: (deviceState === 'rebooting' || deviceState === 'booting')
+                    ? '0 0 8px var(--neon-red), 0 0 16px var(--neon-red)'
+                    : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                }}
+              />
+            </div>
+          </button>
+        </div>
+
+        <span className="text-[3px] text-white/20">MEM-1</span>
+      </div>
+
+      <style jsx global>{`
+        @keyframes mem-scan {
+          0% { transform: translateY(-100%); }
+          100% { transform: translateY(100%); }
         }
       `}</style>
     </PanelFrame>
