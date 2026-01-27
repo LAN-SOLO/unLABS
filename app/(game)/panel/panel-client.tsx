@@ -43,6 +43,8 @@ import {
   SupercomputerArray,
 } from '@/components/panel/modules/EquipmentTile'
 import { ResourceBar } from '@/components/panel/modules/ResourceBar'
+import { VentilationFan } from '@/components/panel/modules/VentilationFan'
+import { NarrowSpeaker } from '@/components/panel/modules/NarrowSpeaker'
 import type { EquipmentData } from '../terminal/actions/equipment'
 
 interface PanelClientProps {
@@ -252,6 +254,9 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
 
         {/* Interpolator - linked to optics tech tree */}
         <Interpolator progress={techTrees?.optics} />
+
+        {/* Ventilation Fan - system cooling */}
+        <VentilationFan />
       </PanelLeft>
 
       {/* Main Area - Terminal + Organized Modules */}
@@ -670,15 +675,18 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
         </div>
       </PanelMain>
 
-      {/* Right Panel - Oscilloscope (full height with all controls) */}
+      {/* Right Panel - Oscilloscope + Speaker */}
       <PanelRight>
-        <Oscilloscope
-          walletAddress={`${userId.slice(0, 4)}....${userId.slice(-4)}`}
-          balance={balance}
-          frequency1={2.91}
-          frequency2={2.501}
-          className="flex-1"
-        />
+        <div className="flex gap-1 h-full">
+          <Oscilloscope
+            walletAddress={`${userId.slice(0, 4)}....${userId.slice(-4)}`}
+            balance={balance}
+            frequency1={2.91}
+            frequency2={2.501}
+            className="flex-1"
+          />
+          <NarrowSpeaker className="h-full" />
+        </div>
       </PanelRight>
 
       {/* Bottom Resource Bar */}
