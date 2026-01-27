@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { PanelFrame } from '../PanelFrame'
 import { Knob } from '../controls/Knob'
@@ -2098,44 +2098,307 @@ export function Interpolator({
 // ==================================================
 // BASIC TOOLKIT - Fundamental laboratory hand tools
 // ==================================================
+// BASIC TOOLKIT - Tier 1 Hand Tools
+// ==================================================
+type ToolkitState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type ToolkitTestPhase = 'probe' | 'clamp' | 'laser' | 'drill' | 'calibrate' | 'complete' | null
+type ToolkitBootPhase = 'init' | 'tools' | 'interface' | 'ready' | null
+
 interface BasicToolkitProps {
   className?: string
 }
 
 export function BasicToolkit({ className }: BasicToolkitProps) {
+  const [deviceState, setDeviceState] = useState<ToolkitState>('booting')
+  const [testPhase, setTestPhase] = useState<ToolkitTestPhase>(null)
+  const [bootPhase, setBootPhase] = useState<ToolkitBootPhase>('init')
+  const [selectedTool, setSelectedTool] = useState<string | null>(null)
+
+  // Random logo position (memoized on mount)
+  const [logoPosition] = useState(() => {
+    const positions = [
+      { bottom: '4px', right: '4px' },
+      { bottom: '4px', left: '4px' },
+      { top: '20px', right: '4px' },
+      { top: '20px', left: '4px' },
+    ]
+    return positions[Math.floor(Math.random() * positions.length)]
+  })
+
   // Tool status indicators
   const tools = [
-    { name: 'PROBE', active: true, color: 'var(--neon-cyan)' },
-    { name: 'CLAMP', active: true, color: 'var(--neon-green)' },
-    { name: 'LASER', active: false, color: 'var(--neon-red)' },
-    { name: 'DRILL', active: true, color: 'var(--neon-amber)' },
+    { name: 'PROBE', active: deviceState === 'online', color: 'var(--neon-cyan)', testPhase: 'probe' as const },
+    { name: 'CLAMP', active: deviceState === 'online', color: 'var(--neon-green)', testPhase: 'clamp' as const },
+    { name: 'LASER', active: deviceState === 'online' && selectedTool === 'LASER', color: 'var(--neon-red)', testPhase: 'laser' as const },
+    { name: 'DRILL', active: deviceState === 'online', color: 'var(--neon-amber)', testPhase: 'drill' as const },
   ]
 
+  // Boot sequence
+  useEffect(() => {
+    if (deviceState === 'booting') {
+      const bootSequence = async () => {
+        setBootPhase('init')
+        await new Promise(r => setTimeout(r, 400))
+        setBootPhase('tools')
+        await new Promise(r => setTimeout(r, 500))
+        setBootPhase('interface')
+        await new Promise(r => setTimeout(r, 400))
+        setBootPhase('ready')
+        await new Promise(r => setTimeout(r, 300))
+        setDeviceState('online')
+        setBootPhase(null)
+      }
+      bootSequence()
+    }
+  }, [deviceState])
+
+  // Test sequence handler
+  const runTest = useCallback(() => {
+    if (deviceState !== 'online') return
+    setDeviceState('testing')
+    const testSequence = async () => {
+      setTestPhase('probe')
+      await new Promise(r => setTimeout(r, 600))
+      setTestPhase('clamp')
+      await new Promise(r => setTimeout(r, 500))
+      setTestPhase('laser')
+      await new Promise(r => setTimeout(r, 700))
+      setTestPhase('drill')
+      await new Promise(r => setTimeout(r, 600))
+      setTestPhase('calibrate')
+      await new Promise(r => setTimeout(r, 500))
+      setTestPhase('complete')
+      await new Promise(r => setTimeout(r, 400))
+      setTestPhase(null)
+      setDeviceState('online')
+    }
+    testSequence()
+  }, [deviceState])
+
+  // Reboot handler
+  const reboot = useCallback(() => {
+    setDeviceState('rebooting')
+    setTestPhase(null)
+    setTimeout(() => {
+      setDeviceState('booting')
+    }, 800)
+  }, [])
+
+  // Tool select handler
+  const selectTool = useCallback((toolName: string) => {
+    if (deviceState !== 'online') return
+    setSelectedTool(prev => prev === toolName ? null : toolName)
+  }, [deviceState])
+
+  const getStatusColor = () => {
+    switch (deviceState) {
+      case 'online': return 'var(--neon-green)'
+      case 'booting': return 'var(--neon-cyan)'
+      case 'testing': return 'var(--neon-purple)'
+      case 'rebooting': return 'var(--neon-amber)'
+      case 'offline': return 'var(--neon-red)'
+      default: return 'var(--neon-green)'
+    }
+  }
+
   return (
-    <PanelFrame variant="default" className={cn('p-2', className)}>
+    <PanelFrame variant="default" className={cn('p-2 relative overflow-hidden', className)}>
+      {/* Round nano buttons with illuminated edges - top */}
+      <div className="absolute top-1 right-1 flex gap-1 z-10">
+        {/* Test button */}
+        <button
+          onClick={runTest}
+          disabled={deviceState !== 'online'}
+          className="group relative"
+          title="Test"
+        >
+          <div
+            className="w-3 h-3 rounded-full border transition-all"
+            style={{
+              background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+              borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a',
+              boxShadow: deviceState === 'testing'
+                ? '0 0 6px var(--neon-purple), inset 0 0 3px var(--neon-purple)'
+                : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+            }}
+          />
+          {/* Illuminated edge ring */}
+          <div
+            className="absolute inset-0 rounded-full pointer-events-none"
+            style={{
+              border: '1px solid',
+              borderColor: deviceState === 'online' ? 'var(--neon-cyan)' : 'transparent',
+              opacity: deviceState === 'online' ? 0.6 : 0,
+              animation: deviceState === 'testing' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+            }}
+          />
+        </button>
+        {/* Reboot button */}
+        <button
+          onClick={reboot}
+          disabled={deviceState === 'booting' || deviceState === 'rebooting'}
+          className="group relative"
+          title="Reboot"
+        >
+          <div
+            className="w-3 h-3 rounded-full border transition-all"
+            style={{
+              background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+              borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a',
+              boxShadow: deviceState === 'rebooting'
+                ? '0 0 6px var(--neon-amber), inset 0 0 3px var(--neon-amber)'
+                : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+            }}
+          />
+          {/* Illuminated edge ring */}
+          <div
+            className="absolute inset-0 rounded-full pointer-events-none"
+            style={{
+              border: '1px solid',
+              borderColor: deviceState === 'online' ? 'var(--neon-amber)' : 'transparent',
+              opacity: deviceState === 'online' ? 0.5 : 0,
+              animation: deviceState === 'rebooting' ? 'pulse 0.3s ease-in-out infinite' : 'none',
+            }}
+          />
+        </button>
+      </div>
+
+      {/* Company logo - HNDX (Handex Tools) */}
+      <div
+        className="absolute font-mono text-[5px] text-white/20 pointer-events-none z-0"
+        style={logoPosition}
+      >
+        HNDX
+      </div>
+
+      {/* Header */}
       <div className="flex items-center justify-between mb-2">
-        <div className="font-mono text-[9px] text-[var(--neon-amber)]">
-          BASIC TOOLKIT
+        <div className="flex items-center gap-1">
+          <div
+            className="w-1.5 h-1.5 rounded-full"
+            style={{
+              backgroundColor: getStatusColor(),
+              boxShadow: `0 0 4px ${getStatusColor()}`,
+              animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+            }}
+          />
+          <div className="font-mono text-[9px] text-[var(--neon-amber)]">
+            BASIC TOOLKIT
+          </div>
         </div>
         <div className="font-mono text-[7px] text-white/30">T1</div>
       </div>
-      <div className="grid grid-cols-2 gap-1">
-        {tools.map((tool) => (
-          <div
-            key={tool.name}
-            className="flex items-center gap-1 bg-black/30 px-1 py-0.5 rounded"
-          >
-            <div
-              className="w-1.5 h-1.5 rounded-full"
-              style={{
-                backgroundColor: tool.active ? tool.color : '#333',
-                boxShadow: tool.active ? `0 0 4px ${tool.color}` : 'none',
-              }}
-            />
-            <span className="font-mono text-[7px] text-white/60">{tool.name}</span>
+
+      {/* Boot overlay */}
+      {deviceState === 'booting' && bootPhase && (
+        <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20">
+          <div className="text-center">
+            <div className="font-mono text-[8px] text-[var(--neon-cyan)] mb-1">
+              {bootPhase === 'init' && 'INITIALIZING...'}
+              {bootPhase === 'tools' && 'LOADING TOOLS...'}
+              {bootPhase === 'interface' && 'I/O INTERFACE...'}
+              {bootPhase === 'ready' && 'READY'}
+            </div>
+            <div className="flex gap-0.5 justify-center">
+              {['init', 'tools', 'interface', 'ready'].map((phase, i) => (
+                <div
+                  key={phase}
+                  className="w-1 h-1 rounded-full"
+                  style={{
+                    backgroundColor: ['init', 'tools', 'interface', 'ready'].indexOf(bootPhase) >= i
+                      ? 'var(--neon-cyan)'
+                      : '#333',
+                  }}
+                />
+              ))}
+            </div>
           </div>
-        ))}
+        </div>
+      )}
+
+      {/* Reboot overlay */}
+      {deviceState === 'rebooting' && (
+        <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-20">
+          <div className="font-mono text-[8px] text-[var(--neon-amber)] animate-pulse">
+            REBOOTING...
+          </div>
+        </div>
+      )}
+
+      {/* Tool grid */}
+      <div className="grid grid-cols-2 gap-1">
+        {tools.map((tool) => {
+          const isBeingTested = deviceState === 'testing' && testPhase === tool.testPhase
+          const isSelected = selectedTool === tool.name
+          return (
+            <button
+              key={tool.name}
+              onClick={() => selectTool(tool.name)}
+              disabled={deviceState !== 'online'}
+              className={cn(
+                'flex items-center gap-1 px-1 py-0.5 rounded transition-all',
+                isSelected ? 'bg-white/10 border border-white/20' : 'bg-black/30',
+                deviceState === 'online' && 'hover:bg-white/5'
+              )}
+            >
+              <div
+                className="w-1.5 h-1.5 rounded-full transition-all"
+                style={{
+                  backgroundColor: tool.active || isBeingTested ? tool.color : '#333',
+                  boxShadow: tool.active || isBeingTested ? `0 0 4px ${tool.color}` : 'none',
+                  animation: isBeingTested ? 'pulse 0.3s ease-in-out infinite' : 'none',
+                }}
+              />
+              <span
+                className="font-mono text-[7px] transition-colors"
+                style={{
+                  color: isBeingTested ? tool.color : tool.active ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)',
+                }}
+              >
+                {tool.name}
+              </span>
+            </button>
+          )
+        })}
       </div>
+
+      {/* Test status bar */}
+      {deviceState === 'testing' && testPhase && (
+        <div className="mt-1.5 pt-1 border-t border-white/10">
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[6px] text-[var(--neon-purple)]">
+              TEST: {testPhase.toUpperCase()}
+            </span>
+            <div className="flex gap-0.5">
+              {['probe', 'clamp', 'laser', 'drill', 'calibrate'].map((phase) => (
+                <div
+                  key={phase}
+                  className="w-1 h-1 rounded-sm"
+                  style={{
+                    backgroundColor:
+                      testPhase === phase ? 'var(--neon-purple)' :
+                      ['probe', 'clamp', 'laser', 'drill', 'calibrate'].indexOf(phase) <
+                      ['probe', 'clamp', 'laser', 'drill', 'calibrate'].indexOf(testPhase || 'probe')
+                        ? 'var(--neon-green)' : '#333',
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Selected tool info */}
+      {deviceState === 'online' && selectedTool && (
+        <div className="mt-1.5 pt-1 border-t border-white/10">
+          <div className="font-mono text-[6px] text-white/50">
+            {selectedTool === 'PROBE' && 'Digital probe for I/O testing'}
+            {selectedTool === 'CLAMP' && 'Precision grip for assembly'}
+            {selectedTool === 'LASER' && 'Micro-laser for fine cuts'}
+            {selectedTool === 'DRILL' && 'High-speed drill bit'}
+          </div>
+        </div>
+      )}
     </PanelFrame>
   )
 }
