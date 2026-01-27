@@ -306,14 +306,14 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
           {/* CENTER: Terminal + Quantum Analyzer + Resource Storage + Tech Tree Preview */}
           <div className="flex flex-col gap-1 flex-1">
             {/* Terminal, Quantum Analyzer, and Diagnostics Console */}
-            <div className="flex gap-1" style={{ minHeight: '320px' }}>
-              <div className="flex-1">
+            <div className="flex gap-1" style={{ minHeight: '280px' }}>
+              <div className="flex-1 min-w-[300px]">
                 <TerminalModule userId={userId} username={username} balance={balance} />
               </div>
               <div className="w-[280px]">
                 <QuantumAnalyzer className="h-full" />
               </div>
-              <div className="w-[300px]">
+              <div className="w-[340px]">
                 <DiagnosticsConsole className="h-full" />
               </div>
             </div>
