@@ -16,20 +16,19 @@ export function NarrowSpeaker({ className }: NarrowSpeakerProps) {
     bass: false,
     mid: true,
     high: false,
-    noise: false,
   })
-  const [audioLevel, setAudioLevel] = useState<number[]>([0, 0, 0, 0, 0])
+  const [audioLevel, setAudioLevel] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0])
 
   // Simulate audio level visualization
   useEffect(() => {
     if (!isOn || isMuted) {
-      setAudioLevel([0, 0, 0, 0, 0])
+      setAudioLevel([0, 0, 0, 0, 0, 0, 0, 0])
       return
     }
 
     const interval = setInterval(() => {
       setAudioLevel(
-        Array.from({ length: 5 }, () =>
+        Array.from({ length: 8 }, () =>
           Math.random() * (volume / 100) * 100
         )
       )
@@ -46,106 +45,77 @@ export function NarrowSpeaker({ className }: NarrowSpeakerProps) {
 
   return (
     <div className={cn(
-      'w-10 h-full bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a] rounded border border-[#2a2a3a] flex flex-col p-1 gap-1',
+      'w-12 shrink-0 bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a] rounded border border-[#2a2a3a] flex flex-col p-1 gap-1',
       className
     )}>
-      {/* Power button */}
-      <button
-        onClick={() => setIsOn(!isOn)}
-        className={cn(
-          'w-full aspect-square rounded flex items-center justify-center transition-all',
-          isOn
-            ? 'bg-[var(--neon-green)]/20 border border-[var(--neon-green)]/50'
-            : 'bg-[#1a1a1a] border border-[#2a2a3a]'
-        )}
-      >
-        <div className={cn(
-          'w-2 h-2 rounded-full transition-all',
-          isOn ? 'bg-[var(--neon-green)] shadow-[0_0_6px_var(--neon-green)]' : 'bg-[#3a3a3a]'
-        )} />
-      </button>
-
-      {/* Speaker label */}
-      <div className="text-center">
-        <span className="font-mono text-[5px] text-white/40 writing-vertical">SPK</span>
+      {/* Header with power LED */}
+      <div className="flex items-center justify-between px-0.5">
+        <span className="font-mono text-[5px] text-white/40">SPK</span>
+        <button onClick={() => setIsOn(!isOn)}>
+          <LED on={isOn} color={isOn ? 'green' : 'red'} size="sm" />
+        </button>
       </div>
 
-      {/* Speaker grille */}
-      <div className="flex-1 bg-[#0a0a0a] rounded border border-[#1a1a2a] overflow-hidden relative">
+      {/* Speaker grille with level meters */}
+      <div className="flex-1 min-h-[60px] bg-[#0a0a0a] rounded border border-[#1a1a2a] overflow-hidden relative">
         {/* Grille pattern */}
-        <div className="absolute inset-0"
+        <div className="absolute inset-0 opacity-30"
           style={{
-            backgroundImage: `
-              radial-gradient(circle at center, #2a2a2a 1px, transparent 1px)
-            `,
-            backgroundSize: '4px 4px',
+            backgroundImage: `radial-gradient(circle at center, #3a3a3a 1px, transparent 1px)`,
+            backgroundSize: '3px 3px',
           }}
         />
 
-        {/* Audio level bars */}
-        <div className="absolute inset-1 flex flex-col justify-end gap-px">
+        {/* Audio level bars - vertical */}
+        <div className="absolute inset-1 flex gap-px justify-center">
           {audioLevel.map((level, i) => (
             <div
               key={i}
-              className="w-full h-1 bg-[#1a1a1a] rounded overflow-hidden"
+              className="w-1 h-full bg-[#1a1a1a] rounded-sm overflow-hidden flex flex-col justify-end"
             >
               <div
-                className="h-full transition-all duration-75"
+                className="w-full transition-all duration-75 rounded-sm"
                 style={{
-                  width: `${level}%`,
+                  height: `${level}%`,
                   background: level > 80
                     ? 'var(--neon-red)'
                     : level > 50
                     ? 'var(--neon-amber)'
                     : 'var(--neon-green)',
+                  boxShadow: level > 0 ? `0 0 3px ${level > 80 ? 'var(--neon-red)' : level > 50 ? 'var(--neon-amber)' : 'var(--neon-green)'}` : 'none',
                 }}
               />
             </div>
           ))}
         </div>
-
-        {/* Speaker cone (decorative) */}
-        <div className="absolute inset-2 rounded-full border border-[#2a2a2a]"
-          style={{
-            background: 'radial-gradient(circle at center, #1a1a1a 0%, #0a0a0a 100%)',
-          }}
-        >
-          <div className="absolute inset-2 rounded-full border border-[#1a1a1a]" />
-          <div className="absolute inset-[40%] rounded-full bg-[#2a2a2a]" />
-        </div>
       </div>
 
-      {/* Volume slider (vertical) */}
+      {/* Volume control */}
       <div className="flex flex-col items-center gap-0.5">
-        <span className="font-mono text-[5px] text-white/40">VOL</span>
-        <div className="relative w-2 h-16 bg-[#0a0a0a] rounded border border-[#1a1a2a]">
-          {/* Volume fill */}
-          <div
-            className="absolute bottom-0 left-0 right-0 rounded-b transition-all"
-            style={{
-              height: `${effectiveVolume}%`,
-              background: effectiveVolume > 80
-                ? 'var(--neon-red)'
-                : effectiveVolume > 50
-                ? 'var(--neon-amber)'
-                : 'var(--neon-green)',
-              boxShadow: `0 0 4px ${effectiveVolume > 80 ? 'var(--neon-red)' : effectiveVolume > 50 ? 'var(--neon-amber)' : 'var(--neon-green)'}`,
-            }}
-          />
-          {/* Clickable area for volume control */}
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={volume}
-            onChange={(e) => setVolume(Number(e.target.value))}
-            disabled={!isOn}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            style={{
-              writingMode: 'vertical-lr',
-              direction: 'rtl',
-            }}
-          />
+        <div className="flex items-center gap-1 w-full">
+          <span className="font-mono text-[5px] text-white/30">V</span>
+          <div className="relative flex-1 h-1.5 bg-[#0a0a0a] rounded border border-[#1a1a2a]">
+            <div
+              className="absolute inset-y-0 left-0 rounded transition-all"
+              style={{
+                width: `${effectiveVolume}%`,
+                background: effectiveVolume > 80
+                  ? 'var(--neon-red)'
+                  : effectiveVolume > 50
+                  ? 'var(--neon-amber)'
+                  : 'var(--neon-green)',
+              }}
+            />
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={volume}
+              onChange={(e) => setVolume(Number(e.target.value))}
+              disabled={!isOn}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+          </div>
         </div>
         <span className="font-mono text-[6px] text-[var(--neon-green)]">{volume}</span>
       </div>
@@ -155,30 +125,28 @@ export function NarrowSpeaker({ className }: NarrowSpeakerProps) {
         onClick={() => setIsMuted(!isMuted)}
         disabled={!isOn}
         className={cn(
-          'w-full py-1 rounded font-mono text-[5px] transition-all',
+          'w-full py-0.5 rounded font-mono text-[5px] transition-all',
           isMuted
             ? 'bg-[var(--neon-red)]/30 text-[var(--neon-red)] border border-[var(--neon-red)]/50'
             : 'bg-[#1a1a1a] text-white/40 border border-[#2a2a3a] hover:text-white/60'
         )}
       >
-        {isMuted ? 'X' : 'M'}
+        {isMuted ? 'MUTE' : 'M'}
       </button>
 
-      {/* Filter toggles */}
-      <div className="flex flex-col gap-0.5">
-        <span className="font-mono text-[4px] text-white/30 text-center">FLT</span>
+      {/* Filter toggles - horizontal row */}
+      <div className="flex gap-0.5">
         {[
           { key: 'bass' as const, label: 'B', color: 'var(--neon-red)' },
           { key: 'mid' as const, label: 'M', color: 'var(--neon-amber)' },
           { key: 'high' as const, label: 'H', color: 'var(--neon-cyan)' },
-          { key: 'noise' as const, label: 'N', color: 'var(--neon-purple)' },
         ].map((filter) => (
           <button
             key={filter.key}
             onClick={() => toggleFilter(filter.key)}
             disabled={!isOn}
             className={cn(
-              'w-full py-0.5 rounded font-mono text-[5px] transition-all',
+              'flex-1 py-0.5 rounded font-mono text-[5px] transition-all',
               filters[filter.key]
                 ? 'font-bold'
                 : 'bg-[#1a1a1a] text-white/30 border border-[#2a2a3a]'
@@ -192,11 +160,6 @@ export function NarrowSpeaker({ className }: NarrowSpeakerProps) {
             {filter.label}
           </button>
         ))}
-      </div>
-
-      {/* Status indicator */}
-      <div className="flex justify-center">
-        <LED on={isOn && !isMuted} color={isMuted ? 'red' : 'green'} size="sm" />
       </div>
     </div>
   )

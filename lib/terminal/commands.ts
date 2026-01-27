@@ -202,6 +202,19 @@ const helpCommand: Command = {
       '|  RUN       - Launch a subsystem module                     |',
       '|  KILL      - Shut down a subsystem module                  |',
       '+------------------------------------------------------------+',
+      '|                      DEVICES                               |',
+      '+------------------------------------------------------------+',
+      '|  DEVICE    - List and control lab devices                  |',
+      '|             DEVICE LIST    - Show all connected devices    |',
+      '|             DEVICE <n> TEST   - Run device diagnostics     |',
+      '|             DEVICE <n> REBOOT - Reboot device (or RESET)   |',
+      '|             DEVICE <n> STATUS - Show device status         |',
+      '|             DEVICE <n> INFO   - Show device details        |',
+      '|                                                            |',
+      '|  Device names: cache, core, battery, synth, recorder,      |',
+      '|    reactor, ai, super, drone, magnet, tank, exotic,       |',
+      '|    qsm, quantum, net, temp, dim, cpu, clock, vent, diag   |',
+      '+------------------------------------------------------------+',
       '|                      SYSTEM                                |',
       '+------------------------------------------------------------+',
       '|  UNSYSTEMCTL - System control (reboot, poweroff, status)   |',
@@ -1024,6 +1037,418 @@ const historyCommand: Command = {
   },
 }
 
+// Device control command
+const deviceCommand: Command = {
+  name: 'device',
+  aliases: ['dev', 'devices'],
+  description: 'Control and monitor lab devices',
+  usage: 'device [name] [command]',
+  execute: async (args, ctx) => {
+    const deviceName = args[0]?.toLowerCase()
+    const action = args[1]?.toLowerCase()
+
+    // List all devices
+    if (!deviceName || deviceName === 'list') {
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│                    DEVICE REGISTRY                          │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  ID        DEVICE                  VERSION   STATUS    ',
+          '  ────────  ──────────────────────  ────────  ──────────',
+          '  CDC-001   Crystal Data Cache      v1.4.2    ONLINE    ',
+          '  UEC-001   Unstable Energy Core    v2.0.1    ONLINE    ',
+          '  BAT-001   Battery Pack            v1.8.0    ONLINE    ',
+          '  HMS-001   Handmade Synthesizer    v3.2.1    ONLINE    ',
+          '  ECR-001   Echo Recorder           v1.1.0    ONLINE    ',
+          '  INT-001   Interpolator            v2.5.3    ONLINE    ',
+          '  MFR-001   Microfusion Reactor     v2.3.0    ONLINE    ',
+          '  AIC-001   AI Assistant Core       v2.4.0    ONLINE    ',
+          '  SCA-001   Supercomputer Array     v5.2.0    ONLINE    ',
+          '  EXD-001   Explorer Drone          v3.1.2    ONLINE    ',
+          '  RMG-001   Resource Magnet         v1.2.0    ONLINE    ',
+          '  ATK-001   Abstractum Tank         v2.1.0    ONLINE    ',
+          '  EMC-001   Exotic Matter Contain.  v4.0.1    ONLINE    ',
+          '  VNT-001   Ventilation System      v1.0.0    ONLINE    ',
+          '  SPK-001   Narrow Speaker          v1.0.0    ONLINE    ',
+          '  OSC-001   Oscilloscope Array      v4.6.0    ONLINE    ',
+          '  QAN-001   Quantum Analyzer        v2.1.0    ONLINE    ',
+          '  QSM-001   Quantum State Monitor   v1.2.0    ONLINE    ',
+          '  NET-001   Network Monitor         v2.1.0    ONLINE    ',
+          '  TMP-001   Temperature Monitor     v1.0.0    ONLINE    ',
+          '  DIM-001   Dimension Monitor       v1.0.0    ONLINE    ',
+          '  CPU-001   CPU Monitor             v3.2.1    ONLINE    ',
+          '  CLK-001   Lab Clock               v2.4.0    ONLINE    ',
+          '  DGN-001   Diagnostics Console     v1.0.0    ONLINE    ',
+          '',
+          '  Usage: DEVICE <name> [TEST|RESET|STATUS|INFO]',
+          '  Example: DEVICE CACHE TEST',
+          '',
+        ],
+      }
+    }
+
+    // Device-specific commands
+    const deviceMap: Record<string, { name: string; id: string; version: string; desc: string; compatible: string[] }> = {
+      'cache': {
+        name: 'Crystal Data Cache',
+        id: 'CDC-001',
+        version: '1.4.2',
+        desc: 'Stores and indexes crystal and slice data from the blockchain.\nProvides real-time inventory tracking and power calculations.',
+        compatible: ['UEC-001', 'BAT-001', 'HMS-001'],
+      },
+      'core': {
+        name: 'Unstable Energy Core',
+        id: 'UEC-001',
+        version: '2.0.1',
+        desc: 'Monitors network volatility and converts TPS data to energy levels.\nPowers all lab equipment based on blockchain activity.',
+        compatible: ['CDC-001', 'BAT-001', 'QAN-001'],
+      },
+      'battery': {
+        name: 'Battery Pack',
+        id: 'BAT-001',
+        version: '1.8.0',
+        desc: 'Manages _unSC token balance display and staking status.\nTracks available, staked, and locked funds.',
+        compatible: ['UEC-001', 'CDC-001'],
+      },
+      'synth': {
+        name: 'Handmade Synthesizer',
+        id: 'HMS-001',
+        version: '3.2.1',
+        desc: 'Enables slice synthesis and trait manipulation.\nProgress linked to Synthesizers tech tree.',
+        compatible: ['CDC-001', 'INT-001'],
+      },
+      'recorder': {
+        name: 'Echo Recorder',
+        id: 'ECR-001',
+        version: '1.1.0',
+        desc: 'Records and replays trait patterns for analysis.\nProgress linked to Adapters tech tree.',
+        compatible: ['HMS-001', 'OSC-001'],
+      },
+      'interpolator': {
+        name: 'Interpolator',
+        id: 'INT-001',
+        version: '2.5.3',
+        desc: 'Interpolates trait values for precision targeting.\nProgress linked to Optics tech tree.',
+        compatible: ['HMS-001', 'OSC-001'],
+      },
+      'reactor': {
+        name: 'Microfusion Reactor',
+        id: 'MFR-001',
+        version: '2.3.0',
+        desc: 'Tier 2 power generation via plasma microfusion.\nProvides stable MW output for lab operations.',
+        compatible: ['UEC-001', 'BAT-001', 'QAN-001'],
+      },
+      'ai': {
+        name: 'AI Assistant Core',
+        id: 'AIC-001',
+        version: '2.4.0',
+        desc: 'Semi-sentient AI for lab automation and optimization.\nAutomates tasks, learns patterns, boosts production efficiency.',
+        compatible: ['MFR-001', 'CDC-001', 'QAN-001', 'DGN-001'],
+      },
+      'assistant': {
+        name: 'AI Assistant Core',
+        id: 'AIC-001',
+        version: '2.4.0',
+        desc: 'Semi-sentient AI for lab automation and optimization.\nAutomates tasks, learns patterns, boosts production efficiency.',
+        compatible: ['MFR-001', 'CDC-001', 'QAN-001', 'DGN-001'],
+      },
+      'super': {
+        name: 'Supercomputer Array',
+        id: 'SCA-001',
+        version: '5.2.0',
+        desc: 'High-performance computing cluster for heavy calculations.\n16-node array accelerates research and runs complex simulations.',
+        compatible: ['AIC-001', 'CDC-001', 'QAN-001', 'MFR-001'],
+      },
+      'supercomputer': {
+        name: 'Supercomputer Array',
+        id: 'SCA-001',
+        version: '5.2.0',
+        desc: 'High-performance computing cluster for heavy calculations.\n16-node array accelerates research and runs complex simulations.',
+        compatible: ['AIC-001', 'CDC-001', 'QAN-001', 'MFR-001'],
+      },
+      'drone': {
+        name: 'Explorer Drone',
+        id: 'EXD-001',
+        version: '3.1.2',
+        desc: 'Remote-controlled drone for field exploration and resource collection.\nExpands gathering radius and enables autonomous harvesting.',
+        compatible: ['AIC-001', 'QAN-001', 'CDC-001'],
+      },
+      'explorer': {
+        name: 'Explorer Drone',
+        id: 'EXD-001',
+        version: '3.1.2',
+        desc: 'Remote-controlled drone for field exploration and resource collection.\nExpands gathering radius and enables autonomous harvesting.',
+        compatible: ['AIC-001', 'QAN-001', 'CDC-001'],
+      },
+      'magnet': {
+        name: 'Resource Magnet',
+        id: 'RMG-001',
+        version: '1.2.0',
+        desc: 'Handheld device that passively pulls in stray Abstractum fragments.\nBoosts idle resource gain with adjustable field strength.',
+        compatible: ['BAT-001', 'QAN-001', 'UEC-001'],
+      },
+      'tank': {
+        name: 'Abstractum Tank',
+        id: 'ATK-001',
+        version: '2.1.0',
+        desc: 'Primary storage vessel for raw Abstractum resource.\nMonitors fill level, purity percentage, and flow state.',
+        compatible: ['RMG-001', 'CDC-001', 'UEC-001', 'MFR-001'],
+      },
+      'exotic': {
+        name: 'Exotic Matter Containment',
+        id: 'EMC-001',
+        version: '4.0.1',
+        desc: 'Containment field for exotic matter particles.\nMonitors unit count and stability percentage.',
+        compatible: ['MFR-001', 'QAN-001', 'DGN-001'],
+      },
+      'containment': {
+        name: 'Exotic Matter Containment',
+        id: 'EMC-001',
+        version: '4.0.1',
+        desc: 'Containment field for exotic matter particles.\nMonitors unit count and stability percentage.',
+        compatible: ['MFR-001', 'QAN-001', 'DGN-001'],
+      },
+      'vent': {
+        name: 'Ventilation System',
+        id: 'VNT-001',
+        version: '1.0.0',
+        desc: 'Dual-fan cooling system for CPU and GPU.\nAuto-adjusts speed based on system load.',
+        compatible: ['DGN-001'],
+      },
+      'speaker': {
+        name: 'Narrow Speaker',
+        id: 'SPK-001',
+        version: '1.0.0',
+        desc: 'Audio output with volume and filter controls.\nB/M/H frequency band filtering.',
+        compatible: ['OSC-001'],
+      },
+      'scope': {
+        name: 'Oscilloscope Array',
+        id: 'OSC-001',
+        version: '4.6.0',
+        desc: 'Dual-channel waveform display (OZSC-460).\nVisualizes wallet balance and network frequencies.',
+        compatible: ['QAN-001', 'ECR-001', 'INT-001'],
+      },
+      'quantum': {
+        name: 'Quantum Analyzer',
+        id: 'QAN-001',
+        version: '2.1.0',
+        desc: 'Analyzes quantum state coherence and superposition.\nProvides dimensional stability readings.',
+        compatible: ['OSC-001', 'UEC-001', 'QSM-001'],
+      },
+      'qsm': {
+        name: 'Quantum State Monitor',
+        id: 'QSM-001',
+        version: '1.2.0',
+        desc: 'Monitors quantum coherence and qubit entanglement.\n127-qubit array with real-time wave function display.',
+        compatible: ['QAN-001', 'SCA-001', 'AIC-001'],
+      },
+      'state': {
+        name: 'Quantum State Monitor',
+        id: 'QSM-001',
+        version: '1.2.0',
+        desc: 'Monitors quantum coherence and qubit entanglement.\n127-qubit array with real-time wave function display.',
+        compatible: ['QAN-001', 'SCA-001', 'AIC-001'],
+      },
+      'network': {
+        name: 'Network Monitor',
+        id: 'NET-001',
+        version: '2.1.0',
+        desc: 'Monitors network throughput and connectivity.\nReal-time bandwidth visualization with latency tracking.',
+        compatible: ['SCA-001', 'AIC-001', 'QSM-001', 'DGN-001'],
+      },
+      'net': {
+        name: 'Network Monitor',
+        id: 'NET-001',
+        version: '2.1.0',
+        desc: 'Monitors network throughput and connectivity.\nReal-time bandwidth visualization with latency tracking.',
+        compatible: ['SCA-001', 'AIC-001', 'QSM-001', 'DGN-001'],
+      },
+      'temp': {
+        name: 'Temperature Monitor',
+        id: 'TMP-001',
+        version: '1.0.0',
+        desc: 'Thermal monitoring system for lab equipment.\nTracks CPU/GPU and ambient temperatures with alerts.',
+        compatible: ['VNT-001', 'MFR-001', 'SCA-001', 'DGN-001'],
+      },
+      'thermal': {
+        name: 'Temperature Monitor',
+        id: 'TMP-001',
+        version: '1.0.0',
+        desc: 'Thermal monitoring system for lab equipment.\nTracks CPU/GPU and ambient temperatures with alerts.',
+        compatible: ['VNT-001', 'MFR-001', 'SCA-001', 'DGN-001'],
+      },
+      'dim': {
+        name: 'Dimension Monitor',
+        id: 'DIM-001',
+        version: '1.0.0',
+        desc: 'Monitors dimensional stability and rift activity.\nTracks D-space coordinates and Halo Plane proximity.',
+        compatible: ['QSM-001', 'EMC-001', 'QAN-001'],
+      },
+      'dimension': {
+        name: 'Dimension Monitor',
+        id: 'DIM-001',
+        version: '1.0.0',
+        desc: 'Monitors dimensional stability and rift activity.\nTracks D-space coordinates and Halo Plane proximity.',
+        compatible: ['QSM-001', 'EMC-001', 'QAN-001'],
+      },
+      'cpu': {
+        name: 'CPU Monitor',
+        id: 'CPU-001',
+        version: '3.2.1',
+        desc: 'Multi-core processor utilization monitor.\nTracks core loads, frequency scaling, and thermal limits.',
+        compatible: ['TMP-001', 'VNT-001', 'SCA-001', 'MFR-001'],
+      },
+      'processor': {
+        name: 'CPU Monitor',
+        id: 'CPU-001',
+        version: '3.2.1',
+        desc: 'Multi-core processor utilization monitor.\nTracks core loads, frequency scaling, and thermal limits.',
+        compatible: ['TMP-001', 'VNT-001', 'SCA-001', 'MFR-001'],
+      },
+      'clock': {
+        name: 'Lab Clock',
+        id: 'CLK-001',
+        version: '2.4.0',
+        desc: 'Multi-mode time display system with 6 modes.\nLOCAL, UTC, DATE, UPTIME, COUNTDOWN, STOPWATCH.',
+        compatible: ['DGN-001', 'SCA-001', 'ALL'],
+      },
+      'time': {
+        name: 'Lab Clock',
+        id: 'CLK-001',
+        version: '2.4.0',
+        desc: 'Multi-mode time display system with 6 modes.\nLOCAL, UTC, DATE, UPTIME, COUNTDOWN, STOPWATCH.',
+        compatible: ['DGN-001', 'SCA-001', 'ALL'],
+      },
+      'diag': {
+        name: 'Diagnostics Console',
+        id: 'DGN-001',
+        version: '1.0.0',
+        desc: 'Universal system diagnostics and monitoring.\nCovers SYSTEMS, DEVICES, ENERGY, NETWORK, CRYSTALS, PROCESS.',
+        compatible: ['ALL'],
+      },
+    }
+
+    const device = deviceMap[deviceName]
+    if (!device) {
+      return {
+        success: false,
+        error: `Unknown device: ${deviceName}\nUse DEVICE LIST to see available devices.`,
+      }
+    }
+
+    // Device info
+    if (!action || action === 'info') {
+      const compatList = device.compatible.join(', ')
+      return {
+        success: true,
+        output: [
+          '',
+          `┌─────────────────────────────────────────────────────────────┐`,
+          `│  DEVICE: ${device.name.padEnd(47)} │`,
+          `└─────────────────────────────────────────────────────────────┘`,
+          '',
+          `  ID:           ${device.id}`,
+          `  Version:      ${device.version}`,
+          `  Status:       ONLINE`,
+          '',
+          `  Description:`,
+          ...device.desc.split('\n').map(line => `    ${line}`),
+          '',
+          `  Compatible:   ${compatList}`,
+          '',
+          `  Commands:`,
+          `    DEVICE ${deviceName.toUpperCase()} TEST   - Run diagnostics`,
+          `    DEVICE ${deviceName.toUpperCase()} REBOOT - Reboot device`,
+          `    DEVICE ${deviceName.toUpperCase()} STATUS - Show current status`,
+          '',
+        ],
+      }
+    }
+
+    // Device test
+    if (action === 'test') {
+      ctx.setTyping(true)
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          `[TEST] ${device.name} (${device.id})`,
+          '────────────────────────────────────────',
+          '[CHECK] Memory integrity............ OK',
+          '[CHECK] Data bus connection......... OK',
+          '[CHECK] Cache coherence............. OK',
+          '[CHECK] Power supply................ OK',
+          '[CHECK] Communication protocol...... OK',
+          '',
+          `[RESULT] All diagnostics PASSED`,
+          `[TIME]   ${new Date().toISOString()}`,
+          '',
+        ],
+      }
+    }
+
+    // Device reboot/reset
+    if (action === 'reset' || action === 'reboot') {
+      ctx.setTyping(true)
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          `[REBOOT] ${device.name} (${device.id})`,
+          '────────────────────────────────────────',
+          '[STOP]  Halting device.............. OK',
+          '[FLUSH] Clearing data buffers....... OK',
+          '[POST]  Power-on self test.......... OK',
+          '[INIT]  Initializing subsystems..... OK',
+          '[SYNC]  Re-synchronizing data....... OK',
+          '[BOOT]  Device online............... OK',
+          '',
+          `[RESULT] Device reboot complete`,
+          `[TIME]   ${new Date().toISOString()}`,
+          '',
+        ],
+      }
+    }
+
+    // Device status
+    if (action === 'status') {
+      return {
+        success: true,
+        output: [
+          '',
+          `┌─────────────────────────────────────────────────────────────┐`,
+          `│  STATUS: ${device.name.padEnd(47)} │`,
+          `└─────────────────────────────────────────────────────────────┘`,
+          '',
+          `  Device ID:     ${device.id}`,
+          `  Version:       ${device.version}`,
+          `  Status:        ● ONLINE`,
+          `  Uptime:        ${Math.floor(Math.random() * 24)}h ${Math.floor(Math.random() * 60)}m`,
+          `  Last Test:     ${new Date(Date.now() - Math.random() * 3600000).toLocaleTimeString()}`,
+          `  Errors:        0`,
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `Unknown action: ${action}\nAvailable: TEST, REBOOT, STATUS, INFO`,
+    }
+  },
+}
+
 // Command registry
 export const commands: Command[] = [
   helpCommand,
@@ -1043,6 +1468,7 @@ export const commands: Command[] = [
   runCommand,
   killCommand,
   unsystemctlCommand,
+  deviceCommand,
 ]
 
 // Find command by name or alias

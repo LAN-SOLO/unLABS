@@ -41,6 +41,12 @@ import {
   Printer3D,
   ExoticMatterContainment,
   SupercomputerArray,
+  QuantumStateMonitor,
+  NetworkMonitor,
+  TemperatureMonitor,
+  DimensionMonitor,
+  CpuMonitor,
+  LabClock,
 } from '@/components/panel/modules/EquipmentTile'
 import { ResourceBar } from '@/components/panel/modules/ResourceBar'
 import { VentilationFan } from '@/components/panel/modules/VentilationFan'
@@ -61,6 +67,25 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
   const [isLaserOn, setIsLaserOn] = useState(false)
   const [isActivated, setIsActivated] = useState(false)
   const [isRunning, setIsRunning] = useState(true)
+
+  // Simulated system loads for ventilation fans
+  const [cpuLoad, setCpuLoad] = useState(45)
+  const [gpuLoad, setGpuLoad] = useState(62)
+
+  // Simulate varying system loads
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCpuLoad(prev => {
+        const delta = (Math.random() - 0.5) * 20
+        return Math.min(95, Math.max(15, prev + delta))
+      })
+      setGpuLoad(prev => {
+        const delta = (Math.random() - 0.5) * 25
+        return Math.min(98, Math.max(20, prev + delta))
+      })
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [])
 
   // Check for panel access from terminal
   useEffect(() => {
@@ -255,8 +280,11 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
         {/* Interpolator - linked to optics tech tree */}
         <Interpolator progress={techTrees?.optics} />
 
-        {/* Ventilation Fan - system cooling */}
-        <VentilationFan />
+        {/* Ventilation Fans - system cooling, speed varies with workload */}
+        <div className="flex gap-1 flex-1 min-h-0">
+          <VentilationFan label="CPU" systemLoad={cpuLoad} targetTemp={35} className="flex-1" />
+          <VentilationFan label="GPU" systemLoad={gpuLoad} targetTemp={40} className="flex-1" />
+        </div>
       </PanelLeft>
 
       {/* Main Area - Terminal + Organized Modules */}
@@ -338,37 +366,11 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
             <div className="border-t border-[var(--neon-cyan)]/20 pt-1">
               <div className="font-mono text-[7px] text-white/40 mb-1 px-1">SYSTEM STATUS</div>
               <div className="grid grid-cols-5 gap-1">
-                <ExoticMatterContainment units={12} stability={76} isContained={true} />
-                <PanelFrame variant="teal" className="p-1.5">
-                  <div className="font-mono text-[8px] text-[var(--neon-cyan)] mb-0.5">QUANTUM</div>
-                  <div className="h-5 bg-black/40 rounded flex items-center justify-center">
-                    <span className="font-mono text-[10px] text-[var(--neon-cyan)]">|ψ⟩</span>
-                  </div>
-                  <div className="font-mono text-[6px] text-white/40 mt-0.5">COHERENT</div>
-                </PanelFrame>
-                <PanelFrame variant="military" className="p-1.5">
-                  <div className="font-mono text-[8px] text-[var(--neon-lime,#bfff00)] mb-0.5">NETWORK</div>
-                  <div className="h-5 bg-black/40 rounded p-0.5 flex items-end gap-px">
-                    {[60, 80, 45, 90, 70].map((h, i) => (
-                      <div key={i} className="flex-1 bg-[var(--neon-lime,#bfff00)]/60" style={{ height: `${h}%` }} />
-                    ))}
-                  </div>
-                  <div className="font-mono text-[6px] text-white/40 mt-0.5">2.4 Gbps</div>
-                </PanelFrame>
-                <PanelFrame variant="default" className="p-1.5">
-                  <div className="font-mono text-[8px] text-[var(--neon-amber)] mb-0.5">TEMP</div>
-                  <div className="h-5 bg-black/40 rounded flex items-center px-1">
-                    <div className="flex-1 h-1.5 bg-gradient-to-r from-[var(--neon-cyan)] via-[var(--neon-green)] to-[var(--neon-red)] rounded" />
-                  </div>
-                  <div className="font-mono text-[6px] text-white/40 mt-0.5">28.4°C</div>
-                </PanelFrame>
-                <PanelFrame variant="teal" className="p-1.5">
-                  <div className="font-mono text-[8px] text-[var(--neon-purple,#9d00ff)] mb-0.5">DIM</div>
-                  <div className="h-5 bg-black/40 rounded flex items-center justify-center">
-                    <span className="font-mono text-[9px] text-white/60">D-3.14</span>
-                  </div>
-                  <div className="font-mono text-[6px] text-white/40 mt-0.5">STABLE</div>
-                </PanelFrame>
+                <ExoticMatterContainment units={42} stability={76} isContained={true} />
+                <QuantumStateMonitor coherence={94} qubits={127} isEntangled={true} />
+                <NetworkMonitor bandwidth={2.4} latency={12} isConnected={true} />
+                <TemperatureMonitor temperature={28.4} minTemp={15} maxTemp={85} />
+                <DimensionMonitor dimension={3.14} stability={98} riftActivity={0.02} />
               </div>
             </div>
 
@@ -379,23 +381,8 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                 <PortableWorkbench queuedItems={2} craftingProgress={45} />
                 <BasicToolkit />
                 <MaterialScanner scanProgress={78} detectedMaterials={5} />
-                <PanelFrame variant="default" className="p-1.5">
-                  <div className="font-mono text-[8px] text-[var(--neon-green)] mb-0.5">CLOCK</div>
-                  <div className="h-5 bg-black/40 rounded flex items-center justify-center">
-                    <span className="font-mono text-[11px] text-[var(--neon-green)] text-glow-green">
-                      {new Date().toLocaleTimeString('en-US', { hour12: false })}
-                    </span>
-                  </div>
-                </PanelFrame>
-                <PanelFrame variant="teal" className="p-1.5">
-                  <div className="font-mono text-[8px] text-[var(--neon-cyan)] mb-0.5">CPU</div>
-                  <div className="h-5 bg-black/40 rounded flex items-end p-0.5 gap-px">
-                    {[40, 65, 80, 55, 70, 90].map((h, i) => (
-                      <div key={i} className="flex-1 bg-[var(--neon-cyan)]" style={{ height: `${h}%` }} />
-                    ))}
-                  </div>
-                  <div className="font-mono text-[6px] text-white/40">67%</div>
-                </PanelFrame>
+                <LabClock />
+                <CpuMonitor cores={8} utilization={67} frequency={4.2} />
                 <PanelFrame variant="military" className="p-1.5">
                   <div className="font-mono text-[8px] text-[var(--neon-amber)] mb-0.5">MEM</div>
                   <div className="h-5 bg-black/40 rounded p-0.5">

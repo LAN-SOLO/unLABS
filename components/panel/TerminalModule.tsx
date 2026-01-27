@@ -40,6 +40,93 @@ function VentHoles({ count = 8, vertical = false }: { count?: number; vertical?:
   )
 }
 
+// System status messages for ticker
+const STATUS_MESSAGES = [
+  '◈ QUANTUM CORE STABLE ◈ FLUX: 98.7%',
+  '◈ MEMORY BANKS ONLINE ◈ 64TB AVAILABLE',
+  '◈ NEURAL LINK ACTIVE ◈ LATENCY: 0.3ms',
+  '◈ POWER GRID NOMINAL ◈ 847MW OUTPUT',
+  '◈ COOLING SYSTEM OK ◈ TEMP: 28.4°C',
+  '◈ NETWORK SYNC ◈ 2.4 Gbps THROUGHPUT',
+  '◈ CRYPTO PROCESSOR ◈ HASH RATE: 142 TH/s',
+  '◈ SHIELD GENERATOR ◈ INTEGRITY: 100%',
+  '◈ DIMENSIONAL ANCHOR ◈ D-3.14 LOCKED',
+  '◈ ANOMALY SCAN ◈ NO THREATS DETECTED',
+  '◈ QUANTUM ENTANGLE ◈ PAIR STATUS: SYNC',
+  '◈ AI SUBSYSTEM ◈ LEARNING MODE ACTIVE',
+  '◈ REACTOR CORE ◈ FUSION STABLE',
+  '◈ GRAVITY WELL ◈ 1.0G MAINTAINED',
+  '◈ TIME CRYSTAL ◈ OSCILLATION NORMAL',
+  '◈ VOID SCANNER ◈ RANGE: 2.4 LY',
+  '◈ MATTER COMPILER ◈ QUEUE: 7 ITEMS',
+  '◈ TELEPORT PAD ◈ CHARGE: 85%',
+  '◈ STEALTH FIELD ◈ SIGNATURE: MINIMAL',
+  '◈ COMM ARRAY ◈ 47 CHANNELS OPEN',
+]
+
+// Scrolling status ticker component
+function StatusTicker() {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [isAnimating, setIsAnimating] = useState(false)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsAnimating(true)
+      setTimeout(() => {
+        setCurrentIndex((prev) => (prev + 1) % STATUS_MESSAGES.length)
+        setIsAnimating(false)
+      }, 500)
+    }, 4000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <div
+      className="w-[280px] h-5 rounded overflow-hidden relative"
+      style={{
+        background: 'linear-gradient(180deg, #0a0a0a 0%, #0f0f12 50%, #0a0a0a 100%)',
+        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.8), inset 0 -1px 1px rgba(255,255,255,0.03)',
+        border: '1px solid #1a1a2a',
+      }}
+    >
+      {/* Scanline effect */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-20"
+        style={{
+          backgroundImage: 'repeating-linear-gradient(0deg, transparent 0px, transparent 1px, rgba(0,255,100,0.03) 1px, rgba(0,255,100,0.03) 2px)',
+        }}
+      />
+
+      {/* Text container */}
+      <div className="absolute inset-0 flex items-center justify-center overflow-hidden">
+        <span
+          className={cn(
+            'font-mono text-[8px] tracking-wide whitespace-nowrap transition-all duration-500',
+            isAnimating ? 'opacity-0 translate-y-2' : 'opacity-100 translate-y-0'
+          )}
+          style={{
+            color: 'var(--neon-green)',
+            textShadow: '0 0 8px var(--neon-green), 0 0 2px var(--neon-green)',
+          }}
+        >
+          {STATUS_MESSAGES[currentIndex]}
+        </span>
+      </div>
+
+      {/* Edge fade */}
+      <div
+        className="absolute inset-y-0 left-0 w-4 pointer-events-none"
+        style={{ background: 'linear-gradient(to right, #0a0a0a 0%, transparent 100%)' }}
+      />
+      <div
+        className="absolute inset-y-0 right-0 w-4 pointer-events-none"
+        style={{ background: 'linear-gradient(to left, #0a0a0a 0%, transparent 100%)' }}
+      />
+    </div>
+  )
+}
+
 export function TerminalModule({
   userId,
   username,
@@ -269,20 +356,8 @@ export function TerminalModule({
             </div>
           </div>
 
-          {/* Center: Manufacturer badge */}
-          <div className="flex items-center gap-2">
-            <div
-              className="px-4 py-1 rounded"
-              style={{
-                background: 'linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%)',
-                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.05)',
-              }}
-            >
-              <span className="font-mono text-[8px] text-[var(--neon-green)]/60 tracking-widest">
-                ◈ QUANTUM DISPLAY TECH ◈
-              </span>
-            </div>
-          </div>
+          {/* Center: Status ticker display */}
+          <StatusTicker />
 
           {/* Right: Controls and screw */}
           <div className="flex items-center gap-3">

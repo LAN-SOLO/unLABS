@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { PanelFrame } from '../PanelFrame'
 import { LED } from '../controls/LED'
@@ -41,6 +41,9 @@ export function QuantumAnalyzer({ className }: QuantumAnalyzerProps) {
 
   // Waveform data for display
   const [waveformData, setWaveformData] = useState<number[]>(Array(64).fill(50))
+
+  // Ref for autoscroll
+  const logContainerRef = useRef<HTMLDivElement>(null)
 
   // Mode configurations
   const modeConfigs: Record<AnalysisMode, { color: string; icon: string; description: string }> = {
@@ -207,6 +210,13 @@ export function QuantumAnalyzer({ className }: QuantumAnalyzerProps) {
     return () => clearInterval(interval)
   }, [isPowered, isAnalyzing, sensitivity])
 
+  // Autoscroll output log when new content is added
+  useEffect(() => {
+    if (logContainerRef.current) {
+      logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight
+    }
+  }, [outputLog])
+
   const currentConfig = modeConfigs[mode]
 
   return (
@@ -267,37 +277,37 @@ export function QuantumAnalyzer({ className }: QuantumAnalyzerProps) {
           <div className="font-mono text-[8px] text-white/40 mt-1">{Math.floor(bootProgress)}%</div>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col p-2 gap-2 overflow-hidden">
-          {/* Mode selector */}
-          <div className="flex gap-1">
+        <div className="flex-1 flex flex-col p-2 gap-1.5 overflow-hidden">
+          {/* Mode selector - compact */}
+          <div className="flex gap-0.5 shrink-0">
             {(Object.keys(modeConfigs) as AnalysisMode[]).map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
                 className={cn(
-                  'flex-1 py-1.5 rounded font-mono text-[7px] transition-all',
+                  'flex-1 py-1 rounded font-mono text-[6px] transition-all',
                   mode === m
                     ? 'text-black font-bold shadow-lg'
                     : 'bg-[#1a1a2a] text-white/50 border border-[#2a2a4a] hover:border-white/20'
                 )}
                 style={{
                   backgroundColor: mode === m ? modeConfigs[m].color : undefined,
-                  boxShadow: mode === m ? `0 0 10px ${modeConfigs[m].color}` : undefined,
+                  boxShadow: mode === m ? `0 0 8px ${modeConfigs[m].color}` : undefined,
                 }}
               >
-                <span className="mr-1">{modeConfigs[m].icon}</span>
+                <span className="mr-0.5">{modeConfigs[m].icon}</span>
                 {m}
               </button>
             ))}
           </div>
 
-          {/* Mode description */}
-          <div className="font-mono text-[7px] text-white/40 text-center" style={{ color: currentConfig.color }}>
+          {/* Mode description - compact */}
+          <div className="font-mono text-[6px] text-center shrink-0" style={{ color: currentConfig.color }}>
             {currentConfig.description}
           </div>
 
-          {/* Waveform display */}
-          <div className="h-16 bg-[#050510] rounded border border-[#1a1a3a] relative overflow-hidden">
+          {/* Waveform display - fixed height */}
+          <div className="h-12 shrink-0 bg-[#050510] rounded border border-[#1a1a3a] relative overflow-hidden">
             <div className="absolute inset-0 flex items-end justify-around px-0.5 pb-0.5">
               {waveformData.map((height, i) => (
                 <div
@@ -331,31 +341,33 @@ export function QuantumAnalyzer({ className }: QuantumAnalyzerProps) {
             }} />
           </div>
 
-          {/* Controls row */}
-          <div className="flex items-center justify-between bg-[#0a0a1a] rounded p-2 border border-[#1a1a3a]">
-            <div className="flex items-center gap-3">
+          {/* Controls + Results combined row */}
+          <div className="flex gap-1.5 shrink-0">
+            {/* Knobs */}
+            <div className="flex items-center gap-2 bg-[#0a0a1a] rounded p-1.5 border border-[#1a1a3a]">
               <div className="flex flex-col items-center">
-                <span className="font-mono text-[6px] text-white/40">SENS</span>
+                <span className="font-mono text-[5px] text-white/40">SENS</span>
                 <Knob value={sensitivity} onChange={setSensitivity} size="sm" accentColor={currentConfig.color} />
-                <span className="font-mono text-[7px]" style={{ color: currentConfig.color }}>{sensitivity}%</span>
+                <span className="font-mono text-[6px]" style={{ color: currentConfig.color }}>{sensitivity}%</span>
               </div>
               <div className="flex flex-col items-center">
-                <span className="font-mono text-[6px] text-white/40">DEPTH</span>
+                <span className="font-mono text-[5px] text-white/40">DEPTH</span>
                 <Knob value={depth} onChange={setDepth} size="sm" accentColor={currentConfig.color} />
-                <span className="font-mono text-[7px]" style={{ color: currentConfig.color }}>{depth}%</span>
+                <span className="font-mono text-[6px]" style={{ color: currentConfig.color }}>{depth}%</span>
               </div>
               <div className="flex flex-col items-center">
-                <span className="font-mono text-[6px] text-white/40">FREQ</span>
+                <span className="font-mono text-[5px] text-white/40">FREQ</span>
                 <Knob value={frequency} onChange={setFrequency} size="sm" accentColor={currentConfig.color} />
-                <span className="font-mono text-[7px]" style={{ color: currentConfig.color }}>{frequency}Hz</span>
+                <span className="font-mono text-[6px]" style={{ color: currentConfig.color }}>{frequency}Hz</span>
               </div>
             </div>
 
+            {/* Run button */}
             <button
               onClick={runAnalysis}
               disabled={isAnalyzing}
               className={cn(
-                'px-4 py-2 rounded font-mono text-[9px] font-bold transition-all',
+                'flex-1 rounded font-mono text-[8px] font-bold transition-all',
                 isAnalyzing
                   ? 'bg-[var(--neon-amber)] text-black animate-pulse'
                   : 'hover:brightness-110'
@@ -363,30 +375,30 @@ export function QuantumAnalyzer({ className }: QuantumAnalyzerProps) {
               style={{
                 backgroundColor: isAnalyzing ? undefined : currentConfig.color,
                 color: 'black',
-                boxShadow: `0 0 15px ${currentConfig.color}`,
+                boxShadow: `0 0 12px ${currentConfig.color}`,
               }}
             >
-              {isAnalyzing ? `ANALYZING ${Math.floor(analysisProgress)}%` : 'RUN ANALYSIS'}
+              {isAnalyzing ? `${Math.floor(analysisProgress)}%` : 'RUN ANALYSIS'}
             </button>
           </div>
 
-          {/* Results grid */}
-          {scanResults.length > 0 && (
-            <div className="grid grid-cols-4 gap-1">
-              {scanResults.map((result) => (
+          {/* Results grid - fixed height */}
+          <div className="grid grid-cols-4 gap-0.5 h-[36px] shrink-0">
+            {scanResults.length > 0 ? (
+              scanResults.map((result) => (
                 <div
                   key={result.id}
                   className={cn(
-                    'p-1.5 rounded border',
+                    'p-1 rounded border',
                     result.status === 'critical' ? 'bg-[var(--neon-red)]/10 border-[var(--neon-red)]/50' :
                     result.status === 'warning' ? 'bg-[var(--neon-amber)]/10 border-[var(--neon-amber)]/50' :
                     result.status === 'optimal' ? 'bg-[var(--neon-green)]/10 border-[var(--neon-green)]/50' :
                     'bg-[#1a1a2a] border-[#2a2a4a]'
                   )}
                 >
-                  <div className="font-mono text-[6px] text-white/50">{result.type}</div>
+                  <div className="font-mono text-[5px] text-white/50 truncate">{result.type}</div>
                   <div className={cn(
-                    'font-mono text-[10px] font-bold',
+                    'font-mono text-[8px] font-bold',
                     result.status === 'critical' ? 'text-[var(--neon-red)]' :
                     result.status === 'warning' ? 'text-[var(--neon-amber)]' :
                     result.status === 'optimal' ? 'text-[var(--neon-green)]' :
@@ -395,31 +407,106 @@ export function QuantumAnalyzer({ className }: QuantumAnalyzerProps) {
                     {result.value}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-
-          {/* Output log */}
-          <div className="flex-1 bg-[#050510] rounded border border-[#1a1a3a] p-1.5 overflow-hidden">
-            <div className="h-full overflow-y-auto font-mono text-[7px]">
-              {outputLog.map((line, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    'leading-relaxed',
-                    line.includes('SUCCESS') || line.includes('READY') || line.includes('complete') ? 'text-[var(--neon-green)]' :
-                    line.includes('WARNING') || line.includes('fault') ? 'text-[var(--neon-amber)]' :
-                    line.includes('ERROR') || line.includes('CRITICAL') ? 'text-[var(--neon-red)]' :
-                    line.startsWith('─') || line.startsWith('>') ? 'text-[var(--neon-cyan)]' :
-                    line.startsWith('  └') ? 'text-white/60' :
-                    'text-[var(--crt-green)]'
-                  )}
-                >
-                  {line}
+              ))
+            ) : (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="p-1 rounded border bg-[#0a0a15] border-[#1a1a2a]">
+                  <div className="font-mono text-[5px] text-white/15">SLOT {i + 1}</div>
+                  <div className="font-mono text-[8px] font-bold text-white/10">--</div>
                 </div>
-              ))}
-              {isPowered && <span className="inline-block w-1.5 h-3 bg-[var(--crt-green)] animate-pulse ml-0.5" />}
+              ))
+            )}
+          </div>
+
+          {/* Output log - Old CRT screen style */}
+          <div className="flex-1 min-h-[60px] relative rounded overflow-hidden shrink-0"
+            style={{
+              background: '#020804',
+              boxShadow: 'inset 0 0 30px rgba(0,20,0,0.8), inset 0 0 10px rgba(0,0,0,0.9)',
+              border: '2px solid #1a1a1a',
+              borderRadius: '4px',
+            }}
+          >
+            {/* CRT screen bezel */}
+            <div className="absolute inset-0 rounded"
+              style={{
+                background: 'linear-gradient(145deg, #2a2a2a 0%, #0a0a0a 50%, #1a1a1a 100%)',
+                padding: '3px',
+              }}
+            >
+              {/* Inner screen area */}
+              <div className="relative w-full h-full rounded-sm overflow-hidden"
+                style={{
+                  background: '#010602',
+                  boxShadow: 'inset 0 0 20px rgba(0,40,0,0.5)',
+                }}
+              >
+                {/* Screen content */}
+                <div
+                  ref={logContainerRef}
+                  className="absolute inset-1 overflow-y-auto font-mono text-[6px] leading-relaxed z-10"
+                  style={{ textShadow: '0 0 2px rgba(0,255,0,0.5)' }}
+                >
+                  {outputLog.map((line, i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        line.includes('SUCCESS') || line.includes('READY') || line.includes('complete') ? 'text-[#4eff4e]' :
+                        line.includes('WARNING') || line.includes('fault') ? 'text-[#ffcc00]' :
+                        line.includes('ERROR') || line.includes('CRITICAL') ? 'text-[#ff4444]' :
+                        line.startsWith('─') || line.startsWith('>') ? 'text-[#00ffaa]' :
+                        line.startsWith('  └') ? 'text-[#33aa33]' :
+                        'text-[#33ff33]'
+                      )}
+                    >
+                      {line}
+                    </div>
+                  ))}
+                  {isPowered && <span className="inline-block w-1.5 h-2.5 bg-[#33ff33] animate-pulse ml-0.5" style={{ boxShadow: '0 0 4px #33ff33' }} />}
+                </div>
+
+                {/* CRT scanlines overlay */}
+                <div className="absolute inset-0 pointer-events-none z-20"
+                  style={{
+                    backgroundImage: 'repeating-linear-gradient(0deg, transparent 0px, transparent 1px, rgba(0,0,0,0.3) 1px, rgba(0,0,0,0.3) 2px)',
+                    backgroundSize: '100% 2px',
+                  }}
+                />
+
+                {/* Screen flicker effect */}
+                <div className="absolute inset-0 pointer-events-none z-20 opacity-[0.02]"
+                  style={{ animation: 'crt-flicker 0.1s infinite' }}
+                />
+
+                {/* Vignette/curvature effect */}
+                <div className="absolute inset-0 pointer-events-none z-30"
+                  style={{
+                    background: 'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.4) 80%, rgba(0,0,0,0.8) 100%)',
+                  }}
+                />
+
+                {/* Screen reflection */}
+                <div className="absolute inset-0 pointer-events-none z-30 opacity-10"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%)',
+                  }}
+                />
+
+                {/* Phosphor glow */}
+                <div className="absolute inset-0 pointer-events-none z-10"
+                  style={{
+                    background: 'radial-gradient(ellipse at center, rgba(0,60,0,0.15) 0%, transparent 70%)',
+                  }}
+                />
+              </div>
             </div>
+
+            <style jsx>{`
+              @keyframes crt-flicker {
+                0%, 100% { opacity: 0.02; }
+                50% { opacity: 0.04; }
+              }
+            `}</style>
           </div>
         </div>
       )}
