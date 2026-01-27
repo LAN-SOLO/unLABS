@@ -215,7 +215,7 @@ const helpCommand: Command = {
       '|    reactor, ai, super, drone, magnet, tank, exotic, qsm,   |',
       '|    net, temp, dim, cpu, clock, mem, anomaly, compass,      |',
       '|    teleport, vent, diag, laser, printer, thermal, toolkit, |',
-      '|    scanner                                                  |',
+      '|    scanner, power                                           |',
       '+------------------------------------------------------------+',
       '|                      thermal                               |',
       '+------------------------------------------------------------+',
@@ -228,6 +228,17 @@ const helpCommand: Command = {
       '|  fan ids: cpu, gpu                                         |',
       '|  modes: auto, low, med, high, or 0-100 (speed %)           |',
       '+------------------------------------------------------------+',
+      '|                       power                                |',
+      '+------------------------------------------------------------+',
+      '|  power     - power management system (pwrmgmt)             |',
+      '|             power status      - show power overview        |',
+      '|             power devices     - list power consumers       |',
+      '|             power grid        - show power grid topology   |',
+      '|             power on <id>     - turn on a device           |',
+      '|             power off <id>    - turn off a device          |',
+      '|             power fault       - show fault diagnostics     |',
+      '|             power emergency   - emergency shutdown         |',
+      '+------------------------------------------------------------+',
       '|                      system                                |',
       '+------------------------------------------------------------+',
       '|  unsystemctl - system control (reboot, poweroff, status)   |',
@@ -236,6 +247,7 @@ const helpCommand: Command = {
       'usage: mint <name> | crystal <name> | rename <old> <new>',
       '       run panel dev -un | kill panel dev -un',
       '       thermal fan cpu 75 | thermal auto on',
+      '       power status | power on tlp-001 | power emergency -now',
       '       unsystemctl shutdown -now | unsystemctl reboot -now',
       'type a command and press enter to execute.',
       '',
@@ -1106,6 +1118,7 @@ const deviceCommand: Command = {
           '  THM-001   Thermal Manager         v1.0.0    ONLINE    ',
           '  BTK-001   Basic Toolkit           v1.2.0    ONLINE    ',
           '  MSC-001   Material Scanner        v1.3.0    ONLINE    ',
+          '  PWR-001   Power Management Sys.   v1.0.0    ONLINE    ',
           '',
           '  usage: device <name> [test|reset|status|info]',
           '  example: device cache test',
@@ -1529,6 +1542,27 @@ const deviceCommand: Command = {
         desc: 'Tier 1 handheld scanner for resource detection.\nIdentifies nearby resource nodes and small anomalies.\nHelps locate Abstractum deposits and flags minor anomaly signals.',
         compatible: ['BTK-001', 'AND-001', 'QCP-001', 'RMG-001', 'ALL'],
       },
+      'power': {
+        name: 'Power Management System',
+        id: 'PWR-001',
+        version: '1.0.0',
+        desc: 'Central power management and monitoring system.\nTracks power generation, consumption, storage, and grid health.\nManages device power states and provides fault protection.\nSupports emergency shutdown and load balancing.',
+        compatible: ['UEC-001', 'MFR-001', 'BAT-001', 'THM-001', 'DGN-001', 'ALL'],
+      },
+      'pwr': {
+        name: 'Power Management System',
+        id: 'PWR-001',
+        version: '1.0.0',
+        desc: 'Central power management and monitoring system.\nTracks power generation, consumption, storage, and grid health.\nManages device power states and provides fault protection.\nSupports emergency shutdown and load balancing.',
+        compatible: ['UEC-001', 'MFR-001', 'BAT-001', 'THM-001', 'DGN-001', 'ALL'],
+      },
+      'pwrmgmt': {
+        name: 'Power Management System',
+        id: 'PWR-001',
+        version: '1.0.0',
+        desc: 'Central power management and monitoring system.\nTracks power generation, consumption, storage, and grid health.\nManages device power states and provides fault protection.\nSupports emergency shutdown and load balancing.',
+        compatible: ['UEC-001', 'MFR-001', 'BAT-001', 'THM-001', 'DGN-001', 'ALL'],
+      },
     }
 
     const device = deviceMap[deviceName]
@@ -1643,6 +1677,427 @@ const deviceCommand: Command = {
     return {
       success: false,
       error: `Unknown action: ${action}\nAvailable: TEST, REBOOT, STATUS, INFO`,
+    }
+  },
+}
+
+// Power management command
+const powerCommand: Command = {
+  name: 'power',
+  aliases: ['pwr', 'pwrmgmt', 'energy'],
+  description: 'Power management system',
+  usage: 'power [status|devices|grid|on|off|fault|emergency]',
+  execute: async (args, ctx) => {
+    const action = args[0]?.toLowerCase()
+    const target = args[1]?.toLowerCase()
+    const param = args[2]?.toLowerCase()
+
+    // Power source definitions
+    const powerSources = [
+      { id: 'UEC-001', name: 'Unstable Energy Core', output: 150, maxOutput: 200, status: 'online', efficiency: 75, tier: 1 },
+      { id: 'MFR-001', name: 'Microfusion Reactor', output: 500, maxOutput: 600, status: 'online', efficiency: 92, tier: 2 },
+    ]
+
+    // Power storage definitions
+    const powerStorage = [
+      { id: 'BAT-001', name: 'Battery Pack', stored: 850, capacity: 1000, status: 'charging', chargeRate: 25 },
+    ]
+
+    // Consuming devices with power draw
+    const powerConsumers = [
+      { id: 'CDC-001', name: 'Crystal Data Cache', draw: 15, priority: 1, status: 'on' },
+      { id: 'HMS-001', name: 'Handmade Synthesizer', draw: 45, priority: 2, status: 'on' },
+      { id: 'ECR-001', name: 'Echo Recorder', draw: 20, priority: 2, status: 'on' },
+      { id: 'INT-001', name: 'Interpolator', draw: 30, priority: 2, status: 'on' },
+      { id: 'AIC-001', name: 'AI Assistant Core', draw: 80, priority: 1, status: 'on' },
+      { id: 'SCA-001', name: 'Supercomputer Array', draw: 150, priority: 3, status: 'on' },
+      { id: 'EXD-001', name: 'Explorer Drone', draw: 35, priority: 3, status: 'standby' },
+      { id: 'RMG-001', name: 'Resource Magnet', draw: 25, priority: 3, status: 'on' },
+      { id: 'ATK-001', name: 'Abstractum Tank', draw: 10, priority: 1, status: 'on' },
+      { id: 'EMC-001', name: 'Exotic Matter Contain.', draw: 120, priority: 1, status: 'on' },
+      { id: 'VNT-001', name: 'Ventilation System', draw: 40, priority: 1, status: 'on' },
+      { id: 'OSC-001', name: 'Oscilloscope Array', draw: 25, priority: 2, status: 'on' },
+      { id: 'QAN-001', name: 'Quantum Analyzer', draw: 60, priority: 2, status: 'on' },
+      { id: 'QSM-001', name: 'Quantum State Monitor', draw: 55, priority: 2, status: 'on' },
+      { id: 'NET-001', name: 'Network Monitor', draw: 20, priority: 2, status: 'on' },
+      { id: 'TMP-001', name: 'Temperature Monitor', draw: 5, priority: 1, status: 'on' },
+      { id: 'DIM-001', name: 'Dimension Monitor', draw: 40, priority: 2, status: 'on' },
+      { id: 'CPU-001', name: 'CPU Monitor', draw: 10, priority: 1, status: 'on' },
+      { id: 'CLK-001', name: 'Lab Clock', draw: 2, priority: 1, status: 'on' },
+      { id: 'MEM-001', name: 'Memory Monitor', draw: 8, priority: 1, status: 'on' },
+      { id: 'AND-001', name: 'Anomaly Detector', draw: 45, priority: 2, status: 'on' },
+      { id: 'QCP-001', name: 'Quantum Compass', draw: 30, priority: 3, status: 'on' },
+      { id: 'TLP-001', name: 'Teleport Pad', draw: 200, priority: 4, status: 'standby' },
+      { id: 'DGN-001', name: 'Diagnostics Console', draw: 35, priority: 1, status: 'on' },
+      { id: 'THM-001', name: 'Thermal Manager', draw: 15, priority: 1, status: 'on' },
+      { id: 'LCT-001', name: 'Precision Laser', draw: 75, priority: 3, status: 'standby' },
+      { id: 'P3D-001', name: '3D Fabricator', draw: 90, priority: 3, status: 'standby' },
+      { id: 'BTK-001', name: 'Basic Toolkit', draw: 5, priority: 2, status: 'on' },
+      { id: 'MSC-001', name: 'Material Scanner', draw: 12, priority: 2, status: 'on' },
+    ]
+
+    // Calculate totals
+    const totalGeneration = powerSources.reduce((sum, s) => sum + s.output, 0)
+    const totalMaxGeneration = powerSources.reduce((sum, s) => sum + s.maxOutput, 0)
+    const activeConsumers = powerConsumers.filter(c => c.status === 'on')
+    const totalConsumption = activeConsumers.reduce((sum, c) => sum + c.draw, 0)
+    const totalStorage = powerStorage.reduce((sum, s) => sum + s.stored, 0)
+    const totalCapacity = powerStorage.reduce((sum, s) => sum + s.capacity, 0)
+    const powerBalance = totalGeneration - totalConsumption
+    const loadPercent = Math.round((totalConsumption / totalGeneration) * 100)
+
+    // Default: show status overview
+    if (!action || action === 'status') {
+      const statusIndicator = powerBalance >= 0 ? 'NOMINAL' : 'DEFICIT'
+      const statusColor = powerBalance >= 0 ? '●' : '!'
+
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│              POWER MANAGEMENT SYSTEM v1.0.0                 │',
+          '│                        PWR-001                              │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  ╔═══════════════════════════════════════════════════════════╗',
+          '  ║  POWER GRID OVERVIEW                                      ║',
+          '  ╠═══════════════════════════════════════════════════════════╣',
+          `  ║  GENERATION   : ${totalGeneration.toString().padStart(6)} W  (max ${totalMaxGeneration} W)              ║`,
+          `  ║  CONSUMPTION  : ${totalConsumption.toString().padStart(6)} W  (${activeConsumers.length} devices active)          ║`,
+          `  ║  BALANCE      : ${(powerBalance >= 0 ? '+' : '') + powerBalance.toString().padStart(5)} W                              ║`,
+          `  ║  LOAD         : ${loadPercent.toString().padStart(6)}%                                   ║`,
+          '  ╠═══════════════════════════════════════════════════════════╣',
+          `  ║  STORAGE      : ${totalStorage.toString().padStart(6)} / ${totalCapacity} Wh  (${Math.round(totalStorage/totalCapacity*100)}%)              ║`,
+          `  ║  STATUS       : ${statusColor} ${statusIndicator.padEnd(44)} ║`,
+          '  ╚═══════════════════════════════════════════════════════════╝',
+          '',
+          '  ╔═══════════════════════════════════════════════════════════╗',
+          '  ║  POWER SOURCES                                            ║',
+          '  ╠═══════════════════════════════════════════════════════════╣',
+          '  ║  ID        OUTPUT      MAX       EFF    STATUS            ║',
+          '  ║  ───────   ─────────   ───────   ────   ──────            ║',
+          ...powerSources.map(s =>
+            `  ║  ${s.id}   ${s.output.toString().padStart(4)} W      ${s.maxOutput.toString().padStart(4)} W    ${s.efficiency}%   ${s.status.toUpperCase().padEnd(8)}      ║`
+          ),
+          '  ╚═══════════════════════════════════════════════════════════╝',
+          '',
+          '  ╔═══════════════════════════════════════════════════════════╗',
+          '  ║  STORAGE BANKS                                            ║',
+          '  ╠═══════════════════════════════════════════════════════════╣',
+          '  ║  ID        STORED     CAPACITY  RATE    STATUS            ║',
+          '  ║  ───────   ────────   ────────  ─────   ──────            ║',
+          ...powerStorage.map(s =>
+            `  ║  ${s.id}   ${s.stored.toString().padStart(5)} Wh   ${s.capacity.toString().padStart(5)} Wh  +${s.chargeRate}W   ${s.status.toUpperCase().padEnd(10)}  ║`
+          ),
+          '  ╚═══════════════════════════════════════════════════════════╝',
+          '',
+          '  commands: power devices | power grid | power on/off <id>',
+          '            power fault | power emergency',
+          '',
+        ],
+      }
+    }
+
+    // Show all devices with power consumption
+    if (action === 'devices' || action === 'dev' || action === 'list') {
+      const sortedConsumers = [...powerConsumers].sort((a, b) => b.draw - a.draw)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│                   POWER CONSUMERS                           │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  ID        DEVICE                  DRAW    PRI  STATUS',
+          '  ───────   ────────────────────    ─────   ───  ──────',
+          ...sortedConsumers.map(c =>
+            `  ${c.id}   ${c.name.padEnd(20)}  ${c.draw.toString().padStart(4)} W   P${c.priority}   ${c.status.toUpperCase()}`
+          ),
+          '',
+          '  ─────────────────────────────────────────────────────────────',
+          `  TOTAL ACTIVE DRAW: ${totalConsumption} W (${activeConsumers.length}/${powerConsumers.length} devices)`,
+          `  AVAILABLE POWER:   ${totalGeneration} W`,
+          `  HEADROOM:          ${powerBalance >= 0 ? '+' : ''}${powerBalance} W`,
+          '',
+          '  Priority Levels:',
+          '    P1 = Critical (always on)  P2 = Standard operations',
+          '    P3 = Non-essential         P4 = High-power (manual)',
+          '',
+          '  use power on/off <device-id> to toggle power',
+          '',
+        ],
+      }
+    }
+
+    // Show power grid topology
+    if (action === 'grid' || action === 'topology') {
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│                   POWER GRID TOPOLOGY                       │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  ┌─────────────────┐     ┌─────────────────┐',
+          '  │   UEC-001       │     │   MFR-001       │',
+          '  │ Unstable Core   │     │ Microfusion     │',
+          '  │   150W / 200W   │     │   500W / 600W   │',
+          '  │   [####----]    │     │   [########-]   │',
+          '  └────────┬────────┘     └────────┬────────┘',
+          '           │                       │',
+          '           └───────────┬───────────┘',
+          '                       │',
+          '                       ▼',
+          '           ┌─────────────────────────┐',
+          '           │     MAIN POWER BUS      │',
+          '           │  ════════════════════   │',
+          '           │     650W AVAILABLE      │',
+          '           └───────────┬─────────────┘',
+          '                       │',
+          '           ┌───────────┴───────────┐',
+          '           ▼                       ▼',
+          '  ┌─────────────────┐     ┌─────────────────┐',
+          '  │   BAT-001       │     │   LOAD CENTER   │',
+          '  │ Battery Pack    │     │   29 Devices    │',
+          `  │   850 / 1000 Wh │     │   ${totalConsumption}W Draw      │`,
+          '  │   [########--]  │     │   [###########] │',
+          '  └─────────────────┘     └─────────────────┘',
+          '',
+          '  LEGEND: [####] = Load/Capacity bar',
+          '',
+          '  Grid Protection:',
+          '    - Overcurrent protection: ARMED',
+          '    - Emergency shutdown: READY',
+          '    - Battery backup: ONLINE',
+          '',
+        ],
+      }
+    }
+
+    // Turn device power on
+    if (action === 'on') {
+      if (!target) {
+        return {
+          success: false,
+          error: 'usage: power on <device-id>\nexample: power on tlp-001',
+        }
+      }
+
+      const device = powerConsumers.find(c => c.id.toLowerCase() === target)
+      if (!device) {
+        return {
+          success: false,
+          error: `device not found: ${target}\nuse power devices to see available devices.`,
+        }
+      }
+
+      if (device.status === 'on') {
+        return {
+          success: true,
+          output: [
+            '',
+            `[power] ${device.id} is already powered on.`,
+            '',
+          ],
+        }
+      }
+
+      // Check if we have enough power
+      const newConsumption = totalConsumption + device.draw
+      if (newConsumption > totalGeneration) {
+        return {
+          success: false,
+          error: `insufficient power to activate ${device.id}\n` +
+            `required: ${device.draw}W | available: ${totalGeneration - totalConsumption}W\n` +
+            `consider shutting down non-essential devices first.`,
+        }
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          `[power] activating ${device.name} (${device.id})...`,
+          '[power] establishing power connection...... OK',
+          '[power] device initialization............ OK',
+          '[power] system handshake................. OK',
+          '',
+          `[power] ${device.id} is now ONLINE`,
+          `[power] power draw: ${device.draw}W`,
+          `[power] new total consumption: ${newConsumption}W`,
+          '',
+        ],
+      }
+    }
+
+    // Turn device power off
+    if (action === 'off') {
+      if (!target) {
+        return {
+          success: false,
+          error: 'usage: power off <device-id>\nexample: power off sca-001',
+        }
+      }
+
+      const device = powerConsumers.find(c => c.id.toLowerCase() === target)
+      if (!device) {
+        return {
+          success: false,
+          error: `device not found: ${target}\nuse power devices to see available devices.`,
+        }
+      }
+
+      if (device.status === 'off' || device.status === 'standby') {
+        return {
+          success: true,
+          output: [
+            '',
+            `[power] ${device.id} is already powered off.`,
+            '',
+          ],
+        }
+      }
+
+      // Warn about critical devices
+      if (device.priority === 1) {
+        if (param !== '-f' && param !== '--force') {
+          return {
+            success: false,
+            error: `${device.id} is a CRITICAL device (P1 priority).\n` +
+              `shutting it down may cause system instability.\n` +
+              `use power off ${target} -f to force shutdown.`,
+          }
+        }
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          `[power] shutting down ${device.name} (${device.id})...`,
+          '[power] sending shutdown signal.......... OK',
+          '[power] flushing device buffers.......... OK',
+          '[power] disconnecting power.............. OK',
+          '',
+          `[power] ${device.id} is now OFFLINE`,
+          `[power] power saved: ${device.draw}W`,
+          `[power] new total consumption: ${totalConsumption - device.draw}W`,
+          '',
+        ],
+      }
+    }
+
+    // Show fault diagnostics
+    if (action === 'fault' || action === 'faults' || action === 'diag') {
+      // Simulate some potential faults
+      const faults = [
+        { level: 'WARN', device: 'UEC-001', message: 'Efficiency below optimal (75% < 80%)', time: '14:23:05' },
+        { level: 'INFO', device: 'TLP-001', message: 'High-power device on standby', time: '14:20:00' },
+      ]
+
+      const hasCritical = faults.some(f => f.level === 'CRIT')
+      const hasWarnings = faults.some(f => f.level === 'WARN')
+
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│                   POWER FAULT DIAGNOSTICS                   │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          `  SYSTEM STATUS: ${hasCritical ? '! CRITICAL' : hasWarnings ? '! WARNING' : '● NOMINAL'}`,
+          '',
+          '  FAULT LOG:',
+          '  ─────────────────────────────────────────────────────────────',
+          ...faults.map(f =>
+            `  [${f.time}] ${f.level.padEnd(4)} ${f.device}  ${f.message}`
+          ),
+          '  ─────────────────────────────────────────────────────────────',
+          '',
+          '  PROTECTION STATUS:',
+          '    Overcurrent Protection.... ARMED',
+          '    Undervoltage Lockout...... ARMED',
+          '    Thermal Shutdown.......... ARMED',
+          '    Emergency Cutoff.......... READY',
+          '',
+          '  RECOMMENDED ACTIONS:',
+          ...faults.filter(f => f.level !== 'INFO').map(f =>
+            `    - ${f.device}: Check and resolve ${f.message.toLowerCase()}`
+          ),
+          '',
+          '  use power emergency to initiate emergency shutdown',
+          '',
+        ],
+      }
+    }
+
+    // Emergency power shutdown
+    if (action === 'emergency' || action === 'shutdown' || action === 'kill') {
+      if (target !== '-now' && target !== 'now') {
+        return {
+          success: false,
+          error: 'emergency shutdown requires confirmation.\n' +
+            'usage: power emergency -now\n\n' +
+            'WARNING: This will shut down all non-critical devices\n' +
+            'and switch to battery backup mode.',
+        }
+      }
+
+      const nonCritical = powerConsumers.filter(c => c.priority > 1 && c.status === 'on')
+      const savedPower = nonCritical.reduce((sum, c) => sum + c.draw, 0)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '╔═══════════════════════════════════════════════════════════════╗',
+          '║              EMERGENCY POWER SHUTDOWN INITIATED               ║',
+          '╚═══════════════════════════════════════════════════════════════╝',
+          '',
+          '[EMERGENCY] Activating emergency protocol...',
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│                   SHUTDOWN SEQUENCE                          │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '[SHUTDOWN] Disabling P4 devices (high-power)...... OK',
+          '[SHUTDOWN] Disabling P3 devices (non-essential)... OK',
+          '[SHUTDOWN] Disabling P2 devices (standard)........ OK',
+          '[SHUTDOWN] P1 devices (critical) maintained....... OK',
+          '',
+          `[RESULT] ${nonCritical.length} devices shut down`,
+          `[RESULT] ${savedPower}W power saved`,
+          `[RESULT] Battery backup engaged`,
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│  CRITICAL SYSTEMS MAINTAINED:                               │',
+          '└─────────────────────────────────────────────────────────────┘',
+          ...powerConsumers.filter(c => c.priority === 1).map(c =>
+            `  ● ${c.id}  ${c.name.padEnd(24)} ${c.draw}W`
+          ),
+          '',
+          '[NOTICE] Lab running on minimum power mode.',
+          '[NOTICE] Use power on <device-id> to restore devices.',
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `unknown power command: ${action}\n\navailable commands:\n` +
+        '  power status     - show power overview\n' +
+        '  power devices    - list all power consumers\n' +
+        '  power grid       - show power grid topology\n' +
+        '  power on <id>    - turn on a device\n' +
+        '  power off <id>   - turn off a device\n' +
+        '  power fault      - show fault diagnostics\n' +
+        '  power emergency  - emergency shutdown',
     }
   },
 }
@@ -1829,6 +2284,7 @@ export const commands: Command[] = [
   unsystemctlCommand,
   deviceCommand,
   thermalCommand,
+  powerCommand,
 ]
 
 // Find command by name or alias
