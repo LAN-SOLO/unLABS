@@ -763,7 +763,11 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
                             style={{
                               background: `linear-gradient(90deg, transparent 0%, ${getStatusColor(comp.status)} 50%, transparent 100%)`,
                               opacity: 0.4,
-                              animation: `chevron-pulse 1s ease-in-out infinite ${i * 0.15}s`,
+                              animationName: 'chevron-pulse',
+                              animationDuration: '1s',
+                              animationTimingFunction: 'ease-in-out',
+                              animationIterationCount: 'infinite',
+                              animationDelay: `${i * 0.15}s`,
                             }}
                           />
                         ))}

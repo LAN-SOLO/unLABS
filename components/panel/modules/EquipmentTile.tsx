@@ -2956,7 +2956,7 @@ export function AbstractumContainer({
         />
         {/* Bubbles */}
         <div className="absolute bottom-1 left-2 w-1 h-1 rounded-full bg-white/30 animate-pulse" />
-        <div className="absolute bottom-3 right-3 w-0.5 h-0.5 rounded-full bg-white/20 animate-pulse" style={{ animationDelay: '0.5s' }} />
+        <div className="absolute bottom-3 right-3 w-0.5 h-0.5 rounded-full bg-white/20" style={{ animationName: 'pulse', animationDuration: '2s', animationTimingFunction: 'cubic-bezier(0.4, 0, 0.6, 1)', animationIterationCount: 'infinite', animationDelay: '0.5s' }} />
 
         {/* Level marks */}
         {[25, 50, 75].map((level) => (
@@ -3317,7 +3317,10 @@ export function AbstractumTank({
                 style={{
                   left: `${15 + i * 25}%`,
                   bottom: `${Math.min(fillPercent - 5, 5 + i * 10)}%`,
-                  animation: `float-up ${0.8 + i * 0.2}s ease-in-out infinite`,
+                  animationName: 'float-up',
+                  animationDuration: `${0.8 + i * 0.2}s`,
+                  animationTimingFunction: 'ease-in-out',
+                  animationIterationCount: 'infinite',
                   animationDelay: `${i * 0.2}s`,
                 }}
               />
@@ -6096,20 +6099,26 @@ export function ExoticMatterContainment({
             const yPos = 15 + (row / (rows - 1 || 1)) * 70 // 15% to 85%
 
             // Different animations for boot vs test
-            let animation = 'none'
+            let animationName = 'none'
+            let animationDuration = '1s'
+            let animationTimingFunction = 'ease-in-out'
             let animationDelay = '0s'
 
             if (isTesting) {
               // Test: chaotic quantum fluctuation
-              animation = `exotic-test ${0.15 + (i % 6) * 0.08}s ease-in-out infinite`
+              animationName = 'exotic-test'
+              animationDuration = `${0.15 + (i % 6) * 0.08}s`
               animationDelay = `${i * 0.015}s`
             } else if (isBooting) {
               // Boot: materialize from center outward
-              animation = `exotic-boot ${0.4 + (i % 4) * 0.15}s ease-out infinite`
+              animationName = 'exotic-boot'
+              animationDuration = `${0.4 + (i % 4) * 0.15}s`
+              animationTimingFunction = 'ease-out'
               animationDelay = `${(row * 0.1) + (col * 0.03)}s`
             } else if (fieldActive) {
               // Normal: gentle float
-              animation = `exotic-float ${1 + (i % 5) * 0.15}s ease-in-out infinite`
+              animationName = 'exotic-float'
+              animationDuration = `${1 + (i % 5) * 0.15}s`
               animationDelay = `${i * 0.02}s`
             }
 
@@ -6122,7 +6131,10 @@ export function ExoticMatterContainment({
                   top: `${yPos}%`,
                   background: particleColor,
                   boxShadow: `0 0 ${isTesting ? '8' : isBooting ? '5' : '3'}px ${particleColor}`,
-                  animation,
+                  animationName,
+                  animationDuration,
+                  animationTimingFunction,
+                  animationIterationCount: 'infinite',
                   animationDelay,
                 }}
               />

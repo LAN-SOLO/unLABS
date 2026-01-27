@@ -614,9 +614,9 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                 </div>
                                 {/* Activity dots */}
                                 <div className="flex gap-0.5">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-green)] animate-pulse" style={{ animationDelay: '0ms' }} />
-                                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-green)] animate-pulse" style={{ animationDelay: '200ms' }} />
-                                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-green)] animate-pulse" style={{ animationDelay: '400ms' }} />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-green)]" style={{ animationName: 'pulse', animationDuration: '2s', animationTimingFunction: 'cubic-bezier(0.4, 0, 0.6, 1)', animationIterationCount: 'infinite', animationDelay: '0ms' }} />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-green)]" style={{ animationName: 'pulse', animationDuration: '2s', animationTimingFunction: 'cubic-bezier(0.4, 0, 0.6, 1)', animationIterationCount: 'infinite', animationDelay: '200ms' }} />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-green)]" style={{ animationName: 'pulse', animationDuration: '2s', animationTimingFunction: 'cubic-bezier(0.4, 0, 0.6, 1)', animationIterationCount: 'infinite', animationDelay: '400ms' }} />
                                 </div>
                               </>
                             ) : (
