@@ -52,7 +52,7 @@ export function TerminalInput({
         ref={inputRef}
         type="text"
         value={value}
-        onChange={(e) => setValue(e.target.value.toUpperCase())}
+        onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         disabled={disabled}
         className="flex-1 bg-transparent text-green-400 font-mono text-sm outline-none border-none caret-green-400 placeholder-green-500/30 disabled:opacity-50"
