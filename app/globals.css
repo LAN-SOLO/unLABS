@@ -124,6 +124,23 @@
   }
 }
 
+/* Disable all scrolling globally */
+html, body {
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Disable scrollbars everywhere */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
 /* Panel Theme - Retro-Futuristic Laboratory */
 :root {
   /* Panel Backgrounds */
@@ -162,7 +179,7 @@
 /* Panel Layout */
 .game-panel {
   display: grid;
-  grid-template-columns: 200px 1fr 320px;
+  grid-template-columns: 180px minmax(400px, 1fr) 550px;
   grid-template-rows: auto 1fr auto auto;
   grid-template-areas:
     "toolbar toolbar toolbar"
@@ -171,8 +188,14 @@
     "bottom bottom bottom";
   gap: 4px;
   height: 100vh;
+  width: 100vw;
   background: var(--panel-void);
   padding: 4px;
+  overflow: hidden;
+}
+
+/* Disable overflow on all panel areas */
+.game-panel > * {
   overflow: hidden;
 }
 
@@ -313,4 +336,130 @@
 @keyframes waveform-sweep {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
+}
+
+/* Scanner sweep animation */
+@keyframes scan-sweep {
+  0% { left: 0%; }
+  50% { left: 100%; }
+  100% { left: 0%; }
+}
+
+/* Spin animation for reactors */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Pulse animation */
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(0.95); }
+}
+
+/* Loading bar animation */
+@keyframes loading {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+/* Wave animation for detector */
+@keyframes wave {
+  0% { transform: scaleY(0.5); }
+  100% { transform: scaleY(1.5); }
+}
+
+/* Nano float animation */
+@keyframes nano-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* Exotic matter float */
+@keyframes exotic-float {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(2px, -2px); }
+  50% { transform: translate(0, -3px); }
+  75% { transform: translate(-2px, -1px); }
+}
+
+/* Containment pulse */
+@keyframes containment-pulse {
+  0%, 100% { box-shadow: 0 0 5px var(--neon-pink); }
+  50% { box-shadow: 0 0 15px var(--neon-pink); }
+}
+
+/* Warning pulse */
+@keyframes containment-warning {
+  0%, 100% { border-color: #ff0000; }
+  50% { border-color: #ff6600; }
+}
+
+/* Laser pulse */
+@keyframes laser-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* Print head movement */
+@keyframes print-head {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(5px); }
+}
+
+/* Node blink for supercomputer */
+@keyframes node-blink {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 0.5; }
+}
+
+/* Spark flicker for energy */
+@keyframes spark-flicker {
+  0%, 100% { opacity: 0.8; height: 8px; }
+  50% { opacity: 0.3; height: 4px; }
+}
+
+/* Terminal Fixed 4:3 Ratio - Never resize */
+.terminal-fixed {
+  resize: none !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  overflow: hidden !important;
+}
+
+.terminal-fixed-large {
+  width: 800px !important;
+  height: 600px !important;
+  min-width: 800px !important;
+  min-height: 600px !important;
+  max-width: 800px !important;
+  max-height: 600px !important;
+}
+
+.terminal-fixed-small {
+  width: 640px !important;
+  height: 480px !important;
+  min-width: 640px !important;
+  min-height: 480px !important;
+  max-width: 640px !important;
+  max-height: 480px !important;
+}
+
+/* Boot Sequence Animations */
+@keyframes fade-out {
+  0% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
+
+.animate-fade-out {
+  animation: fade-out 0.5s ease-out forwards;
+}
+
+@keyframes boot-line {
+  0% { opacity: 0; transform: translateY(5px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-boot-line {
+  animation: boot-line 0.1s ease-out forwards;
 }

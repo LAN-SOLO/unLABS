@@ -96,67 +96,115 @@ export function Slider({
           {label}
         </span>
       )}
+      {/* Track container with shadow */}
       <div
-        ref={trackRef}
-        className={cn(
-          'relative bg-[#111] rounded border border-[#333]',
-          'shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)]',
-          disabled && 'opacity-50 cursor-not-allowed',
-          !disabled && 'cursor-pointer'
-        )}
+        className="relative"
         style={{
-          width: isVertical ? width : height,
-          height: isVertical ? height : width,
+          width: isVertical ? width + 4 : height,
+          height: isVertical ? height : width + 4,
         }}
-        onMouseDown={handleMouseDown}
       >
-        {/* Fill */}
+        {/* Shadow below track (light from above) */}
         <div
-          className="absolute rounded transition-all"
+          className="absolute rounded pointer-events-none"
           style={{
-            backgroundColor: accentColor,
-            boxShadow: `0 0 8px ${accentColor}`,
-            ...(isVertical
-              ? {
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: `${fillPercent}%`,
-                }
-              : {
-                  top: 0,
-                  left: 0,
-                  bottom: 0,
-                  width: `${fillPercent}%`,
-                }),
-            transition: isDragging ? 'none' : 'all 0.1s ease-out',
+            width: isVertical ? width - 2 : height - 4,
+            height: isVertical ? height - 4 : width - 2,
+            left: isVertical ? 3 : 2,
+            top: isVertical ? 4 : 3,
+            background: 'rgba(0, 0, 0, 0.3)',
+            filter: 'blur(3px)',
           }}
         />
-        {/* Handle */}
+        {/* Track */}
         <div
+          ref={trackRef}
           className={cn(
-            'absolute bg-gradient-to-b from-[#5a5a5a] to-[#3a3a3a]',
-            'border border-[#555] rounded-sm',
-            'shadow-[0_2px_4px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)]',
-            isDragging && 'brightness-125'
+            'absolute rounded',
+            disabled && 'opacity-50 cursor-not-allowed',
+            !disabled && 'cursor-pointer'
           )}
           style={{
-            ...(isVertical
-              ? {
-                  width: width + 8,
-                  height: 8,
-                  left: -4,
-                  bottom: `calc(${fillPercent}% - 4px)`,
-                }
-              : {
-                  width: 8,
-                  height: width + 8,
-                  top: -4,
-                  left: `calc(${fillPercent}% - 4px)`,
-                }),
-            transition: isDragging ? 'none' : 'all 0.1s ease-out',
+            width: isVertical ? width : height,
+            height: isVertical ? height : width,
+            left: 0,
+            top: 0,
+            background: `
+              linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 50%, rgba(255,255,255,0.03) 100%),
+              #111
+            `,
+            border: '1px solid #333',
+            boxShadow: `
+              inset 0 2px 4px rgba(0, 0, 0, 0.5),
+              inset 0 -1px 2px rgba(255, 255, 255, 0.05)
+            `,
           }}
-        />
+          onMouseDown={handleMouseDown}
+        >
+          {/* Fill */}
+          <div
+            className="absolute rounded transition-all"
+            style={{
+              backgroundColor: accentColor,
+              boxShadow: `0 0 8px ${accentColor}, inset 0 1px 2px rgba(255,255,255,0.2)`,
+              ...(isVertical
+                ? {
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: `${fillPercent}%`,
+                  }
+                : {
+                    top: 0,
+                    left: 0,
+                    bottom: 0,
+                    width: `${fillPercent}%`,
+                  }),
+              transition: isDragging ? 'none' : 'all 0.1s ease-out',
+            }}
+          />
+          {/* Handle with top lighting */}
+          <div
+            className="absolute"
+            style={{
+              ...(isVertical
+                ? {
+                    width: width + 8,
+                    height: 10,
+                    left: -4,
+                    bottom: `calc(${fillPercent}% - 5px)`,
+                  }
+                : {
+                    width: 10,
+                    height: width + 8,
+                    top: -4,
+                    left: `calc(${fillPercent}% - 5px)`,
+                  }),
+              // 3D handle with light from above
+              background: `
+                linear-gradient(175deg, #666 0%, #444 30%, #2a2a2a 100%)
+              `,
+              border: '1px solid #222',
+              borderRadius: 2,
+              boxShadow: `
+                inset 0 1px 2px rgba(255, 255, 255, 0.25),
+                inset 0 -1px 2px rgba(0, 0, 0, 0.3),
+                0 2px 4px rgba(0, 0, 0, 0.4)
+              `,
+              transition: isDragging ? 'none' : 'all 0.1s ease-out',
+            }}
+          >
+            {/* Handle grip lines */}
+            <div
+              className="absolute inset-x-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5"
+              style={{ opacity: 0.4 }}
+            >
+              <div className="h-px bg-white/30" />
+              <div className="h-px bg-black/30" />
+              <div className="h-px bg-white/30" />
+            </div>
+          </div>
+        </div>
       </div>
       {showValue && (
         <span

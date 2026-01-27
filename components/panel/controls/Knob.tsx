@@ -35,16 +35,16 @@ export function Knob({
   const startYRef = useRef(0)
   const startValueRef = useRef(value)
 
-  const sizeStyles = {
-    sm: 'w-10 h-10',
-    md: 'w-14 h-14',
-    lg: 'w-20 h-20',
+  const sizePx = {
+    sm: 40,
+    md: 56,
+    lg: 80,
   }
 
   const indicatorSizes = {
-    sm: 'w-0.5 h-2 top-1',
-    md: 'w-0.5 h-3 top-2',
-    lg: 'w-1 h-4 top-2',
+    sm: { width: 2, height: 10, top: 5 },
+    md: { width: 3, height: 14, top: 6 },
+    lg: { width: 4, height: 18, top: 8 },
   }
 
   // Convert value to rotation (-135 to 135 degrees)
@@ -81,6 +81,9 @@ export function Knob({
     [value, min, max, onChange, disabled]
   )
 
+  const knobSize = sizePx[size]
+  const indicator = indicatorSizes[size]
+
   return (
     <div className={cn('flex flex-col items-center gap-1', className)}>
       {label && (
@@ -91,32 +94,68 @@ export function Knob({
           {label}
         </span>
       )}
+      {/* Container for knob + shadow */}
       <div
-        ref={knobRef}
-        className={cn(
-          'knob relative select-none',
-          sizeStyles[size],
-          isDragging && 'scale-105',
-          disabled && 'opacity-50 cursor-not-allowed',
-          !disabled && 'hover:brightness-110'
-        )}
+        className="relative"
         style={{
-          transform: `rotate(${rotation}deg)`,
-          transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+          width: knobSize,
+          height: knobSize + 6,
         }}
-        onMouseDown={handleMouseDown}
       >
-        {/* Indicator line */}
+        {/* Shadow element - BELOW the knob (light from above) */}
         <div
-          className={cn(
-            'absolute left-1/2 -translate-x-1/2 rounded-full',
-            indicatorSizes[size]
-          )}
+          className="absolute rounded-full pointer-events-none"
           style={{
-            backgroundColor: accentColor,
-            boxShadow: `0 0 6px ${accentColor}`,
+            width: knobSize - 4,
+            height: knobSize - 4,
+            left: 2,
+            top: 6, // Shadow is offset DOWN
+            background: 'rgba(0, 0, 0, 0.4)',
+            filter: 'blur(4px)',
           }}
         />
+        {/* Knob body */}
+        <div
+          ref={knobRef}
+          className={cn(
+            'absolute select-none cursor-grab rounded-full',
+            isDragging && 'cursor-grabbing',
+            disabled && 'opacity-50 cursor-not-allowed',
+          )}
+          style={{
+            width: knobSize,
+            height: knobSize,
+            top: 0,
+            left: 0,
+            transform: `rotate(${rotation}deg)`,
+            transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+            // Light from above: top is lighter, bottom is darker
+            background: `
+              radial-gradient(ellipse 80% 40% at 50% 15%, rgba(255,255,255,0.2) 0%, transparent 50%),
+              linear-gradient(180deg, #5a5a5a 0%, #3a3a3a 40%, #1a1a1a 100%)
+            `,
+            border: '2px solid #0a0a0a',
+            // Inner shadows for 3D depth
+            boxShadow: `
+              inset 0 3px 6px rgba(255, 255, 255, 0.15),
+              inset 0 -3px 6px rgba(0, 0, 0, 0.4)
+            `,
+          }}
+          onMouseDown={handleMouseDown}
+        >
+          {/* Indicator line */}
+          <div
+            className="absolute left-1/2 rounded-full"
+            style={{
+              width: indicator.width,
+              height: indicator.height,
+              top: indicator.top,
+              transform: 'translateX(-50%)',
+              backgroundColor: accentColor,
+              boxShadow: `0 0 6px ${accentColor}`,
+            }}
+          />
+        </div>
       </div>
       {showValue && (
         <span

@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 
 interface Resource {
@@ -15,17 +16,46 @@ interface ResourceBarProps {
   className?: string
 }
 
-const defaultResources: Resource[] = Array.from({ length: 12 }, (_, i) => ({
+// Static initial values to avoid hydration mismatch
+const initialResources: Resource[] = Array.from({ length: 12 }, (_, i) => ({
   id: `res-${i + 1}`,
   label: `RES-${i + 1}`,
-  value: Math.random() * 100,
+  value: 50,
   max: 100,
 }))
 
 export function ResourceBar({
-  resources = defaultResources,
+  resources: propResources,
   className,
 }: ResourceBarProps) {
+  const [resources, setResources] = useState<Resource[]>(
+    propResources || initialResources
+  )
+
+  useEffect(() => {
+    // Only randomize if using default resources
+    if (!propResources) {
+      setResources(
+        initialResources.map((r) => ({
+          ...r,
+          value: Math.random() * 100,
+        }))
+      )
+
+      // Simulate resource fluctuation
+      const interval = setInterval(() => {
+        setResources((prev) =>
+          prev.map((r) => ({
+            ...r,
+            value: Math.max(0, Math.min(100, r.value + (Math.random() - 0.5) * 10)),
+          }))
+        )
+      }, 2000)
+
+      return () => clearInterval(interval)
+    }
+  }, [propResources])
+
   return (
     <div className={cn('flex items-center gap-1', className)}>
       {resources.map((resource) => (

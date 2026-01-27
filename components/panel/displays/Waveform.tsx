@@ -14,7 +14,14 @@ interface WaveformProps {
   height?: number
   data?: number[]
   animated?: boolean
+  offset?: number  // Vertical DC offset (-1 to 1)
+  phase?: number   // Phase shift in radians
   className?: string
+  // Interference settings
+  frequency2?: number
+  interferenceStrength?: number
+  wavelengthFactor?: number
+  is3D?: boolean
 }
 
 export function Waveform({
@@ -28,19 +35,27 @@ export function Waveform({
   height = 150,
   data,
   animated = true,
+  offset = 0,
+  phase = 0,
   className,
+  frequency2 = 0,
+  interferenceStrength = 0,
+  wavelengthFactor = 1,
+  is3D = false,
 }: WaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const animationRef = useRef<number | undefined>(undefined)
   const phaseRef = useRef(0)
 
   const generateWaveform = useCallback(
-    (phase: number): number[] => {
+    (animPhase: number): number[] => {
       const points: number[] = []
       const samples = width
 
       for (let i = 0; i < samples; i++) {
-        const x = (i / samples) * Math.PI * 2 * frequency + phase
+        // Include both animation phase and user-controlled phase shift
+        // Apply wavelength factor to stretch/compress the waveform
+        const x = (i / samples) * Math.PI * 2 * frequency * wavelengthFactor + animPhase + phase
         let y: number
 
         switch (type) {
@@ -63,12 +78,20 @@ export function Waveform({
             y = 0
         }
 
-        points.push(y)
+        // Apply interference if enabled
+        if (interferenceStrength > 0 && frequency2 > 0) {
+          const x2 = (i / samples) * Math.PI * 2 * frequency2 * wavelengthFactor + animPhase * 0.7
+          const y2 = Math.sin(x2) * amplitude * interferenceStrength
+          y = y + y2
+        }
+
+        // Apply vertical offset (DC offset)
+        points.push(y + offset)
       }
 
       return points
     },
-    [type, frequency, amplitude, width, data]
+    [type, frequency, amplitude, width, data, offset, phase, frequency2, interferenceStrength, wavelengthFactor]
   )
 
   const draw = useCallback(() => {
@@ -123,32 +146,64 @@ export function Waveform({
     const points = data || generateWaveform(phaseRef.current)
     const centerY = height / 2
 
-    ctx.beginPath()
-    ctx.strokeStyle = color
-    ctx.lineWidth = 2
-    ctx.shadowColor = color
-    ctx.shadowBlur = 8
+    // 3D mode - draw multiple layers with offset
+    if (is3D) {
+      const layers = 5
+      for (let layer = layers - 1; layer >= 0; layer--) {
+        const layerOffset = layer * 3
+        const layerAlpha = 0.2 + (1 - layer / layers) * 0.8
 
-    for (let i = 0; i < points.length; i++) {
-      const x = (i / points.length) * width
-      const y = centerY - points[i] * (height / 2) * 0.9
+        ctx.beginPath()
+        ctx.strokeStyle = color
+        ctx.lineWidth = layer === 0 ? 2 : 1
+        ctx.globalAlpha = layerAlpha
+        ctx.shadowColor = color
+        ctx.shadowBlur = layer === 0 ? 8 : 2
 
-      if (i === 0) {
-        ctx.moveTo(x, y)
-      } else {
-        ctx.lineTo(x, y)
+        for (let i = 0; i < points.length; i++) {
+          const x = (i / points.length) * width
+          const y = centerY - points[i] * (height / 2) * 0.9 - layerOffset
+
+          if (i === 0) {
+            ctx.moveTo(x, y)
+          } else {
+            ctx.lineTo(x, y)
+          }
+        }
+
+        ctx.stroke()
       }
+      ctx.globalAlpha = 1
+      ctx.shadowBlur = 0
+    } else {
+      // Normal 2D mode
+      ctx.beginPath()
+      ctx.strokeStyle = color
+      ctx.lineWidth = 2
+      ctx.shadowColor = color
+      ctx.shadowBlur = 8
+
+      for (let i = 0; i < points.length; i++) {
+        const x = (i / points.length) * width
+        const y = centerY - points[i] * (height / 2) * 0.9
+
+        if (i === 0) {
+          ctx.moveTo(x, y)
+        } else {
+          ctx.lineTo(x, y)
+        }
+      }
+
+      ctx.stroke()
+
+      // Draw glow layer
+      ctx.shadowBlur = 16
+      ctx.globalAlpha = 0.5
+      ctx.stroke()
+      ctx.globalAlpha = 1
+      ctx.shadowBlur = 0
     }
-
-    ctx.stroke()
-
-    // Draw glow layer
-    ctx.shadowBlur = 16
-    ctx.globalAlpha = 0.5
-    ctx.stroke()
-    ctx.globalAlpha = 1
-    ctx.shadowBlur = 0
-  }, [width, height, color, showGrid, gridColor, generateWaveform, data])
+  }, [width, height, color, showGrid, gridColor, generateWaveform, data, is3D])
 
   useEffect(() => {
     if (!animated || type === 'custom') {

@@ -19,39 +19,85 @@ export function LED({
   label,
   className,
 }: LEDProps) {
-  const sizeStyles = {
-    sm: 'w-2 h-2',
-    md: 'w-3 h-3',
-    lg: 'w-4 h-4',
+  const sizePx = {
+    sm: 8,
+    md: 12,
+    lg: 16,
   }
 
   const colorValues = {
-    red: '#ff3333',
-    green: '#00ff66',
-    amber: '#ffb800',
-    cyan: '#00ffff',
-    blue: '#0066ff',
+    red: { on: '#ff3333', off: '#4a2222', glow: 'rgba(255, 51, 51, 0.8)' },
+    green: { on: '#00ff66', off: '#224a33', glow: 'rgba(0, 255, 102, 0.8)' },
+    amber: { on: '#ffb800', off: '#4a3a22', glow: 'rgba(255, 184, 0, 0.8)' },
+    cyan: { on: '#00ffff', off: '#224a4a', glow: 'rgba(0, 255, 255, 0.8)' },
+    blue: { on: '#0066ff', off: '#22334a', glow: 'rgba(0, 102, 255, 0.8)' },
   }
 
-  const ledColor = colorValues[color]
+  const colorConfig = colorValues[color]
+  const ledSize = sizePx[size]
 
   return (
     <div className={cn('flex flex-col items-center gap-0.5', className)}>
+      {/* LED container with shadow */}
       <div
-        className={cn(
-          'rounded-full border border-[rgba(0,0,0,0.5)]',
-          sizeStyles[size],
-          blink && on && 'animate-pulse'
-        )}
+        className="relative"
         style={{
-          backgroundColor: on ? ledColor : '#333',
-          boxShadow: on
-            ? `inset 0 1px 2px rgba(255,255,255,0.3), 0 0 8px ${ledColor}, 0 0 16px ${ledColor}`
-            : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+          width: ledSize,
+          height: ledSize + 2,
         }}
-      />
+      >
+        {/* Shadow below (light from above) */}
+        <div
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            width: ledSize - 2,
+            height: ledSize - 2,
+            left: 1,
+            top: 3,
+            background: on ? colorConfig.glow : 'rgba(0, 0, 0, 0.3)',
+            filter: on ? 'blur(3px)' : 'blur(2px)',
+            opacity: on ? 0.6 : 0.4,
+          }}
+        />
+        {/* LED body */}
+        <div
+          className={cn(
+            'absolute rounded-full',
+            blink && on && 'animate-pulse'
+          )}
+          style={{
+            width: ledSize,
+            height: ledSize,
+            top: 0,
+            left: 0,
+            // Dome effect with light from above
+            background: on
+              ? `
+                  radial-gradient(ellipse 70% 50% at 50% 30%, rgba(255,255,255,0.5) 0%, transparent 60%),
+                  radial-gradient(circle at 40% 40%, ${colorConfig.on} 0%, transparent 60%),
+                  ${colorConfig.on}
+                `
+              : `
+                  radial-gradient(ellipse 60% 40% at 50% 35%, rgba(255,255,255,0.1) 0%, transparent 50%),
+                  ${colorConfig.off}
+                `,
+            border: '1px solid rgba(0, 0, 0, 0.5)',
+            boxShadow: on
+              ? `
+                  inset 0 1px 2px rgba(255, 255, 255, 0.4),
+                  inset 0 -1px 2px rgba(0, 0, 0, 0.3),
+                  0 0 ${ledSize}px ${colorConfig.glow},
+                  0 0 ${ledSize * 2}px ${colorConfig.glow}
+                `
+              : `
+                  inset 0 1px 1px rgba(255, 255, 255, 0.1),
+                  inset 0 -1px 2px rgba(0, 0, 0, 0.4)
+                `,
+          }}
+        />
+      </div>
       {label && (
-        <span className="font-mono text-[7px] uppercase tracking-wide text-gray-500">
+        <span className="font-mono text-[7px] uppercase tracking-wide text-white/40">
           {label}
         </span>
       )}
