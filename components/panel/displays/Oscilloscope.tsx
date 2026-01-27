@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { Knob } from '../controls/Knob'
 import { LED } from '../controls/LED'
@@ -31,6 +31,26 @@ const WAVEFORM_COLORS = [
   { label: 'oB', value: 79, hex: '#0066ff' },
 ]
 
+// Boot sequence stages
+type BootStage =
+  | 'off'
+  | 'power_check'
+  | 'memory_test'
+  | 'display_init'
+  | 'audio_init'
+  | 'waveform_cal'
+  | 'sensor_check'
+  | 'network_init'
+  | 'system_ready'
+  | 'running'
+  | 'shutting_down'
+
+interface ComponentTest {
+  name: string
+  status: 'pending' | 'testing' | 'pass' | 'fail' | 'skip'
+  value?: string
+}
+
 export function Oscilloscope({
   walletAddress = 'EfiL....B82M',
   balance = 0,
@@ -39,13 +59,79 @@ export function Oscilloscope({
   onConnect,
   className,
 }: OscilloscopeProps) {
+  // Power and boot states
+  const [powerState, setPowerState] = useState<'off' | 'booting' | 'on' | 'shutting_down'>('off')
+  const [bootStage, setBootStage] = useState<BootStage>('off')
+  const [bootProgress, setBootProgress] = useState(0)
+  const [powerHoldProgress, setPowerHoldProgress] = useState(0)
+  const [isPowerHeld, setIsPowerHeld] = useState(false)
+  const powerHoldRef = useRef<NodeJS.Timeout | null>(null)
+  const bootTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Component test results
+  const [componentTests, setComponentTests] = useState<ComponentTest[]>([
+    { name: 'PWR', status: 'pending', value: '' },
+    { name: 'MEM', status: 'pending', value: '' },
+    { name: 'DSP', status: 'pending', value: '' },
+    { name: 'AUD', status: 'pending', value: '' },
+    { name: 'WAV', status: 'pending', value: '' },
+    { name: 'SNS', status: 'pending', value: '' },
+    { name: 'NET', status: 'pending', value: '' },
+    { name: 'SYS', status: 'pending', value: '' },
+  ])
+
+  const [bootLog, setBootLog] = useState<string[]>([])
+
   // Control states
   const [intensity, setIntensity] = useState(70)
   const [focus, setFocus] = useState(50)
 
   // Feature states
-  const [waveType, setWaveType] = useState<'sine' | 'square' | 'sawtooth' | 'noise'>('sine')
+  type WaveType = 'sine' | 'square' | 'sawtooth' | 'noise' | 'triangle' | 'pulse' | 'harmonic' | 'morph' | 'fm' | 'am' | 'pwm' | 'supersaw' | 'subsine' | 'bell' | 'organ' | 'pluck' | 'pad' | 'bass' | 'lead' | 'arp' | 'sweep' | 'wobble' | 'glitch' | 'grain' | 'formant' | 'vocal' | 'breath' | 'wind' | 'string' | 'brass' | 'keys'
+  const [waveType, setWaveType] = useState<WaveType>('sine')
   const [preset, setPreset] = useState('default')
+
+  // Preset definitions
+  interface PresetConfig {
+    wave: WaveType
+    freq1: number
+    freq2: number
+    interference: number
+    interferenceEnabled: boolean
+    wavelength: number
+    is3D: boolean
+    intensity: number
+    colors: Record<string, number>
+    xGain: number
+    yGain: number
+    phaseKnob: number
+    amplKnob: number
+    freqKnob: number
+  }
+
+  const presetConfigs: Record<string, PresetConfig> = {
+    default: { wave: 'sine', freq1: 2.0, freq2: 3.0, interference: 60, interferenceEnabled: false, wavelength: 10, is3D: false, intensity: 70, colors: { 'G': 100 }, xGain: 0, yGain: 0, phaseKnob: 0, amplKnob: 0, freqKnob: 0 },
+    calm: { wave: 'sine', freq1: 0.8, freq2: 1.2, interference: 20, interferenceEnabled: true, wavelength: 15, is3D: false, intensity: 50, colors: { 'C': 80, 'B': 40 }, xGain: 0, yGain: 10, phaseKnob: 0, amplKnob: 0, freqKnob: 0 },
+    chaos: { wave: 'glitch', freq1: 8.0, freq2: 7.5, interference: 90, interferenceEnabled: true, wavelength: 5, is3D: true, intensity: 95, colors: { 'R': 100, 'oR': 80, 'M': 60 }, xGain: 80, yGain: 70, phaseKnob: 50, amplKnob: 60, freqKnob: 70 },
+    pulse: { wave: 'pulse', freq1: 4.0, freq2: 4.0, interference: 0, interferenceEnabled: false, wavelength: 8, is3D: false, intensity: 85, colors: { 'R': 100 }, xGain: 20, yGain: 0, phaseKnob: 0, amplKnob: 30, freqKnob: 20 },
+    ambient: { wave: 'pad', freq1: 1.0, freq2: 1.5, interference: 40, interferenceEnabled: true, wavelength: 18, is3D: true, intensity: 45, colors: { 'C': 60, 'B': 80, 'M': 30 }, xGain: 10, yGain: 20, phaseKnob: 30, amplKnob: 0, freqKnob: 0 },
+    retro: { wave: 'square', freq1: 3.0, freq2: 6.0, interference: 30, interferenceEnabled: false, wavelength: 10, is3D: false, intensity: 75, colors: { 'G': 100, 'oG': 50 }, xGain: 0, yGain: 0, phaseKnob: 0, amplKnob: 20, freqKnob: 10 },
+    digital: { wave: 'pwm', freq1: 5.0, freq2: 5.5, interference: 50, interferenceEnabled: true, wavelength: 7, is3D: false, intensity: 80, colors: { 'C': 100, 'B': 60 }, xGain: 40, yGain: 30, phaseKnob: 20, amplKnob: 40, freqKnob: 30 },
+    analog: { wave: 'sawtooth', freq1: 2.5, freq2: 2.0, interference: 25, interferenceEnabled: false, wavelength: 12, is3D: false, intensity: 65, colors: { 'oR': 90, 'Y': 60 }, xGain: 10, yGain: 15, phaseKnob: 10, amplKnob: 10, freqKnob: 5 },
+    'lo-fi': { wave: 'grain', freq1: 2.0, freq2: 3.0, interference: 70, interferenceEnabled: true, wavelength: 8, is3D: false, intensity: 55, colors: { 'oR': 70, 'K': 50 }, xGain: 30, yGain: 20, phaseKnob: 40, amplKnob: 20, freqKnob: 15 },
+    'hi-fi': { wave: 'supersaw', freq1: 3.0, freq2: 3.5, interference: 15, interferenceEnabled: true, wavelength: 12, is3D: true, intensity: 90, colors: { 'C': 90, 'M': 70, 'B': 50 }, xGain: 20, yGain: 25, phaseKnob: 0, amplKnob: 50, freqKnob: 40 },
+    space: { wave: 'fm', freq1: 1.5, freq2: 4.5, interference: 60, interferenceEnabled: true, wavelength: 20, is3D: true, intensity: 60, colors: { 'B': 100, 'M': 80, 'C': 40 }, xGain: 50, yGain: 40, phaseKnob: 60, amplKnob: 30, freqKnob: 25 },
+    dark: { wave: 'subsine', freq1: 1.0, freq2: 0.5, interference: 30, interferenceEnabled: true, wavelength: 15, is3D: true, intensity: 40, colors: { 'M': 60, 'R': 30 }, xGain: 20, yGain: 30, phaseKnob: 20, amplKnob: 10, freqKnob: 0 },
+    bright: { wave: 'harmonic', freq1: 4.0, freq2: 8.0, interference: 40, interferenceEnabled: true, wavelength: 8, is3D: false, intensity: 95, colors: { 'Y': 100, 'oG': 80, 'C': 60 }, xGain: 30, yGain: 40, phaseKnob: 10, amplKnob: 60, freqKnob: 50 },
+    warm: { wave: 'organ', freq1: 2.0, freq2: 2.5, interference: 20, interferenceEnabled: false, wavelength: 14, is3D: false, intensity: 70, colors: { 'oR': 100, 'Y': 70, 'R': 40 }, xGain: 0, yGain: 10, phaseKnob: 0, amplKnob: 20, freqKnob: 10 },
+    cold: { wave: 'triangle', freq1: 3.0, freq2: 4.5, interference: 35, interferenceEnabled: true, wavelength: 11, is3D: false, intensity: 65, colors: { 'C': 100, 'B': 90, 'K': 30 }, xGain: 15, yGain: 20, phaseKnob: 15, amplKnob: 15, freqKnob: 20 },
+    aggressive: { wave: 'bass', freq1: 6.0, freq2: 5.0, interference: 80, interferenceEnabled: true, wavelength: 5, is3D: true, intensity: 100, colors: { 'R': 100, 'oR': 100 }, xGain: 90, yGain: 80, phaseKnob: 70, amplKnob: 80, freqKnob: 60 },
+    soft: { wave: 'breath', freq1: 1.2, freq2: 1.8, interference: 15, interferenceEnabled: true, wavelength: 18, is3D: false, intensity: 40, colors: { 'C': 50, 'oG': 40, 'B': 30 }, xGain: 5, yGain: 10, phaseKnob: 5, amplKnob: 0, freqKnob: 0 },
+    sharp: { wave: 'lead', freq1: 5.5, freq2: 6.0, interference: 45, interferenceEnabled: false, wavelength: 6, is3D: false, intensity: 88, colors: { 'Y': 100, 'G': 70 }, xGain: 60, yGain: 50, phaseKnob: 30, amplKnob: 55, freqKnob: 45 },
+    smooth: { wave: 'string', freq1: 1.8, freq2: 2.2, interference: 25, interferenceEnabled: true, wavelength: 16, is3D: true, intensity: 55, colors: { 'oG': 80, 'C': 60, 'B': 40 }, xGain: 10, yGain: 15, phaseKnob: 20, amplKnob: 10, freqKnob: 5 },
+    random: { wave: 'noise', freq1: 5.0, freq2: 7.0, interference: 100, interferenceEnabled: true, wavelength: 5, is3D: true, intensity: 75, colors: { 'R': 50, 'G': 50, 'B': 50, 'C': 50, 'M': 50, 'Y': 50 }, xGain: 50, yGain: 50, phaseKnob: 50, amplKnob: 50, freqKnob: 50 },
+  }
+
   const [isConnected, setIsConnected] = useState(false)
   const [maikActive, setMaikActive] = useState(false)
 
@@ -134,12 +220,42 @@ export function Oscilloscope({
   const [chaosKnob, setChaosKnob] = useState(0)
   const [speedKnob, setSpeedKnob] = useState(0)
 
+  // Apply preset function
+  const applyPreset = (presetName: string) => {
+    const config = presetConfigs[presetName]
+    if (!config) return
+
+    setPreset(presetName)
+    setWaveType(config.wave)
+    setFreq1(config.freq1)
+    setFreq2(config.freq2)
+    setInterference(config.interference)
+    setInterferenceEnabled(config.interferenceEnabled)
+    setWavelength(config.wavelength)
+    setIs3DEnabled(config.is3D)
+    setIntensity(config.intensity)
+    setSelectedColors(config.colors)
+    setXGain(config.xGain)
+    setYGain(config.yGain)
+    setPhaseKnob(config.phaseKnob)
+    setAmplKnob(config.amplKnob)
+    setFreqKnob(config.freqKnob)
+  }
+
   // Audio controls
   const [audioEnabled, setAudioEnabled] = useState(false)
   const [volume, setVolume] = useState(100)
   const [pitch, setPitch] = useState(50)
   const [filter, setFilter] = useState(0)
   const [reverb, setReverb] = useState(0)
+
+  // Info display mode
+  const [infoMode, setInfoMode] = useState<'WAVE' | 'SIGNAL' | 'COLOR' | 'SYS' | 'PRESET' | 'TIME'>('WAVE')
+  const infoModes: ('WAVE' | 'SIGNAL' | 'COLOR' | 'SYS' | 'PRESET' | 'TIME')[] = ['WAVE', 'SIGNAL', 'COLOR', 'SYS', 'PRESET', 'TIME']
+  const cycleInfoMode = () => {
+    const currentIndex = infoModes.indexOf(infoMode)
+    setInfoMode(infoModes[(currentIndex + 1) % infoModes.length])
+  }
 
   // Sound Tool - Extended state
   const [isPlaying, setIsPlaying] = useState(false)
@@ -182,9 +298,177 @@ export function Oscilloscope({
   const [vuLeft, setVuLeft] = useState(0)
   const [vuRight, setVuRight] = useState(0)
 
+  // Power button hold logic
+  const handlePowerDown = () => {
+    if (powerState === 'off' || powerState === 'shutting_down') {
+      // Start boot sequence
+      setIsPowerHeld(true)
+      let progress = 0
+      powerHoldRef.current = setInterval(() => {
+        progress += 2
+        setPowerHoldProgress(progress)
+        if (progress >= 100) {
+          if (powerHoldRef.current) clearInterval(powerHoldRef.current)
+          setIsPowerHeld(false)
+          setPowerHoldProgress(0)
+          startBootSequence()
+        }
+      }, 30)
+    } else if (powerState === 'on') {
+      // Start shutdown sequence
+      setIsPowerHeld(true)
+      let progress = 0
+      powerHoldRef.current = setInterval(() => {
+        progress += 2
+        setPowerHoldProgress(progress)
+        if (progress >= 100) {
+          if (powerHoldRef.current) clearInterval(powerHoldRef.current)
+          setIsPowerHeld(false)
+          setPowerHoldProgress(0)
+          startShutdownSequence()
+        }
+      }, 30)
+    }
+  }
+
+  const handlePowerUp = () => {
+    if (powerHoldRef.current) {
+      clearInterval(powerHoldRef.current)
+    }
+    setIsPowerHeld(false)
+    setPowerHoldProgress(0)
+  }
+
+  // Boot sequence
+  const startBootSequence = () => {
+    setPowerState('booting')
+    setBootProgress(0)
+    setBootLog([])
+    setComponentTests([
+      { name: 'PWR', status: 'pending', value: '' },
+      { name: 'MEM', status: 'pending', value: '' },
+      { name: 'DSP', status: 'pending', value: '' },
+      { name: 'AUD', status: 'pending', value: '' },
+      { name: 'WAV', status: 'pending', value: '' },
+      { name: 'SNS', status: 'pending', value: '' },
+      { name: 'NET', status: 'pending', value: '' },
+      { name: 'SYS', status: 'pending', value: '' },
+    ])
+
+    const bootStages: { stage: BootStage; delay: number; testIndex: number; log: string; value: string }[] = [
+      { stage: 'power_check', delay: 300, testIndex: 0, log: 'POWER SUBSYSTEM CHECK...', value: '12.4V' },
+      { stage: 'memory_test', delay: 500, testIndex: 1, log: 'MEMORY TEST 256KB...', value: '256KB OK' },
+      { stage: 'display_init', delay: 400, testIndex: 2, log: 'DISPLAY INIT CRT-460...', value: '480x310' },
+      { stage: 'audio_init', delay: 450, testIndex: 3, log: 'AUDIO CODEC 48KHZ/24BIT...', value: '48K/24' },
+      { stage: 'waveform_cal', delay: 600, testIndex: 4, log: 'WAVEFORM CALIBRATION...', value: '31 TYPES' },
+      { stage: 'sensor_check', delay: 350, testIndex: 5, log: 'SENSOR ARRAY CHECK...', value: '12 OK' },
+      { stage: 'network_init', delay: 500, testIndex: 6, log: 'NETWORK INTERFACE...', value: 'READY' },
+      { stage: 'system_ready', delay: 400, testIndex: 7, log: 'SYSTEM INITIALIZATION...', value: 'ONLINE' },
+    ]
+
+    let currentStage = 0
+    const runStage = () => {
+      if (currentStage >= bootStages.length) {
+        setBootStage('running')
+        setPowerState('on')
+        setBootLog(prev => [...prev, '═══════════════════════════════', 'EICO-460 OSCILLOSCOPE READY', '═══════════════════════════════'])
+        return
+      }
+
+      const stage = bootStages[currentStage]
+      setBootStage(stage.stage)
+      setBootProgress(((currentStage + 1) / bootStages.length) * 100)
+      setBootLog(prev => [...prev, stage.log])
+
+      // Update test status to testing
+      setComponentTests(prev => prev.map((t, i) =>
+        i === stage.testIndex ? { ...t, status: 'testing' } : t
+      ))
+
+      bootTimeoutRef.current = setTimeout(() => {
+        // Random pass/fail (95% pass rate)
+        const passed = Math.random() > 0.05
+        setComponentTests(prev => prev.map((t, i) =>
+          i === stage.testIndex ? { ...t, status: passed ? 'pass' : 'fail', value: stage.value } : t
+        ))
+        setBootLog(prev => [...prev, `  └─ ${passed ? 'PASS' : 'FAIL'}: ${stage.value}`])
+        currentStage++
+        runStage()
+      }, stage.delay)
+    }
+
+    // Initial delay before boot
+    bootTimeoutRef.current = setTimeout(() => {
+      setBootLog(['EICO-460 BOOT SEQUENCE v2.4.1', '───────────────────────────────'])
+      runStage()
+    }, 200)
+  }
+
+  // Shutdown sequence
+  const startShutdownSequence = () => {
+    setPowerState('shutting_down')
+    setBootStage('shutting_down')
+    setBootLog(['', 'INITIATING SHUTDOWN SEQUENCE...'])
+
+    const shutdownSteps = [
+      { delay: 200, log: 'SAVING STATE...' },
+      { delay: 300, log: 'STOPPING AUDIO ENGINE...' },
+      { delay: 250, log: 'CLEARING BUFFERS...' },
+      { delay: 200, log: 'DISCONNECTING NETWORK...' },
+      { delay: 300, log: 'POWER DOWN DISPLAY...' },
+      { delay: 400, log: 'SYSTEM HALTED' },
+    ]
+
+    let currentStep = 0
+    const runStep = () => {
+      if (currentStep >= shutdownSteps.length) {
+        bootTimeoutRef.current = setTimeout(() => {
+          setPowerState('off')
+          setBootStage('off')
+          setBootProgress(0)
+          setBootLog([])
+          setComponentTests([
+            { name: 'PWR', status: 'pending', value: '' },
+            { name: 'MEM', status: 'pending', value: '' },
+            { name: 'DSP', status: 'pending', value: '' },
+            { name: 'AUD', status: 'pending', value: '' },
+            { name: 'WAV', status: 'pending', value: '' },
+            { name: 'SNS', status: 'pending', value: '' },
+            { name: 'NET', status: 'pending', value: '' },
+            { name: 'SYS', status: 'pending', value: '' },
+          ])
+          // Reset all audio states
+          setAudioEnabled(false)
+          setIsPlaying(false)
+          setIsRecording(false)
+          setIsPaused(false)
+        }, 500)
+        return
+      }
+
+      const step = shutdownSteps[currentStep]
+      bootTimeoutRef.current = setTimeout(() => {
+        setBootLog(prev => [...prev, step.log])
+        setBootProgress(100 - ((currentStep + 1) / shutdownSteps.length) * 100)
+        currentStep++
+        runStep()
+      }, step.delay)
+    }
+
+    runStep()
+  }
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (powerHoldRef.current) clearInterval(powerHoldRef.current)
+      if (bootTimeoutRef.current) clearTimeout(bootTimeoutRef.current)
+    }
+  }, [])
+
   // Animate spectrum and recording when audio enabled
   useEffect(() => {
-    if (!audioEnabled && !isPlaying && !isRecording) {
+    if (powerState !== 'on' || (!audioEnabled && !isPlaying && !isRecording)) {
       setSpectrumData(Array(24).fill(5))
       setVuLeft(0)
       setVuRight(0)
@@ -287,9 +571,25 @@ export function Oscilloscope({
   const isAnimated = isConnected || maikActive
   const formattedBalance = balance.toLocaleString()
 
-  // Wave type options
-  const waveTypes = ['sine', 'square', 'sawtooth', 'noise'] as const
-  const presets = ['default', 'calm', 'chaos', 'pulse', 'ambient']
+  // Wave type options - expanded
+  const waveTypes = [
+    // Basic waveforms
+    'sine', 'square', 'sawtooth', 'triangle', 'noise', 'pulse',
+    // Synthesis
+    'harmonic', 'morph', 'fm', 'am', 'pwm', 'supersaw', 'subsine',
+    // Instruments
+    'bell', 'organ', 'pluck', 'pad', 'bass', 'lead', 'arp',
+    // Effects
+    'sweep', 'wobble', 'glitch', 'grain',
+    // Vocal/Acoustic
+    'formant', 'vocal', 'breath', 'wind', 'string', 'brass', 'keys'
+  ] as const
+  const presets = [
+    'default', 'calm', 'chaos', 'pulse', 'ambient',
+    'retro', 'digital', 'analog', 'lo-fi', 'hi-fi',
+    'space', 'dark', 'bright', 'warm', 'cold',
+    'aggressive', 'soft', 'sharp', 'smooth', 'random'
+  ]
 
   // Helper to format knob value
   const formatValue = (v: number) => (v / 100).toFixed(2)
@@ -308,43 +608,235 @@ export function Oscilloscope({
     </div>
   )
 
+  // Calculate power button glow intensity based on state and hold progress
+  const powerGlowIntensity = useMemo(() => {
+    if (powerState === 'on') {
+      // When on and holding to shut down, fade out
+      return isPowerHeld ? 1 - (powerHoldProgress / 100) : 1
+    } else if (powerState === 'off') {
+      // When off and holding to turn on, fade in
+      return isPowerHeld ? powerHoldProgress / 100 : 0
+    } else if (powerState === 'booting') {
+      return 0.7
+    } else {
+      // Shutting down
+      return 0.3
+    }
+  }, [powerState, isPowerHeld, powerHoldProgress])
+
+  // Power button component - always in same position
+  const PowerButton = () => (
+    <button
+      onMouseDown={handlePowerDown}
+      onMouseUp={handlePowerUp}
+      onMouseLeave={handlePowerUp}
+      onTouchStart={handlePowerDown}
+      onTouchEnd={handlePowerUp}
+      className="relative w-10 h-10 rounded-full border-2 flex items-center justify-center transition-colors duration-300"
+      style={{
+        backgroundColor: `rgba(26, 58, 26, ${powerGlowIntensity})`,
+        borderColor: powerState === 'booting'
+          ? 'var(--neon-amber)'
+          : powerState === 'shutting_down'
+          ? 'var(--neon-red)'
+          : `rgba(0, 255, 102, ${0.3 + powerGlowIntensity * 0.7})`,
+        boxShadow: powerState === 'booting'
+          ? '0 0 10px var(--neon-amber)'
+          : powerState === 'shutting_down'
+          ? '0 0 10px var(--neon-red)'
+          : `0 0 ${powerGlowIntensity * 15}px rgba(0, 255, 102, ${powerGlowIntensity}), inset 0 0 ${powerGlowIntensity * 10}px rgba(0, 255, 100, ${powerGlowIntensity * 0.3})`,
+      }}
+    >
+      {/* Power icon */}
+      <svg
+        className="w-5 h-5 transition-colors duration-300"
+        style={{
+          color: powerState === 'booting'
+            ? 'var(--neon-amber)'
+            : powerState === 'shutting_down'
+            ? 'var(--neon-red)'
+            : `rgba(0, 255, 102, ${0.3 + powerGlowIntensity * 0.7})`,
+        }}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.5"
+      >
+        <path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0" />
+      </svg>
+    </button>
+  )
+
+  // Check if device is powered off or in boot/shutdown state
+  const isDeviceOff = powerState === 'off' || powerState === 'booting' || powerState === 'shutting_down'
+
   return (
     <div
       className={cn(
         'flex flex-col gap-1 p-1.5 rounded-lg w-full h-full overflow-hidden',
-        'bg-gradient-to-b from-[#5a6a5a] to-[#4a5a4a]',
-        'border border-[#3a4a3a]',
+        'border transition-colors duration-500',
+        isDeviceOff
+          ? 'bg-gradient-to-b from-[#2a2a2a] to-[#1a1a1a] border-[#3a3a3a]'
+          : 'bg-gradient-to-b from-[#5a6a5a] to-[#4a5a4a] border-[#3a4a3a]',
         className
       )}
     >
-      {/* Header Row */}
+      {/* Header Row - Always visible in same position */}
       <div className="flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-1">
-          <span className="font-mono text-[8px] text-white/80">INT</span>
-          <Knob value={intensity} onChange={setIntensity} size="sm" accentColor="#ffffff" />
+          <span className={cn('font-mono text-[8px]', isDeviceOff ? 'text-white/40' : 'text-white/80')}>INT</span>
+          <Knob value={intensity} onChange={setIntensity} size="sm" accentColor={isDeviceOff ? '#3a3a3a' : '#ffffff'} disabled={isDeviceOff} />
         </div>
-        <div className="flex items-center gap-1">
-          <LED on={true} color="red" size="sm" />
-          <LED on={maikActive} color="amber" size="sm" />
-          <LED on={isConnected} color="green" size="sm" />
+        <div className="flex items-center gap-2">
+          <PowerButton />
+          <div className="flex items-center gap-1">
+            <LED on={powerState === 'on'} color="green" size="sm" />
+            <LED on={powerState === 'on' && maikActive} color="amber" size="sm" />
+            <LED on={powerState === 'on' && isConnected} color="cyan" size="sm" />
+          </div>
           <button
-            className={cn('px-2 py-1 rounded font-mono text-[8px] font-bold border',
-              maikActive ? 'bg-[var(--neon-green)] text-black' : 'bg-[#2a3a2a] text-[var(--neon-green)] border-[#1a2a1a]'
+            className={cn('px-2 py-1 rounded font-mono text-[8px] font-bold border transition-opacity',
+              maikActive && powerState === 'on' ? 'bg-[var(--neon-green)] text-black' : 'bg-[#2a3a2a] text-[var(--neon-green)] border-[#1a2a1a]',
+              isDeviceOff && 'opacity-30 cursor-not-allowed'
             )}
-            onClick={() => setMaikActive(!maikActive)}
+            onClick={() => powerState === 'on' && setMaikActive(!maikActive)}
+            disabled={isDeviceOff}
           >MAIK</button>
           <button
-            className={cn('px-2 py-1 rounded font-mono text-[8px] font-bold border',
-              isConnected ? 'bg-[#bfff00] text-black' : 'bg-[#2a2a1a] text-[var(--neon-amber)] border-[var(--neon-amber)]'
+            className={cn('px-2 py-1 rounded font-mono text-[8px] font-bold border transition-opacity',
+              isConnected && powerState === 'on' ? 'bg-[#bfff00] text-black' : 'bg-[#2a2a1a] text-[var(--neon-amber)] border-[var(--neon-amber)]',
+              isDeviceOff && 'opacity-30 cursor-not-allowed'
             )}
-            onClick={() => { setIsConnected(!isConnected); onConnect?.() }}
+            onClick={() => { if (powerState === 'on') { setIsConnected(!isConnected); onConnect?.() } }}
+            disabled={isDeviceOff}
           >WALLET</button>
         </div>
         <div className="flex items-center gap-1">
-          <span className="font-mono text-[8px] text-white/80">FOC</span>
-          <Knob value={focus} onChange={setFocus} size="sm" accentColor="#ffffff" />
+          <span className={cn('font-mono text-[8px]', isDeviceOff ? 'text-white/40' : 'text-white/80')}>FOC</span>
+          <Knob value={focus} onChange={setFocus} size="sm" accentColor={isDeviceOff ? '#3a3a3a' : '#ffffff'} disabled={isDeviceOff} />
         </div>
       </div>
+
+      {/* Boot/Shutdown Screen - replaces main content when off */}
+      {isDeviceOff ? (
+        <>
+          {/* Main boot display */}
+          <div className="flex-1 bg-[#0a0a0a] border border-[#2a2a2a] rounded relative overflow-hidden">
+            {powerState === 'off' ? (
+              // Off state - dark screen
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="font-mono text-[32px] text-[#1a1a1a] font-bold mb-2">EICO</div>
+                  <div className="font-mono text-[8px] text-white/15">HOLD POWER TO START</div>
+                </div>
+              </div>
+            ) : (
+              // Booting or shutting down
+              <div className="absolute inset-0 p-2 flex flex-col">
+                {/* CRT effect overlay */}
+                <div className="absolute inset-0 pointer-events-none crt-scanlines" />
+
+                {/* Component test grid */}
+                <div className="grid grid-cols-8 gap-1 mb-2">
+                  {componentTests.map((test) => (
+                    <div
+                      key={test.name}
+                      className={cn(
+                        'flex flex-col items-center p-1 rounded border',
+                        test.status === 'pending' ? 'border-[#2a2a2a] bg-[#0a0a0a]' :
+                        test.status === 'testing' ? 'border-[var(--neon-amber)] bg-[#1a1a0a] animate-pulse' :
+                        test.status === 'pass' ? 'border-[var(--neon-green)] bg-[#0a1a0a]' :
+                        test.status === 'fail' ? 'border-[var(--neon-red)] bg-[#1a0a0a]' :
+                        'border-[#2a2a2a] bg-[#0a0a0a]'
+                      )}
+                    >
+                      <span className="font-mono text-[7px] text-white/60">{test.name}</span>
+                      <div className={cn(
+                        'w-3 h-3 rounded-full mt-0.5',
+                        test.status === 'pending' ? 'bg-[#2a2a2a]' :
+                        test.status === 'testing' ? 'bg-[var(--neon-amber)] animate-pulse' :
+                        test.status === 'pass' ? 'bg-[var(--neon-green)]' :
+                        test.status === 'fail' ? 'bg-[var(--neon-red)]' :
+                        'bg-[#2a2a2a]'
+                      )} />
+                      <span className="font-mono text-[5px] text-white/40 mt-0.5 truncate max-w-full">
+                        {test.value || '---'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Boot log */}
+                <div className="flex-1 bg-[#050505] border border-[#1a1a1a] rounded p-1.5 overflow-hidden font-mono text-[7px]">
+                  <div className="h-full overflow-y-auto">
+                    {bootLog.map((line, i) => (
+                      <div
+                        key={i}
+                        className={cn(
+                          'leading-tight',
+                          line.includes('PASS') ? 'text-[var(--neon-green)]' :
+                          line.includes('FAIL') ? 'text-[var(--neon-red)]' :
+                          line.includes('═') || line.includes('─') ? 'text-[var(--neon-cyan)]' :
+                          line.includes('READY') || line.includes('ONLINE') ? 'text-[var(--neon-green)] font-bold' :
+                          line.includes('HALTED') ? 'text-[var(--neon-red)]' :
+                          'text-[var(--crt-green)]'
+                        )}
+                      >
+                        {line}
+                      </div>
+                    ))}
+                    {powerState === 'booting' && bootStage !== 'running' && (
+                      <span className="inline-block w-2 h-3 bg-[var(--crt-green)] animate-pulse" />
+                    )}
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="mt-2">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="font-mono text-[6px] text-white/40">
+                      {powerState === 'booting' ? 'BOOT PROGRESS' : 'SHUTDOWN'}
+                    </span>
+                    <span className="font-mono text-[6px] text-[var(--neon-cyan)]">
+                      {Math.round(bootProgress)}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-[#0a0a0a] border border-[#2a2a2a] rounded overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full transition-all duration-200',
+                        powerState === 'booting'
+                          ? 'bg-gradient-to-r from-[var(--neon-green)] to-[var(--neon-cyan)]'
+                          : 'bg-gradient-to-r from-[var(--neon-red)] to-[var(--neon-amber)]'
+                      )}
+                      style={{ width: `${bootProgress}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Status bar when off */}
+          <div className="flex items-center justify-between bg-[#1a1a1a] rounded px-2 py-1 border border-[#2a2a2a]">
+            <div className="flex items-center gap-2">
+              <LED on={powerState !== 'off'} color={powerState === 'booting' ? 'amber' : 'red'} size="sm" />
+              <span className="font-mono text-[7px] text-white/50">
+                {powerState === 'off' ? 'STANDBY' :
+                 powerState === 'booting' ? `BOOT: ${bootStage.toUpperCase().replace('_', ' ')}` :
+                 'SHUTDOWN IN PROGRESS'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="font-mono text-[6px] text-white/30">EICO-460 v2.4.1</span>
+              <LED on={powerState === 'booting'} color="amber" size="sm" />
+              <LED on={powerState === 'shutting_down'} color="red" size="sm" />
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Normal operational content */}
 
       {/* CRT Display */}
       <CRTScreen className="h-[345px] w-full flex-shrink-0">
@@ -381,10 +873,50 @@ export function Oscilloscope({
           <span className="font-mono text-sm text-[var(--neon-cyan)] font-bold">{formattedBalance}</span>
         </div>
         <select value={waveType} onChange={(e) => setWaveType(e.target.value as typeof waveType)}
-          className="bg-[#1a2a1a] border border-[#0a1a0a] rounded px-1 py-0.5 font-mono text-[8px] text-white">
-          {waveTypes.map(t => <option key={t} value={t}>{t}</option>)}
+          className="bg-[#1a2a1a] border border-[#0a1a0a] rounded px-1 py-0.5 font-mono text-[8px] text-white max-h-[200px]">
+          <optgroup label="─── BASIC ───">
+            <option value="sine">◎ sine</option>
+            <option value="square">▢ square</option>
+            <option value="sawtooth">◤ sawtooth</option>
+            <option value="triangle">△ triangle</option>
+            <option value="noise">▒ noise</option>
+            <option value="pulse">▮ pulse</option>
+          </optgroup>
+          <optgroup label="─── SYNTHESIS ───">
+            <option value="harmonic">≋ harmonic</option>
+            <option value="morph">◇ morph</option>
+            <option value="fm">⊛ fm</option>
+            <option value="am">⊕ am</option>
+            <option value="pwm">▤ pwm</option>
+            <option value="supersaw">⫿ supersaw</option>
+            <option value="subsine">◉ subsine</option>
+          </optgroup>
+          <optgroup label="─── INSTRUMENTS ───">
+            <option value="bell">🔔 bell</option>
+            <option value="organ">♪ organ</option>
+            <option value="pluck">◊ pluck</option>
+            <option value="pad">≡ pad</option>
+            <option value="bass">▼ bass</option>
+            <option value="lead">▲ lead</option>
+            <option value="arp">⋮ arp</option>
+          </optgroup>
+          <optgroup label="─── EFFECTS ───">
+            <option value="sweep">↝ sweep</option>
+            <option value="wobble">∿ wobble</option>
+            <option value="glitch">⌇ glitch</option>
+            <option value="grain">⁘ grain</option>
+          </optgroup>
+          <optgroup label="─── ACOUSTIC ───">
+            <option value="formant">◯ formant</option>
+            <option value="vocal">♫ vocal</option>
+            <option value="breath">○ breath</option>
+            <option value="wind">≈ wind</option>
+            <option value="string">⌒ string</option>
+            <option value="brass">◖ brass</option>
+            <option value="keys">♯ keys</option>
+          </optgroup>
         </select>
-        <select value={preset} onChange={(e) => setPreset(e.target.value)}
+        <select value={preset} onChange={(e) => applyPreset(e.target.value)}
           className="bg-[#1a2a1a] border border-[#0a1a0a] rounded px-1 py-0.5 font-mono text-[8px] text-white">
           {presets.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
@@ -453,7 +985,128 @@ export function Oscilloscope({
         <KnobWithInput label="PIT" value={pitch} setter={setPitch} />
         <KnobWithInput label="FLT" value={filter} setter={setFilter} />
         <KnobWithInput label="REV" value={reverb} setter={setReverb} />
-        <div className="ml-auto font-mono text-[6px] text-[var(--neon-cyan)]">EICO 460</div>
+
+        {/* Info Display */}
+        <div className="ml-auto flex items-center gap-1">
+          <div className="bg-[#0a1a0a] border border-[#1a2a1a] rounded px-1.5 py-0.5 min-w-[120px]">
+            <div className="flex items-center justify-between mb-0.5">
+              <span className="font-mono text-[5px] text-[var(--neon-cyan)]/60">{infoMode}</span>
+              <span className="font-mono text-[5px] text-white/30">EICO-460</span>
+            </div>
+            <div className="font-mono text-[7px] text-[var(--crt-green)] leading-tight">
+              {infoMode === 'WAVE' && (
+                <>
+                  <div className="flex justify-between">
+                    <span>TYPE:</span>
+                    <span className="text-[var(--neon-amber)]">{waveType.toUpperCase()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>F1/F2:</span>
+                    <span>{freq1.toFixed(1)}/{freq2.toFixed(1)}Hz</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>3D:</span>
+                    <span className={is3DEnabled ? 'text-[var(--neon-green)]' : 'text-white/30'}>{is3DEnabled ? 'ON' : 'OFF'}</span>
+                  </div>
+                </>
+              )}
+              {infoMode === 'SIGNAL' && (
+                <>
+                  <div className="flex justify-between">
+                    <span>AMP:</span>
+                    <span>{((intensity / 100) * (1 + amplKnob / 100)).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>PHASE:</span>
+                    <span>{((phaseKnob / 100) * 360).toFixed(0)}°</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>INT:</span>
+                    <span className={interferenceEnabled ? 'text-[var(--neon-amber)]' : 'text-white/30'}>{interferenceEnabled ? `${interference}%` : 'OFF'}</span>
+                  </div>
+                </>
+              )}
+              {infoMode === 'COLOR' && (() => {
+                const rgb = waveColor.match(/\d+/g) || ['0', '0', '0']
+                const hex = `#${parseInt(rgb[0]).toString(16).padStart(2, '0')}${parseInt(rgb[1]).toString(16).padStart(2, '0')}${parseInt(rgb[2]).toString(16).padStart(2, '0')}`
+                return (
+                  <>
+                    <div className="flex justify-between">
+                      <span>RGB:</span>
+                      <span>{rgb.join(',')}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>HEX:</span>
+                      <span style={{ color: waveColor }}>{hex.toUpperCase()}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>MIX:</span>
+                      <span>{Object.keys(selectedColors).filter(k => selectedColors[k] > 0).join('+') || 'NONE'}</span>
+                    </div>
+                  </>
+                )
+              })()}
+              {infoMode === 'SYS' && (
+                <>
+                  <div className="flex justify-between">
+                    <span>CPU:</span>
+                    <span className={audioEnabled ? 'text-[var(--neon-amber)]' : 'text-[var(--neon-green)]'}>{audioEnabled ? '23%' : '4%'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>MEM:</span>
+                    <span>128KB</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>PWR:</span>
+                    <span className="text-[var(--neon-green)]">12.4V</span>
+                  </div>
+                </>
+              )}
+              {infoMode === 'PRESET' && (
+                <>
+                  <div className="flex justify-between">
+                    <span>NAME:</span>
+                    <span className="text-[var(--neon-cyan)]">{preset.toUpperCase()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>WAVE:</span>
+                    <span>{waveType}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>MOD:</span>
+                    <span className="text-[var(--neon-amber)]">{(xGain + yGain + freqKnob > 0) ? 'CUSTOM' : 'STD'}</span>
+                  </div>
+                </>
+              )}
+              {infoMode === 'TIME' && (() => {
+                const now = new Date()
+                return (
+                  <>
+                    <div className="flex justify-between">
+                      <span>TIME:</span>
+                      <span>{now.toLocaleTimeString('en-US', { hour12: false })}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>BPM:</span>
+                      <span className="text-[var(--neon-amber)]">{bpm}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>RATE:</span>
+                      <span>{sampleRate}Hz</span>
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+          </div>
+          <button
+            onClick={cycleInfoMode}
+            className="w-5 h-10 bg-[#2a3a2a] border border-[#1a2a1a] rounded flex items-center justify-center hover:bg-[#3a4a3a] active:bg-[#1a2a1a] transition-colors"
+            title="Cycle info mode"
+          >
+            <span className="font-mono text-[6px] text-[var(--neon-cyan)] writing-mode-vertical" style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>MODE</span>
+          </button>
+        </div>
       </div>
 
       {/* Color Mixer - Compact Sliders with Inline Info */}
@@ -890,6 +1543,8 @@ export function Oscilloscope({
           ))}
         </div>
       </div>
+        </>
+      )}
     </div>
   )
 }
