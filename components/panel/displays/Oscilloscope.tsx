@@ -371,7 +371,7 @@ export function Oscilloscope({
       if (currentStage >= bootStages.length) {
         setBootStage('running')
         setPowerState('on')
-        setBootLog(prev => [...prev, '═══════════════════════════════', 'EICO-460 OSCILLOSCOPE READY', '═══════════════════════════════'])
+        setBootLog(prev => [...prev, '═══════════════════════════════', 'OZSC-460 OSCILLOSCOPE READY', '═══════════════════════════════'])
         return
       }
 
@@ -399,7 +399,7 @@ export function Oscilloscope({
 
     // Initial delay before boot
     bootTimeoutRef.current = setTimeout(() => {
-      setBootLog(['EICO-460 BOOT SEQUENCE v2.4.1', '───────────────────────────────'])
+      setBootLog(['OZSC-460 BOOT SEQUENCE v2.4.1', '───────────────────────────────'])
       runStage()
     }, 200)
   }
@@ -726,7 +726,7 @@ export function Oscilloscope({
               // Off state - dark screen
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="font-mono text-[32px] text-[#1a1a1a] font-bold mb-2">EICO</div>
+                  <div className="font-mono text-[32px] text-[#1a1a1a] font-bold mb-2">OZSC</div>
                   <div className="font-mono text-[8px] text-white/15">HOLD POWER TO START</div>
                 </div>
               </div>
@@ -828,7 +828,7 @@ export function Oscilloscope({
               </span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="font-mono text-[6px] text-white/30">EICO-460 v2.4.1</span>
+              <span className="font-mono text-[6px] text-white/30">OZSC-460 v2.4.1</span>
               <LED on={powerState === 'booting'} color="amber" size="sm" />
               <LED on={powerState === 'shutting_down'} color="red" size="sm" />
             </div>
@@ -991,7 +991,7 @@ export function Oscilloscope({
           <div className="bg-[#0a1a0a] border border-[#1a2a1a] rounded px-1.5 py-0.5 min-w-[120px]">
             <div className="flex items-center justify-between mb-0.5">
               <span className="font-mono text-[5px] text-[var(--neon-cyan)]/60">{infoMode}</span>
-              <span className="font-mono text-[5px] text-white/30">EICO-460</span>
+              <span className="font-mono text-[5px] text-white/30">OZSC-460</span>
             </div>
             <div className="font-mono text-[7px] text-[var(--crt-green)] leading-tight">
               {infoMode === 'WAVE' && (
