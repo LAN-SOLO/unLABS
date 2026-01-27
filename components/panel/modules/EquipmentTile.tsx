@@ -2406,6 +2406,13 @@ export function BasicToolkit({ className }: BasicToolkitProps) {
 // ==================================================
 // MATERIAL SCANNER - Resource detection device
 // ==================================================
+// ==================================================
+// MATERIAL SCANNER - Tier 1 Resource Detection
+// ==================================================
+type ScannerState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type ScannerTestPhase = 'emitter' | 'receiver' | 'calibrate' | 'sweep' | 'complete' | null
+type ScannerBootPhase = 'init' | 'sensors' | 'calibrate' | 'ready' | null
+
 interface MaterialScannerProps {
   scanProgress?: number
   detectedMaterials?: number
@@ -2417,45 +2424,317 @@ export function MaterialScanner({
   detectedMaterials = 3,
   className,
 }: MaterialScannerProps) {
+  const [deviceState, setDeviceState] = useState<ScannerState>('booting')
+  const [testPhase, setTestPhase] = useState<ScannerTestPhase>(null)
+  const [bootPhase, setBootPhase] = useState<ScannerBootPhase>('init')
+  const [scanLine, setScanLine] = useState(0)
+  const [foundMaterials, setFoundMaterials] = useState<number[]>([])
+
+  // Random logo position (memoized on mount)
+  const [logoPosition] = useState(() => {
+    const positions = [
+      { bottom: '2px', right: '2px' },
+      { bottom: '2px', left: '2px' },
+      { top: '16px', right: '2px' },
+    ]
+    return positions[Math.floor(Math.random() * positions.length)]
+  })
+
+  // Boot sequence
+  useEffect(() => {
+    if (deviceState === 'booting') {
+      const bootSequence = async () => {
+        setBootPhase('init')
+        await new Promise(r => setTimeout(r, 350))
+        setBootPhase('sensors')
+        await new Promise(r => setTimeout(r, 400))
+        setBootPhase('calibrate')
+        await new Promise(r => setTimeout(r, 450))
+        setBootPhase('ready')
+        await new Promise(r => setTimeout(r, 300))
+        setDeviceState('online')
+        setBootPhase(null)
+      }
+      bootSequence()
+    }
+  }, [deviceState])
+
+  // Scanning animation when online
+  useEffect(() => {
+    if (deviceState !== 'online') return
+
+    const scanInterval = setInterval(() => {
+      setScanLine(prev => {
+        const next = prev + 2
+        if (next > 100) {
+          // Reset and generate new material positions
+          setFoundMaterials(
+            Array.from({ length: detectedMaterials }, () =>
+              Math.floor(Math.random() * 80) + 10
+            ).sort((a, b) => a - b)
+          )
+          return 0
+        }
+        return next
+      })
+    }, 50)
+
+    return () => clearInterval(scanInterval)
+  }, [deviceState, detectedMaterials])
+
+  // Initialize materials on first online
+  useEffect(() => {
+    if (deviceState === 'online' && foundMaterials.length === 0) {
+      setFoundMaterials(
+        Array.from({ length: detectedMaterials }, (_, i) => 20 + i * 25)
+      )
+    }
+  }, [deviceState, detectedMaterials, foundMaterials.length])
+
+  // Test sequence handler
+  const runTest = useCallback(() => {
+    if (deviceState !== 'online') return
+    setDeviceState('testing')
+    const testSequence = async () => {
+      setTestPhase('emitter')
+      await new Promise(r => setTimeout(r, 500))
+      setTestPhase('receiver')
+      await new Promise(r => setTimeout(r, 500))
+      setTestPhase('calibrate')
+      await new Promise(r => setTimeout(r, 600))
+      setTestPhase('sweep')
+      await new Promise(r => setTimeout(r, 700))
+      setTestPhase('complete')
+      await new Promise(r => setTimeout(r, 400))
+      setTestPhase(null)
+      setDeviceState('online')
+    }
+    testSequence()
+  }, [deviceState])
+
+  // Reboot handler
+  const reboot = useCallback(() => {
+    setDeviceState('rebooting')
+    setTestPhase(null)
+    setFoundMaterials([])
+    setScanLine(0)
+    setTimeout(() => {
+      setDeviceState('booting')
+    }, 600)
+  }, [])
+
+  const getStatusColor = () => {
+    switch (deviceState) {
+      case 'online': return 'var(--neon-cyan)'
+      case 'booting': return 'var(--neon-green)'
+      case 'testing': return 'var(--neon-purple)'
+      case 'rebooting': return 'var(--neon-amber)'
+      case 'offline': return 'var(--neon-red)'
+      default: return 'var(--neon-cyan)'
+    }
+  }
+
   return (
-    <PanelFrame variant="teal" className={cn('p-2', className)}>
-      <div className="flex items-center justify-between mb-1">
-        <div className="font-mono text-[9px] text-[var(--neon-cyan)]">
-          MATERIAL SCANNER
-        </div>
-        <LED on={true} color="cyan" size="sm" />
+    <PanelFrame variant="teal" className={cn('p-2 relative overflow-hidden', className)}>
+      {/* Ultra thin stacked nano buttons - top right */}
+      <div className="absolute top-1 right-1 flex flex-col gap-px z-10">
+        {/* Test button - ultra thin */}
+        <button
+          onClick={runTest}
+          disabled={deviceState !== 'online'}
+          className="group relative"
+          title="Test"
+        >
+          <div
+            className="w-4 h-1.5 rounded-sm border transition-all"
+            style={{
+              background: 'linear-gradient(180deg, #2a2a3a 0%, #1a1a2a 100%)',
+              borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a',
+              boxShadow: deviceState === 'testing'
+                ? '0 0 4px var(--neon-purple), inset 0 0 2px var(--neon-purple)'
+                : 'inset 0 0.5px 1px rgba(0,0,0,0.5)',
+            }}
+          />
+          {/* Illuminated edge - top */}
+          <div
+            className="absolute inset-x-0 top-0 h-px rounded-t-sm"
+            style={{
+              background: deviceState === 'online' ? 'var(--neon-cyan)' : 'transparent',
+              opacity: deviceState === 'online' ? 0.7 : 0,
+              boxShadow: deviceState === 'online' ? '0 0 3px var(--neon-cyan)' : 'none',
+            }}
+          />
+        </button>
+        {/* Reboot button - ultra thin */}
+        <button
+          onClick={reboot}
+          disabled={deviceState === 'booting' || deviceState === 'rebooting'}
+          className="group relative"
+          title="Reboot"
+        >
+          <div
+            className="w-4 h-1.5 rounded-sm border transition-all"
+            style={{
+              background: 'linear-gradient(180deg, #2a2a3a 0%, #1a1a2a 100%)',
+              borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a',
+              boxShadow: deviceState === 'rebooting'
+                ? '0 0 4px var(--neon-amber), inset 0 0 2px var(--neon-amber)'
+                : 'inset 0 0.5px 1px rgba(0,0,0,0.5)',
+            }}
+          />
+          {/* Illuminated edge - bottom */}
+          <div
+            className="absolute inset-x-0 bottom-0 h-px rounded-b-sm"
+            style={{
+              background: deviceState === 'online' ? 'var(--neon-amber)' : 'transparent',
+              opacity: deviceState === 'online' ? 0.5 : 0,
+              boxShadow: deviceState === 'online' ? '0 0 3px var(--neon-amber)' : 'none',
+            }}
+          />
+        </button>
       </div>
+
+      {/* Company logo - SCNR (Scanner Tech) */}
+      <div
+        className="absolute font-mono text-[4px] text-white/15 pointer-events-none z-0"
+        style={logoPosition}
+      >
+        SCNR
+      </div>
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-1">
+          <div
+            className="w-1.5 h-1.5 rounded-full transition-all"
+            style={{
+              backgroundColor: getStatusColor(),
+              boxShadow: `0 0 4px ${getStatusColor()}`,
+              animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+            }}
+          />
+          <div className="font-mono text-[9px] text-[var(--neon-cyan)]">
+            MATERIAL SCANNER
+          </div>
+        </div>
+      </div>
+
+      {/* Boot overlay */}
+      {deviceState === 'booting' && bootPhase && (
+        <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20 rounded">
+          <div className="text-center">
+            <div className="font-mono text-[7px] text-[var(--neon-cyan)] mb-1">
+              {bootPhase === 'init' && 'INIT...'}
+              {bootPhase === 'sensors' && 'SENSORS...'}
+              {bootPhase === 'calibrate' && 'CALIBRATE...'}
+              {bootPhase === 'ready' && 'READY'}
+            </div>
+            <div className="flex gap-0.5 justify-center">
+              {['init', 'sensors', 'calibrate', 'ready'].map((phase, i) => (
+                <div
+                  key={phase}
+                  className="w-1 h-0.5 rounded-sm"
+                  style={{
+                    backgroundColor: ['init', 'sensors', 'calibrate', 'ready'].indexOf(bootPhase) >= i
+                      ? 'var(--neon-cyan)'
+                      : '#333',
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reboot overlay */}
+      {deviceState === 'rebooting' && (
+        <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-20 rounded">
+          <div className="font-mono text-[7px] text-[var(--neon-amber)] animate-pulse">
+            REBOOTING...
+          </div>
+        </div>
+      )}
 
       {/* Scanning visualization */}
       <div className="relative h-6 bg-black/40 rounded overflow-hidden mb-1">
+        {/* Test overlay */}
+        {deviceState === 'testing' && testPhase && (
+          <div className="absolute inset-0 bg-[var(--neon-purple)]/10 z-10 flex items-center justify-center">
+            <span className="font-mono text-[6px] text-[var(--neon-purple)]">
+              {testPhase.toUpperCase()}
+            </span>
+          </div>
+        )}
+
         {/* Scan line animation */}
-        <div
-          className="absolute top-0 bottom-0 w-0.5 bg-[var(--neon-cyan)]"
-          style={{
-            left: `${scanProgress}%`,
-            boxShadow: '0 0 8px var(--neon-cyan), 0 0 16px var(--neon-cyan)',
-            animation: 'scan-sweep 2s ease-in-out infinite',
-          }}
-        />
+        {deviceState === 'online' && (
+          <div
+            className="absolute top-0 bottom-0 w-0.5 bg-[var(--neon-cyan)]"
+            style={{
+              left: `${scanLine}%`,
+              boxShadow: '0 0 8px var(--neon-cyan), 0 0 16px var(--neon-cyan)',
+            }}
+          />
+        )}
+
         {/* Detection blips */}
-        {Array.from({ length: detectedMaterials }).map((_, i) => (
+        {deviceState === 'online' && foundMaterials.map((pos, i) => (
           <div
             key={i}
-            className="absolute w-1 h-1 rounded-full bg-[var(--neon-green)]"
+            className="absolute w-1 h-1 rounded-full bg-[var(--neon-green)] transition-opacity"
             style={{
-              left: `${20 + i * 25}%`,
+              left: `${pos}%`,
               top: '50%',
               transform: 'translateY(-50%)',
               boxShadow: '0 0 4px var(--neon-green)',
+              opacity: scanLine > pos ? 1 : 0.3,
             }}
           />
         ))}
+
+        {/* Grid lines */}
+        <div
+          className="absolute inset-0 pointer-events-none opacity-20"
+          style={{
+            backgroundImage: 'linear-gradient(90deg, var(--neon-cyan) 1px, transparent 1px)',
+            backgroundSize: '20% 100%',
+          }}
+        />
       </div>
 
+      {/* Footer */}
       <div className="flex justify-between font-mono text-[7px]">
         <span className="text-white/40">MATERIALS</span>
-        <span className="text-[var(--neon-green)]">{detectedMaterials} FOUND</span>
+        <span className="text-[var(--neon-green)]">
+          {deviceState === 'online' ? `${foundMaterials.length} FOUND` : '-- --'}
+        </span>
       </div>
+
+      {/* Test status */}
+      {deviceState === 'testing' && testPhase && (
+        <div className="mt-1 pt-1 border-t border-white/10">
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[5px] text-[var(--neon-purple)]">
+              TEST: {testPhase.toUpperCase()}
+            </span>
+            <div className="flex gap-0.5">
+              {['emitter', 'receiver', 'calibrate', 'sweep'].map((phase) => (
+                <div
+                  key={phase}
+                  className="w-1 h-1 rounded-sm"
+                  style={{
+                    backgroundColor:
+                      testPhase === phase ? 'var(--neon-purple)' :
+                      ['emitter', 'receiver', 'calibrate', 'sweep'].indexOf(phase) <
+                      ['emitter', 'receiver', 'calibrate', 'sweep'].indexOf(testPhase || 'emitter')
+                        ? 'var(--neon-green)' : '#333',
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </PanelFrame>
   )
 }
