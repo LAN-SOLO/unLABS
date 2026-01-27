@@ -14,6 +14,7 @@ import { PanelFrame } from '@/components/panel/PanelFrame'
 import { TerminalModule } from '@/components/panel/TerminalModule'
 import { Oscilloscope } from '@/components/panel/displays/Oscilloscope'
 import { QuantumAnalyzer } from '@/components/panel/displays/QuantumAnalyzer'
+import { DiagnosticsConsole } from '@/components/panel/displays/DiagnosticsConsole'
 import { Knob, PushButton, LED, LEDBar } from '@/components/panel/controls'
 import {
   CrystalDataCache,
@@ -304,13 +305,16 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
 
           {/* CENTER: Terminal + Quantum Analyzer + Resource Storage + Tech Tree Preview */}
           <div className="flex flex-col gap-1 flex-1">
-            {/* Terminal and Quantum Analyzer side by side */}
-            <div className="flex gap-1" style={{ minHeight: '280px' }}>
+            {/* Terminal, Quantum Analyzer, and Diagnostics Console */}
+            <div className="flex gap-1" style={{ minHeight: '320px' }}>
               <div className="flex-1">
                 <TerminalModule userId={userId} username={username} balance={balance} />
               </div>
-              <div className="w-[320px]">
+              <div className="w-[280px]">
                 <QuantumAnalyzer className="h-full" />
+              </div>
+              <div className="w-[300px]">
+                <DiagnosticsConsole className="h-full" />
               </div>
             </div>
 
