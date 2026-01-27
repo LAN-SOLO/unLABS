@@ -47,7 +47,7 @@ export function TerminalInput({
       className="flex items-center gap-2 border-t border-green-500/30 pt-2 mt-2 cursor-text"
       onClick={handleContainerClick}
     >
-      <span className="text-green-400 font-mono select-none">&gt;</span>
+      <span className="text-green-400 font-mono text-[10px] select-none">&gt;</span>
       <input
         ref={inputRef}
         type="text"
@@ -55,14 +55,14 @@ export function TerminalInput({
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={handleKeyDown}
         disabled={disabled}
-        className="flex-1 bg-transparent text-green-400 font-mono text-sm outline-none border-none caret-green-400 placeholder-green-500/30 disabled:opacity-50"
+        className="flex-1 bg-transparent text-green-400 font-mono text-[10px] outline-none border-none caret-green-400 placeholder-green-500/30 disabled:opacity-50"
         placeholder={disabled ? 'PROCESSING...' : 'ENTER COMMAND'}
         autoComplete="off"
         autoCorrect="off"
         autoCapitalize="off"
         spellCheck={false}
       />
-      <span className="text-green-500 animate-pulse font-mono">█</span>
+      <span className="text-green-500 animate-pulse font-mono text-[10px]">█</span>
     </div>
   )
 }
