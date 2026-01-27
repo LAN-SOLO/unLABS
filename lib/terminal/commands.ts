@@ -10,6 +10,158 @@ const ASCII_LOGO = `
  =============================================================
 `
 
+// Boot sequence messages for terminal (compact)
+const TERMINAL_BOOT_SEQUENCE = [
+  '[SYSTEM] Security level: MAXIMUM',
+  '[SYSTEM] Network: SOLANA DEVNET',
+  '[SYSTEM] Session: ENCRYPTED',
+  '',
+]
+
+// Panel boot sequence
+const PANEL_BOOT_SEQUENCE = [
+  '',
+  '╔═══════════════════════════════════════════════════════════════╗',
+  '║            PANEL MODULE INITIALIZATION v2.1.0                 ║',
+  '╚═══════════════════════════════════════════════════════════════╝',
+  '',
+  '[BOOT] Initializing Panel Subsystem...',
+  '[BOOT] Loading hardware abstraction layer....',
+  '[BOOT] Mounting virtual framebuffer...........',
+  '',
+  '┌─────────────────────────────────────────────────────────────┐',
+  '│                  PRE-FLIGHT DIAGNOSTICS                     │',
+  '└─────────────────────────────────────────────────────────────┘',
+  '',
+  '[DIAG] Crystal Interface............ ONLINE    [  OK  ]',
+  '[DIAG] Oscilloscope Array........... ONLINE    [  OK  ]',
+  '[DIAG] Equipment Modules............ ONLINE    [  OK  ]',
+  '[DIAG] Resource Monitors............ ONLINE    [  OK  ]',
+  '[DIAG] Waveform Generators.......... ONLINE    [  OK  ]',
+  '[DIAG] Frequency Synthesizers....... ONLINE    [  OK  ]',
+  '',
+  '┌─────────────────────────────────────────────────────────────┐',
+  '│                   EQUIPMENT DRIVERS                         │',
+  '└─────────────────────────────────────────────────────────────┘',
+  '',
+  '[LOAD] CrystalDataCache............ v1.4.2    [LOADED]',
+  '[LOAD] EnergyCore.................. v2.0.1    [LOADED]',
+  '[LOAD] BatteryPack................. v1.8.0    [LOADED]',
+  '[LOAD] HandmadeSynthesizer......... v3.2.1    [LOADED]',
+  '[LOAD] EchoRecorder................ v1.1.0    [LOADED]',
+  '[LOAD] Interpolator................ v2.5.3    [LOADED]',
+  '',
+  '┌─────────────────────────────────────────────────────────────┐',
+  '│                    SYSTEM CHECK                             │',
+  '└─────────────────────────────────────────────────────────────┘',
+  '',
+  '[CHECK] Display Resolution......... 1920x1080 [  OK  ]',
+  '[CHECK] Refresh Rate............... 60Hz      [  OK  ]',
+  '[CHECK] Color Depth................ 32-bit    [  OK  ]',
+  '[CHECK] GPU Memory................. 8192 MB   [  OK  ]',
+  '[CHECK] Audio Subsystem............ 48kHz     [  OK  ]',
+  '[CHECK] Input Latency.............. <1ms      [  OK  ]',
+  '[CHECK] Oscilloscope Calibration... 99.9%     [  OK  ]',
+  '[CHECK] Waveform Buffer............ 16384 pts [  OK  ]',
+  '',
+  '[INIT] Calibrating oscilloscope waveforms......',
+  '[INIT] Synchronizing frequency generators......',
+  '[INIT] Establishing quantum entanglement.......',
+  '[INIT] Loading color mixing algorithms.........',
+  '',
+  '┌─────────────────────────────────────────────────────────────┐',
+  '│                  NETWORK CONNECTION                         │',
+  '└─────────────────────────────────────────────────────────────┘',
+  '',
+  '[NET] Connecting to Solana devnet.............',
+  '[NET] Handshake complete...................... OK',
+  '[NET] Fetching volatility data................ OK',
+  '[NET] TPS synchronization..................... OK',
+  '[NET] Block height: 284,729,103',
+  '',
+  '╔═══════════════════════════════════════════════════════════════╗',
+  '║  Module   : PANEL              Status : FULLY OPERATIONAL    ║',
+  '║  Mode     : DEVELOPER          Uptime : 00:00:00             ║',
+  '║  Access   : UNLOCKED           Memory : 2.4 GB / 8 GB        ║',
+  '╚═══════════════════════════════════════════════════════════════╝',
+  '',
+  '> All systems nominal. Redirecting to PANEL interface...',
+  '',
+]
+
+// Panel shutdown sequence
+const PANEL_SHUTDOWN_SEQUENCE = [
+  '',
+  '╔═══════════════════════════════════════════════════════════════╗',
+  '║              PANEL MODULE SHUTDOWN SEQUENCE                   ║',
+  '╚═══════════════════════════════════════════════════════════════╝',
+  '',
+  '┌─────────────────────────────────────────────────────────────┐',
+  '│                    STATE PRESERVATION                       │',
+  '└─────────────────────────────────────────────────────────────┘',
+  '',
+  '[SAVE] Crystal configurations......... 12 items  [SAVED]',
+  '[SAVE] Oscilloscope settings.......... 24 params [SAVED]',
+  '[SAVE] Waveform presets............... 8 presets [SAVED]',
+  '[SAVE] Color mixing profiles.......... 4 profiles[SAVED]',
+  '[SAVE] Resource allocations........... 6 slots   [SAVED]',
+  '[SAVE] User preferences............... 32 keys   [SAVED]',
+  '',
+  '┌─────────────────────────────────────────────────────────────┐',
+  '│                  PROCESS TERMINATION                        │',
+  '└─────────────────────────────────────────────────────────────┘',
+  '',
+  '[STOP] Waveform Generators........... PID 2847  [STOPPED]',
+  '[STOP] Frequency Synthesizers........ PID 2848  [STOPPED]',
+  '[STOP] Audio Engine.................. PID 2849  [STOPPED]',
+  '[STOP] Quantum Entanglement.......... PID 2850  [RELEASED]',
+  '[STOP] Render Pipeline............... PID 2851  [STOPPED]',
+  '',
+  '┌─────────────────────────────────────────────────────────────┐',
+  '│                  SYSTEM CHECK - FINAL                       │',
+  '└─────────────────────────────────────────────────────────────┘',
+  '',
+  '[CHECK] Memory Leaks................. 0 bytes   [  OK  ]',
+  '[CHECK] Open File Handles............ 0         [  OK  ]',
+  '[CHECK] Pending Transactions......... 0         [  OK  ]',
+  '[CHECK] Unsaved Changes.............. None      [  OK  ]',
+  '[CHECK] Network Sockets.............. Closed    [  OK  ]',
+  '',
+  '┌─────────────────────────────────────────────────────────────┐',
+  '│                  NETWORK DISCONNECT                         │',
+  '└─────────────────────────────────────────────────────────────┘',
+  '',
+  '[NET] Flushing transaction queue...... OK',
+  '[NET] Closing secure channels......... OK',
+  '[NET] Session data synchronized....... OK',
+  '[NET] Disconnected from Solana devnet. OK',
+  '',
+  '┌─────────────────────────────────────────────────────────────┐',
+  '│                  DRIVER UNLOAD                              │',
+  '└─────────────────────────────────────────────────────────────┘',
+  '',
+  '[UNLOAD] CrystalDataCache........... v1.4.2  [RELEASED]',
+  '[UNLOAD] EnergyCore................. v2.0.1  [RELEASED]',
+  '[UNLOAD] BatteryPack................ v1.8.0  [RELEASED]',
+  '[UNLOAD] HandmadeSynthesizer........ v3.2.1  [RELEASED]',
+  '[UNLOAD] EchoRecorder............... v1.1.0  [RELEASED]',
+  '[UNLOAD] Interpolator............... v2.5.3  [RELEASED]',
+  '',
+  '[SHUTDOWN] Oscilloscope Array.............. OFFLINE',
+  '[SHUTDOWN] Equipment Modules............... OFFLINE',
+  '[SHUTDOWN] Resource Monitors............... OFFLINE',
+  '[SHUTDOWN] Display Subsystem............... OFFLINE',
+  '',
+  '╔═══════════════════════════════════════════════════════════════╗',
+  '║  Module   : PANEL              Status : TERMINATED           ║',
+  '║  Session  : SAVED              Uptime : 00:12:34             ║',
+  '║  Exit     : CLEAN              Errors : 0                    ║',
+  '╚═══════════════════════════════════════════════════════════════╝',
+  '',
+  '> Panel module offline. Returning to terminal...',
+  '',
+]
+
 // Command definitions
 const helpCommand: Command = {
   name: 'help',
@@ -45,8 +197,19 @@ const helpCommand: Command = {
       '|  ECHO      - Echo text back                                |',
       '|  ABOUT     - About UnstableLabs                            |',
       '+------------------------------------------------------------+',
+      '|                      MODULES                               |',
+      '+------------------------------------------------------------+',
+      '|  RUN       - Launch a subsystem module                     |',
+      '|  KILL      - Shut down a subsystem module                  |',
+      '+------------------------------------------------------------+',
+      '|                      SYSTEM                                |',
+      '+------------------------------------------------------------+',
+      '|  UNSYSTEMCTL - System control (reboot, poweroff, status)   |',
+      '+------------------------------------------------------------+',
       '',
       'Usage: MINT <name> | CRYSTAL <name> | RENAME <old> <new>',
+      '       RUN panel dev -un | KILL panel dev -un',
+      '       UNSYSTEMCTL shutdown -now | UNSYSTEMCTL reboot -now',
       'Type a command and press ENTER to execute.',
       '',
     ]
@@ -535,6 +698,298 @@ const renameCommand: Command = {
   },
 }
 
+// System reboot sequence
+const REBOOT_SEQUENCE = [
+  '',
+  '╔═══════════════════════════════════════════════════════════════╗',
+  '║                    SYSTEM REBOOT INITIATED                    ║',
+  '╚═══════════════════════════════════════════════════════════════╝',
+  '',
+  '┌─────────────────────────────────────────────────────────────┐',
+  '│                   SHUTDOWN PHASE                            │',
+  '└─────────────────────────────────────────────────────────────┘',
+  '',
+  '[STOP] Terminating user processes............ OK',
+  '[STOP] Closing active connections............ OK',
+  '[STOP] Flushing disk buffers................. OK',
+  '[STOP] Saving system state................... OK',
+  '',
+  '[UNMOUNT] /dev/quantum0...................... OK',
+  '[UNMOUNT] /dev/crystal_cache................. OK',
+  '[UNMOUNT] /dev/oscilloscope.................. OK',
+  '[UNMOUNT] /home/operator..................... OK',
+  '',
+  '┌─────────────────────────────────────────────────────────────┐',
+  '│                   SYSTEM CHECK - PRE-REBOOT                 │',
+  '└─────────────────────────────────────────────────────────────┘',
+  '',
+  '[CHECK] Open File Handles............ 0         [  OK  ]',
+  '[CHECK] Pending I/O Operations....... 0         [  OK  ]',
+  '[CHECK] Memory Mapped Files.......... Flushed   [  OK  ]',
+  '[CHECK] Network Sockets.............. Closed    [  OK  ]',
+  '[CHECK] Session Data................. Saved     [  OK  ]',
+  '',
+  '[POWER] Sending ACPI shutdown signal...',
+  '[POWER] Hardware acknowledges shutdown...',
+  '',
+  '╔═══════════════════════════════════════════════════════════════╗',
+  '║                    SYSTEM HALTED                              ║',
+  '╚═══════════════════════════════════════════════════════════════╝',
+  '',
+  '[POWER] ████████████████████████████████ 100%',
+  '',
+  '┌─────────────────────────────────────────────────────────────┐',
+  '│                   REBOOT PHASE                              │',
+  '└─────────────────────────────────────────────────────────────┘',
+  '',
+  '[BIOS] POST Check............................ OK',
+  '[BIOS] Memory Test: 16384 MB................. OK',
+  '[BIOS] CPU: Quantum-Core X99 @ 4.7GHz........ OK',
+  '',
+  '[BOOT] Loading UnstableLabs Kernel v4.2.1...',
+  '[BOOT] Remounting filesystems................',
+  '[BOOT] Restoring system state................',
+  '',
+  '┌─────────────────────────────────────────────────────────────┐',
+  '│                   SYSTEM CHECK - POST-REBOOT                │',
+  '└─────────────────────────────────────────────────────────────┘',
+  '',
+  '[CHECK] CPU Temperature............... 36°C    [  OK  ]',
+  '[CHECK] Memory Integrity.............. 100%    [  OK  ]',
+  '[CHECK] Quantum Coherence............. 99.9%   [  OK  ]',
+  '[CHECK] Network Status................ Online  [  OK  ]',
+  '[CHECK] Security Protocols............ Active  [  OK  ]',
+  '',
+  '[INIT] Starting system services..............',
+  '[INIT] Loading terminal environment..........',
+  '[INIT] Restoring user session................',
+  '',
+  '╔═══════════════════════════════════════════════════════════════╗',
+  '║  REBOOT COMPLETE | ALL SYSTEMS OPERATIONAL                   ║',
+  '║  Uptime: 00:00:00 | Ready for commands                       ║',
+  '╚═══════════════════════════════════════════════════════════════╝',
+  '',
+  '> System rebooted successfully. Type HELP for commands.',
+  '',
+]
+
+const unsystemctlCommand: Command = {
+  name: 'unsystemctl',
+  aliases: ['systemctl', 'sysctl'],
+  description: 'System control commands',
+  usage: 'unsystemctl <command> [flags]',
+  execute: async (args, ctx) => {
+    const command = args[0]?.toLowerCase()
+    const flags = args.slice(1).join(' ').toLowerCase()
+
+    if (!command) {
+      return {
+        success: false,
+        error: 'Usage: unsystemctl <command> [flags]\n\nAvailable commands:\n  reboot    - Reboot the system\n  shutdown  - Shutdown panel and return to terminal\n  status    - Show system status\n\nFlags:\n  -now      - Execute immediately',
+      }
+    }
+
+    if (command === 'reboot') {
+      if (!flags.includes('-now')) {
+        return {
+          success: false,
+          error: 'Reboot requires -now flag for immediate execution.\nUsage: unsystemctl reboot -now',
+        }
+      }
+
+      // Reboot sequence ends with panel restart
+      const rebootWithPanelRestart = [
+        ...REBOOT_SEQUENCE.slice(0, -2), // Remove last 2 lines
+        '',
+        '┌─────────────────────────────────────────────────────────────┐',
+        '│                   PANEL AUTO-RESTART                        │',
+        '└─────────────────────────────────────────────────────────────┘',
+        '',
+        '[INIT] Restarting panel subsystem...........',
+        '[INIT] Loading equipment drivers............',
+        '[INIT] Calibrating oscilloscope.............',
+        '[INIT] Connecting to network................',
+        '',
+        '╔═══════════════════════════════════════════════════════════════╗',
+        '║  REBOOT COMPLETE | PANEL RESTORED                            ║',
+        '║  All systems operational | Resuming session                  ║',
+        '╚═══════════════════════════════════════════════════════════════╝',
+        '',
+        '> Returning to panel interface...',
+        '',
+      ]
+
+      return {
+        success: true,
+        output: rebootWithPanelRestart,
+        navigate: '/panel',
+        // Don't clear panel access - keep it so panel loads
+      }
+    }
+
+    if (command === 'status') {
+      const output = [
+        '',
+        '╔═══════════════════════════════════════════════════════════════╗',
+        '║                      SYSTEM STATUS                            ║',
+        '╚═══════════════════════════════════════════════════════════════╝',
+        '',
+        '  System:     UnstableLabs OS v4.2.1',
+        '  Kernel:     quantum-core 5.15.0-generic',
+        '  Uptime:     ' + new Date().toISOString().slice(11, 19),
+        '  Load Avg:   0.42, 0.38, 0.35',
+        '',
+        '  CPU:        Quantum-Core X99 @ 4.7GHz (8 cores)',
+        '  Memory:     2.4 GB / 16 GB (15%)',
+        '  Swap:       0 B / 4 GB (0%)',
+        '',
+        '  Network:    SOLANA DEVNET (Connected)',
+        '  Security:   MAXIMUM',
+        '  Session:    ENCRYPTED',
+        '',
+        '  Services:   12 running, 0 failed',
+        '',
+      ]
+      return { success: true, output }
+    }
+
+    if (command === 'shutdown') {
+      if (!flags.includes('-now')) {
+        return {
+          success: false,
+          error: 'Shutdown requires -now flag.\nUsage: unsystemctl shutdown -now',
+        }
+      }
+
+      const output = [
+        '',
+        '╔═══════════════════════════════════════════════════════════════╗',
+        '║                    PANEL SHUTDOWN                             ║',
+        '╚═══════════════════════════════════════════════════════════════╝',
+        '',
+        '┌─────────────────────────────────────────────────────────────┐',
+        '│                   SHUTDOWN SEQUENCE                         │',
+        '└─────────────────────────────────────────────────────────────┘',
+        '',
+        '[STOP] Terminating panel processes.......... OK',
+        '[STOP] Closing display subsystem............ OK',
+        '[STOP] Releasing equipment drivers.......... OK',
+        '[STOP] Saving panel state................... OK',
+        '',
+        '┌─────────────────────────────────────────────────────────────┐',
+        '│                   SYSTEM CHECK                              │',
+        '└─────────────────────────────────────────────────────────────┘',
+        '',
+        '[CHECK] Memory Released............. 2.4 GB   [  OK  ]',
+        '[CHECK] GPU Resources............... Freed    [  OK  ]',
+        '[CHECK] Audio Subsystem............. Stopped  [  OK  ]',
+        '[CHECK] Network Connections......... Closed   [  OK  ]',
+        '',
+        '[UNMOUNT] /dev/oscilloscope................. OK',
+        '[UNMOUNT] /dev/equipment.................... OK',
+        '[UNMOUNT] /dev/crystal_cache................ OK',
+        '',
+        '╔═══════════════════════════════════════════════════════════════╗',
+        '║  PANEL MODULE OFFLINE | RETURNING TO TERMINAL                ║',
+        '╚═══════════════════════════════════════════════════════════════╝',
+        '',
+        '> Panel shutdown complete. Returning to terminal...',
+        '',
+      ]
+      return { success: true, output, navigate: '/terminal', clearPanelAccess: true }
+    }
+
+    return {
+      success: false,
+      error: `Unknown command: ${command}\nAvailable: reboot, shutdown, status`,
+    }
+  },
+}
+
+const killCommand: Command = {
+  name: 'kill',
+  aliases: ['stop', 'shutdown'],
+  description: 'Shut down a subsystem module',
+  usage: 'kill <module> <mode> [flags]',
+  execute: async (args, _ctx) => {
+    const module = args[0]?.toLowerCase()
+    const mode = args[1]?.toLowerCase()
+    const flags = args.slice(2).join(' ')
+
+    if (!module) {
+      return {
+        success: false,
+        error: 'Usage: KILL <module> <mode> [flags]\nAvailable modules: panel',
+      }
+    }
+
+    if (module === 'panel') {
+      if (mode !== 'dev') {
+        return {
+          success: false,
+          error: 'Usage: KILL panel dev -un\nMode "dev" required for panel shutdown.',
+        }
+      }
+
+      if (!flags.toLowerCase().includes('-un')) {
+        return {
+          success: false,
+          error: 'Access denied. Flag -un required.\nUsage: KILL panel dev -un',
+        }
+      }
+
+      return { success: true, output: PANEL_SHUTDOWN_SEQUENCE, navigate: '/terminal', clearPanelAccess: true }
+    }
+
+    return {
+      success: false,
+      error: `Unknown module: ${module}\nAvailable modules: panel`,
+    }
+  },
+}
+
+const runCommand: Command = {
+  name: 'run',
+  aliases: ['exec', 'launch'],
+  description: 'Run a subsystem module',
+  usage: 'run <module> <mode> [flags]',
+  execute: async (args, _ctx) => {
+    const module = args[0]?.toLowerCase()
+    const mode = args[1]?.toLowerCase()
+    const flags = args.slice(2).join(' ')
+
+    if (!module) {
+      return {
+        success: false,
+        error: 'Usage: RUN <module> <mode> [flags]\nAvailable modules: panel',
+      }
+    }
+
+    if (module === 'panel') {
+      if (mode !== 'dev') {
+        return {
+          success: false,
+          error: 'Usage: RUN panel dev -un\nMode "dev" required for panel access.',
+        }
+      }
+
+      if (!flags.toLowerCase().includes('-un')) {
+        return {
+          success: false,
+          error: 'Access denied. Flag -un required.\nUsage: RUN panel dev -un',
+        }
+      }
+
+      return { success: true, output: PANEL_BOOT_SEQUENCE, navigate: '/panel' }
+    }
+
+    return {
+      success: false,
+      error: `Unknown module: ${module}\nAvailable modules: panel`,
+    }
+  },
+}
+
 const historyCommand: Command = {
   name: 'history',
   aliases: ['hist'],
@@ -585,6 +1040,9 @@ export const commands: Command[] = [
   echoCommand,
   aboutCommand,
   historyCommand,
+  runCommand,
+  killCommand,
+  unsystemctlCommand,
 ]
 
 // Find command by name or alias
@@ -640,9 +1098,10 @@ export async function executeCommand(
   }
 }
 
-// Get welcome message
+// Get welcome message with boot sequence
 export function getWelcomeMessage(username: string | null): string[] {
   return [
+    ...TERMINAL_BOOT_SEQUENCE,
     ASCII_LOGO,
     '+------------------------------------------------------------+',
     '|       UNSTABLE LABORATORIES TERMINAL v0.1.0                |',

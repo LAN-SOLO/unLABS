@@ -36,7 +36,7 @@ export function TerminalOutput({ lines, isTyping }: TerminalOutputProps) {
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto overflow-x-auto font-mono text-sm leading-tight"
+      className="flex-1 overflow-hidden font-mono text-sm leading-tight"
       style={{ fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace' }}
     >
       <pre className="whitespace-pre">

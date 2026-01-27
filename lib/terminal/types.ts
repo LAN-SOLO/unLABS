@@ -57,6 +57,8 @@ export interface CommandResult {
   success: boolean
   output?: string[]
   error?: string
+  navigate?: string  // URL to navigate to after command execution
+  clearPanelAccess?: boolean  // Clear panel access token
 }
 
 export interface TerminalState {

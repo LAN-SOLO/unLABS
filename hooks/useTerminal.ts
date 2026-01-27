@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import type { TerminalLine, TerminalState, CommandContext, DataFetchers } from '@/lib/terminal/types'
 import { executeCommand, getWelcomeMessage } from '@/lib/terminal/commands'
 import {
@@ -24,6 +25,7 @@ interface UseTerminalProps {
 }
 
 export function useTerminal({ userId, username, balance }: UseTerminalProps) {
+  const router = useRouter()
   const [state, setState] = useState<TerminalState>(() => ({
     lines: [],
     history: [],
@@ -132,8 +134,24 @@ export function useTerminal({ userId, username, balance }: UseTerminalProps) {
       } else if (result.output) {
         result.output.forEach((line) => addLine(line, 'output'))
       }
+
+      // Handle panel access changes
+      if (result.clearPanelAccess) {
+        sessionStorage.removeItem('panel_access')
+      }
+
+      // Handle navigation if specified
+      if (result.navigate) {
+        // Store access token in session for panel protection
+        if (result.navigate === '/panel') {
+          sessionStorage.setItem('panel_access', 'unlocked')
+        }
+        setTimeout(() => {
+          router.push(result.navigate!)
+        }, 1500) // Delay to let user see the output
+      }
     },
-    [userId, username, balance, addLine, addOutput, clearScreen, setTyping, dataFetchers]
+    [userId, username, balance, addLine, addOutput, clearScreen, setTyping, dataFetchers, router]
   )
 
   const navigateHistory = useCallback(

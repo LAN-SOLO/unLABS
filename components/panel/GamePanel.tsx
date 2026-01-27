@@ -34,7 +34,7 @@ export function PanelLeft({ children, className }: GamePanelProps) {
   return (
     <div
       className={cn(
-        'flex flex-col gap-2 overflow-y-auto p-1',
+        'flex flex-col gap-2 overflow-hidden p-1',
         'bg-[var(--panel-void)]',
         className
       )}
@@ -64,7 +64,7 @@ export function PanelRight({ children, className }: GamePanelProps) {
   return (
     <div
       className={cn(
-        'flex flex-col gap-2 overflow-y-auto p-1',
+        'flex flex-col gap-2 overflow-hidden p-1',
         'bg-[var(--panel-void)]',
         className
       )}

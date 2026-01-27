@@ -10,6 +10,8 @@ export {
 } from './GamePanel'
 export { PanelFrame } from './PanelFrame'
 export { TerminalModule } from './TerminalModule'
+export { WindowManagerProvider, useWindowManager } from './WindowManager'
+export { DynamicWindow } from './DynamicWindow'
 
 // Controls
 export { Knob } from './controls/Knob'

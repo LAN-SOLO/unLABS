@@ -3,10 +3,18 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { login } from '../actions'
+import { BootSequence } from '@/components/BootSequence'
 
 export default function LoginPage() {
+  const [showBoot, setShowBoot] = useState(true)
+  const [showContent, setShowContent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+
+  const handleBootComplete = () => {
+    setShowBoot(false)
+    setShowContent(true)
+  }
 
   async function handleSubmit(formData: FormData) {
     setIsLoading(true)
@@ -22,6 +30,10 @@ export default function LoginPage() {
 
   return (
     <div className="font-mono">
+      {/* Boot Sequence */}
+      {showBoot && <BootSequence variant="login" onComplete={handleBootComplete} />}
+
+      <div className={`transition-opacity duration-500 ${showContent ? 'opacity-100' : 'opacity-0'}`}>
       {/* ASCII Header */}
       <pre className="text-green-500 text-xs mb-6 leading-tight">
 {`
@@ -101,6 +113,7 @@ export default function LoginPage() {
       {/* Blinking cursor */}
       <div className="mt-4 text-green-500">
         <span className="animate-pulse">_</span>
+      </div>
       </div>
     </div>
   )

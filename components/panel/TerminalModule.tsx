@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Terminal } from '@/components/terminal'
 import { PanelFrame } from './PanelFrame'
@@ -17,32 +18,48 @@ export function TerminalModule({
   balance,
   className,
 }: TerminalModuleProps) {
+  const [time, setTime] = useState<string>('--:--:--')
+
+  useEffect(() => {
+    const updateTime = () => {
+      setTime(
+        new Date().toLocaleTimeString('en-US', {
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        })
+      )
+    }
+    updateTime()
+    const interval = setInterval(updateTime, 1000)
+    return () => clearInterval(interval)
+  }, [])
+  // Fixed 4:3 terminal size (640x480)
   return (
     <PanelFrame
       variant="default"
       glow="green"
-      className={cn('flex flex-col overflow-hidden h-full', className)}
+      className={cn('flex flex-col overflow-hidden', className)}
+      style={{
+        width: '640px',
+        height: '480px',
+        minWidth: '640px',
+        minHeight: '480px',
+        maxWidth: '640px',
+        maxHeight: '480px',
+        flexShrink: 0,
+        flexGrow: 0,
+      }}
     >
-      {/* Title bar */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--neon-green)]/20 bg-[#0a1a0a]">
-        <div className="flex items-center gap-2">
-          <span className="text-[var(--neon-green)] text-xs font-mono">
-            _unOS Terminal v1.0.0
-          </span>
-          <span className="text-[var(--neon-amber)] text-[10px] font-mono px-1 bg-[var(--neon-amber)]/10 rounded">
-            # OFF
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button className="px-2 py-0.5 text-[10px] font-mono text-[var(--neon-cyan)] bg-[var(--neon-cyan)]/10 rounded hover:bg-[var(--neon-cyan)]/20">
-            START
-          </button>
-          <button className="px-2 py-0.5 text-[10px] font-mono text-white/50 bg-white/5 rounded hover:bg-white/10">
-            STOP
-          </button>
-          <button className="px-2 py-0.5 text-[10px] font-mono text-white/50 bg-white/5 rounded hover:bg-white/10">
-            Clear
-          </button>
+      {/* Title bar - compact */}
+      <div className="flex items-center justify-between px-2 py-1 border-b border-[var(--neon-green)]/20 bg-[#0a1a0a] shrink-0">
+        <span className="text-[var(--neon-green)] text-[10px] font-mono">
+          _unOS Terminal v1.0
+        </span>
+        <div className="flex items-center gap-1">
+          <div className="w-2 h-2 rounded-full bg-[var(--neon-green)]/60" />
+          <span className="text-[8px] font-mono text-white/40">ONLINE</span>
         </div>
       </div>
 
@@ -71,17 +88,10 @@ export function TerminalModule({
         </div>
       </div>
 
-      {/* Status bar */}
-      <div className="flex items-center justify-between px-3 py-1 border-t border-[var(--neon-green)]/20 bg-[#0a1a0a] text-[9px] font-mono">
-        <span className="text-[var(--neon-amber)]">System Offline</span>
-        <span className="text-white/30">
-          {new Date().toLocaleTimeString('en-US', {
-            hour12: false,
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          })}
-        </span>
+      {/* Status bar - compact */}
+      <div className="flex items-center justify-between px-2 py-0.5 border-t border-[var(--neon-green)]/20 bg-[#0a1a0a] text-[8px] font-mono shrink-0">
+        <span className="text-[var(--neon-green)]/60">READY</span>
+        <span className="text-white/30">{time}</span>
       </div>
     </PanelFrame>
   )

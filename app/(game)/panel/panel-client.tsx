@@ -13,6 +13,7 @@ import { WindowManagerProvider } from '@/components/panel/WindowManager'
 import { PanelFrame } from '@/components/panel/PanelFrame'
 import { TerminalModule } from '@/components/panel/TerminalModule'
 import { Oscilloscope } from '@/components/panel/displays/Oscilloscope'
+import { QuantumAnalyzer } from '@/components/panel/displays/QuantumAnalyzer'
 import { Knob, PushButton, LED, LEDBar } from '@/components/panel/controls'
 import {
   CrystalDataCache,
@@ -301,9 +302,17 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
             </div>
           </div>
 
-          {/* CENTER: Terminal + Resource Storage + Tech Tree Preview */}
+          {/* CENTER: Terminal + Quantum Analyzer + Resource Storage + Tech Tree Preview */}
           <div className="flex flex-col gap-1 flex-1">
-            <TerminalModule userId={userId} username={username} balance={balance} />
+            {/* Terminal and Quantum Analyzer side by side */}
+            <div className="flex gap-1" style={{ minHeight: '280px' }}>
+              <div className="flex-1">
+                <TerminalModule userId={userId} username={username} balance={balance} />
+              </div>
+              <div className="w-[320px]">
+                <QuantumAnalyzer className="h-full" />
+              </div>
+            </div>
 
             {/* Resource Storage Row */}
             <div className="border-t border-[var(--neon-green)]/20 pt-1">

@@ -8,6 +8,7 @@ interface PanelFrameProps {
   glow?: 'amber' | 'green' | 'cyan' | 'none'
   className?: string
   title?: string
+  style?: React.CSSProperties
 }
 
 export function PanelFrame({
@@ -16,6 +17,7 @@ export function PanelFrame({
   glow = 'none',
   className,
   title,
+  style,
 }: PanelFrameProps) {
   const variantStyles = {
     default: 'panel-frame',
@@ -39,6 +41,7 @@ export function PanelFrame({
         glowStyles[glow],
         className
       )}
+      style={style}
     >
       {title && (
         <div className="absolute top-1 left-2 font-mono text-[10px] uppercase tracking-wider text-[var(--neon-amber)] opacity-80">

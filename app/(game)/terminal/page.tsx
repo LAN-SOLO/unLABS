@@ -71,9 +71,21 @@ export default async function TerminalPage() {
         }}
       />
 
-      <div className="h-screen flex flex-col max-w-5xl mx-auto p-4">
-        {/* Terminal window */}
-        <div className="flex-1 flex flex-col border border-green-500/30 rounded-lg overflow-hidden shadow-[0_0_30px_rgba(34,197,94,0.15)]">
+      <div className="h-screen flex items-center justify-center p-4">
+        {/* Terminal window - Fixed 4:3 aspect ratio (800x600) */}
+        <div
+          className="flex flex-col border border-green-500/30 rounded-lg overflow-hidden shadow-[0_0_30px_rgba(34,197,94,0.15)]"
+          style={{
+            width: '800px',
+            height: '600px',
+            minWidth: '800px',
+            minHeight: '600px',
+            maxWidth: '800px',
+            maxHeight: '600px',
+            flexShrink: 0,
+            flexGrow: 0,
+          }}
+        >
           {/* Title bar */}
           <div className="bg-green-900/20 border-b border-green-500/30 px-4 py-2 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2">
