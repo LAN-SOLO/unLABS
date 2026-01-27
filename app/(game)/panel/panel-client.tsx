@@ -52,6 +52,7 @@ import {
 import { ResourceBar } from '@/components/panel/modules/ResourceBar'
 import { VentilationFan } from '@/components/panel/modules/VentilationFan'
 import { NarrowSpeaker } from '@/components/panel/modules/NarrowSpeaker'
+import { ThermalManagerProvider } from '@/contexts/ThermalManager'
 import type { EquipmentData } from '../terminal/actions/equipment'
 
 interface PanelClientProps {
@@ -116,6 +117,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
   const volatility = equipmentData?.volatility ?? { currentTier: 1, tps: 1000, network: 'unknown' }
 
   return (
+    <ThermalManagerProvider>
     <WindowManagerProvider className="text-white">
       {/* Top Toolbar */}
       <PanelToolbar>
@@ -281,10 +283,10 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
         {/* Interpolator - linked to optics tech tree */}
         <Interpolator progress={techTrees?.optics} />
 
-        {/* Ventilation Fans - system cooling, speed varies with workload */}
+        {/* Ventilation Fans - system cooling, controlled by ThermalManager */}
         <div className="flex gap-1 flex-1 min-h-0">
-          <VentilationFan label="CPU" systemLoad={cpuLoad} targetTemp={35} className="flex-1" />
-          <VentilationFan label="GPU" systemLoad={gpuLoad} targetTemp={40} className="flex-1" />
+          <VentilationFan label="CPU" fanId="cpu" systemLoad={cpuLoad} targetTemp={35} className="flex-1" />
+          <VentilationFan label="GPU" fanId="gpu" systemLoad={gpuLoad} targetTemp={40} className="flex-1" />
         </div>
       </PanelLeft>
 
@@ -685,5 +687,6 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
         }}
       />
     </WindowManagerProvider>
+    </ThermalManagerProvider>
   )
 }

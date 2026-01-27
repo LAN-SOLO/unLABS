@@ -214,7 +214,18 @@ const helpCommand: Command = {
       '|  Device names: cache, core, battery, synth, recorder,      |',
       '|    reactor, ai, super, drone, magnet, tank, exotic, qsm,  |',
       '|    net, temp, dim, cpu, clock, mem, anomaly, compass,     |',
-      '|    teleport, vent, diag, laser, printer                   |',
+      '|    teleport, vent, diag, laser, printer, thermal          |',
+      '+------------------------------------------------------------+',
+      '|                      THERMAL                               |',
+      '+------------------------------------------------------------+',
+      '|  THERMAL   - Panel thermal management system               |',
+      '|             THERMAL STATUS     - Show thermal status       |',
+      '|             THERMAL FAN <id> <mode> - Set fan mode         |',
+      '|             THERMAL AUTO [on|off]  - Toggle auto mode      |',
+      '|             THERMAL EMERGENCY  - Emergency cooling         |',
+      '|                                                            |',
+      '|  Fan IDs: CPU, GPU                                         |',
+      '|  Modes: AUTO, LOW, MED, HIGH, or 0-100 (speed %)           |',
       '+------------------------------------------------------------+',
       '|                      SYSTEM                                |',
       '+------------------------------------------------------------+',
@@ -223,6 +234,7 @@ const helpCommand: Command = {
       '',
       'Usage: MINT <name> | CRYSTAL <name> | RENAME <old> <new>',
       '       RUN panel dev -un | KILL panel dev -un',
+      '       THERMAL FAN CPU 75 | THERMAL AUTO on',
       '       UNSYSTEMCTL shutdown -now | UNSYSTEMCTL reboot -now',
       'Type a command and press ENTER to execute.',
       '',
@@ -1090,6 +1102,7 @@ const deviceCommand: Command = {
           '  LCT-001   Precision Laser         v2.1.0    ONLINE    ',
           '  P3D-001   3D Fabricator           v3.2.1    ONLINE    ',
           '  DGN-001   Diagnostics Console     v2.0.4    ONLINE    ',
+          '  THM-001   Thermal Manager         v1.0.0    ONLINE    ',
           '',
           '  Usage: DEVICE <name> [TEST|RESET|STATUS|INFO]',
           '  Example: DEVICE CACHE TEST',
@@ -1450,6 +1463,27 @@ const deviceCommand: Command = {
         desc: 'Tier 2 fabricator that prints complex parts in plastic, metal or crystal.\nSpeeds up component production and prototyping of new devices.',
         compatible: ['LCT-001', 'CDC-001', 'AIC-001', 'HMS-001'],
       },
+      'thmgr': {
+        name: 'Thermal Manager',
+        id: 'THM-001',
+        version: '1.0.0',
+        desc: 'Panel thermal management system with auto-cooling.\nMonitors CPU/GPU/Panel temperatures and controls dual-fan cooling system.\nAuto-adjusts fan speeds based on device loads and temperatures.',
+        compatible: ['VNT-001', 'TMP-001', 'CPU-001', 'DGN-001', 'ALL'],
+      },
+      'thm': {
+        name: 'Thermal Manager',
+        id: 'THM-001',
+        version: '1.0.0',
+        desc: 'Panel thermal management system with auto-cooling.\nMonitors CPU/GPU/Panel temperatures and controls dual-fan cooling system.\nAuto-adjusts fan speeds based on device loads and temperatures.',
+        compatible: ['VNT-001', 'TMP-001', 'CPU-001', 'DGN-001', 'ALL'],
+      },
+      'cooling': {
+        name: 'Thermal Manager',
+        id: 'THM-001',
+        version: '1.0.0',
+        desc: 'Panel thermal management system with auto-cooling.\nMonitors CPU/GPU/Panel temperatures and controls dual-fan cooling system.\nAuto-adjusts fan speeds based on device loads and temperatures.',
+        compatible: ['VNT-001', 'TMP-001', 'CPU-001', 'DGN-001', 'ALL'],
+      },
     }
 
     const device = deviceMap[deviceName]
@@ -1568,6 +1602,167 @@ const deviceCommand: Command = {
   },
 }
 
+// Thermal management command
+const thermalCommand: Command = {
+  name: 'thermal',
+  aliases: ['therm', 'temp', 'cooling'],
+  description: 'Panel thermal management system',
+  usage: 'thermal [status|fan|auto|emergency]',
+  execute: async (args, ctx) => {
+    const action = args[0]?.toLowerCase()
+    const param = args[1]?.toLowerCase()
+    const value = args[2]
+
+    // Default: show status
+    if (!action || action === 'status') {
+      // This will show simulated/current thermal status
+      // Actual real-time data comes from ThermalManager context in panel UI
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│                 THERMAL MANAGEMENT SYSTEM                    │',
+          '│                        THM-001 v1.0.0                        │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  ╔═══════════════════════════════════════════════════════════╗',
+          '  ║  THERMAL ZONES                                            ║',
+          '  ╠═══════════════════════════════════════════════════════════╣',
+          '  ║  ZONE     TEMP     TARGET   STATUS                        ║',
+          '  ║  ────     ────     ──────   ──────                        ║',
+          '  ║  CPU      ~32°C    45°C     NOMINAL                       ║',
+          '  ║  GPU      ~28°C    50°C     NOMINAL                       ║',
+          '  ║  PANEL    ~30°C    35°C     NOMINAL                       ║',
+          '  ╚═══════════════════════════════════════════════════════════╝',
+          '',
+          '  ╔═══════════════════════════════════════════════════════════╗',
+          '  ║  FAN STATUS                                               ║',
+          '  ╠═══════════════════════════════════════════════════════════╣',
+          '  ║  FAN      SPEED    RPM      MODE                          ║',
+          '  ║  ───      ─────    ───      ────                          ║',
+          '  ║  CPU      50%      2400     AUTO                          ║',
+          '  ║  GPU      45%      2200     AUTO                          ║',
+          '  ╚═══════════════════════════════════════════════════════════╝',
+          '',
+          '  OVERALL STATUS: NOMINAL',
+          '  PERFORMANCE:    100%',
+          '  AUTO MODE:      ENABLED',
+          '',
+          '  Note: Real-time data displayed in panel cooling modules.',
+          '        Use panel fan controls for manual adjustment.',
+          '',
+        ],
+      }
+    }
+
+    // Fan control
+    if (action === 'fan') {
+      if (!param) {
+        return {
+          success: false,
+          error: 'Usage: THERMAL FAN <cpu|gpu> <speed|auto|low|med|high>\nExample: THERMAL FAN CPU 75',
+        }
+      }
+
+      const fanId = param === 'cpu' || param === 'gpu' ? param : null
+      if (!fanId) {
+        return {
+          success: false,
+          error: `Unknown fan: ${param}\nAvailable fans: CPU, GPU`,
+        }
+      }
+
+      const mode = value?.toUpperCase()
+      if (!mode) {
+        return {
+          success: false,
+          error: `Usage: THERMAL FAN ${fanId.toUpperCase()} <speed|auto|low|med|high>`,
+        }
+      }
+
+      // Validate mode/speed
+      if (['AUTO', 'LOW', 'MED', 'HIGH'].includes(mode)) {
+        return {
+          success: true,
+          output: [
+            '',
+            `[THERMAL] ${fanId.toUpperCase()} fan mode set to ${mode}`,
+            `[THERMAL] Speed will ${mode === 'AUTO' ? 'adjust automatically based on temperature' : `be set to ${mode === 'LOW' ? '25%' : mode === 'MED' ? '50%' : '100%'}`}`,
+            '',
+            'Note: Adjust fan controls directly in the panel for immediate effect.',
+            '',
+          ],
+        }
+      }
+
+      const speedNum = parseInt(mode)
+      if (isNaN(speedNum) || speedNum < 0 || speedNum > 100) {
+        return {
+          success: false,
+          error: `Invalid speed: ${mode}\nSpeed must be 0-100 or AUTO/LOW/MED/HIGH`,
+        }
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          `[THERMAL] ${fanId.toUpperCase()} fan speed set to ${speedNum}%`,
+          `[THERMAL] Estimated RPM: ${Math.round((speedNum / 100) * 4000 + 800)}`,
+          '',
+          'Note: Use panel fan controls for real-time adjustment.',
+          '',
+        ],
+      }
+    }
+
+    // Auto mode toggle
+    if (action === 'auto') {
+      const enabled = param !== 'off' && param !== '0' && param !== 'false'
+      return {
+        success: true,
+        output: [
+          '',
+          `[THERMAL] Auto mode ${enabled ? 'ENABLED' : 'DISABLED'}`,
+          enabled
+            ? '[THERMAL] Fans will automatically adjust based on temperature.'
+            : '[THERMAL] Manual fan control enabled.',
+          '',
+        ],
+      }
+    }
+
+    // Emergency cooling
+    if (action === 'emergency' || action === 'cool') {
+      return {
+        success: true,
+        output: [
+          '',
+          '╔═══════════════════════════════════════════════════════════════╗',
+          '║              EMERGENCY COOLING ACTIVATED                      ║',
+          '╚═══════════════════════════════════════════════════════════════╝',
+          '',
+          '[THERMAL] All fans set to MAXIMUM (100%)',
+          '[THERMAL] CPU fan: 4800 RPM',
+          '[THERMAL] GPU fan: 4800 RPM',
+          '',
+          '[NOTICE] Emergency mode will remain active until manually',
+          '         disabled or temperature returns to safe levels.',
+          '',
+          'Use THERMAL AUTO to restore automatic control.',
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `Unknown thermal command: ${action}\n\nAvailable commands:\n  THERMAL STATUS     - Show thermal status\n  THERMAL FAN <id> <mode>  - Set fan mode\n  THERMAL AUTO [on|off]    - Toggle auto mode\n  THERMAL EMERGENCY  - Activate emergency cooling`,
+    }
+  },
+}
+
 // Command registry
 export const commands: Command[] = [
   helpCommand,
@@ -1588,6 +1783,7 @@ export const commands: Command[] = [
   killCommand,
   unsystemctlCommand,
   deviceCommand,
+  thermalCommand,
 ]
 
 // Find command by name or alias

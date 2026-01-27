@@ -1,14 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { PanelFrame } from '../PanelFrame'
 import { LED } from '../controls/LED'
 import { KnurledWheel } from '../controls/KnurledWheel'
+import { useThermalManagerOptional } from '@/contexts/ThermalManager'
 
 interface VentilationFanProps {
   className?: string
   label?: string
+  fanId?: 'cpu' | 'gpu'
   systemLoad?: number
   targetTemp?: number
 }
@@ -123,49 +125,133 @@ function FanUnit({ speed, isOn }: { speed: number; isOn: boolean }) {
   )
 }
 
-export function VentilationFan({ className, label = 'COOL', systemLoad = 50, targetTemp = 32 }: VentilationFanProps) {
-  const [isOn, setIsOn] = useState(true)
-  const [speed, setSpeed] = useState(65)
-  const [mode, setMode] = useState<'AUTO' | 'LOW' | 'MED' | 'HIGH'>('AUTO')
-  const [temp, setTemp] = useState(34)
-  const [rpm, setRpm] = useState(2400)
+export function VentilationFan({
+  className,
+  label = 'COOL',
+  fanId = 'cpu',
+  systemLoad = 50,
+  targetTemp = 32
+}: VentilationFanProps) {
+  // Try to use thermal manager if available
+  const thermalManager = useThermalManagerOptional()
 
-  // Auto-adjust speed based on system load when in AUTO mode
+  // Local state (used when thermal manager not available)
+  const [localIsOn, setLocalIsOn] = useState(true)
+  const [localSpeed, setLocalSpeed] = useState(65)
+  const [localMode, setLocalMode] = useState<'AUTO' | 'LOW' | 'MED' | 'HIGH'>('AUTO')
+  const [localTemp, setLocalTemp] = useState(34)
+  const [localRpm, setLocalRpm] = useState(2400)
+
+  // Use thermal manager state if available, otherwise use local state
+  const fanState = thermalManager?.state.fans[fanId]
+  const zoneTemp = thermalManager?.state.zones[fanId]?.temperature
+  const isOverheating = thermalManager?.state.isOverheating ?? false
+  const overallStatus = thermalManager?.state.overallStatus ?? 'nominal'
+
+  const isOn = fanState?.isOn ?? localIsOn
+  const speed = fanState?.speed ?? localSpeed
+  const mode = fanState?.mode ?? localMode
+  const temp = zoneTemp ?? localTemp
+  const rpm = fanState?.rpm ?? localRpm
+
+  // Flashing warning state
+  const [flashOn, setFlashOn] = useState(true)
+
+  // Flash warning light when overheating
   useEffect(() => {
-    if (mode === 'AUTO' && isOn) {
-      const autoSpeed = Math.min(100, Math.max(20, systemLoad + 15 + (temp > targetTemp ? (temp - targetTemp) * 3 : 0)))
-      setSpeed(Math.round(autoSpeed))
+    if (overallStatus === 'critical' || overallStatus === 'warning') {
+      const flashInterval = setInterval(() => {
+        setFlashOn(prev => !prev)
+      }, overallStatus === 'critical' ? 250 : 500)
+      return () => clearInterval(flashInterval)
+    } else {
+      setFlashOn(true)
     }
-  }, [mode, isOn, systemLoad, temp, targetTemp])
+  }, [overallStatus])
 
+  // Local auto-adjust speed based on system load when in AUTO mode (fallback)
   useEffect(() => {
-    if (!isOn) {
-      setRpm(0)
+    if (thermalManager) return // Skip if using thermal manager
+
+    if (localMode === 'AUTO' && localIsOn) {
+      const autoSpeed = Math.min(100, Math.max(20, systemLoad + 15 + (localTemp > targetTemp ? (localTemp - targetTemp) * 3 : 0)))
+      setLocalSpeed(Math.round(autoSpeed))
+    }
+  }, [thermalManager, localMode, localIsOn, systemLoad, localTemp, targetTemp])
+
+  // Local RPM calculation (fallback)
+  useEffect(() => {
+    if (thermalManager) return
+
+    if (!localIsOn) {
+      setLocalRpm(0)
       return
     }
-    const baseRpm = (speed / 100) * 4000 + 800
-    setRpm(Math.round(baseRpm))
-  }, [speed, isOn])
+    const baseRpm = (localSpeed / 100) * 4000 + 800
+    setLocalRpm(Math.round(baseRpm))
+  }, [thermalManager, localSpeed, localIsOn])
 
+  // Local temperature simulation (fallback)
   useEffect(() => {
+    if (thermalManager) return
+
     const interval = setInterval(() => {
-      setTemp(prev => {
+      setLocalTemp(prev => {
         const delta = (Math.random() - 0.5) * 2
         const heatFromLoad = systemLoad * 0.3
-        const coolingFromFan = isOn ? speed * 0.2 : 0
+        const coolingFromFan = localIsOn ? localSpeed * 0.2 : 0
         const target = 25 + heatFromLoad - coolingFromFan
         return Math.round((prev + (target - prev) * 0.1 + delta) * 10) / 10
       })
     }, 2000)
     return () => clearInterval(interval)
-  }, [isOn, speed, systemLoad])
+  }, [thermalManager, localIsOn, localSpeed, systemLoad])
+
+  const handleSpeedChange = useCallback((v: number) => {
+    if (thermalManager) {
+      thermalManager.setFanSpeed(fanId, v)
+    } else {
+      setLocalSpeed(v)
+      if (localMode === 'AUTO') setLocalMode('MED')
+    }
+  }, [thermalManager, fanId, localMode])
+
+  const handleModeChange = useCallback((m: 'AUTO' | 'LOW' | 'MED' | 'HIGH') => {
+    if (thermalManager) {
+      thermalManager.setFanMode(fanId, m)
+    } else {
+      setLocalMode(m)
+      if (m === 'LOW') setLocalSpeed(25)
+      else if (m === 'MED') setLocalSpeed(50)
+      else if (m === 'HIGH') setLocalSpeed(100)
+    }
+  }, [thermalManager, fanId])
+
+  const handlePowerToggle = useCallback(() => {
+    if (thermalManager) {
+      thermalManager.toggleFan(fanId, !isOn)
+    } else {
+      setLocalIsOn(!localIsOn)
+    }
+  }, [thermalManager, fanId, isOn, localIsOn])
 
   const getTempColor = () => {
+    if (thermalManager) {
+      return thermalManager.getTemperatureColor(temp)
+    }
     if (temp < 30) return 'var(--neon-cyan)'
     if (temp < 38) return 'var(--neon-green)'
     if (temp < 45) return 'var(--neon-amber)'
     return 'var(--neon-red)'
   }
+
+  const getWarningLedColor = (): 'red' | 'amber' | undefined => {
+    if (overallStatus === 'critical') return flashOn ? 'red' : undefined
+    if (overallStatus === 'warning') return flashOn ? 'amber' : undefined
+    return undefined
+  }
+
+  const showWarningLed = (overallStatus === 'critical' || overallStatus === 'warning') && flashOn
 
   return (
     <PanelFrame variant="default" className={cn('flex flex-col flex-1 min-h-0', className)}>
@@ -173,6 +259,12 @@ export function VentilationFan({ className, label = 'COOL', systemLoad = 50, tar
       <div className="flex items-center justify-between px-1.5 py-1 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-1">
           <LED on={isOn} color={isOn ? 'green' : 'red'} size="sm" />
+          {/* Warning LED - flashes when overheating */}
+          <LED
+            on={showWarningLed}
+            color={getWarningLedColor() || 'red'}
+            size="sm"
+          />
           <span className="font-mono text-[7px] text-[var(--neon-cyan)] font-bold">{label}</span>
         </div>
         <span className="font-mono text-[6px] text-white/40">{rpm} RPM</span>
@@ -187,10 +279,13 @@ export function VentilationFan({ className, label = 'COOL', systemLoad = 50, tar
           <FanUnit speed={speed} isOn={isOn} />
         </div>
 
-        {/* Temperature display */}
+        {/* Temperature display with warning indicator */}
         <div className="flex justify-center shrink-0">
           <div
-            className="font-mono text-[9px] px-2 py-0.5 rounded border"
+            className={cn(
+              "font-mono text-[9px] px-2 py-0.5 rounded border relative",
+              (overallStatus === 'critical' || overallStatus === 'warning') && "animate-pulse"
+            )}
             style={{
               color: getTempColor(),
               borderColor: `${getTempColor()}50`,
@@ -198,7 +293,18 @@ export function VentilationFan({ className, label = 'COOL', systemLoad = 50, tar
               textShadow: `0 0 6px ${getTempColor()}`,
             }}
           >
-            {temp}°C
+            {temp.toFixed(1)}°C
+            {/* Overheat indicator */}
+            {(overallStatus === 'critical' || overallStatus === 'warning') && (
+              <span
+                className="absolute -right-1 -top-1 w-2 h-2 rounded-full"
+                style={{
+                  backgroundColor: overallStatus === 'critical' ? 'var(--neon-red)' : 'var(--neon-amber)',
+                  boxShadow: `0 0 6px ${overallStatus === 'critical' ? 'var(--neon-red)' : 'var(--neon-amber)'}`,
+                  animation: 'pulse 0.5s ease-in-out infinite',
+                }}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -213,10 +319,7 @@ export function VentilationFan({ className, label = 'COOL', systemLoad = 50, tar
               value={speed}
               min={0}
               max={100}
-              onChange={(v) => {
-                setSpeed(v)
-                if (mode === 'AUTO') setMode('MED') // Switch to manual when wheel is used
-              }}
+              onChange={handleSpeedChange}
               disabled={!isOn}
               label="SPD"
               size="sm"
@@ -230,12 +333,7 @@ export function VentilationFan({ className, label = 'COOL', systemLoad = 50, tar
               {(['AUTO', 'LOW', 'MED', 'HIGH'] as const).map((m) => (
                 <button
                   key={m}
-                  onClick={() => {
-                    setMode(m)
-                    if (m === 'LOW') setSpeed(25)
-                    else if (m === 'MED') setSpeed(50)
-                    else if (m === 'HIGH') setSpeed(100)
-                  }}
+                  onClick={() => handleModeChange(m)}
                   disabled={!isOn}
                   className={cn(
                     'py-0.5 rounded font-mono text-[5px] transition-all border',
@@ -251,7 +349,7 @@ export function VentilationFan({ className, label = 'COOL', systemLoad = 50, tar
 
             {/* Power button */}
             <button
-              onClick={() => setIsOn(!isOn)}
+              onClick={handlePowerToggle}
               className={cn(
                 'w-full py-0.5 rounded font-mono text-[5px] transition-all border',
                 isOn

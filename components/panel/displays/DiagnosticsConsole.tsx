@@ -592,35 +592,254 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
 
               {/* Component Grid - 3 columns */}
               <div className="flex-1 grid grid-cols-3 gap-1 overflow-y-auto pr-0.5 min-h-0">
-                {currentComponents.map((comp) => (
+                {currentComponents.map((comp, index) => (
                   <button
                     key={comp.id}
                     onClick={() => testComponent(comp)}
                     disabled={isRunningDiag || comp.status === 'offline'}
                     className={cn(
-                      'relative p-1.5 rounded text-left transition-all border',
+                      'relative p-1.5 rounded text-left transition-all border overflow-hidden',
                       testingComponent === comp.id
-                        ? 'border-[var(--neon-purple)] bg-[var(--neon-purple)]/10 animate-pulse'
+                        ? 'border-[var(--neon-purple)] bg-[var(--neon-purple)]/10'
                         : comp.status === 'offline'
                         ? 'border-[#1a1a2a] bg-[#0a0a0a] opacity-50 cursor-not-allowed'
                         : 'border-[#1a1a2a] bg-[#0a0a12] hover:border-white/20 cursor-pointer'
                     )}
                   >
-                    {/* Status dot */}
-                    <div
-                      className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full"
-                      style={{
-                        backgroundColor: testingComponent === comp.id ? 'var(--neon-purple)' : getStatusColor(comp.status),
-                        boxShadow: comp.status !== 'offline' ? `0 0 4px ${getStatusColor(comp.status)}` : 'none',
-                      }}
-                    />
-                    <div className="font-mono text-[7px] text-white/70 truncate pr-3">{comp.name}</div>
-                    <div className="font-mono text-[9px] font-bold" style={{ color: getStatusColor(comp.status) }}>
+                    {/* Subtle corner accents */}
+                    {comp.status !== 'offline' && (
+                      <>
+                        <div
+                          className="absolute top-0 left-0 w-2 h-px"
+                          style={{ backgroundColor: getStatusColor(comp.status), opacity: 0.4 }}
+                        />
+                        <div
+                          className="absolute top-0 left-0 h-2 w-px"
+                          style={{ backgroundColor: getStatusColor(comp.status), opacity: 0.4 }}
+                        />
+                        <div
+                          className="absolute bottom-0 right-0 w-2 h-px"
+                          style={{ backgroundColor: getStatusColor(comp.status), opacity: 0.3 }}
+                        />
+                        <div
+                          className="absolute bottom-0 right-0 h-2 w-px"
+                          style={{ backgroundColor: getStatusColor(comp.status), opacity: 0.3 }}
+                        />
+                      </>
+                    )}
+
+                    {/* Activity pulse - subtle background animation for online components */}
+                    {comp.status === 'online' && (
+                      <div
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                          background: `radial-gradient(ellipse at ${30 + (index % 3) * 20}% ${40 + (index % 2) * 30}%, ${getStatusColor(comp.status)}08 0%, transparent 70%)`,
+                          animation: `pulse-subtle ${2 + (index % 3) * 0.5}s ease-in-out infinite`,
+                        }}
+                      />
+                    )}
+
+                    {/* Data flow indicator - tiny animated bar at bottom */}
+                    {comp.status === 'online' && (
+                      <div className="absolute bottom-0 left-0 right-0 h-px overflow-hidden">
+                        <div
+                          className="h-full"
+                          style={{
+                            width: '30%',
+                            backgroundColor: getStatusColor(comp.status),
+                            opacity: 0.5,
+                            animation: `data-flow ${1.5 + (index % 4) * 0.3}s linear infinite`,
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Warning pulse effect */}
+                    {comp.status === 'warning' && (
+                      <div
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                          boxShadow: `inset 0 0 8px ${getStatusColor(comp.status)}20`,
+                          animation: 'warning-pulse 2s ease-in-out infinite',
+                        }}
+                      />
+                    )}
+
+                    {/* Status dot with pulse */}
+                    <div className="absolute top-1 right-1">
+                      {/* Pulse ring for active components */}
+                      {(comp.status === 'online' || comp.status === 'standby') && (
+                        <div
+                          className="absolute inset-0 rounded-full"
+                          style={{
+                            backgroundColor: getStatusColor(comp.status),
+                            opacity: 0.3,
+                            animation: `dot-pulse ${comp.status === 'standby' ? '3s' : '2s'} ease-out infinite`,
+                            transform: 'scale(1)',
+                          }}
+                        />
+                      )}
+                      <div
+                        className="relative w-1.5 h-1.5 rounded-full"
+                        style={{
+                          backgroundColor: testingComponent === comp.id ? 'var(--neon-purple)' : getStatusColor(comp.status),
+                          boxShadow: comp.status !== 'offline' ? `0 0 4px ${getStatusColor(comp.status)}` : 'none',
+                        }}
+                      />
+                    </div>
+
+                    {/* Testing scan effect */}
+                    {testingComponent === comp.id && (
+                      <div
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                          background: 'linear-gradient(180deg, transparent 0%, var(--neon-purple) 50%, transparent 100%)',
+                          opacity: 0.15,
+                          animation: 'scan-down 0.8s ease-in-out infinite',
+                        }}
+                      />
+                    )}
+
+                    {/* Interior micro visualization - activity bars */}
+                    {comp.status !== 'offline' && (
+                      <div className="absolute bottom-1 left-1.5 right-4 h-[3px] flex gap-px pointer-events-none">
+                        {[...Array(5)].map((_, i) => (
+                          <div
+                            key={i}
+                            className="flex-1 rounded-sm"
+                            style={{
+                              backgroundColor: getStatusColor(comp.status),
+                              opacity: comp.status === 'online' ? 0.15 + Math.random() * 0.25 : 0.1,
+                              animation: comp.status === 'online'
+                                ? `bar-flicker ${0.8 + i * 0.2}s ease-in-out infinite ${i * 0.1}s`
+                                : 'none',
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Interior micro waveform for active components */}
+                    {comp.status === 'online' && (
+                      <div
+                        className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-3 pointer-events-none overflow-hidden"
+                        style={{ opacity: 0.4 }}
+                      >
+                        <svg viewBox="0 0 20 12" className="w-full h-full">
+                          <path
+                            d={`M0,6 Q2,${2 + index % 3} 4,6 T8,6 T12,6 T16,6 T20,6`}
+                            fill="none"
+                            stroke={getStatusColor(comp.status)}
+                            strokeWidth="1"
+                            style={{
+                              animation: `wave-move ${1.5 + (index % 3) * 0.3}s linear infinite`,
+                            }}
+                          />
+                        </svg>
+                      </div>
+                    )}
+
+                    {/* Interior standby pulse rings */}
+                    {comp.status === 'standby' && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div
+                          className="w-3 h-3 rounded-full border"
+                          style={{
+                            borderColor: getStatusColor(comp.status),
+                            opacity: 0.2,
+                            animation: 'standby-ring 3s ease-out infinite',
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Interior warning indicator - animated chevrons */}
+                    {comp.status === 'warning' && (
+                      <div className="absolute left-1/2 -translate-x-1/2 top-[6px] flex flex-col gap-px pointer-events-none">
+                        {[0, 1].map((i) => (
+                          <div
+                            key={i}
+                            className="w-1.5 h-0.5"
+                            style={{
+                              background: `linear-gradient(90deg, transparent 0%, ${getStatusColor(comp.status)} 50%, transparent 100%)`,
+                              opacity: 0.4,
+                              animation: `chevron-pulse 1s ease-in-out infinite ${i * 0.15}s`,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Interior data grid pattern for critical */}
+                    {comp.status === 'critical' && (
+                      <div
+                        className="absolute inset-1 pointer-events-none"
+                        style={{
+                          backgroundImage: `
+                            linear-gradient(90deg, ${getStatusColor(comp.status)}15 1px, transparent 1px),
+                            linear-gradient(${getStatusColor(comp.status)}15 1px, transparent 1px)
+                          `,
+                          backgroundSize: '4px 4px',
+                          animation: 'grid-flash 0.5s ease-in-out infinite',
+                        }}
+                      />
+                    )}
+
+                    <div className="font-mono text-[7px] text-white/70 truncate pr-3 relative z-10">{comp.name}</div>
+                    <div className="font-mono text-[9px] font-bold relative z-10" style={{ color: getStatusColor(comp.status) }}>
                       {comp.value || comp.status.toUpperCase()}
                     </div>
                   </button>
                 ))}
               </div>
+
+              {/* Keyframe animations */}
+              <style jsx>{`
+                @keyframes pulse-subtle {
+                  0%, 100% { opacity: 0.3; }
+                  50% { opacity: 0.6; }
+                }
+                @keyframes data-flow {
+                  0% { transform: translateX(-100%); }
+                  100% { transform: translateX(400%); }
+                }
+                @keyframes warning-pulse {
+                  0%, 100% { opacity: 0.3; }
+                  50% { opacity: 0.7; }
+                }
+                @keyframes dot-pulse {
+                  0% { transform: scale(1); opacity: 0.4; }
+                  50% { transform: scale(2); opacity: 0; }
+                  100% { transform: scale(1); opacity: 0; }
+                }
+                @keyframes scan-down {
+                  0% { transform: translateY(-100%); }
+                  100% { transform: translateY(100%); }
+                }
+                @keyframes bar-flicker {
+                  0%, 100% { opacity: 0.15; transform: scaleY(0.6); }
+                  25% { opacity: 0.35; transform: scaleY(1); }
+                  50% { opacity: 0.2; transform: scaleY(0.8); }
+                  75% { opacity: 0.4; transform: scaleY(1); }
+                }
+                @keyframes wave-move {
+                  0% { transform: translateX(0); }
+                  100% { transform: translateX(-8px); }
+                }
+                @keyframes standby-ring {
+                  0% { transform: scale(0.5); opacity: 0.4; }
+                  50% { transform: scale(1.5); opacity: 0; }
+                  100% { transform: scale(0.5); opacity: 0; }
+                }
+                @keyframes chevron-pulse {
+                  0%, 100% { opacity: 0.2; transform: scaleX(0.8); }
+                  50% { opacity: 0.6; transform: scaleX(1.2); }
+                }
+                @keyframes grid-flash {
+                  0%, 100% { opacity: 0.3; }
+                  50% { opacity: 0.7; }
+                }
+              `}</style>
 
               {/* Progress bar when running */}
               {isRunningDiag && (
