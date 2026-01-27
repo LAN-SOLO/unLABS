@@ -171,72 +171,72 @@ const helpCommand: Command = {
     const output = [
       '',
       '+------------------------------------------------------------+',
-      '|                    AVAILABLE COMMANDS                      |',
+      '|                    available commands                      |',
       '+------------------------------------------------------------+',
-      '|  HELP      - Display this help message                     |',
-      '|  CLEAR     - Clear terminal screen                         |',
-      '|  STATUS    - Display system status                         |',
+      '|  help      - display this help message                     |',
+      '|  clear     - clear terminal screen                         |',
+      '|  status    - display system status                         |',
       '+------------------------------------------------------------+',
-      '|                      CRYSTALS                              |',
+      '|                      crystals                              |',
       '+------------------------------------------------------------+',
-      '|  INV       - View crystal inventory                        |',
-      '|  MINT      - Mint a new crystal (50 _unSC)                 |',
-      '|  CRYSTAL   - View detailed crystal info                    |',
-      '|  RENAME    - Rename a crystal                              |',
+      '|  inv       - view crystal inventory                        |',
+      '|  mint      - mint a new crystal (50 _unSC)                 |',
+      '|  crystal   - view detailed crystal info                    |',
+      '|  rename    - rename a crystal                              |',
       '+------------------------------------------------------------+',
-      '|                      ECONOMY                               |',
+      '|                      economy                               |',
       '+------------------------------------------------------------+',
-      '|  BALANCE   - Check _unSC token balance                     |',
-      '|  RESEARCH  - View tech tree progress                       |',
-      '|  SCAN      - Scan for volatility data                      |',
+      '|  balance   - check _unSC token balance                     |',
+      '|  research  - view tech tree progress                       |',
+      '|  scan      - scan for volatility data                      |',
       '+------------------------------------------------------------+',
-      '|                       OTHER                                |',
+      '|                       other                                |',
       '+------------------------------------------------------------+',
-      '|  HISTORY   - View command history                          |',
-      '|  WHOAMI    - Display operator information                  |',
-      '|  ECHO      - Echo text back                                |',
-      '|  ABOUT     - About UnstableLabs                            |',
+      '|  history   - view command history                          |',
+      '|  whoami    - display operator information                  |',
+      '|  echo      - echo text back                                |',
+      '|  about     - about UnstableLabs                            |',
       '+------------------------------------------------------------+',
-      '|                      MODULES                               |',
+      '|                      modules                               |',
       '+------------------------------------------------------------+',
-      '|  RUN       - Launch a subsystem module                     |',
-      '|  KILL      - Shut down a subsystem module                  |',
+      '|  run       - launch a subsystem module                     |',
+      '|  kill      - shut down a subsystem module                  |',
       '+------------------------------------------------------------+',
-      '|                      DEVICES                               |',
+      '|                      devices                               |',
       '+------------------------------------------------------------+',
-      '|  DEVICE    - List and control lab devices                  |',
-      '|             DEVICE LIST    - Show all connected devices    |',
-      '|             DEVICE <n> TEST   - Run device diagnostics     |',
-      '|             DEVICE <n> REBOOT - Reboot device (or RESET)   |',
-      '|             DEVICE <n> STATUS - Show device status         |',
-      '|             DEVICE <n> INFO   - Show device details        |',
+      '|  device    - list and control lab devices                  |',
+      '|             device list    - show all connected devices    |',
+      '|             device <n> test   - run device diagnostics     |',
+      '|             device <n> reboot - reboot device (or reset)   |',
+      '|             device <n> status - show device status         |',
+      '|             device <n> info   - show device details        |',
       '|                                                            |',
-      '|  Device names: cache, core, battery, synth, recorder,      |',
-      '|    reactor, ai, super, drone, magnet, tank, exotic, qsm,  |',
-      '|    net, temp, dim, cpu, clock, mem, anomaly, compass,     |',
-      '|    teleport, vent, diag, laser, printer, thermal, toolkit |',
+      '|  device names: cache, core, battery, synth, recorder,      |',
+      '|    reactor, ai, super, drone, magnet, tank, exotic, qsm,   |',
+      '|    net, temp, dim, cpu, clock, mem, anomaly, compass,      |',
+      '|    teleport, vent, diag, laser, printer, thermal, toolkit  |',
       '+------------------------------------------------------------+',
-      '|                      THERMAL                               |',
+      '|                      thermal                               |',
       '+------------------------------------------------------------+',
-      '|  THERMAL   - Panel thermal management system               |',
-      '|             THERMAL STATUS     - Show thermal status       |',
-      '|             THERMAL FAN <id> <mode> - Set fan mode         |',
-      '|             THERMAL AUTO [on|off]  - Toggle auto mode      |',
-      '|             THERMAL EMERGENCY  - Emergency cooling         |',
+      '|  thermal   - panel thermal management system               |',
+      '|             thermal status     - show thermal status       |',
+      '|             thermal fan <id> <mode> - set fan mode         |',
+      '|             thermal auto [on|off]  - toggle auto mode      |',
+      '|             thermal emergency  - emergency cooling         |',
       '|                                                            |',
-      '|  Fan IDs: CPU, GPU                                         |',
-      '|  Modes: AUTO, LOW, MED, HIGH, or 0-100 (speed %)           |',
+      '|  fan ids: cpu, gpu                                         |',
+      '|  modes: auto, low, med, high, or 0-100 (speed %)           |',
       '+------------------------------------------------------------+',
-      '|                      SYSTEM                                |',
+      '|                      system                                |',
       '+------------------------------------------------------------+',
-      '|  UNSYSTEMCTL - System control (reboot, poweroff, status)   |',
+      '|  unsystemctl - system control (reboot, poweroff, status)   |',
       '+------------------------------------------------------------+',
       '',
-      'Usage: MINT <name> | CRYSTAL <name> | RENAME <old> <new>',
-      '       RUN panel dev -un | KILL panel dev -un',
-      '       THERMAL FAN CPU 75 | THERMAL AUTO on',
-      '       UNSYSTEMCTL shutdown -now | UNSYSTEMCTL reboot -now',
-      'Type a command and press ENTER to execute.',
+      'usage: mint <name> | crystal <name> | rename <old> <new>',
+      '       run panel dev -un | kill panel dev -un',
+      '       thermal fan cpu 75 | thermal auto on',
+      '       unsystemctl shutdown -now | unsystemctl reboot -now',
+      'type a command and press enter to execute.',
       '',
     ]
     return { success: true, output }
@@ -300,7 +300,7 @@ const invCommand: Command = {
         '+-------------------------------------+',
         '|  No crystals found.                 |',
         '|                                     |',
-        '|  Use MINT to create your first      |',
+        '|  use mint to create your first      |',
         '|  crystal, or acquire one from       |',
         '|  the marketplace.                   |',
         '+-------------------------------------+',
@@ -555,7 +555,7 @@ const mintCommand: Command = {
     if (!name) {
       return {
         success: false,
-        error: 'Usage: MINT <name>\nExample: MINT my-crystal',
+        error: 'usage: mint <name>\nexample: mint my-crystal',
       }
     }
 
@@ -589,7 +589,7 @@ const mintCommand: Command = {
       `|  NEW BALANCE: ${(result.newBalance || 0).toFixed(2).padStart(10)} _unSC                         |`,
       '+---------------------------------------------------------------+',
       '',
-      '30 slices initialized. Use CRYSTAL <name> for detailed view.',
+      '30 slices initialized. use crystal <name> for detailed view.',
       '',
     ]
 
@@ -608,7 +608,7 @@ const crystalCommand: Command = {
     if (!name) {
       return {
         success: false,
-        error: 'Usage: CRYSTAL <name>\nExample: CRYSTAL my-crystal',
+        error: 'usage: crystal <name>\nexample: crystal my-crystal',
       }
     }
 
@@ -697,7 +697,7 @@ const renameCommand: Command = {
     if (!oldName || !newName) {
       return {
         success: false,
-        error: 'Usage: RENAME <old-name> <new-name>\nExample: RENAME my-crystal new-name',
+        error: 'usage: rename <old-name> <new-name>\nexample: rename my-crystal new-name',
       }
     }
 
@@ -811,7 +811,7 @@ const unsystemctlCommand: Command = {
     if (!command) {
       return {
         success: false,
-        error: 'Usage: unsystemctl <command> [flags]\n\nAvailable commands:\n  reboot    - Reboot the system\n  shutdown  - Shutdown panel and return to terminal\n  status    - Show system status\n\nFlags:\n  -now      - Execute immediately',
+        error: 'usage: unsystemctl <command> [flags]\n\navailable commands:\n  reboot    - reboot the system\n  shutdown  - shutdown panel and return to terminal\n  status    - show system status\n\nflags:\n  -now      - execute immediately',
       }
     }
 
@@ -945,7 +945,7 @@ const killCommand: Command = {
     if (!module) {
       return {
         success: false,
-        error: 'Usage: KILL <module> <mode> [flags]\nAvailable modules: panel',
+        error: 'usage: kill <module> <mode> [flags]\navailable modules: panel',
       }
     }
 
@@ -953,14 +953,14 @@ const killCommand: Command = {
       if (mode !== 'dev') {
         return {
           success: false,
-          error: 'Usage: KILL panel dev -un\nMode "dev" required for panel shutdown.',
+          error: 'usage: kill panel dev -un\nmode "dev" required for panel shutdown.',
         }
       }
 
       if (!flags.toLowerCase().includes('-un')) {
         return {
           success: false,
-          error: 'Access denied. Flag -un required.\nUsage: KILL panel dev -un',
+          error: 'access denied. flag -un required.\nusage: kill panel dev -un',
         }
       }
 
@@ -987,7 +987,7 @@ const runCommand: Command = {
     if (!module) {
       return {
         success: false,
-        error: 'Usage: RUN <module> <mode> [flags]\nAvailable modules: panel',
+        error: 'usage: run <module> <mode> [flags]\navailable modules: panel',
       }
     }
 
@@ -995,14 +995,14 @@ const runCommand: Command = {
       if (mode !== 'dev') {
         return {
           success: false,
-          error: 'Usage: RUN panel dev -un\nMode "dev" required for panel access.',
+          error: 'usage: run panel dev -un\nmode "dev" required for panel access.',
         }
       }
 
       if (!flags.toLowerCase().includes('-un')) {
         return {
           success: false,
-          error: 'Access denied. Flag -un required.\nUsage: RUN panel dev -un',
+          error: 'access denied. flag -un required.\nusage: run panel dev -un',
         }
       }
 
@@ -1026,7 +1026,7 @@ const historyCommand: Command = {
     ctx.setTyping(false)
 
     if (history.length === 0) {
-      return { success: true, output: ['No command history found.', '', 'Use UP/DOWN arrows to navigate recent commands.'] }
+      return { success: true, output: ['no command history found.', '', 'use up/down arrows to navigate recent commands.'] }
     }
 
     const output = [
@@ -1043,7 +1043,7 @@ const historyCommand: Command = {
 
     output.push('+-------------------------------------+')
     output.push('')
-    output.push('Use UP/DOWN arrows to navigate recent commands.')
+    output.push('use up/down arrows to navigate recent commands.')
     output.push('')
 
     return { success: true, output }
@@ -1105,8 +1105,8 @@ const deviceCommand: Command = {
           '  THM-001   Thermal Manager         v1.0.0    ONLINE    ',
           '  BTK-001   Basic Toolkit           v1.2.0    ONLINE    ',
           '',
-          '  Usage: DEVICE <name> [TEST|RESET|STATUS|INFO]',
-          '  Example: DEVICE CACHE TEST',
+          '  usage: device <name> [test|reset|status|info]',
+          '  example: device cache test',
           '',
         ],
       }
@@ -1512,7 +1512,7 @@ const deviceCommand: Command = {
     if (!device) {
       return {
         success: false,
-        error: `Unknown device: ${deviceName}\nUse DEVICE LIST to see available devices.`,
+        error: `unknown device: ${deviceName}\nuse device list to see available devices.`,
       }
     }
 
@@ -1672,7 +1672,7 @@ const thermalCommand: Command = {
           '  AUTO MODE:      ENABLED',
           '',
           '  Note: Real-time data displayed in panel cooling modules.',
-          '        Use panel fan controls for manual adjustment.',
+          '        use panel fan controls for manual adjustment.',
           '',
         ],
       }
@@ -1683,7 +1683,7 @@ const thermalCommand: Command = {
       if (!param) {
         return {
           success: false,
-          error: 'Usage: THERMAL FAN <cpu|gpu> <speed|auto|low|med|high>\nExample: THERMAL FAN CPU 75',
+          error: 'usage: thermal fan <cpu|gpu> <speed|auto|low|med|high>\nexample: thermal fan cpu 75',
         }
       }
 
@@ -1691,7 +1691,7 @@ const thermalCommand: Command = {
       if (!fanId) {
         return {
           success: false,
-          error: `Unknown fan: ${param}\nAvailable fans: CPU, GPU`,
+          error: `unknown fan: ${param}\navailable fans: cpu, gpu`,
         }
       }
 
@@ -1699,7 +1699,7 @@ const thermalCommand: Command = {
       if (!mode) {
         return {
           success: false,
-          error: `Usage: THERMAL FAN ${fanId.toUpperCase()} <speed|auto|low|med|high>`,
+          error: `usage: thermal fan ${fanId} <speed|auto|low|med|high>`,
         }
       }
 
@@ -1709,10 +1709,10 @@ const thermalCommand: Command = {
           success: true,
           output: [
             '',
-            `[THERMAL] ${fanId.toUpperCase()} fan mode set to ${mode}`,
-            `[THERMAL] Speed will ${mode === 'AUTO' ? 'adjust automatically based on temperature' : `be set to ${mode === 'LOW' ? '25%' : mode === 'MED' ? '50%' : '100%'}`}`,
+            `[thermal] ${fanId} fan mode set to ${mode.toLowerCase()}`,
+            `[thermal] speed will ${mode === 'AUTO' ? 'adjust automatically based on temperature' : `be set to ${mode === 'LOW' ? '25%' : mode === 'MED' ? '50%' : '100%'}`}`,
             '',
-            'Note: Adjust fan controls directly in the panel for immediate effect.',
+            'note: adjust fan controls directly in the panel for immediate effect.',
             '',
           ],
         }
@@ -1722,7 +1722,7 @@ const thermalCommand: Command = {
       if (isNaN(speedNum) || speedNum < 0 || speedNum > 100) {
         return {
           success: false,
-          error: `Invalid speed: ${mode}\nSpeed must be 0-100 or AUTO/LOW/MED/HIGH`,
+          error: `invalid speed: ${mode}\nspeed must be 0-100 or auto/low/med/high`,
         }
       }
 
@@ -1730,10 +1730,10 @@ const thermalCommand: Command = {
         success: true,
         output: [
           '',
-          `[THERMAL] ${fanId.toUpperCase()} fan speed set to ${speedNum}%`,
-          `[THERMAL] Estimated RPM: ${Math.round((speedNum / 100) * 4000 + 800)}`,
+          `[thermal] ${fanId} fan speed set to ${speedNum}%`,
+          `[thermal] estimated rpm: ${Math.round((speedNum / 100) * 4000 + 800)}`,
           '',
-          'Note: Use panel fan controls for real-time adjustment.',
+          'note: use panel fan controls for real-time adjustment.',
           '',
         ],
       }
@@ -1746,10 +1746,10 @@ const thermalCommand: Command = {
         success: true,
         output: [
           '',
-          `[THERMAL] Auto mode ${enabled ? 'ENABLED' : 'DISABLED'}`,
+          `[thermal] auto mode ${enabled ? 'enabled' : 'disabled'}`,
           enabled
-            ? '[THERMAL] Fans will automatically adjust based on temperature.'
-            : '[THERMAL] Manual fan control enabled.',
+            ? '[thermal] fans will automatically adjust based on temperature.'
+            : '[thermal] manual fan control enabled.',
           '',
         ],
       }
@@ -1765,14 +1765,14 @@ const thermalCommand: Command = {
           '║              EMERGENCY COOLING ACTIVATED                      ║',
           '╚═══════════════════════════════════════════════════════════════╝',
           '',
-          '[THERMAL] All fans set to MAXIMUM (100%)',
-          '[THERMAL] CPU fan: 4800 RPM',
-          '[THERMAL] GPU fan: 4800 RPM',
+          '[thermal] all fans set to maximum (100%)',
+          '[thermal] cpu fan: 4800 rpm',
+          '[thermal] gpu fan: 4800 rpm',
           '',
-          '[NOTICE] Emergency mode will remain active until manually',
+          '[notice] emergency mode will remain active until manually',
           '         disabled or temperature returns to safe levels.',
           '',
-          'Use THERMAL AUTO to restore automatic control.',
+          'use thermal auto to restore automatic control.',
           '',
         ],
       }
@@ -1780,7 +1780,7 @@ const thermalCommand: Command = {
 
     return {
       success: false,
-      error: `Unknown thermal command: ${action}\n\nAvailable commands:\n  THERMAL STATUS     - Show thermal status\n  THERMAL FAN <id> <mode>  - Set fan mode\n  THERMAL AUTO [on|off]    - Toggle auto mode\n  THERMAL EMERGENCY  - Activate emergency cooling`,
+      error: `unknown thermal command: ${action}\n\navailable commands:\n  thermal status     - show thermal status\n  thermal fan <id> <mode>  - set fan mode\n  thermal auto [on|off]    - toggle auto mode\n  thermal emergency  - activate emergency cooling`,
     }
   },
 }
