@@ -9886,42 +9886,97 @@ export function MemoryMonitor({
 }
 
 // ==================================================
-// VOLT METER - Power monitoring display
-// Device ID: VLT-001 | Version: 1.0.0
+// VOLT METER - Power monitoring display with mode switching
+// Device ID: VLT-001 | Version: 1.1.0
 // Compatible: PWR-001, UEC-001, MFR-001, BAT-001
 // unOS Commands: power status, power devices
-// Displays real-time voltage from power management system
+// Displays real-time data from power management system
+// Mode button cycles: VOLT → GEN → LOAD → BAL → BAT → LPCT
 // ==================================================
+
+// Display modes matching power command data
+type VoltMeterMode = 'VOLT' | 'GEN' | 'LOAD' | 'BAL' | 'BAT' | 'LPCT'
+
 interface VoltMeterProps {
-  voltage?: number
-  label?: string
   className?: string
-  // Power system integration
-  totalGeneration?: number
-  totalConsumption?: number
-  powerBalance?: number
+  // Power system data from unOS power command
+  totalGeneration?: number      // Total power generation in watts
+  totalConsumption?: number     // Total power consumption in watts
+  storagePercent?: number       // Battery storage percentage
+  storageWh?: number            // Battery storage in Wh
+  storageCapacity?: number      // Battery capacity in Wh
+  // Optional direct voltage override
+  voltage?: number
+  // Initial mode
+  initialMode?: VoltMeterMode
 }
 
 export function VoltMeter({
-  voltage,
-  label = 'VOLT',
   className,
   totalGeneration = 650,
   totalConsumption = 522,
-  powerBalance,
+  storagePercent = 85,
+  storageWh = 850,
+  storageCapacity = 1000,
+  voltage,
+  initialMode = 'VOLT',
 }: VoltMeterProps) {
+  const [mode, setMode] = useState<VoltMeterMode>(initialMode)
   const [displayValue, setDisplayValue] = useState('--.-')
   const [isBooting, setIsBooting] = useState(true)
   const [flickerIntensity, setFlickerIntensity] = useState(1)
 
-  // Calculate display voltage from power system
-  // Base voltage scales with power balance (positive = higher voltage)
+  // Calculate derived values
+  const powerBalance = totalGeneration - totalConsumption
+  const loadPercent = Math.round((totalConsumption / totalGeneration) * 100)
+
+  // Calculate voltage from power balance (base 120V, scales ±20V based on balance)
   const calculatedVoltage = voltage ?? (() => {
-    const balance = powerBalance ?? (totalGeneration - totalConsumption)
-    // Base 120V, scales ±20V based on power balance percentage
-    const balancePercent = balance / totalGeneration
+    const balancePercent = powerBalance / totalGeneration
     return 120 + (balancePercent * 20)
   })()
+
+  // Mode definitions with labels and value getters
+  const modeConfig: Record<VoltMeterMode, { label: string; getValue: () => string; unit?: string }> = {
+    VOLT: {
+      label: 'VOLT',
+      getValue: () => calculatedVoltage.toFixed(1),
+    },
+    GEN: {
+      label: 'GEN',
+      getValue: () => String(totalGeneration),
+      unit: 'W',
+    },
+    LOAD: {
+      label: 'LOAD',
+      getValue: () => String(totalConsumption),
+      unit: 'W',
+    },
+    BAL: {
+      label: 'BAL',
+      getValue: () => (powerBalance >= 0 ? '+' : '') + String(powerBalance),
+      unit: 'W',
+    },
+    BAT: {
+      label: 'BAT',
+      getValue: () => String(storagePercent),
+      unit: '%',
+    },
+    LPCT: {
+      label: 'LPCT',
+      getValue: () => String(loadPercent),
+      unit: '%',
+    },
+  }
+
+  const modeOrder: VoltMeterMode[] = ['VOLT', 'GEN', 'LOAD', 'BAL', 'BAT', 'LPCT']
+
+  // Cycle to next mode
+  const cycleMode = () => {
+    const currentIndex = modeOrder.indexOf(mode)
+    const nextIndex = (currentIndex + 1) % modeOrder.length
+    setMode(modeOrder[nextIndex])
+  }
 
   // Boot sequence
   useEffect(() => {
@@ -9929,22 +9984,22 @@ export function VoltMeter({
       setIsBooting(true)
       setDisplayValue('--.-')
       await new Promise(r => setTimeout(r, 200))
-      setDisplayValue('88.8')
+      setDisplayValue('888')
       await new Promise(r => setTimeout(r, 150))
       setDisplayValue('--.-')
       await new Promise(r => setTimeout(r, 100))
-      setDisplayValue(calculatedVoltage.toFixed(1))
+      setDisplayValue(modeConfig[mode].getValue())
       setIsBooting(false)
     }
     bootSequence()
   }, [])
 
-  // Update display when voltage changes
+  // Update display when mode or values change
   useEffect(() => {
     if (!isBooting) {
-      setDisplayValue(calculatedVoltage.toFixed(1))
+      setDisplayValue(modeConfig[mode].getValue())
     }
-  }, [calculatedVoltage, isBooting])
+  }, [mode, totalGeneration, totalConsumption, storagePercent, calculatedVoltage, isBooting])
 
   // Subtle flicker effect for realism
   useEffect(() => {
@@ -9954,16 +10009,33 @@ export function VoltMeter({
     return () => clearInterval(flickerInterval)
   }, [])
 
-  // Determine status color based on voltage
-  const getVoltageStatus = (v: number) => {
-    if (v < 100) return 'critical' // Under-voltage
-    if (v < 115) return 'warning'  // Low voltage
-    if (v > 140) return 'warning'  // High voltage
-    if (v > 150) return 'critical' // Over-voltage
-    return 'normal'
+  // Determine status color based on current mode and value
+  const getStatus = (): 'normal' | 'warning' | 'critical' => {
+    switch (mode) {
+      case 'VOLT':
+        if (calculatedVoltage < 100 || calculatedVoltage > 150) return 'critical'
+        if (calculatedVoltage < 115 || calculatedVoltage > 140) return 'warning'
+        return 'normal'
+      case 'LOAD':
+      case 'LPCT':
+        if (loadPercent > 95) return 'critical'
+        if (loadPercent > 80) return 'warning'
+        return 'normal'
+      case 'BAL':
+        if (powerBalance < -50) return 'critical'
+        if (powerBalance < 0) return 'warning'
+        return 'normal'
+      case 'BAT':
+        if (storagePercent < 10) return 'critical'
+        if (storagePercent < 25) return 'warning'
+        return 'normal'
+      default:
+        return 'normal'
+    }
   }
 
-  const status = getVoltageStatus(calculatedVoltage)
+  const status = getStatus()
+  const currentConfig = modeConfig[mode]
 
   return (
     <div
@@ -9978,21 +10050,44 @@ export function VoltMeter({
         padding: '3px 6px',
       }}
     >
+      {/* Mode switch button (left side) */}
+      <button
+        onClick={cycleMode}
+        className="mr-1 flex items-center justify-center transition-all active:scale-95"
+        style={{
+          width: '10px',
+          height: '10px',
+          background: 'linear-gradient(180deg, #3a3020 0%, #2a2010 50%, #1a1008 100%)',
+          border: '1px solid #4a4030',
+          borderRadius: '2px',
+          boxShadow: 'inset 0 1px 1px rgba(255,200,100,0.1), 0 1px 2px rgba(0,0,0,0.5)',
+        }}
+        title="Switch display mode"
+      >
+        <div
+          className="w-1 h-1 rounded-full"
+          style={{
+            background: '#ffaa00',
+            boxShadow: '0 0 3px #ffaa00',
+          }}
+        />
+      </button>
+
       {/* Label */}
       <span
-        className="font-mono text-[8px] tracking-wider select-none"
+        className="font-mono text-[8px] tracking-wider select-none min-w-[24px]"
         style={{
           color: '#ffaa00',
           textShadow: '0 0 4px rgba(255,170,0,0.5)',
           opacity: flickerIntensity,
         }}
       >
-        {label}
+        {currentConfig.label}
       </span>
 
       {/* 7-segment style display */}
       <div
-        className="font-mono text-[11px] font-bold tracking-tight ml-1 select-none"
+        className="font-mono text-[11px] font-bold tracking-tight ml-1 select-none min-w-[40px] text-right"
         style={{
           fontFamily: "'DSEG7 Classic', 'Courier New', monospace",
           color: status === 'critical' ? '#ff4444' :
@@ -10128,7 +10223,7 @@ export function PowerDisplay({
         <VoltMeter
           totalGeneration={totalGeneration}
           totalConsumption={totalConsumption}
-          powerBalance={powerBalance}
+          storagePercent={storagePercent}
         />
       </div>
 
