@@ -31,5 +31,7 @@ export {
   EnergyCore,
   BatteryPack,
   HandmadeSynthesizer,
+  VoltMeter,
+  PowerDisplay,
 } from './modules/EquipmentTile'
 export { ResourceBar } from './modules/ResourceBar'

@@ -9884,3 +9884,332 @@ export function MemoryMonitor({
     </PanelFrame>
   )
 }
+
+// ==================================================
+// VOLT METER - Power monitoring display
+// Device ID: VLT-001 | Version: 1.0.0
+// Compatible: PWR-001, UEC-001, MFR-001, BAT-001
+// unOS Commands: power status, power devices
+// Displays real-time voltage from power management system
+// ==================================================
+interface VoltMeterProps {
+  voltage?: number
+  label?: string
+  className?: string
+  // Power system integration
+  totalGeneration?: number
+  totalConsumption?: number
+  powerBalance?: number
+}
+
+export function VoltMeter({
+  voltage,
+  label = 'VOLT',
+  className,
+  totalGeneration = 650,
+  totalConsumption = 522,
+  powerBalance,
+}: VoltMeterProps) {
+  const [displayValue, setDisplayValue] = useState('--.-')
+  const [isBooting, setIsBooting] = useState(true)
+  const [flickerIntensity, setFlickerIntensity] = useState(1)
+
+  // Calculate display voltage from power system
+  // Base voltage scales with power balance (positive = higher voltage)
+  const calculatedVoltage = voltage ?? (() => {
+    const balance = powerBalance ?? (totalGeneration - totalConsumption)
+    // Base 120V, scales ±20V based on power balance percentage
+    const balancePercent = balance / totalGeneration
+    return 120 + (balancePercent * 20)
+  })()
+
+  // Boot sequence
+  useEffect(() => {
+    const bootSequence = async () => {
+      setIsBooting(true)
+      setDisplayValue('--.-')
+      await new Promise(r => setTimeout(r, 200))
+      setDisplayValue('88.8')
+      await new Promise(r => setTimeout(r, 150))
+      setDisplayValue('--.-')
+      await new Promise(r => setTimeout(r, 100))
+      setDisplayValue(calculatedVoltage.toFixed(1))
+      setIsBooting(false)
+    }
+    bootSequence()
+  }, [])
+
+  // Update display when voltage changes
+  useEffect(() => {
+    if (!isBooting) {
+      setDisplayValue(calculatedVoltage.toFixed(1))
+    }
+  }, [calculatedVoltage, isBooting])
+
+  // Subtle flicker effect for realism
+  useEffect(() => {
+    const flickerInterval = setInterval(() => {
+      setFlickerIntensity(0.95 + Math.random() * 0.1)
+    }, 100 + Math.random() * 200)
+    return () => clearInterval(flickerInterval)
+  }, [])
+
+  // Determine status color based on voltage
+  const getVoltageStatus = (v: number) => {
+    if (v < 100) return 'critical' // Under-voltage
+    if (v < 115) return 'warning'  // Low voltage
+    if (v > 140) return 'warning'  // High voltage
+    if (v > 150) return 'critical' // Over-voltage
+    return 'normal'
+  }
+
+  const status = getVoltageStatus(calculatedVoltage)
+
+  return (
+    <div
+      className={cn(
+        'relative inline-flex items-center gap-0.5 rounded-sm overflow-hidden',
+        className
+      )}
+      style={{
+        background: 'linear-gradient(180deg, #1a1208 0%, #0d0904 50%, #080602 100%)',
+        border: '1px solid #3a3020',
+        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.8), inset 0 -1px 2px rgba(60,50,30,0.2)',
+        padding: '3px 6px',
+      }}
+    >
+      {/* Label */}
+      <span
+        className="font-mono text-[8px] tracking-wider select-none"
+        style={{
+          color: '#ffaa00',
+          textShadow: '0 0 4px rgba(255,170,0,0.5)',
+          opacity: flickerIntensity,
+        }}
+      >
+        {label}
+      </span>
+
+      {/* 7-segment style display */}
+      <div
+        className="font-mono text-[11px] font-bold tracking-tight ml-1 select-none"
+        style={{
+          fontFamily: "'DSEG7 Classic', 'Courier New', monospace",
+          color: status === 'critical' ? '#ff4444' :
+                 status === 'warning' ? '#ffaa00' : '#ffbb22',
+          textShadow: status === 'critical'
+            ? '0 0 8px rgba(255,68,68,0.8), 0 0 16px rgba(255,68,68,0.4)'
+            : status === 'warning'
+            ? '0 0 8px rgba(255,170,0,0.8), 0 0 16px rgba(255,170,0,0.4)'
+            : '0 0 8px rgba(255,187,34,0.8), 0 0 16px rgba(255,170,0,0.4)',
+          opacity: flickerIntensity,
+          letterSpacing: '0.5px',
+        }}
+      >
+        {displayValue}
+      </div>
+
+      {/* Scanline overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 1px, rgba(0,0,0,0.15) 1px, rgba(0,0,0,0.15) 2px)',
+        }}
+      />
+
+      {/* Glass reflection */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, transparent 50%)',
+        }}
+      />
+
+      {/* Status indicator dot */}
+      <div
+        className="absolute top-1 right-1 w-1 h-1 rounded-full"
+        style={{
+          background: status === 'critical' ? '#ff4444' :
+                     status === 'warning' ? '#ffaa00' : '#44ff44',
+          boxShadow: status === 'critical'
+            ? '0 0 4px #ff4444'
+            : status === 'warning'
+            ? '0 0 4px #ffaa00'
+            : '0 0 4px #44ff44',
+          animationName: status !== 'normal' ? 'volt-blink' : 'none',
+          animationDuration: status === 'critical' ? '0.3s' : '1s',
+          animationIterationCount: 'infinite',
+          animationTimingFunction: 'ease-in-out',
+        }}
+      />
+
+      <style jsx global>{`
+        @keyframes volt-blink {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.3; }
+        }
+      `}</style>
+    </div>
+  )
+}
+
+// ==================================================
+// POWER DISPLAY - Full power monitoring panel
+// Device ID: PWD-001 | Version: 1.0.0
+// Compatible: PWR-001, VLT-001, all power devices
+// Shows generation, consumption, and balance metrics
+// ==================================================
+interface PowerDisplayProps {
+  totalGeneration?: number
+  totalConsumption?: number
+  storagePercent?: number
+  className?: string
+}
+
+export function PowerDisplay({
+  totalGeneration = 650,
+  totalConsumption = 522,
+  storagePercent = 85,
+  className,
+}: PowerDisplayProps) {
+  const [isBooting, setIsBooting] = useState(true)
+  const [displayGen, setDisplayGen] = useState('---')
+  const [displayCon, setDisplayCon] = useState('---')
+  const [displayBat, setDisplayBat] = useState('--')
+
+  const powerBalance = totalGeneration - totalConsumption
+  const loadPercent = Math.round((totalConsumption / totalGeneration) * 100)
+
+  // Boot sequence
+  useEffect(() => {
+    const bootSequence = async () => {
+      setIsBooting(true)
+      await new Promise(r => setTimeout(r, 300))
+      setDisplayGen(String(totalGeneration))
+      await new Promise(r => setTimeout(r, 200))
+      setDisplayCon(String(totalConsumption))
+      await new Promise(r => setTimeout(r, 200))
+      setDisplayBat(String(storagePercent))
+      setIsBooting(false)
+    }
+    bootSequence()
+  }, [])
+
+  // Update when values change
+  useEffect(() => {
+    if (!isBooting) {
+      setDisplayGen(String(totalGeneration))
+      setDisplayCon(String(totalConsumption))
+      setDisplayBat(String(storagePercent))
+    }
+  }, [totalGeneration, totalConsumption, storagePercent, isBooting])
+
+  const getLoadColor = () => {
+    if (loadPercent > 95) return '#ff4444'
+    if (loadPercent > 80) return '#ffaa00'
+    return '#44ff88'
+  }
+
+  return (
+    <PanelFrame
+      variant="default"
+      className={cn('p-2', className)}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="font-mono text-[8px] uppercase tracking-wider text-[var(--neon-amber)]">
+          PWR-001
+        </div>
+        <LED on={!isBooting} color="green" size="sm" />
+      </div>
+
+      {/* Volt Meter */}
+      <div className="mb-2">
+        <VoltMeter
+          totalGeneration={totalGeneration}
+          totalConsumption={totalConsumption}
+          powerBalance={powerBalance}
+        />
+      </div>
+
+      {/* Power metrics */}
+      <div className="space-y-1 text-[7px] font-mono">
+        {/* Generation */}
+        <div className="flex items-center justify-between">
+          <span className="text-white/50">GEN</span>
+          <span className="text-[var(--neon-green)]">{displayGen}W</span>
+        </div>
+
+        {/* Consumption */}
+        <div className="flex items-center justify-between">
+          <span className="text-white/50">LOAD</span>
+          <span style={{ color: getLoadColor() }}>{displayCon}W</span>
+        </div>
+
+        {/* Balance bar */}
+        <div className="mt-1">
+          <div className="flex items-center justify-between text-[6px] mb-0.5">
+            <span className="text-white/40">LOAD</span>
+            <span className="text-white/40">{loadPercent}%</span>
+          </div>
+          <div
+            className="h-1.5 rounded-sm overflow-hidden"
+            style={{
+              background: '#1a1a1a',
+              border: '1px solid #333',
+            }}
+          >
+            <div
+              className="h-full transition-all duration-500"
+              style={{
+                width: `${Math.min(100, loadPercent)}%`,
+                background: `linear-gradient(90deg, ${getLoadColor()}88, ${getLoadColor()})`,
+                boxShadow: `0 0 4px ${getLoadColor()}`,
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Battery */}
+        <div className="flex items-center justify-between mt-1">
+          <span className="text-white/50">BAT</span>
+          <div className="flex items-center gap-1">
+            <div
+              className="w-6 h-2 rounded-sm overflow-hidden"
+              style={{
+                background: '#1a1a1a',
+                border: '1px solid #333',
+              }}
+            >
+              <div
+                className="h-full"
+                style={{
+                  width: `${storagePercent}%`,
+                  background: storagePercent > 20
+                    ? 'linear-gradient(90deg, #44ff8888, #44ff88)'
+                    : 'linear-gradient(90deg, #ff444488, #ff4444)',
+                  boxShadow: storagePercent > 20
+                    ? '0 0 4px #44ff88'
+                    : '0 0 4px #ff4444',
+                }}
+              />
+            </div>
+            <span className="text-[var(--neon-cyan)]">{displayBat}%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Status line */}
+      <div className="mt-1.5 pt-1 border-t border-white/10">
+        <div className="flex items-center justify-between text-[5px] font-mono">
+          <span className={cn(
+            powerBalance >= 0 ? 'text-[var(--neon-green)]' : 'text-[var(--neon-red)]'
+          )}>
+            {powerBalance >= 0 ? 'NOMINAL' : 'DEFICIT'}
+          </span>
+          <span className="text-white/30">PWR-MGR v1.0</span>
+        </div>
+      </div>
+    </PanelFrame>
+  )
+}
