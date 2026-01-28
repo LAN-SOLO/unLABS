@@ -22,11 +22,15 @@ function FanUnit({ speed, isOn }: { speed: number; isOn: boolean }) {
   const duration = isOn && speed > 0 ? Math.max(0.04, 1.2 - (speed / 100) * 1.15) : 0
 
   return (
-    <div className="flex-1 relative bg-[#050508] rounded-sm border border-[#1a1a2a] flex items-center justify-center overflow-hidden">
-      {/* Outer casing ring */}
+    <div className="relative w-full aspect-square bg-[#050508] rounded-sm border border-[#1a1a2a] flex items-center justify-center overflow-hidden">
+      {/* Outer casing ring - perfectly round */}
       <div
-        className="absolute inset-1 rounded-full border-2 border-[#2a2a3a]"
+        className="absolute rounded-full border-2 border-[#2a2a3a]"
         style={{
+          top: '4px',
+          left: '4px',
+          right: '4px',
+          bottom: '4px',
           background: 'radial-gradient(circle at 30% 30%, #1a1a2a 0%, #0a0a0f 60%, #050508 100%)',
           boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.8), inset 0 -1px 4px rgba(255,255,255,0.05)'
         }}
@@ -272,7 +276,7 @@ export function VentilationFan({
 
       {/* 4 Fans Vertical Stack */}
       <div className="flex-1 min-h-0 p-1.5 flex flex-col gap-1">
-        <div className="flex-1 flex flex-col gap-1">
+        <div className="flex-1 flex flex-col gap-1 justify-center">
           <FanUnit speed={speed} isOn={isOn} />
           <FanUnit speed={speed} isOn={isOn} />
           <FanUnit speed={speed} isOn={isOn} />

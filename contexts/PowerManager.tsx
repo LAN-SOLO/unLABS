@@ -141,6 +141,7 @@ const defaultConsumers: PowerConsumer[] = [
   { id: 'QCP-001', name: 'Quantum Compass', category: 'light', draw: { full: 2.5, idle: 0.8, standby: 0.2 }, currentState: 'idle', priority: 3 },
   { id: 'PWR-001', name: 'Power Management Sys.', category: 'light', draw: { full: 2.5, idle: 1, standby: 0.2 }, currentState: 'full', priority: 1 },
   { id: 'BTK-001', name: 'Basic Toolkit', category: 'light', draw: { full: 2, idle: 0.3, standby: 0.05 }, currentState: 'idle', priority: 2 },
+  { id: 'PWB-001', name: 'Portable Workbench', category: 'light', draw: { full: 3, idle: 0.8, standby: 0.15 }, currentState: 'idle', priority: 2 },
   { id: 'CPU-001', name: 'CPU Monitor', category: 'light', draw: { full: 2, idle: 0.8, standby: 0.2 }, currentState: 'idle', priority: 1 },
   { id: 'MEM-001', name: 'Memory Monitor', category: 'light', draw: { full: 1.8, idle: 0.6, standby: 0.15 }, currentState: 'idle', priority: 1 },
   { id: 'TMP-001', name: 'Temperature Monitor', category: 'light', draw: { full: 1.5, idle: 0.8, standby: 0.2 }, currentState: 'idle', priority: 1 },

@@ -33,5 +33,9 @@ export {
   HandmadeSynthesizer,
   VoltMeter,
   PowerDisplay,
+  // Tier 1 Tools
+  BasicToolkit,
+  MaterialScanner,
+  PortableWorkbench,
 } from './modules/EquipmentTile'
 export { ResourceBar } from './modules/ResourceBar'

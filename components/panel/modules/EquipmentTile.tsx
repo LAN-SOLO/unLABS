@@ -2290,44 +2290,46 @@ export function BasicToolkit({ className }: BasicToolkitProps) {
         <div className="font-mono text-[7px] text-white/30">T1</div>
       </div>
 
-      {/* Boot overlay */}
-      {deviceState === 'booting' && bootPhase && (
-        <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20">
-          <div className="text-center">
-            <div className="font-mono text-[8px] text-[var(--neon-cyan)] mb-1">
-              {bootPhase === 'init' && 'INITIALIZING...'}
-              {bootPhase === 'tools' && 'LOADING TOOLS...'}
-              {bootPhase === 'interface' && 'I/O INTERFACE...'}
-              {bootPhase === 'ready' && 'READY'}
-            </div>
-            <div className="flex gap-0.5 justify-center">
-              {['init', 'tools', 'interface', 'ready'].map((phase, i) => (
-                <div
-                  key={phase}
-                  className="w-1 h-1 rounded-full"
-                  style={{
-                    backgroundColor: ['init', 'tools', 'interface', 'ready'].indexOf(bootPhase) >= i
-                      ? 'var(--neon-cyan)'
-                      : '#333',
-                  }}
-                />
-              ))}
+      {/* Tool grid - all animations happen inside this area */}
+      <div className="relative grid grid-cols-2 gap-1">
+        {/* Boot animation inside grid area */}
+        {deviceState === 'booting' && bootPhase && (
+          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[6px] text-[var(--neon-cyan)]">
+                {bootPhase === 'init' && 'INIT'}
+                {bootPhase === 'tools' && 'TOOLS'}
+                {bootPhase === 'interface' && 'I/O'}
+                {bootPhase === 'ready' && 'READY'}
+              </span>
+              <div className="flex gap-0.5">
+                {['init', 'tools', 'interface', 'ready'].map((phase, i) => (
+                  <div
+                    key={phase}
+                    className="w-1 h-1 rounded-full"
+                    style={{
+                      backgroundColor: ['init', 'tools', 'interface', 'ready'].indexOf(bootPhase) >= i
+                        ? 'var(--neon-cyan)'
+                        : '#333',
+                      boxShadow: bootPhase === phase ? '0 0 4px var(--neon-cyan)' : 'none',
+                    }}
+                  />
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Reboot overlay */}
-      {deviceState === 'rebooting' && (
-        <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-20">
-          <div className="font-mono text-[8px] text-[var(--neon-amber)] animate-pulse">
-            REBOOTING...
+        {/* Reboot animation inside grid area */}
+        {deviceState === 'rebooting' && (
+          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
+            <span className="font-mono text-[6px] text-[var(--neon-amber)] animate-pulse">
+              REBOOTING...
+            </span>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Tool grid */}
-      <div className="grid grid-cols-2 gap-1">
+        {/* Tool buttons - LEDs animate during testing */}
         {tools.map((tool) => {
           const isBeingTested = deviceState === 'testing' && testPhase === tool.testPhase
           const isSelected = selectedTool === tool.name
@@ -2362,44 +2364,6 @@ export function BasicToolkit({ className }: BasicToolkitProps) {
           )
         })}
       </div>
-
-      {/* Test status bar */}
-      {deviceState === 'testing' && testPhase && (
-        <div className="mt-1.5 pt-1 border-t border-white/10">
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[6px] text-[var(--neon-purple)]">
-              TEST: {testPhase.toUpperCase()}
-            </span>
-            <div className="flex gap-0.5">
-              {['probe', 'clamp', 'laser', 'drill', 'calibrate'].map((phase) => (
-                <div
-                  key={phase}
-                  className="w-1 h-1 rounded-sm"
-                  style={{
-                    backgroundColor:
-                      testPhase === phase ? 'var(--neon-purple)' :
-                      ['probe', 'clamp', 'laser', 'drill', 'calibrate'].indexOf(phase) <
-                      ['probe', 'clamp', 'laser', 'drill', 'calibrate'].indexOf(testPhase || 'probe')
-                        ? 'var(--neon-green)' : '#333',
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Selected tool info */}
-      {deviceState === 'online' && selectedTool && (
-        <div className="mt-1.5 pt-1 border-t border-white/10">
-          <div className="font-mono text-[6px] text-white/50">
-            {selectedTool === 'PROBE' && 'Digital probe for I/O testing'}
-            {selectedTool === 'CLAMP' && 'Precision grip for assembly'}
-            {selectedTool === 'LASER' && 'Micro-laser for fine cuts'}
-            {selectedTool === 'DRILL' && 'High-speed drill bit'}
-          </div>
-        </div>
-      )}
     </PanelFrame>
   )
 }
@@ -2620,50 +2584,69 @@ export function MaterialScanner({
         </div>
       </div>
 
-      {/* Boot overlay */}
-      {deviceState === 'booting' && bootPhase && (
-        <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-20 rounded">
-          <div className="text-center">
-            <div className="font-mono text-[7px] text-[var(--neon-cyan)] mb-1">
-              {bootPhase === 'init' && 'INIT...'}
-              {bootPhase === 'sensors' && 'SENSORS...'}
-              {bootPhase === 'calibrate' && 'CALIBRATE...'}
-              {bootPhase === 'ready' && 'READY'}
-            </div>
-            <div className="flex gap-0.5 justify-center">
-              {['init', 'sensors', 'calibrate', 'ready'].map((phase, i) => (
-                <div
-                  key={phase}
-                  className="w-1 h-0.5 rounded-sm"
-                  style={{
-                    backgroundColor: ['init', 'sensors', 'calibrate', 'ready'].indexOf(bootPhase) >= i
-                      ? 'var(--neon-cyan)'
-                      : '#333',
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Reboot overlay */}
-      {deviceState === 'rebooting' && (
-        <div className="absolute inset-0 bg-black/90 flex items-center justify-center z-20 rounded">
-          <div className="font-mono text-[7px] text-[var(--neon-amber)] animate-pulse">
-            REBOOTING...
-          </div>
-        </div>
-      )}
-
-      {/* Scanning visualization */}
+      {/* Scanning visualization - all animations happen inside this area */}
       <div className="relative h-6 bg-black/40 rounded overflow-hidden mb-1">
-        {/* Test overlay */}
-        {deviceState === 'testing' && testPhase && (
-          <div className="absolute inset-0 bg-[var(--neon-purple)]/10 z-10 flex items-center justify-center">
-            <span className="font-mono text-[6px] text-[var(--neon-purple)]">
-              {testPhase.toUpperCase()}
+        {/* Boot animation inside scan area */}
+        {deviceState === 'booting' && bootPhase && (
+          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[6px] text-[var(--neon-cyan)]">
+                {bootPhase === 'init' && 'INIT'}
+                {bootPhase === 'sensors' && 'SENSORS'}
+                {bootPhase === 'calibrate' && 'CALIBRATE'}
+                {bootPhase === 'ready' && 'READY'}
+              </span>
+              <div className="flex gap-0.5">
+                {['init', 'sensors', 'calibrate', 'ready'].map((phase, i) => (
+                  <div
+                    key={phase}
+                    className="w-1 h-1 rounded-full"
+                    style={{
+                      backgroundColor: ['init', 'sensors', 'calibrate', 'ready'].indexOf(bootPhase) >= i
+                        ? 'var(--neon-cyan)'
+                        : '#333',
+                      boxShadow: bootPhase === phase ? '0 0 4px var(--neon-cyan)' : 'none',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reboot animation inside scan area */}
+        {deviceState === 'rebooting' && (
+          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center">
+            <span className="font-mono text-[6px] text-[var(--neon-amber)] animate-pulse">
+              REBOOTING...
             </span>
+          </div>
+        )}
+
+        {/* Test animation inside scan area */}
+        {deviceState === 'testing' && testPhase && (
+          <div className="absolute inset-0 bg-black/80 z-10 flex items-center justify-center">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[6px] text-[var(--neon-purple)]">
+                {testPhase.toUpperCase()}
+              </span>
+              <div className="flex gap-0.5">
+                {['emitter', 'receiver', 'calibrate', 'sweep'].map((phase) => (
+                  <div
+                    key={phase}
+                    className="w-1 h-1 rounded-full"
+                    style={{
+                      backgroundColor:
+                        testPhase === phase ? 'var(--neon-purple)' :
+                        ['emitter', 'receiver', 'calibrate', 'sweep'].indexOf(phase) <
+                        ['emitter', 'receiver', 'calibrate', 'sweep'].indexOf(testPhase || 'emitter')
+                          ? 'var(--neon-green)' : '#333',
+                      boxShadow: testPhase === phase ? '0 0 4px var(--neon-purple)' : 'none',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -2710,32 +2693,6 @@ export function MaterialScanner({
           {deviceState === 'online' ? `${foundMaterials.length} FOUND` : '-- --'}
         </span>
       </div>
-
-      {/* Test status */}
-      {deviceState === 'testing' && testPhase && (
-        <div className="mt-1 pt-1 border-t border-white/10">
-          <div className="flex items-center justify-between">
-            <span className="font-mono text-[5px] text-[var(--neon-purple)]">
-              TEST: {testPhase.toUpperCase()}
-            </span>
-            <div className="flex gap-0.5">
-              {['emitter', 'receiver', 'calibrate', 'sweep'].map((phase) => (
-                <div
-                  key={phase}
-                  className="w-1 h-1 rounded-sm"
-                  style={{
-                    backgroundColor:
-                      testPhase === phase ? 'var(--neon-purple)' :
-                      ['emitter', 'receiver', 'calibrate', 'sweep'].indexOf(phase) <
-                      ['emitter', 'receiver', 'calibrate', 'sweep'].indexOf(testPhase || 'emitter')
-                        ? 'var(--neon-green)' : '#333',
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </PanelFrame>
   )
 }
@@ -3397,6 +3354,12 @@ export function QuantumCompass({
 // ==================================================
 // PORTABLE WORKBENCH - Mobile crafting station
 // ==================================================
+// PWB-001 - Tier 1 Mobile Bench for prototyping
+// ==================================================
+type WorkbenchState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type WorkbenchTestPhase = 'motors' | 'clamps' | 'sensors' | 'calibrate' | 'complete' | null
+type WorkbenchBootPhase = 'init' | 'motors' | 'surface' | 'ready' | null
+
 interface PortableWorkbenchProps {
   queuedItems?: number
   craftingProgress?: number
@@ -3408,52 +3371,349 @@ export function PortableWorkbench({
   craftingProgress = 35,
   className,
 }: PortableWorkbenchProps) {
+  const [deviceState, setDeviceState] = useState<WorkbenchState>('booting')
+  const [testPhase, setTestPhase] = useState<WorkbenchTestPhase>(null)
+  const [bootPhase, setBootPhase] = useState<WorkbenchBootPhase>('init')
+  const [activeSlot, setActiveSlot] = useState<number | null>(null)
+
   const isCrafting = craftingProgress > 0 && craftingProgress < 100
 
+  // Random button style for nano buttons (memoized on mount)
+  const [buttonStyle] = useState(() => {
+    const styles = ['round', 'square', 'pill'] as const
+    return styles[Math.floor(Math.random() * styles.length)]
+  })
+
+  // Random logo position (memoized on mount)
+  const [logoPosition] = useState(() => {
+    const positions = [
+      { bottom: '3px', right: '3px' },
+      { bottom: '3px', left: '24px' },
+      { top: '18px', right: '3px' },
+      { top: '18px', left: '24px' },
+    ]
+    return positions[Math.floor(Math.random() * positions.length)]
+  })
+
+  // Boot sequence
+  useEffect(() => {
+    if (deviceState === 'booting') {
+      const bootSequence = async () => {
+        setBootPhase('init')
+        await new Promise(r => setTimeout(r, 350))
+        setBootPhase('motors')
+        await new Promise(r => setTimeout(r, 450))
+        setBootPhase('surface')
+        await new Promise(r => setTimeout(r, 400))
+        setBootPhase('ready')
+        await new Promise(r => setTimeout(r, 300))
+        setDeviceState('online')
+        setBootPhase(null)
+      }
+      bootSequence()
+    }
+  }, [deviceState])
+
+  // Test sequence handler
+  const runTest = useCallback(() => {
+    if (deviceState !== 'online') return
+    setDeviceState('testing')
+    const testSequence = async () => {
+      setTestPhase('motors')
+      await new Promise(r => setTimeout(r, 550))
+      setTestPhase('clamps')
+      await new Promise(r => setTimeout(r, 500))
+      setTestPhase('sensors')
+      await new Promise(r => setTimeout(r, 600))
+      setTestPhase('calibrate')
+      await new Promise(r => setTimeout(r, 500))
+      setTestPhase('complete')
+      await new Promise(r => setTimeout(r, 350))
+      setTestPhase(null)
+      setDeviceState('online')
+    }
+    testSequence()
+  }, [deviceState])
+
+  // Reboot handler
+  const reboot = useCallback(() => {
+    setDeviceState('rebooting')
+    setTestPhase(null)
+    setActiveSlot(null)
+    setTimeout(() => {
+      setDeviceState('booting')
+    }, 700)
+  }, [])
+
+  // Slot select handler
+  const selectSlot = useCallback((slotIndex: number) => {
+    if (deviceState !== 'online') return
+    setActiveSlot(prev => prev === slotIndex ? null : slotIndex)
+  }, [deviceState])
+
+  const getStatusColor = () => {
+    switch (deviceState) {
+      case 'online': return 'var(--neon-green)'
+      case 'booting': return 'var(--neon-cyan)'
+      case 'testing': return 'var(--neon-purple)'
+      case 'rebooting': return 'var(--neon-amber)'
+      case 'offline': return 'var(--neon-red)'
+      default: return 'var(--neon-green)'
+    }
+  }
+
+  // Button shape based on random style
+  const getButtonClass = () => {
+    switch (buttonStyle) {
+      case 'round': return 'rounded-full'
+      case 'square': return 'rounded-sm'
+      case 'pill': return 'rounded-full'
+      default: return 'rounded-full'
+    }
+  }
+
+  const getButtonSize = () => {
+    switch (buttonStyle) {
+      case 'pill': return 'w-4 h-2'
+      default: return 'w-2.5 h-2.5'
+    }
+  }
+
   return (
-    <PanelFrame variant="default" className={cn('p-2', className)}>
-      <div className="flex items-center justify-between mb-1">
-        <div className="font-mono text-[9px] text-[var(--neon-amber)]">
-          PORTABLE WORKBENCH
-        </div>
-        <LED on={isCrafting} color={isCrafting ? 'amber' : 'green'} size="sm" />
-      </div>
-
-      {/* Crafting slots */}
-      <div className="flex gap-1 mb-1">
-        {[0, 1, 2].map((slot) => (
+    <PanelFrame variant="default" className={cn('p-2 relative overflow-hidden', className)}>
+      {/* Thin nano buttons - LEFT SIDE vertical strip */}
+      <div className="absolute left-1 top-1/2 -translate-y-1/2 flex flex-col gap-1.5 z-10">
+        {/* Test button */}
+        <button
+          onClick={runTest}
+          disabled={deviceState !== 'online'}
+          className="group relative"
+          title="Test"
+        >
           <div
-            key={slot}
-            className="flex-1 h-4 bg-black/40 rounded border"
+            className={cn('transition-all border', getButtonClass(), getButtonSize())}
             style={{
-              borderColor: slot < queuedItems ? 'var(--neon-amber)' : 'rgba(255,255,255,0.1)',
-              boxShadow: slot < queuedItems ? 'inset 0 0 4px var(--neon-amber)' : 'none',
+              background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+              borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a',
+              boxShadow: deviceState === 'testing'
+                ? '0 0 5px var(--neon-purple), inset 0 0 2px var(--neon-purple)'
+                : 'inset 0 1px 2px rgba(0,0,0,0.5)',
             }}
-          >
-            {slot < queuedItems && (
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="w-2 h-2 bg-[var(--neon-amber)]/60 rounded-sm" />
-              </div>
-            )}
-          </div>
-        ))}
+          />
+          {/* Illuminated edge */}
+          <div
+            className={cn('absolute inset-0 pointer-events-none', getButtonClass())}
+            style={{
+              border: '1px solid',
+              borderColor: deviceState === 'online' ? 'var(--neon-cyan)' : 'transparent',
+              opacity: deviceState === 'online' ? 0.5 : 0,
+              animation: deviceState === 'testing' ? 'pulse 0.4s ease-in-out infinite' : 'none',
+            }}
+          />
+        </button>
+        {/* Reboot button */}
+        <button
+          onClick={reboot}
+          disabled={deviceState === 'booting' || deviceState === 'rebooting'}
+          className="group relative"
+          title="Reboot"
+        >
+          <div
+            className={cn('transition-all border', getButtonClass(), getButtonSize())}
+            style={{
+              background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+              borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a',
+              boxShadow: deviceState === 'rebooting'
+                ? '0 0 5px var(--neon-amber), inset 0 0 2px var(--neon-amber)'
+                : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+            }}
+          />
+          <div
+            className={cn('absolute inset-0 pointer-events-none', getButtonClass())}
+            style={{
+              border: '1px solid',
+              borderColor: deviceState === 'online' ? 'var(--neon-amber)' : 'transparent',
+              opacity: deviceState === 'online' ? 0.4 : 0,
+              animation: deviceState === 'rebooting' ? 'pulse 0.3s ease-in-out infinite' : 'none',
+            }}
+          />
+        </button>
+        {/* Boot button (power on from offline) */}
+        <button
+          onClick={() => {
+            if (deviceState === 'offline') {
+              setDeviceState('booting')
+            }
+          }}
+          disabled={deviceState !== 'offline'}
+          className="group relative"
+          title="Boot"
+        >
+          <div
+            className={cn('transition-all border', getButtonClass(), getButtonSize())}
+            style={{
+              background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+              borderColor: deviceState === 'offline' ? 'var(--neon-green)' : '#2a2a3a',
+              boxShadow: deviceState === 'offline'
+                ? '0 0 4px var(--neon-green)'
+                : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+              opacity: deviceState === 'offline' ? 1 : 0.3,
+            }}
+          />
+        </button>
       </div>
 
-      {/* Progress bar */}
-      <div className="h-1.5 bg-black/40 rounded overflow-hidden">
+      {/* Company logo - FABX (Fabrication Systems) */}
+      <div
+        className="absolute font-mono text-[5px] text-white/15 pointer-events-none z-0 tracking-wider"
+        style={logoPosition}
+      >
+        FABX
+      </div>
+
+      {/* Header with left margin for buttons */}
+      <div className="flex items-center justify-between mb-1 ml-5">
+        <div className="flex items-center gap-1">
+          <div
+            className="w-1.5 h-1.5 rounded-full"
+            style={{
+              backgroundColor: getStatusColor(),
+              boxShadow: `0 0 4px ${getStatusColor()}`,
+              animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+            }}
+          />
+          <div className="font-mono text-[9px] text-[var(--neon-amber)]">
+            PORTABLE WORKBENCH
+          </div>
+        </div>
+        <div className="font-mono text-[7px] text-white/30">T1</div>
+      </div>
+
+      {/* Crafting slots area - all animations happen inside */}
+      <div className="relative flex gap-1 mb-1 ml-5">
+        {/* Boot animation inside slots area */}
+        {deviceState === 'booting' && bootPhase && (
+          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[6px] text-[var(--neon-cyan)]">
+                {bootPhase === 'init' && 'INIT'}
+                {bootPhase === 'motors' && 'MOTORS'}
+                {bootPhase === 'surface' && 'SURFACE'}
+                {bootPhase === 'ready' && 'READY'}
+              </span>
+              <div className="flex gap-0.5">
+                {['init', 'motors', 'surface', 'ready'].map((phase, i) => (
+                  <div
+                    key={phase}
+                    className="w-1 h-1 rounded-full"
+                    style={{
+                      backgroundColor: ['init', 'motors', 'surface', 'ready'].indexOf(bootPhase) >= i
+                        ? 'var(--neon-cyan)'
+                        : '#333',
+                      boxShadow: bootPhase === phase ? '0 0 4px var(--neon-cyan)' : 'none',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Reboot animation inside slots area */}
+        {deviceState === 'rebooting' && (
+          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
+            <span className="font-mono text-[6px] text-[var(--neon-amber)] animate-pulse">
+              REBOOTING...
+            </span>
+          </div>
+        )}
+
+        {/* Offline state inside slots area */}
+        {deviceState === 'offline' && (
+          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
+            <span className="font-mono text-[6px] text-[var(--neon-red)]">
+              OFFLINE
+            </span>
+          </div>
+        )}
+
+        {/* Test animation inside slots area */}
+        {deviceState === 'testing' && testPhase && (
+          <div className="absolute inset-0 bg-black/80 z-10 flex items-center justify-center rounded">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[6px] text-[var(--neon-purple)]">
+                {testPhase.toUpperCase()}
+              </span>
+              <div className="flex gap-0.5">
+                {['motors', 'clamps', 'sensors', 'calibrate'].map((phase) => (
+                  <div
+                    key={phase}
+                    className="w-1 h-1 rounded-full"
+                    style={{
+                      backgroundColor:
+                        testPhase === phase ? 'var(--neon-purple)' :
+                        ['motors', 'clamps', 'sensors', 'calibrate'].indexOf(phase) <
+                        ['motors', 'clamps', 'sensors', 'calibrate'].indexOf(testPhase || 'motors')
+                          ? 'var(--neon-green)' : '#333',
+                      boxShadow: testPhase === phase ? '0 0 4px var(--neon-purple)' : 'none',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Crafting slot buttons */}
+        {[0, 1, 2].map((slot) => {
+          const hasItem = slot < queuedItems
+          const isActive = activeSlot === slot
+          return (
+            <button
+              key={slot}
+              onClick={() => selectSlot(slot)}
+              disabled={deviceState !== 'online'}
+              className="flex-1 h-4 bg-black/40 rounded border transition-all"
+              style={{
+                borderColor: isActive
+                  ? 'var(--neon-cyan)'
+                  : hasItem ? 'var(--neon-amber)' : 'rgba(255,255,255,0.1)',
+                boxShadow: isActive
+                  ? 'inset 0 0 6px var(--neon-cyan)'
+                  : hasItem ? 'inset 0 0 4px var(--neon-amber)' : 'none',
+              }}
+            >
+              {hasItem && (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div
+                    className="w-2 h-2 rounded-sm transition-all"
+                    style={{
+                      backgroundColor: isActive ? 'var(--neon-cyan)' : 'var(--neon-amber)',
+                      opacity: 0.6,
+                    }}
+                  />
+                </div>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Progress bar with left margin */}
+      <div className="h-1.5 bg-black/40 rounded overflow-hidden ml-5">
         <div
           className="h-full transition-all duration-300"
           style={{
-            width: `${craftingProgress}%`,
+            width: deviceState === 'online' ? `${craftingProgress}%` : '0%',
             background: 'linear-gradient(90deg, var(--neon-amber), var(--neon-orange))',
-            boxShadow: isCrafting ? '0 0 4px var(--neon-amber)' : 'none',
+            boxShadow: isCrafting && deviceState === 'online' ? '0 0 4px var(--neon-amber)' : 'none',
           }}
         />
       </div>
 
-      <div className="flex justify-between font-mono text-[7px] mt-1">
+      <div className="flex justify-between font-mono text-[7px] mt-1 ml-5">
         <span className="text-white/40">QUEUE: {queuedItems}</span>
-        <span className="text-[var(--neon-amber)]">{craftingProgress}%</span>
+        <span className="text-[var(--neon-amber)]">{deviceState === 'online' ? `${craftingProgress}%` : '--'}</span>
       </div>
     </PanelFrame>
   )
