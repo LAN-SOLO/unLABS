@@ -54,6 +54,7 @@ import { ResourceBar } from '@/components/panel/modules/ResourceBar'
 import { VentilationFan } from '@/components/panel/modules/VentilationFan'
 import { NarrowSpeaker } from '@/components/panel/modules/NarrowSpeaker'
 import { ThermalManagerProvider } from '@/contexts/ThermalManager'
+import { PowerManagerProvider } from '@/contexts/PowerManager'
 import type { EquipmentData } from '../terminal/actions/equipment'
 
 interface PanelClientProps {
@@ -118,6 +119,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
   const volatility = equipmentData?.volatility ?? { currentTier: 1, tps: 1000, network: 'unknown' }
 
   return (
+    <PowerManagerProvider>
     <ThermalManagerProvider>
     <WindowManagerProvider className="text-white">
       {/* Top Toolbar */}
@@ -185,11 +187,8 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
           </div>
 
           {/* Voltage display - connected to power management */}
-          <VoltMeter
-            totalGeneration={650}
-            totalConsumption={522}
-            storagePercent={85}
-          />
+          {/* Voltage display - connected to power management context */}
+          <VoltMeter />
 
           {/* Mode indicators */}
           <div className="flex gap-1">
@@ -690,5 +689,6 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
       />
     </WindowManagerProvider>
     </ThermalManagerProvider>
+    </PowerManagerProvider>
   )
 }

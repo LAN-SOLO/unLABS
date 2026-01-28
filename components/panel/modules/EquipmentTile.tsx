@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { PanelFrame } from '../PanelFrame'
 import { Knob } from '../controls/Knob'
 import { LED } from '../controls/LED'
+import { usePowerManagerOptional } from '@/contexts/PowerManager'
 import type { TechTreeProgress } from '@/app/(game)/terminal/actions/equipment'
 
 interface EquipmentTileProps {
@@ -9913,14 +9914,25 @@ interface VoltMeterProps {
 
 export function VoltMeter({
   className,
-  totalGeneration = 650,
-  totalConsumption = 522,
-  storagePercent = 85,
-  storageWh = 850,
-  storageCapacity = 1000,
-  voltage,
+  totalGeneration: propGeneration,
+  totalConsumption: propConsumption,
+  storagePercent: propStoragePercent,
+  storageWh: propStorageWh,
+  storageCapacity: propStorageCapacity,
+  voltage: propVoltage,
   initialMode = 'VOLT',
 }: VoltMeterProps) {
+  // Get power data from context if available
+  const powerManager = usePowerManagerOptional()
+
+  // Use context values if available, otherwise fall back to props or defaults
+  const totalGeneration = powerManager?.totalGeneration ?? propGeneration ?? 650
+  const totalConsumption = powerManager?.totalConsumption ?? propConsumption ?? 902
+  const storagePercent = powerManager?.storagePercent ?? propStoragePercent ?? 85
+  const storageWh = powerManager?.storageWh ?? propStorageWh ?? 850
+  const storageCapacity = powerManager?.storageCapacity ?? propStorageCapacity ?? 1000
+  const voltage = powerManager?.voltage ?? propVoltage
+
   const [mode, setMode] = useState<VoltMeterMode>(initialMode)
   const [displayValue, setDisplayValue] = useState('--.-')
   const [isBooting, setIsBooting] = useState(true)
@@ -9928,10 +9940,11 @@ export function VoltMeter({
 
   // Calculate derived values
   const powerBalance = totalGeneration - totalConsumption
-  const loadPercent = Math.round((totalConsumption / totalGeneration) * 100)
+  const loadPercent = totalGeneration > 0 ? Math.round((totalConsumption / totalGeneration) * 100) : 0
 
-  // Calculate voltage from power balance (base 120V, scales ±20V based on balance)
+  // Calculate voltage from power balance (base 120V, scales based on balance)
   const calculatedVoltage = voltage ?? (() => {
+    if (totalGeneration === 0) return 0
     const balancePercent = powerBalance / totalGeneration
     return 120 + (balancePercent * 20)
   })()
