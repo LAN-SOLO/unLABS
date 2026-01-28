@@ -9926,11 +9926,12 @@ export function VoltMeter({
   const powerManager = usePowerManagerOptional()
 
   // Use context values if available, otherwise fall back to props or defaults
-  const totalGeneration = powerManager?.totalGeneration ?? propGeneration ?? 650
-  const totalConsumption = powerManager?.totalConsumption ?? propConsumption ?? 902
+  // Units: E/s (Energy per second) per GD_SPEC_device-power_v1_0.md
+  const totalGeneration = powerManager?.totalGeneration ?? propGeneration ?? 300
+  const totalConsumption = powerManager?.totalConsumption ?? propConsumption ?? 185
   const storagePercent = powerManager?.storagePercent ?? propStoragePercent ?? 85
-  const storageWh = powerManager?.storageWh ?? propStorageWh ?? 850
-  const storageCapacity = powerManager?.storageCapacity ?? propStorageCapacity ?? 1000
+  const storageE = powerManager?.storageE ?? propStorageWh ?? 4250
+  const storageCapacity = powerManager?.storageCapacity ?? propStorageCapacity ?? 5000
   const voltage = powerManager?.voltage ?? propVoltage
 
   const [mode, setMode] = useState<VoltMeterMode>(initialMode)
@@ -9950,6 +9951,7 @@ export function VoltMeter({
   })()
 
   // Mode definitions with labels and value getters
+  // Units: E/s (Energy per second) per GD_SPEC_device-power_v1_0.md
   const modeConfig: Record<VoltMeterMode, { label: string; getValue: () => string; unit?: string }> = {
     VOLT: {
       label: 'VOLT',
@@ -9957,18 +9959,18 @@ export function VoltMeter({
     },
     GEN: {
       label: 'GEN',
-      getValue: () => String(totalGeneration),
-      unit: 'W',
+      getValue: () => totalGeneration.toFixed(1),
+      unit: 'E/s',
     },
     LOAD: {
       label: 'LOAD',
-      getValue: () => String(totalConsumption),
-      unit: 'W',
+      getValue: () => totalConsumption.toFixed(1),
+      unit: 'E/s',
     },
     BAL: {
       label: 'BAL',
-      getValue: () => (powerBalance >= 0 ? '+' : '') + String(powerBalance),
-      unit: 'W',
+      getValue: () => (powerBalance >= 0 ? '+' : '') + powerBalance.toFixed(1),
+      unit: 'E/s',
     },
     BAT: {
       label: 'BAT',

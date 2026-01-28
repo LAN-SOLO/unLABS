@@ -1729,48 +1729,57 @@ const powerCommand: Command = {
     const target = args[1]?.toLowerCase()
     const param = args[2]?.toLowerCase()
 
-    // Power source definitions
+    // Power source definitions (from GD_SPEC_device-power_v1_0.md)
+    // Units: E/s (Energy per second)
     const powerSources = [
-      { id: 'UEC-001', name: 'Unstable Energy Core', output: 150, maxOutput: 200, status: 'online', efficiency: 75, tier: 1 },
-      { id: 'MFR-001', name: 'Microfusion Reactor', output: 500, maxOutput: 600, status: 'online', efficiency: 92, tier: 2 },
+      { id: 'UEC-001', name: 'Unstable Energy Core', output: 50, maxOutput: 50, status: 'online', efficiency: 75, tier: 1 },
+      { id: 'MFR-001', name: 'Microfusion Reactor', output: 250, maxOutput: 250, status: 'online', efficiency: 92, tier: 2 },
     ]
 
-    // Power storage definitions
+    // Power storage definitions (from GD_SPEC_device-power_v1_0.md)
     const powerStorage = [
-      { id: 'BAT-001', name: 'Battery Pack', stored: 850, capacity: 1000, status: 'charging', chargeRate: 25 },
+      { id: 'BAT-001', name: 'Battery Pack', stored: 4250, capacity: 5000, status: 'charging', chargeRate: 100 },
     ]
 
-    // Consuming devices with power draw
+    // Consuming devices with power draw (idle state values from GD_SPEC_device-power_v1_0.md)
+    // Most devices run in idle mode during normal operation
     const powerConsumers = [
-      { id: 'CDC-001', name: 'Crystal Data Cache', draw: 15, priority: 1, status: 'on' },
-      { id: 'HMS-001', name: 'Handmade Synthesizer', draw: 45, priority: 2, status: 'on' },
-      { id: 'ECR-001', name: 'Echo Recorder', draw: 20, priority: 2, status: 'on' },
-      { id: 'INT-001', name: 'Interpolator', draw: 30, priority: 2, status: 'on' },
-      { id: 'AIC-001', name: 'AI Assistant Core', draw: 80, priority: 1, status: 'on' },
-      { id: 'SCA-001', name: 'Supercomputer Array', draw: 150, priority: 3, status: 'on' },
-      { id: 'EXD-001', name: 'Explorer Drone', draw: 35, priority: 3, status: 'standby' },
-      { id: 'RMG-001', name: 'Resource Magnet', draw: 25, priority: 3, status: 'on' },
-      { id: 'ATK-001', name: 'Abstractum Tank', draw: 10, priority: 1, status: 'on' },
-      { id: 'EMC-001', name: 'Exotic Matter Contain.', draw: 120, priority: 1, status: 'on' },
-      { id: 'VNT-001', name: 'Ventilation System', draw: 40, priority: 1, status: 'on' },
-      { id: 'OSC-001', name: 'Oscilloscope Array', draw: 25, priority: 2, status: 'on' },
-      { id: 'QAN-001', name: 'Quantum Analyzer', draw: 60, priority: 2, status: 'on' },
-      { id: 'QSM-001', name: 'Quantum State Monitor', draw: 55, priority: 2, status: 'on' },
-      { id: 'NET-001', name: 'Network Monitor', draw: 20, priority: 2, status: 'on' },
-      { id: 'TMP-001', name: 'Temperature Monitor', draw: 5, priority: 1, status: 'on' },
-      { id: 'DIM-001', name: 'Dimension Monitor', draw: 40, priority: 2, status: 'on' },
-      { id: 'CPU-001', name: 'CPU Monitor', draw: 10, priority: 1, status: 'on' },
-      { id: 'CLK-001', name: 'Lab Clock', draw: 2, priority: 1, status: 'on' },
-      { id: 'MEM-001', name: 'Memory Monitor', draw: 8, priority: 1, status: 'on' },
-      { id: 'AND-001', name: 'Anomaly Detector', draw: 45, priority: 2, status: 'on' },
-      { id: 'QCP-001', name: 'Quantum Compass', draw: 30, priority: 3, status: 'on' },
-      { id: 'TLP-001', name: 'Teleport Pad', draw: 200, priority: 4, status: 'standby' },
-      { id: 'DGN-001', name: 'Diagnostics Console', draw: 35, priority: 1, status: 'on' },
-      { id: 'THM-001', name: 'Thermal Manager', draw: 15, priority: 1, status: 'on' },
-      { id: 'LCT-001', name: 'Precision Laser', draw: 75, priority: 3, status: 'standby' },
-      { id: 'P3D-001', name: '3D Fabricator', draw: 90, priority: 3, status: 'standby' },
-      { id: 'BTK-001', name: 'Basic Toolkit', draw: 5, priority: 2, status: 'on' },
-      { id: 'MSC-001', name: 'Material Scanner', draw: 12, priority: 2, status: 'on' },
+      // Heavy Consumers
+      { id: 'SCA-001', name: 'Supercomputer Array', draw: 45, priority: 3, status: 'on', category: 'heavy' },
+      { id: 'TLP-001', name: 'Teleport Pad', draw: 3, priority: 4, status: 'standby', category: 'heavy' },
+      { id: 'QAN-001', name: 'Quantum Analyzer', draw: 20, priority: 2, status: 'on', category: 'heavy' },
+      { id: 'EMC-001', name: 'Exotic Matter Contain.', draw: 40, priority: 1, status: 'on', category: 'heavy' },
+      { id: 'P3D-001', name: '3D Fabricator', draw: 2, priority: 3, status: 'standby', category: 'heavy' },
+      { id: 'LCT-001', name: 'Precision Laser', draw: 2, priority: 3, status: 'standby', category: 'heavy' },
+      { id: 'EXD-001', name: 'Explorer Drone', draw: 1, priority: 3, status: 'standby', category: 'heavy' },
+      { id: 'AIC-001', name: 'AI Assistant Core', draw: 12, priority: 1, status: 'on', category: 'heavy' },
+      // Medium Consumers
+      { id: 'QSM-001', name: 'Quantum State Monitor', draw: 7, priority: 2, status: 'on', category: 'medium' },
+      { id: 'INT-001', name: 'Interpolator', draw: 6, priority: 2, status: 'on', category: 'medium' },
+      { id: 'OSC-001', name: 'Oscilloscope Array', draw: 5, priority: 2, status: 'on', category: 'medium' },
+      { id: 'CDC-001', name: 'Crystal Data Cache', draw: 5, priority: 1, status: 'on', category: 'medium' },
+      { id: 'AND-001', name: 'Anomaly Detector', draw: 4, priority: 2, status: 'on', category: 'medium' },
+      { id: 'RMG-001', name: 'Resource Magnet', draw: 3, priority: 3, status: 'on', category: 'medium' },
+      { id: 'HMS-001', name: 'Handmade Synthesizer', draw: 3, priority: 2, status: 'on', category: 'medium' },
+      { id: 'ECR-001', name: 'Echo Recorder', draw: 2, priority: 2, status: 'on', category: 'medium' },
+      // Light Consumers
+      { id: 'VNT-001', name: 'Ventilation System', draw: 2, priority: 1, status: 'on', category: 'light' },
+      { id: 'THM-001', name: 'Thermal Manager', draw: 1.5, priority: 1, status: 'on', category: 'light' },
+      { id: 'DIM-001', name: 'Dimension Monitor', draw: 1.5, priority: 2, status: 'on', category: 'light' },
+      { id: 'MSC-001', name: 'Material Scanner', draw: 1, priority: 2, status: 'on', category: 'light' },
+      { id: 'NET-001', name: 'Network Monitor', draw: 1.5, priority: 2, status: 'on', category: 'light' },
+      { id: 'DGN-001', name: 'Diagnostics Console', draw: 1, priority: 1, status: 'on', category: 'light' },
+      { id: 'SPK-001', name: 'Narrow Speaker', draw: 0.5, priority: 3, status: 'on', category: 'light' },
+      { id: 'QCP-001', name: 'Quantum Compass', draw: 0.8, priority: 3, status: 'on', category: 'light' },
+      { id: 'PWR-001', name: 'Power Management Sys.', draw: 2.5, priority: 1, status: 'on', category: 'light' },
+      { id: 'BTK-001', name: 'Basic Toolkit', draw: 0.3, priority: 2, status: 'on', category: 'light' },
+      { id: 'CPU-001', name: 'CPU Monitor', draw: 0.8, priority: 1, status: 'on', category: 'light' },
+      { id: 'MEM-001', name: 'Memory Monitor', draw: 0.6, priority: 1, status: 'on', category: 'light' },
+      { id: 'TMP-001', name: 'Temperature Monitor', draw: 0.8, priority: 1, status: 'on', category: 'light' },
+      { id: 'ATK-001', name: 'Abstractum Tank', draw: 0.3, priority: 1, status: 'on', category: 'light' },
+      { id: 'PWD-001', name: 'Power Display Panel', draw: 1, priority: 1, status: 'on', category: 'light' },
+      { id: 'CLK-001', name: 'Lab Clock', draw: 0.5, priority: 1, status: 'on', category: 'light' },
+      { id: 'VLT-001', name: 'Volt Meter Display', draw: 0.8, priority: 1, status: 'on', category: 'light' },
     ]
 
     // Calculate totals
@@ -1783,10 +1792,18 @@ const powerCommand: Command = {
     const powerBalance = totalGeneration - totalConsumption
     const loadPercent = Math.round((totalConsumption / totalGeneration) * 100)
 
+    // Determine status based on surplus percentage (per GD_SPEC_device-power_v1_0.md)
+    const surplusPercent = totalGeneration > 0 ? (powerBalance / totalGeneration) * 100 : 0
+    const getStatus = () => {
+      if (surplusPercent > 20) return { indicator: 'OPTIMAL', color: '●' }
+      if (surplusPercent >= 0) return { indicator: 'CAUTION', color: '!' }
+      if (surplusPercent > -20) return { indicator: 'CRITICAL', color: '!' }
+      return { indicator: 'EMERGENCY', color: '!' }
+    }
+
     // Default: show status overview
     if (!action || action === 'status') {
-      const statusIndicator = powerBalance >= 0 ? 'NOMINAL' : 'DEFICIT'
-      const statusColor = powerBalance >= 0 ? '●' : '!'
+      const status = getStatus()
 
       return {
         success: true,
@@ -1800,13 +1817,13 @@ const powerCommand: Command = {
           '  ╔═══════════════════════════════════════════════════════════╗',
           '  ║  POWER GRID OVERVIEW                                      ║',
           '  ╠═══════════════════════════════════════════════════════════╣',
-          `  ║  GENERATION   : ${totalGeneration.toString().padStart(6)} W  (max ${totalMaxGeneration} W)              ║`,
-          `  ║  CONSUMPTION  : ${totalConsumption.toString().padStart(6)} W  (${activeConsumers.length} devices active)          ║`,
-          `  ║  BALANCE      : ${(powerBalance >= 0 ? '+' : '') + powerBalance.toString().padStart(5)} W                              ║`,
-          `  ║  LOAD         : ${loadPercent.toString().padStart(6)}%                                   ║`,
+          `  ║  GENERATION   : ${totalGeneration.toFixed(1).padStart(7)} E/s  (max ${totalMaxGeneration} E/s)          ║`,
+          `  ║  CONSUMPTION  : ${totalConsumption.toFixed(1).padStart(7)} E/s  (${activeConsumers.length} devices active)        ║`,
+          `  ║  BALANCE      : ${(powerBalance >= 0 ? '+' : '') + powerBalance.toFixed(1).padStart(6)} E/s                            ║`,
+          `  ║  LOAD         : ${loadPercent.toString().padStart(7)}%                                   ║`,
           '  ╠═══════════════════════════════════════════════════════════╣',
-          `  ║  STORAGE      : ${totalStorage.toString().padStart(6)} / ${totalCapacity} Wh  (${Math.round(totalStorage/totalCapacity*100)}%)              ║`,
-          `  ║  STATUS       : ${statusColor} ${statusIndicator.padEnd(44)} ║`,
+          `  ║  STORAGE      : ${totalStorage.toString().padStart(6)} / ${totalCapacity} E  (${Math.round(totalStorage/totalCapacity*100)}%)                ║`,
+          `  ║  STATUS       : ${status.color} ${status.indicator.padEnd(44)} ║`,
           '  ╚═══════════════════════════════════════════════════════════╝',
           '',
           '  ╔═══════════════════════════════════════════════════════════╗',
@@ -1815,17 +1832,17 @@ const powerCommand: Command = {
           '  ║  ID        OUTPUT      MAX       EFF    STATUS            ║',
           '  ║  ───────   ─────────   ───────   ────   ──────            ║',
           ...powerSources.map(s =>
-            `  ║  ${s.id}   ${s.output.toString().padStart(4)} W      ${s.maxOutput.toString().padStart(4)} W    ${s.efficiency}%   ${s.status.toUpperCase().padEnd(8)}      ║`
+            `  ║  ${s.id}   ${s.output.toString().padStart(4)} E/s    ${s.maxOutput.toString().padStart(4)} E/s  ${s.efficiency}%   ${s.status.toUpperCase().padEnd(8)}      ║`
           ),
           '  ╚═══════════════════════════════════════════════════════════╝',
           '',
           '  ╔═══════════════════════════════════════════════════════════╗',
           '  ║  STORAGE BANKS                                            ║',
           '  ╠═══════════════════════════════════════════════════════════╣',
-          '  ║  ID        STORED     CAPACITY  RATE    STATUS            ║',
-          '  ║  ───────   ────────   ────────  ─────   ──────            ║',
+          '  ║  ID        STORED     CAPACITY  RATE     STATUS           ║',
+          '  ║  ───────   ────────   ────────  ───────  ──────           ║',
           ...powerStorage.map(s =>
-            `  ║  ${s.id}   ${s.stored.toString().padStart(5)} Wh   ${s.capacity.toString().padStart(5)} Wh  +${s.chargeRate}W   ${s.status.toUpperCase().padEnd(10)}  ║`
+            `  ║  ${s.id}   ${s.stored.toString().padStart(5)} E    ${s.capacity.toString().padStart(5)} E   +${s.chargeRate} E/s  ${s.status.toUpperCase().padEnd(10)} ║`
           ),
           '  ╚═══════════════════════════════════════════════════════════╝',
           '',
@@ -1848,16 +1865,16 @@ const powerCommand: Command = {
           '│                   POWER CONSUMERS                           │',
           '└─────────────────────────────────────────────────────────────┘',
           '',
-          '  ID        DEVICE                  DRAW    PRI  STATUS',
-          '  ───────   ────────────────────    ─────   ───  ──────',
+          '  ID        DEVICE                  DRAW      PRI  STATUS',
+          '  ───────   ────────────────────    ────────  ───  ──────',
           ...sortedConsumers.map(c =>
-            `  ${c.id}   ${c.name.padEnd(20)}  ${c.draw.toString().padStart(4)} W   P${c.priority}   ${c.status.toUpperCase()}`
+            `  ${c.id}   ${c.name.padEnd(20)}  ${c.draw.toFixed(1).padStart(6)} E/s  P${c.priority}   ${c.status.toUpperCase()}`
           ),
           '',
           '  ─────────────────────────────────────────────────────────────',
-          `  TOTAL ACTIVE DRAW: ${totalConsumption} W (${activeConsumers.length}/${powerConsumers.length} devices)`,
-          `  AVAILABLE POWER:   ${totalGeneration} W`,
-          `  HEADROOM:          ${powerBalance >= 0 ? '+' : ''}${powerBalance} W`,
+          `  TOTAL ACTIVE DRAW: ${totalConsumption.toFixed(1)} E/s (${activeConsumers.length}/${powerConsumers.length} devices)`,
+          `  AVAILABLE POWER:   ${totalGeneration.toFixed(1)} E/s`,
+          `  HEADROOM:          ${powerBalance >= 0 ? '+' : ''}${powerBalance.toFixed(1)} E/s`,
           '',
           '  Priority Levels:',
           '    P1 = Critical (always on)  P2 = Standard operations',
@@ -1882,8 +1899,8 @@ const powerCommand: Command = {
           '  ┌─────────────────┐     ┌─────────────────┐',
           '  │   UEC-001       │     │   MFR-001       │',
           '  │ Unstable Core   │     │ Microfusion     │',
-          '  │   150W / 200W   │     │   500W / 600W   │',
-          '  │   [####----]    │     │   [########-]   │',
+          '  │   50 E/s (T1)   │     │  250 E/s (T2)   │',
+          '  │   [##########]  │     │   [##########]  │',
           '  └────────┬────────┘     └────────┬────────┘',
           '           │                       │',
           '           └───────────┬───────────┘',
@@ -1892,15 +1909,15 @@ const powerCommand: Command = {
           '           ┌─────────────────────────┐',
           '           │     MAIN POWER BUS      │',
           '           │  ════════════════════   │',
-          '           │     650W AVAILABLE      │',
+          '           │     300 E/s AVAILABLE   │',
           '           └───────────┬─────────────┘',
           '                       │',
           '           ┌───────────┴───────────┐',
           '           ▼                       ▼',
           '  ┌─────────────────┐     ┌─────────────────┐',
           '  │   BAT-001       │     │   LOAD CENTER   │',
-          '  │ Battery Pack    │     │   29 Devices    │',
-          `  │   850 / 1000 Wh │     │   ${totalConsumption}W Draw      │`,
+          '  │ Battery Pack    │     │   36 Devices    │',
+          `  │  4250 / 5000 E  │     │  ${totalConsumption.toFixed(1)} E/s Draw  │`,
           '  │   [########--]  │     │   [###########] │',
           '  └─────────────────┘     └─────────────────┘',
           '',
@@ -1949,7 +1966,7 @@ const powerCommand: Command = {
         return {
           success: false,
           error: `insufficient power to activate ${device.id}\n` +
-            `required: ${device.draw}W | available: ${totalGeneration - totalConsumption}W\n` +
+            `required: ${device.draw} E/s | available: ${(totalGeneration - totalConsumption).toFixed(1)} E/s\n` +
             `consider shutting down non-essential devices first.`,
         }
       }
@@ -1964,8 +1981,8 @@ const powerCommand: Command = {
           '[power] system handshake................. OK',
           '',
           `[power] ${device.id} is now ONLINE`,
-          `[power] power draw: ${device.draw}W`,
-          `[power] new total consumption: ${newConsumption}W`,
+          `[power] power draw: ${device.draw} E/s`,
+          `[power] new total consumption: ${newConsumption.toFixed(1)} E/s`,
           '',
         ],
       }
@@ -2021,8 +2038,8 @@ const powerCommand: Command = {
           '[power] disconnecting power.............. OK',
           '',
           `[power] ${device.id} is now OFFLINE`,
-          `[power] power saved: ${device.draw}W`,
-          `[power] new total consumption: ${totalConsumption - device.draw}W`,
+          `[power] power saved: ${device.draw} E/s`,
+          `[power] new total consumption: ${(totalConsumption - device.draw).toFixed(1)} E/s`,
           '',
         ],
       }
@@ -2108,14 +2125,14 @@ const powerCommand: Command = {
           '[SHUTDOWN] P1 devices (critical) maintained....... OK',
           '',
           `[RESULT] ${nonCritical.length} devices shut down`,
-          `[RESULT] ${savedPower}W power saved`,
+          `[RESULT] ${savedPower.toFixed(1)} E/s power saved`,
           `[RESULT] Battery backup engaged`,
           '',
           '┌─────────────────────────────────────────────────────────────┐',
           '│  CRITICAL SYSTEMS MAINTAINED:                               │',
           '└─────────────────────────────────────────────────────────────┘',
           ...powerConsumers.filter(c => c.priority === 1).map(c =>
-            `  ● ${c.id}  ${c.name.padEnd(24)} ${c.draw}W`
+            `  ● ${c.id}  ${c.name.padEnd(24)} ${c.draw} E/s`
           ),
           '',
           '[NOTICE] Lab running on minimum power mode.',
