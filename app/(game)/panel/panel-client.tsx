@@ -48,6 +48,7 @@ import {
   CpuMonitor,
   LabClock,
   MemoryMonitor,
+  VoltMeter,
 } from '@/components/panel/modules/EquipmentTile'
 import { ResourceBar } from '@/components/panel/modules/ResourceBar'
 import { VentilationFan } from '@/components/panel/modules/VentilationFan'
@@ -183,11 +184,12 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
             </button>
           </div>
 
-          {/* Voltage display */}
-          <div className="flex items-center gap-2 bg-black px-3 py-1 rounded border border-[var(--neon-amber)]/30">
-            <span className="font-mono text-[10px] text-white/40">VOLT</span>
-            <span className="font-mono text-lg text-[var(--neon-amber)] text-glow-amber">i28.0</span>
-          </div>
+          {/* Voltage display - connected to power management */}
+          <VoltMeter
+            totalGeneration={650}
+            totalConsumption={522}
+            storagePercent={85}
+          />
 
           {/* Mode indicators */}
           <div className="flex gap-1">
