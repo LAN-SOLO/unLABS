@@ -190,10 +190,31 @@ const helpCommand: Command = {
       '|  research  - view tech tree progress                       |',
       '|  scan      - scan for volatility data                      |',
       '+------------------------------------------------------------+',
+      '|                     filesystem                              |',
+      '+------------------------------------------------------------+',
+      '|  ls        - list directory contents (dir)                  |',
+      '|  cd        - change directory                               |',
+      '|  pwd       - print working directory                        |',
+      '|  cat       - display file contents                          |',
+      '|  mkdir     - create directory (-p for parents)              |',
+      '|  touch     - create empty file                              |',
+      '|  rm        - remove file/directory (-r recursive)           |',
+      '|  tree      - display directory tree                         |',
+      '|  chmod     - change file permissions                        |',
+      '+------------------------------------------------------------+',
+      '|                  user management                            |',
+      '+------------------------------------------------------------+',
+      '|  whoami    - display current user                           |',
+      '|  id        - show user/group info                           |',
+      '|  su        - switch user                                    |',
+      '|  sudo      - run command as root                            |',
+      '|  passwd    - change password (simulated)                    |',
+      '|  useradd   - create new user (root only)                    |',
+      '|  groups    - show user groups                               |',
+      '+------------------------------------------------------------+',
       '|                       other                                |',
       '+------------------------------------------------------------+',
       '|  history   - view command history                          |',
-      '|  whoami    - display operator information                  |',
       '|  echo      - echo text back                                |',
       '|  about     - about UnstableLabs                            |',
       '+------------------------------------------------------------+',
@@ -214,8 +235,9 @@ const helpCommand: Command = {
       '|  device names: cache, core, battery, synth, recorder,      |',
       '|    reactor, ai, super, drone, magnet, tank, exotic, qsm,   |',
       '|    net, temp, dim, cpu, clock, mem, anomaly, compass,      |',
-      '|    teleport, vent, diag, laser, printer, thermal, toolkit, |',
-      '|    scanner, workbench, bench, power, volt, powerdisplay    |',
+      '|    teleport, vent, matrix, qsm, diag, laser, printer,      |',
+      '|    thermal, toolkit, scanner, workbench, bench, power,     |',
+      '|    volt, powerdisplay                                       |',
       '+------------------------------------------------------------+',
       '|                      thermal                               |',
       '+------------------------------------------------------------+',
@@ -239,6 +261,129 @@ const helpCommand: Command = {
       '|             power fault       - show fault diagnostics     |',
       '|             power emergency   - emergency shutdown         |',
       '+------------------------------------------------------------+',
+      '|                   screw buttons                            |',
+      '+------------------------------------------------------------+',
+      '|  screwstat  - screw button status overview (sbs, screws)  |',
+      '|  nodesync   - NODE-SYNC network control (ns)              |',
+      '|  poollink   - POOL-LINK mining pool (pl, pool)            |',
+      '|  meshcast   - MESH-CAST broadcasting (mc, meme)           |',
+      '|  qbridge    - QUANTUM-BRIDGE link (qb, bridge)            |',
+      '+------------------------------------------------------------+',
+      '|                   crystal data cache                       |',
+      '+------------------------------------------------------------+',
+      '|  cdc        - crystal data cache management (CDC-001)      |',
+      '|             cdc status         - show device status        |',
+      '|             cdc power [on|off] - toggle power/standby      |',
+      '|             cdc firmware       - view firmware info        |',
+      '|             cdc firmware update - check for updates        |',
+      '|             cdc test           - run hardware diagnostics  |',
+      '|             cdc reset          - reboot device             |',
+      '|             cdc info           - full documentation        |',
+      '+------------------------------------------------------------+',
+      '|                  unstable energy core                      |',
+      '+------------------------------------------------------------+',
+      '|  uec        - energy core management (UEC-001)             |',
+      '|             uec status         - show device status        |',
+      '|             uec power [on|off] - toggle power/standby      |',
+      '|             uec firmware       - view firmware info        |',
+      '|             uec firmware update - check for updates        |',
+      '|             uec test           - run hardware diagnostics  |',
+      '|             uec reset          - reboot device             |',
+      '|             uec info           - full documentation        |',
+      '+------------------------------------------------------------+',
+      '|                  portable battery pack                     |',
+      '+------------------------------------------------------------+',
+      '|  bat        - battery pack management (BAT-001)            |',
+      '|             bat status         - show battery status       |',
+      '|             bat power [on|off] - toggle power/standby      |',
+      '|             bat firmware       - view firmware info        |',
+      '|             bat firmware update - check for updates        |',
+      '|             bat test           - run battery diagnostics   |',
+      '|             bat reset          - reboot device             |',
+      '|             bat regen [on|off] - toggle auto-regeneration  |',
+      '|             bat info           - full documentation        |',
+      '+------------------------------------------------------------+',
+      '|                  handmade synthesizer                      |',
+      '+------------------------------------------------------------+',
+      '|  hms        - synthesizer management (HMS-001)             |',
+      '|             hms status         - show synth status         |',
+      '|             hms power [on|off] - toggle power/standby      |',
+      '|             hms firmware       - view firmware info        |',
+      '|             hms firmware update - check for updates        |',
+      '|             hms test           - run synth diagnostics     |',
+      '|             hms reset          - reboot device             |',
+      '|             hms wave [type]    - set waveform type         |',
+      '|             hms knob [k] [val] - adjust knob values        |',
+      '|             hms info           - full documentation        |',
+      '+------------------------------------------------------------+',
+      '|                     echo recorder                         |',
+      '+------------------------------------------------------------+',
+      '|  ecr        - echo recorder management (ECR-001)          |',
+      '|             ecr status         - show recorder status     |',
+      '|             ecr power [on|off] - toggle power/standby     |',
+      '|             ecr firmware       - view firmware info       |',
+      '|             ecr firmware update - check for updates       |',
+      '|             ecr test           - run recorder diagnostics |',
+      '|             ecr reset          - reboot device            |',
+      '|             ecr record [on|off] - toggle recording mode   |',
+      '|             ecr knob [k] [val] - adjust knob values       |',
+      '|             ecr info           - full documentation       |',
+      '+------------------------------------------------------------+',
+      '|                      interpolator                         |',
+      '+------------------------------------------------------------+',
+      '|  ipl        - interpolator management (INT-001)           |',
+      '|             ipl status         - show device status       |',
+      '|             ipl power [on|off] - toggle power/standby     |',
+      '|             ipl firmware       - view firmware info       |',
+      '|             ipl firmware update - check for updates       |',
+      '|             ipl test           - run diagnostics          |',
+      '|             ipl reset          - reboot device            |',
+      '|             ipl info           - full documentation       |',
+      '+------------------------------------------------------------+',
+      '|                   microfusion reactor                     |',
+      '+------------------------------------------------------------+',
+      '|  mfr        - reactor management (MFR-001)                |',
+      '|             mfr status         - show reactor status      |',
+      '|             mfr power [on|off] - ignite/SCRAM reactor     |',
+      '|             mfr firmware       - view firmware info       |',
+      '|             mfr firmware update - check for updates       |',
+      '|             mfr test           - run diagnostics          |',
+      '|             mfr reset          - reboot reactor           |',
+      '|             mfr info           - full documentation       |',
+      '+------------------------------------------------------------+',
+      '|                   ai assistant core                       |',
+      '+------------------------------------------------------------+',
+      '|  aic        - AI core management (AIC-001)               |',
+      '|             aic status         - show core status        |',
+      '|             aic power [on|off] - boot/shutdown core      |',
+      '|             aic firmware       - view firmware info      |',
+      '|             aic firmware update - check for updates      |',
+      '|             aic test           - run neural diagnostics  |',
+      '|             aic reset          - reboot neural core      |',
+      '|             aic learn [on|off] - toggle learning mode    |',
+      '|             aic info           - full documentation      |',
+      '|  emc        - exotic matter containment (EMC-001)           |',
+      '|  qua        - quantum analyzer (QUA-001)                  |',
+      '|  qsm        - quantum state monitor (QSM-001)             |',
+      '|  vnt        - ventilation management (VNT-001)           |',
+      '|  sca        - supercomputer management (SCA-001)         |',
+      '|  exd        - explorer drone management (EXD-001)        |',
+      '|             vnt status         - show fan status          |',
+      '|             vnt power [on|off] - boot/shutdown system     |',
+      '|             vnt fan <id> <cmd> - control individual fan   |',
+      '|             vnt test           - run fan diagnostics      |',
+      '|             vnt reset          - reboot fan controller    |',
+      '|             vnt info           - full documentation       |',
+      '+------------------------------------------------------------+',
+      '|                      display                               |',
+      '+------------------------------------------------------------+',
+      '|  theme    - CRT theme manager                              |',
+      '|             theme list       - show all themes             |',
+      '|             theme set <name|#> - set active theme          |',
+      '|             theme get        - show current theme          |',
+      '|             theme save       - save to ~/.themerc          |',
+      '|             theme load       - load from ~/.themerc        |',
+      '+------------------------------------------------------------+',
       '|                      system                                |',
       '+------------------------------------------------------------+',
       '|  unsystemctl - system control (reboot, poweroff, status)   |',
@@ -248,6 +393,18 @@ const helpCommand: Command = {
       '       run panel dev -un | kill panel dev -un',
       '       thermal fan cpu 75 | thermal auto on',
       '       power status | power on tlp-001 | power emergency -now',
+      '       cdc status | cdc power off | cdc firmware update',
+      '       uec status | uec power off | uec firmware update',
+      '       bat status | bat power off | bat regen on',
+      '       hms status | hms wave sine | hms knob p 50',
+      '       ecr status | ecr record on | ecr knob p 50',
+      '       ipl status | ipl power on | ipl firmware update',
+      '       mfr status | mfr power on | mfr test',
+      '       aic status | aic power on | aic learn off',
+      '       vnt status | vnt fan cpu mode auto | vnt power on',
+      '       sca status | sca test | sca power on',
+      '       exd status | exd power on | exd deploy',
+      '       theme list | theme set amber | theme save',
       '       unsystemctl shutdown -now | unsystemctl reboot -now',
       'type a command and press enter to execute.',
       '',
@@ -467,30 +624,39 @@ const scanCommand: Command = {
 const whoamiCommand: Command = {
   name: 'whoami',
   aliases: ['who'],
-  description: 'Display operator information',
+  description: 'Display current user information',
   execute: async (_args, ctx) => {
-    ctx.setTyping(true)
-    const balance = await ctx.data.fetchBalance()
-    const crystals = await ctx.data.fetchCrystals()
-    ctx.setTyping(false)
+    const userActions = ctx.data.userActions
+    if (userActions) {
+      const user = userActions.getCurrentUser()
+      ctx.setTyping(true)
+      const balance = await ctx.data.fetchBalance()
+      const crystals = await ctx.data.fetchCrystals()
+      ctx.setTyping(false)
+      const total = balance ? balance.available + balance.staked + balance.locked : 0
+      const output = [
+        '',
+        '+-------------------------------------+',
+        '|         USER PROFILE                |',
+        '+-------------------------------------+',
+        `|  USER     : ${user.username.padEnd(22)} |`,
+        `|  UID      : ${user.uid.toString().padEnd(22)} |`,
+        `|  GROUPS   : ${user.groups.join(',').padEnd(22)} |`,
+        `|  HOME     : ${user.home.padEnd(22)} |`,
+        `|  ROOT     : ${(user.isRoot ? 'YES' : 'NO').padEnd(22)} |`,
+        '+-------------------------------------+',
+        `|  SESSION  : ${ctx.userId.slice(0, 20).padEnd(22)} |`,
+        '+-------------------------------------+',
+        `|  BALANCE  : ${total.toFixed(2).padStart(10)} _unSC        |`,
+        `|  CRYSTALS : ${crystals.length.toString().padStart(10)}            |`,
+        '+-------------------------------------+',
+        '',
+      ]
+      return { success: true, output }
+    }
 
-    const total = balance ? balance.available + balance.staked + balance.locked : 0
-
-    const output = [
-      '',
-      '+-------------------------------------+',
-      '|         OPERATOR PROFILE            |',
-      '+-------------------------------------+',
-      `|  USERNAME : ${(ctx.username || 'UNKNOWN').padEnd(22)} |`,
-      `|  SESSION  : ${ctx.userId.slice(0, 20).padEnd(22)} |`,
-      `|  LEVEL    : INITIATE                |`,
-      '+-------------------------------------+',
-      `|  BALANCE  : ${total.toFixed(2).padStart(10)} _unSC        |`,
-      `|  CRYSTALS : ${crystals.length.toString().padStart(10)}            |`,
-      '+-------------------------------------+',
-      '',
-    ]
-    return { success: true, output }
+    // Fallback when userActions not available
+    return { success: true, output: [ctx.username || 'UNKNOWN'] }
   },
 }
 
@@ -858,11 +1024,14 @@ const unsystemctlCommand: Command = {
         '',
       ]
 
+      // Save device state before reboot
+      ctx.data.saveAllDeviceState?.()
+
       return {
         success: true,
         output: rebootWithPanelRestart,
-        navigate: '/panel',
-        // Don't clear panel access - keep it so panel loads
+        refresh: true, // Force page refresh for authentic reboot experience
+        // Panel access is preserved so user stays logged in
       }
     }
 
@@ -935,6 +1104,10 @@ const unsystemctlCommand: Command = {
         '> Panel shutdown complete. Returning to terminal...',
         '',
       ]
+
+      // Save device state before shutdown
+      ctx.data.saveAllDeviceState?.()
+
       return { success: true, output, navigate: '/terminal', clearPanelAccess: true }
     }
 
@@ -950,7 +1123,7 @@ const killCommand: Command = {
   aliases: ['stop', 'shutdown'],
   description: 'Shut down a subsystem module',
   usage: 'kill <module> <mode> [flags]',
-  execute: async (args, _ctx) => {
+  execute: async (args, ctx) => {
     const module = args[0]?.toLowerCase()
     const mode = args[1]?.toLowerCase()
     const flags = args.slice(2).join(' ')
@@ -976,6 +1149,9 @@ const killCommand: Command = {
           error: 'access denied. flag -un required.\nusage: kill panel dev -un',
         }
       }
+
+      // Save device state before shutdown
+      ctx.data.saveAllDeviceState?.()
 
       return { success: true, output: PANEL_SHUTDOWN_SEQUENCE, navigate: '/terminal', clearPanelAccess: true }
     }
@@ -1101,7 +1277,7 @@ const deviceCommand: Command = {
           '  VNT-001   Ventilation System      v1.0.0    ONLINE    ',
           '  SPK-001   Narrow Speaker          v1.0.0    ONLINE    ',
           '  OSC-001   Oscilloscope Array      v4.6.0    ONLINE    ',
-          '  QAN-001   Quantum Analyzer        v3.7.2    ONLINE    ',
+          `  QAN-001   Quantum Analyzer        v3.7.2    ${ctx.data.quaDevice?.getState().isPowered ? 'ONLINE' : 'STANDBY'}   `,
           '  QSM-001   Quantum State Monitor   v1.2.0    ONLINE    ',
           '  NET-001   Network Monitor         v2.1.0    ONLINE    ',
           '  TMP-001   Temperature Monitor     v1.0.0    ONLINE    ',
@@ -1136,22 +1312,43 @@ const deviceCommand: Command = {
         name: 'Crystal Data Cache',
         id: 'CDC-001',
         version: '1.4.2',
-        desc: 'Stores and indexes crystal and slice data from the blockchain.\nProvides real-time inventory tracking and power calculations.',
-        compatible: ['UEC-001', 'BAT-001', 'HMS-001'],
+        desc: 'Crystalline data storage for research archives (Tech Tier 1).\nIndexes crystal (_unITM) and slice (_unSLC) data from blockchain.\nFeatures: crystal-index, slice-tracking, power-calc, auto-sync.\n\nPower: Full 15 E/s | Idle 5 E/s | Standby 1 E/s\nPriority: P1 (Critical) | Category: Medium\n\nUse CDC command for management: cdc status | cdc firmware | cdc info',
+        compatible: ['UEC-001', 'BAT-001', 'HMS-001', 'AIC-001', 'SCA-001'],
       },
       'core': {
         name: 'Unstable Energy Core',
         id: 'UEC-001',
         version: '2.0.1',
-        desc: 'Monitors network volatility and converts TPS data to energy levels.\nPowers all lab equipment based on blockchain activity.',
-        compatible: ['CDC-001', 'BAT-001', 'QAN-001'],
+        desc: 'Primary power generation via blockchain volatility monitoring.\nConverts TPS data to energy output for all lab equipment.\nFeatures: volatility-tracking, tps-monitor, tier-calc, network-sync, field-stabilizer.\n\nOutput: Max 500 E/s | Per Tier 100 E/s | Self 10 E/s | Standby 2 E/s\nPriority: P0 (Generator) | Category: Generator\n\nUse UEC command for management: uec status | uec firmware | uec info',
+        compatible: ['CDC-001', 'BAT-001', 'QAN-001', 'HMS-001', 'MFR-001'],
+      },
+      'energy': {
+        name: 'Unstable Energy Core',
+        id: 'UEC-001',
+        version: '2.0.1',
+        desc: 'Primary power generation via blockchain volatility monitoring.\nConverts TPS data to energy output for all lab equipment.\nFeatures: volatility-tracking, tps-monitor, tier-calc, network-sync, field-stabilizer.\n\nOutput: Max 500 E/s | Per Tier 100 E/s | Self 10 E/s | Standby 2 E/s\nPriority: P0 (Generator) | Category: Generator\n\nUse UEC command for management: uec status | uec firmware | uec info',
+        compatible: ['CDC-001', 'BAT-001', 'QAN-001', 'HMS-001', 'MFR-001'],
+      },
+      'energycore': {
+        name: 'Unstable Energy Core',
+        id: 'UEC-001',
+        version: '2.0.1',
+        desc: 'Primary power generation via blockchain volatility monitoring.\nConverts TPS data to energy output for all lab equipment.\nFeatures: volatility-tracking, tps-monitor, tier-calc, network-sync, field-stabilizer.\n\nOutput: Max 500 E/s | Per Tier 100 E/s | Self 10 E/s | Standby 2 E/s\nPriority: P0 (Generator) | Category: Generator\n\nUse UEC command for management: uec status | uec firmware | uec info',
+        compatible: ['CDC-001', 'BAT-001', 'QAN-001', 'HMS-001', 'MFR-001'],
       },
       'battery': {
-        name: 'Battery Pack',
+        name: 'Portable Battery Pack',
         id: 'BAT-001',
         version: '1.8.0',
-        desc: 'Manages _unSC token balance display and staking status.\nTracks available, staked, and locked funds.',
-        compatible: ['UEC-001', 'CDC-001'],
+        desc: 'Energy storage device with 4-cell array and auto-regeneration.\nStores excess power and releases during high-demand periods.\nFeatures: cell-monitor, auto-regen, capacity-track, thermal-protect, cdc-handshake.\n\nCapacity: 5,000 E | Charge 100 E/s | Discharge 150 E/s (burst)\nPriority: P2 (Storage) | Category: Storage\n\nUse BAT command for management: bat status | bat firmware | bat info',
+        compatible: ['UEC-001', 'CDC-001', 'EXD-001'],
+      },
+      'pack': {
+        name: 'Portable Battery Pack',
+        id: 'BAT-001',
+        version: '1.8.0',
+        desc: 'Energy storage device with 4-cell array and auto-regeneration.\nStores excess power and releases during high-demand periods.\nFeatures: cell-monitor, auto-regen, capacity-track, thermal-protect, cdc-handshake.\n\nCapacity: 5,000 E | Charge 100 E/s | Discharge 150 E/s (burst)\nPriority: P2 (Storage) | Category: Storage\n\nUse BAT command for management: bat status | bat firmware | bat info',
+        compatible: ['UEC-001', 'CDC-001', 'EXD-001'],
       },
       'synth': {
         name: 'Handmade Synthesizer',
@@ -1290,14 +1487,14 @@ const deviceCommand: Command = {
         name: 'Quantum State Monitor',
         id: 'QSM-001',
         version: '1.2.0',
-        desc: 'Monitors quantum coherence and qubit entanglement.\n127-qubit array with real-time wave function display.',
+        desc: '127-qubit quantum coherence monitor with real-time wave function display.\nTracks entanglement state, coherence, error rates, and cryogenic temperature.\nFeatures: qubit-array, coherence-tracking, entanglement-verify, error-correction, wave-function.\n\nPower: Full 12 E/s | Idle 7 E/s | Standby 1 E/s | Scan 18 E/s\nPriority: P2 (Standard) | Category: Medium\n\nUse QSM command for management: qsm status | qsm firmware | qsm info',
         compatible: ['QAN-001', 'SCA-001', 'AIC-001'],
       },
       'state': {
         name: 'Quantum State Monitor',
         id: 'QSM-001',
         version: '1.2.0',
-        desc: 'Monitors quantum coherence and qubit entanglement.\n127-qubit array with real-time wave function display.',
+        desc: '127-qubit quantum coherence monitor with real-time wave function display.\nTracks entanglement state, coherence, error rates, and cryogenic temperature.\n\nUse QSM command for management: qsm status | qsm firmware | qsm info',
         compatible: ['QAN-001', 'SCA-001', 'AIC-001'],
       },
       'network': {
@@ -1767,16 +1964,16 @@ const powerCommand: Command = {
     // Most devices run in idle mode during normal operation
     const powerConsumers = [
       // Heavy Consumers
-      { id: 'SCA-001', name: 'Supercomputer Array', draw: 45, priority: 3, status: 'on', category: 'heavy' },
+      { id: 'SCA-001', name: 'Supercomputer Array', draw: ctx.data.scaDevice?.getState().currentDraw ?? 45, priority: 3, status: ctx.data.scaDevice?.getState().isPowered ? 'on' : 'standby', category: 'heavy' },
       { id: 'TLP-001', name: 'Teleport Pad', draw: 3, priority: 4, status: 'standby', category: 'heavy' },
-      { id: 'QAN-001', name: 'Quantum Analyzer', draw: 20, priority: 2, status: 'on', category: 'heavy' },
-      { id: 'EMC-001', name: 'Exotic Matter Contain.', draw: 40, priority: 1, status: 'on', category: 'heavy' },
+      { id: 'QAN-001', name: 'Quantum Analyzer', draw: ctx.data.quaDevice?.getState().currentDraw ?? 10, priority: 2, status: ctx.data.quaDevice?.getState().isPowered ? 'on' : 'standby', category: 'heavy' },
+      { id: 'EMC-001', name: 'Exotic Matter Contain.', draw: ctx.data.emcDevice?.getState().currentDraw ?? 18, priority: 1, status: ctx.data.emcDevice?.getState().isPowered ? 'on' : 'standby', category: 'heavy' },
       { id: 'P3D-001', name: '3D Fabricator', draw: 2, priority: 3, status: 'standby', category: 'heavy' },
       { id: 'LCT-001', name: 'Precision Laser', draw: 2, priority: 3, status: 'standby', category: 'heavy' },
-      { id: 'EXD-001', name: 'Explorer Drone', draw: 1, priority: 3, status: 'standby', category: 'heavy' },
+      { id: 'EXD-001', name: 'Explorer Drone', draw: ctx.data.exdDevice?.getState().currentDraw ?? 1, priority: 3, status: ctx.data.exdDevice?.getState().isPowered ? 'on' : 'standby', category: 'heavy' },
       { id: 'AIC-001', name: 'AI Assistant Core', draw: 12, priority: 1, status: 'on', category: 'heavy' },
       // Medium Consumers
-      { id: 'QSM-001', name: 'Quantum State Monitor', draw: 7, priority: 2, status: 'on', category: 'medium' },
+      { id: 'QSM-001', name: 'Quantum State Monitor', draw: ctx.data.qsmDevice?.getState().currentDraw ?? 7, priority: 2, status: ctx.data.qsmDevice?.getState().isPowered ? 'on' : 'standby', category: 'medium' },
       { id: 'INT-001', name: 'Interpolator', draw: 6, priority: 2, status: 'on', category: 'medium' },
       { id: 'OSC-001', name: 'Oscilloscope Array', draw: 5, priority: 2, status: 'on', category: 'medium' },
       { id: 'CDC-001', name: 'Crystal Data Cache', draw: 5, priority: 1, status: 'on', category: 'medium' },
@@ -2340,6 +2537,7302 @@ const thermalCommand: Command = {
   },
 }
 
+// ==================================================
+// CDC - Crystal Data Cache Management Command
+// ==================================================
+const cdcCommand: Command = {
+  name: 'cdc',
+  aliases: ['cache', 'crystalcache'],
+  description: 'Crystal Data Cache management and firmware control',
+  execute: async (args, ctx) => {
+    const [action, ...params] = args
+
+    // Get CDC device from context (for bidirectional sync)
+    const cdcDevice = ctx.data.cdcDevice
+
+    // Get firmware and power specs from device or use defaults
+    const firmware = cdcDevice?.getFirmware() ?? {
+      version: '1.4.2',
+      build: '2024.01.15',
+      checksum: 'A7F3B2E1',
+      securityPatch: '2024.01.10',
+      features: ['crystal-index', 'slice-tracking', 'power-calc', 'auto-sync'],
+    }
+
+    const powerSpecs = cdcDevice?.getPowerSpecs() ?? {
+      full: 15,
+      idle: 5,
+      standby: 1,
+      category: 'medium',
+      priority: 1,
+    }
+
+    // Get current device state if available
+    const deviceState = cdcDevice?.getState()
+    const currentStatus = deviceState?.deviceState ?? 'online'
+    const currentDraw = deviceState?.currentDraw ?? powerSpecs.idle
+    const isPowered = deviceState?.isPowered ?? true
+
+    // Show help if no action
+    if (!action) {
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│          CDC-001: CRYSTAL DATA CACHE                        │',
+          '│              Management Console v1.0                        │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  COMMANDS:',
+          '    cdc status       - Show device status and power state',
+          '    cdc power [on|off] - Toggle power (standby mode)',
+          '    cdc firmware     - Show firmware information',
+          '    cdc firmware update - Check for firmware updates',
+          '    cdc firmware patch  - Apply security patches',
+          '    cdc test         - Run hardware diagnostics',
+          '    cdc reset        - Reboot device',
+          '    cdc info         - Show full device documentation',
+          '',
+          '  POWER INTEGRATION:',
+          `    Full:    ${powerSpecs.full} E/s  |  Idle: ${powerSpecs.idle} E/s  |  Standby: ${powerSpecs.standby} E/s`,
+          '',
+        ],
+      }
+    }
+
+    // STATUS command
+    if (action === 'status' || action === 'stat') {
+      ctx.setTyping(true)
+      await new Promise(resolve => setTimeout(resolve, 500))
+      ctx.setTyping(false)
+
+      const stateLabel = currentStatus === 'standby' ? 'STANDBY' :
+                        currentStatus === 'booting' ? 'BOOTING' :
+                        currentStatus === 'testing' ? 'TESTING' :
+                        currentStatus === 'rebooting' ? 'REBOOTING' :
+                        currentStatus === 'shutdown' ? 'SHUTDOWN' : 'ONLINE'
+      const modeLabel = currentStatus === 'standby' ? 'STANDBY' :
+                       currentStatus === 'testing' ? 'FULL (DIAG)' : 'IDLE'
+
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│          CDC-001: STATUS REPORT                             │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  DEVICE INFO:',
+          '    Name:       Crystal Data Cache',
+          '    ID:         CDC-001',
+          `    Firmware:   v${firmware.version} (build ${firmware.build})`,
+          '    Tech Tree:  Tech Tier 1',
+          '',
+          '  POWER STATE:',
+          `    Status:     ${stateLabel}`,
+          `    Mode:       ${modeLabel}`,
+          `    Draw:       ${currentDraw} E/s`,
+          '    Priority:   P1 (Critical)',
+          '',
+          '  STORAGE:',
+          `    Crystal Index:    ${currentStatus === 'online' ? 'Active' : 'Inactive'}`,
+          `    Slice Tracking:   ${currentStatus === 'online' ? 'Active' : 'Inactive'}`,
+          `    Auto-Sync:        ${currentStatus === 'online' ? 'Enabled' : 'Disabled'}`,
+          `    Cache Coherence:  ${currentStatus === 'online' ? '100%' : 'N/A'}`,
+          ...(deviceState ? [
+            '',
+            '  CACHED DATA:',
+            `    Crystals:   ${deviceState.crystalCount}`,
+            `    Slices:     ${deviceState.sliceCount}`,
+            `    Power Gen:  ${deviceState.totalPower.toFixed(1)} E/s`,
+          ] : []),
+          '',
+          '  CONNECTIONS:',
+          '    UEC-001:    Connected (Power)',
+          '    BAT-001:    Connected (Backup)',
+          '    HMS-001:    Connected (Synthesis)',
+          '',
+        ],
+      }
+    }
+
+    // POWER command
+    if (action === 'power') {
+      const powerState = params[0]?.toLowerCase()
+
+      if (!powerState || (powerState !== 'on' && powerState !== 'off')) {
+        return {
+          success: true,
+          output: [
+            '',
+            '  CDC-001 POWER CONTROL:',
+            '',
+            '    cdc power on   - Boot device from standby',
+            '    cdc power off  - Enter standby mode (1 E/s)',
+            '',
+            `  Current State: ${currentStatus === 'standby' ? 'STANDBY' : 'ONLINE'}`,
+            `  Current Draw:  ${currentDraw} E/s`,
+            '',
+          ],
+        }
+      }
+
+      // Check if device is already in the requested state
+      if (powerState === 'off' && currentStatus === 'standby') {
+        return {
+          success: false,
+          error: '[CDC-001] Device is already in STANDBY mode',
+        }
+      }
+      if (powerState === 'on' && currentStatus === 'online') {
+        return {
+          success: false,
+          error: '[CDC-001] Device is already ONLINE',
+        }
+      }
+
+      // Check if device is busy
+      if (currentStatus === 'booting' || currentStatus === 'testing' || currentStatus === 'rebooting' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: `[CDC-001] Cannot change power state while device is ${currentStatus.toUpperCase()}`,
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (powerState === 'off') {
+        // Trigger actual shutdown on device UI
+        if (cdcDevice) {
+          await cdcDevice.powerOff()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 800))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '[CDC-001] Initiating shutdown sequence...',
+            '[CDC-001] Saving cache state...',
+            '[CDC-001] Flushing buffers...',
+            '[CDC-001] Releasing resources...',
+            '[CDC-001] System halted',
+            '',
+            '[CDC-001] Device entered STANDBY mode',
+            `[CDC-001] Power draw: ${powerSpecs.standby} E/s`,
+            '',
+          ],
+        }
+      } else {
+        // Trigger actual boot on device UI
+        if (cdcDevice) {
+          await cdcDevice.powerOn()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 800))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '[CDC-001] Initiating boot sequence...',
+            '[CDC-001] POST check.............. OK',
+            '[CDC-001] Memory init............. OK',
+            '[CDC-001] Cache allocate.......... OK',
+            '[CDC-001] Bus connect............. OK',
+            '[CDC-001] Data sync............... OK',
+            '',
+            '[CDC-001] Device is now ONLINE',
+            `[CDC-001] Power draw: ${powerSpecs.idle} E/s`,
+            '',
+          ],
+        }
+      }
+    }
+
+    // FIRMWARE command
+    if (action === 'firmware' || action === 'fw') {
+      const fwAction = params[0]?.toLowerCase()
+
+      if (!fwAction) {
+        return {
+          success: true,
+          output: [
+            '',
+            '┌─────────────────────────────────────────────────────────────┐',
+            '│          CDC-001: FIRMWARE INFORMATION                      │',
+            '└─────────────────────────────────────────────────────────────┘',
+            '',
+            '  INSTALLED FIRMWARE:',
+            `    Version:        v${firmware.version}`,
+            `    Build Date:     ${firmware.build}`,
+            `    Checksum:       ${firmware.checksum}`,
+            `    Security Patch: ${firmware.securityPatch}`,
+            '',
+            '  INSTALLED FEATURES:',
+            ...firmware.features.map(f => `    • ${f}`),
+            '',
+            '  COMMANDS:',
+            '    cdc firmware update  - Check for updates',
+            '    cdc firmware patch   - Apply security patches',
+            '    cdc firmware verify  - Verify firmware integrity',
+            '',
+          ],
+        }
+      }
+
+      if (fwAction === 'update' || fwAction === 'check') {
+        ctx.setTyping(true)
+        await new Promise(resolve => setTimeout(resolve, 1200))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '[FIRMWARE] Checking for updates...',
+            '[FIRMWARE] Contacting update server...',
+            '[FIRMWARE] Comparing versions...',
+            '',
+            `[FIRMWARE] Installed: v${firmware.version}`,
+            '[FIRMWARE] Latest:    v1.4.2',
+            '',
+            '[FIRMWARE] Your firmware is up to date.',
+            '',
+          ],
+        }
+      }
+
+      if (fwAction === 'patch') {
+        ctx.setTyping(true)
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '[SECURITY] Checking for security patches...',
+            '[SECURITY] Analyzing vulnerabilities...',
+            '[SECURITY] Verifying patch signatures...',
+            '',
+            `[SECURITY] Last patch: ${firmware.securityPatch}`,
+            '[SECURITY] No new security patches available.',
+            '',
+            '[SECURITY] Device is fully patched.',
+            '',
+          ],
+        }
+      }
+
+      if (fwAction === 'verify') {
+        ctx.setTyping(true)
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '[VERIFY] Running firmware integrity check...',
+            '[VERIFY] Calculating checksum...',
+            '[VERIFY] Comparing with manifest...',
+            '',
+            `[VERIFY] Expected: ${firmware.checksum}`,
+            `[VERIFY] Actual:   ${firmware.checksum}`,
+            '',
+            '[VERIFY] Firmware integrity: VERIFIED',
+            '',
+          ],
+        }
+      }
+    }
+
+    // TEST command
+    if (action === 'test' || action === 'diag') {
+      // Check if device is online
+      if (currentStatus !== 'online') {
+        return {
+          success: false,
+          error: `[CDC-001] Cannot run diagnostics - device is ${currentStatus.toUpperCase()}\n\nUse 'cdc power on' to boot the device first.`,
+        }
+      }
+
+      ctx.setTyping(true)
+
+      // Trigger actual test on device UI
+      if (cdcDevice) {
+        await cdcDevice.runTest()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│          CDC-001: HARDWARE DIAGNOSTICS                      │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  [TEST] Memory integrity............ PASS',
+          '  [TEST] Data bus connection......... PASS',
+          '  [TEST] Cache coherence............. PASS',
+          '  [TEST] Power supply................ PASS',
+          '  [TEST] Communication protocol...... PASS',
+          '',
+          '  RESULT: All diagnostics PASSED',
+          `  TIME:   ${new Date().toISOString()}`,
+          '',
+        ],
+      }
+    }
+
+    // RESET command
+    if (action === 'reset' || action === 'reboot') {
+      // Check if device can be rebooted
+      if (currentStatus === 'standby' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: `[CDC-001] Cannot reboot - device is ${currentStatus.toUpperCase()}\n\nUse 'cdc power on' to boot the device first.`,
+        }
+      }
+      if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+        return {
+          success: false,
+          error: `[CDC-001] Cannot reboot - device is currently ${currentStatus.toUpperCase()}`,
+        }
+      }
+
+      ctx.setTyping(true)
+
+      // Trigger actual reboot on device UI
+      if (cdcDevice) {
+        await cdcDevice.reboot()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1500))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '[CDC-001] Initiating reboot...',
+          '[STOP]  Halting device.............. OK',
+          '[FLUSH] Clearing data buffers....... OK',
+          '[POST]  Power-on self test.......... OK',
+          '[INIT]  Initializing subsystems..... OK',
+          '[SYNC]  Re-synchronizing data....... OK',
+          '[BOOT]  Device online............... OK',
+          '',
+          '[CDC-001] Reboot complete',
+          `[TIME]   ${new Date().toISOString()}`,
+          '',
+        ],
+      }
+    }
+
+    // INFO command - full documentation
+    if (action === 'info' || action === 'doc' || action === 'help') {
+      return {
+        success: true,
+        output: [
+          '',
+          '╔═══════════════════════════════════════════════════════════════╗',
+          '║          CDC-001: CRYSTAL DATA CACHE                          ║',
+          '║              Technical Documentation                          ║',
+          '╚═══════════════════════════════════════════════════════════════╝',
+          '',
+          '  OVERVIEW:',
+          '    The Crystal Data Cache is a crystalline data storage device',
+          '    used for research archives. It indexes and tracks all crystal',
+          '    and slice data from the blockchain, providing real-time',
+          '    inventory tracking and power calculations.',
+          '',
+          '  SPECIFICATIONS:',
+          '    Device ID:    CDC-001',
+          `    Firmware:     v${firmware.version}`,
+          '    Tech Tree:    Tech Tier 1',
+          '    Category:     Medium Power Consumer',
+          '',
+          '  POWER CONSUMPTION:',
+          '    ┌───────────┬────────────┬───────────────────────────────┐',
+          '    │ State     │ Draw (E/s) │ Notes                         │',
+          '    ├───────────┼────────────┼───────────────────────────────┤',
+          `    │ Full      │ ${String(powerSpecs.full).padStart(10)} │ Active indexing/sync          │`,
+          `    │ Idle      │ ${String(powerSpecs.idle).padStart(10)} │ Monitoring mode               │`,
+          `    │ Standby   │ ${String(powerSpecs.standby).padStart(10)} │ Minimal power (data retained) │`,
+          '    └───────────┴────────────┴───────────────────────────────┘',
+          '',
+          '  FEATURES:',
+          '    • Crystal indexing - Tracks all owned crystals (_unITM)',
+          '    • Slice tracking   - Monitors 30 slices per crystal (_unSLC)',
+          '    • Power calculation - Calculates total crystal power output',
+          '    • Auto-sync        - Automatic blockchain synchronization',
+          '',
+          '  COMPATIBLE DEVICES:',
+          '    UEC-001  Unstable Energy Core    (Power supply)',
+          '    BAT-001  Battery Pack            (Backup power)',
+          '    HMS-001  Handmade Synthesizer    (Slice synthesis)',
+          '',
+          '  COMMANDS:',
+          '    cdc status          - Show device status',
+          '    cdc power [on|off]  - Toggle power state',
+          '    cdc firmware        - View firmware info',
+          '    cdc firmware update - Check for updates',
+          '    cdc firmware patch  - Apply security patches',
+          '    cdc test            - Run diagnostics',
+          '    cdc reset           - Reboot device',
+          '',
+          '  LOCATION IN unOS:',
+          '    /sys/devices/cdc-001/',
+          '    /var/log/cdc/',
+          '    /etc/cdc/firmware.conf',
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `unknown cdc command: ${action}\n\ntype cdc for available commands.`,
+    }
+  },
+}
+
+// ==================================================
+// UEC COMMAND - Unstable Energy Core management
+// ==================================================
+const uecCommand: Command = {
+  name: 'uec',
+  aliases: ['energycore', 'core', 'energy'],
+  description: 'Unstable Energy Core management and firmware control',
+  execute: async (args, ctx) => {
+    const [action, ...params] = args
+
+    // Get UEC device from context (for bidirectional sync)
+    const uecDevice = ctx.data.uecDevice
+
+    // Get firmware and power specs from device or use defaults
+    const firmware = uecDevice?.getFirmware() ?? {
+      version: '2.0.1',
+      build: '2024.02.08',
+      checksum: 'E9C4F7A2',
+      securityPatch: '2024.02.01',
+      features: ['volatility-tracking', 'tps-monitor', 'tier-calc', 'network-sync', 'field-stabilizer'],
+    }
+
+    const powerSpecs = uecDevice?.getPowerSpecs() ?? {
+      outputMax: 500,
+      outputPerTier: 100,
+      selfConsume: 10,
+      standby: 2,
+      category: 'generator',
+      priority: 0,
+    }
+
+    // Get current device state if available
+    const deviceState = uecDevice?.getState()
+    const currentStatus = deviceState?.deviceState ?? 'online'
+    const isPowered = deviceState?.isPowered ?? true
+    const energyOutput = deviceState?.energyOutput ?? 0
+    const fieldStability = deviceState?.fieldStability ?? 0
+    const volatilityTier = deviceState?.volatilityTier ?? 1
+    const tps = deviceState?.tps ?? 0
+
+    // Show help if no action
+    if (!action) {
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│          UEC-001: UNSTABLE ENERGY CORE                      │',
+          '│              Management Console v1.0                        │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  COMMANDS:',
+          '    uec status       - Show device status and power output',
+          '    uec power [on|off] - Toggle power (standby mode)',
+          '    uec firmware     - Show firmware information',
+          '    uec firmware update - Check for firmware updates',
+          '    uec firmware patch  - Apply security patches',
+          '    uec test         - Run hardware diagnostics',
+          '    uec reset        - Reboot device',
+          '    uec info         - Show full device documentation',
+          '',
+          '  POWER OUTPUT:',
+          `    Per Tier:  ${powerSpecs.outputPerTier} E/s  |  Max: ${powerSpecs.outputMax} E/s (T5)`,
+          `    Self-Use:  ${powerSpecs.selfConsume} E/s  |  Standby: ${powerSpecs.standby} E/s`,
+          '',
+        ],
+      }
+    }
+
+    // STATUS command
+    if (action === 'status' || action === 'stat') {
+      ctx.setTyping(true)
+      await new Promise(resolve => setTimeout(resolve, 500))
+      ctx.setTyping(false)
+
+      const stateLabel = currentStatus === 'standby' ? 'STANDBY' :
+                        currentStatus === 'booting' ? 'BOOTING' :
+                        currentStatus === 'testing' ? 'TESTING' :
+                        currentStatus === 'rebooting' ? 'REBOOTING' :
+                        currentStatus === 'shutdown' ? 'SHUTDOWN' : 'ONLINE'
+
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│          UEC-001: STATUS REPORT                             │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  DEVICE INFO:',
+          '    Name:       Unstable Energy Core',
+          '    ID:         UEC-001',
+          `    Firmware:   v${firmware.version} (build ${firmware.build})`,
+          '    Category:   Power Generator (P0 - Critical)',
+          '',
+          '  POWER STATE:',
+          `    Status:     ${stateLabel}`,
+          `    Output:     ${currentStatus === 'online' ? energyOutput : 0} E/s`,
+          `    Max Output: ${powerSpecs.outputMax} E/s (at T5)`,
+          `    Self-Use:   ${currentStatus === 'standby' ? powerSpecs.standby : powerSpecs.selfConsume} E/s`,
+          '',
+          '  ENERGY FIELD:',
+          `    Volatility Tier: T${volatilityTier}`,
+          `    Network TPS:     ${tps.toLocaleString()}`,
+          `    Field Stability: ${currentStatus === 'online' ? fieldStability : 0}%`,
+          `    Energy Level:    ${currentStatus === 'online' ? volatilityTier * 20 : 0}%`,
+          '',
+          '  CONNECTED CONSUMERS:',
+          '    CDC-001:    Crystal Data Cache    (15 E/s)',
+          '    BAT-001:    Battery Pack          (5 E/s)',
+          '    HMS-001:    Handmade Synthesizer  (20 E/s)',
+          '',
+        ],
+      }
+    }
+
+    // POWER command
+    if (action === 'power') {
+      const powerState = params[0]?.toLowerCase()
+
+      if (!powerState || (powerState !== 'on' && powerState !== 'off')) {
+        return {
+          success: true,
+          output: [
+            '',
+            '  UEC-001 POWER CONTROL:',
+            '',
+            '    uec power on   - Boot core from standby',
+            '    uec power off  - Enter standby mode',
+            '',
+            `  Current State: ${currentStatus === 'standby' ? 'STANDBY' : 'ONLINE'}`,
+            `  Current Output: ${currentStatus === 'online' ? energyOutput : 0} E/s`,
+            '',
+            '  WARNING: Shutting down the Energy Core will affect',
+            '           all connected devices!',
+            '',
+          ],
+        }
+      }
+
+      // Check if device is already in the requested state
+      if (powerState === 'off' && currentStatus === 'standby') {
+        return {
+          success: false,
+          error: '[UEC-001] Core is already in STANDBY mode',
+        }
+      }
+      if (powerState === 'on' && currentStatus === 'online') {
+        return {
+          success: false,
+          error: '[UEC-001] Core is already ONLINE',
+        }
+      }
+
+      // Check if device is busy
+      if (currentStatus === 'booting' || currentStatus === 'testing' || currentStatus === 'rebooting' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: `[UEC-001] Cannot change power state while core is ${currentStatus.toUpperCase()}`,
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (powerState === 'off') {
+        if (uecDevice) {
+          await uecDevice.powerOff()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 800))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '[UEC-001] Initiating shutdown sequence...',
+            '[UEC-001] Draining capacitors...',
+            '[UEC-001] Releasing energy field...',
+            '[UEC-001] Core halted',
+            '',
+            '[UEC-001] Core entered STANDBY mode',
+            `[UEC-001] Power draw: ${powerSpecs.standby} E/s`,
+            '',
+            '  WARNING: Connected devices may lose power!',
+            '',
+          ],
+        }
+      } else {
+        if (uecDevice) {
+          await uecDevice.powerOn()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 800))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '[UEC-001] Initiating boot sequence...',
+            '[UEC-001] POST check.............. OK',
+            '[UEC-001] Voltage calibration..... OK',
+            '[UEC-001] Frequency sync.......... OK',
+            '[UEC-001] Network connect......... OK',
+            '[UEC-001] Energy stabilize........ OK',
+            '',
+            '[UEC-001] Core is now ONLINE',
+            `[UEC-001] Energy output: ${powerSpecs.outputPerTier * volatilityTier} E/s (T${volatilityTier})`,
+            '',
+          ],
+        }
+      }
+    }
+
+    // FIRMWARE command
+    if (action === 'firmware' || action === 'fw') {
+      const fwAction = params[0]?.toLowerCase()
+
+      if (!fwAction) {
+        return {
+          success: true,
+          output: [
+            '',
+            '┌─────────────────────────────────────────────────────────────┐',
+            '│          UEC-001: FIRMWARE INFORMATION                      │',
+            '└─────────────────────────────────────────────────────────────┘',
+            '',
+            '  INSTALLED FIRMWARE:',
+            `    Version:        v${firmware.version}`,
+            `    Build Date:     ${firmware.build}`,
+            `    Checksum:       ${firmware.checksum}`,
+            `    Security Patch: ${firmware.securityPatch}`,
+            '',
+            '  INSTALLED FEATURES:',
+            ...firmware.features.map(f => `    • ${f}`),
+            '',
+            '  COMMANDS:',
+            '    uec firmware update  - Check for updates',
+            '    uec firmware patch   - Apply security patches',
+            '    uec firmware verify  - Verify firmware integrity',
+            '',
+          ],
+        }
+      }
+
+      if (fwAction === 'update' || fwAction === 'check') {
+        ctx.setTyping(true)
+        await new Promise(resolve => setTimeout(resolve, 1200))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '[FIRMWARE] Checking for updates...',
+            '[FIRMWARE] Contacting update server...',
+            '[FIRMWARE] Comparing versions...',
+            '',
+            `[FIRMWARE] Installed: v${firmware.version}`,
+            '[FIRMWARE] Latest:    v2.0.1',
+            '',
+            '[FIRMWARE] Your firmware is up to date.',
+            '',
+          ],
+        }
+      }
+
+      if (fwAction === 'patch') {
+        ctx.setTyping(true)
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '[SECURITY] Checking for security patches...',
+            '[SECURITY] Analyzing vulnerabilities...',
+            '[SECURITY] Verifying patch signatures...',
+            '',
+            `[SECURITY] Last patch: ${firmware.securityPatch}`,
+            '[SECURITY] No new security patches available.',
+            '',
+            '[SECURITY] Core is fully patched.',
+            '',
+          ],
+        }
+      }
+
+      if (fwAction === 'verify') {
+        ctx.setTyping(true)
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '[VERIFY] Running firmware integrity check...',
+            '[VERIFY] Calculating checksum...',
+            '[VERIFY] Comparing with manifest...',
+            '',
+            `[VERIFY] Expected: ${firmware.checksum}`,
+            `[VERIFY] Actual:   ${firmware.checksum}`,
+            '',
+            '[VERIFY] Firmware integrity: VERIFIED',
+            '',
+          ],
+        }
+      }
+    }
+
+    // TEST command
+    if (action === 'test' || action === 'diag') {
+      if (currentStatus !== 'online') {
+        return {
+          success: false,
+          error: `[UEC-001] Cannot run diagnostics - core is ${currentStatus.toUpperCase()}\n\nUse 'uec power on' to boot the core first.`,
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (uecDevice) {
+        await uecDevice.runTest()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│          UEC-001: HARDWARE DIAGNOSTICS                      │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  [TEST] Voltage regulators.......... PASS',
+          '  [TEST] Frequency sync.............. PASS',
+          '  [TEST] Field stability............. PASS',
+          '  [TEST] Power output................ PASS',
+          '  [TEST] Network sync................ PASS',
+          '',
+          '  RESULT: All diagnostics PASSED',
+          `  TIME:   ${new Date().toISOString()}`,
+          '',
+        ],
+      }
+    }
+
+    // RESET command
+    if (action === 'reset' || action === 'reboot') {
+      if (currentStatus === 'standby' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: `[UEC-001] Cannot reboot - core is ${currentStatus.toUpperCase()}\n\nUse 'uec power on' to boot the core first.`,
+        }
+      }
+      if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+        return {
+          success: false,
+          error: `[UEC-001] Cannot reboot - core is currently ${currentStatus.toUpperCase()}`,
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (uecDevice) {
+        await uecDevice.reboot()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1500))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '[UEC-001] Initiating reboot...',
+          '[STOP]  Draining capacitors......... OK',
+          '[STOP]  Releasing energy field...... OK',
+          '[POST]  Power-on self test.......... OK',
+          '[INIT]  Voltage calibration......... OK',
+          '[INIT]  Frequency synchronization... OK',
+          '[BOOT]  Core online................. OK',
+          '',
+          '[UEC-001] Reboot complete',
+          `[TIME]   ${new Date().toISOString()}`,
+          '',
+        ],
+      }
+    }
+
+    // INFO command - full documentation
+    if (action === 'info' || action === 'doc' || action === 'help') {
+      return {
+        success: true,
+        output: [
+          '',
+          '╔═══════════════════════════════════════════════════════════════╗',
+          '║          UEC-001: UNSTABLE ENERGY CORE                        ║',
+          '║              Technical Documentation                          ║',
+          '╚═══════════════════════════════════════════════════════════════╝',
+          '',
+          '  OVERVIEW:',
+          '    The Unstable Energy Core is the primary power generator for',
+          '    the laboratory. It converts blockchain volatility (TPS) into',
+          '    usable energy, powering all connected devices.',
+          '',
+          '  SPECIFICATIONS:',
+          '    Device ID:    UEC-001',
+          `    Firmware:     v${firmware.version}`,
+          '    Category:     Power Generator (P0 - Critical)',
+          '    Priority:     0 (Highest - power source)',
+          '',
+          '  POWER OUTPUT:',
+          '    ┌───────────┬────────────┬───────────────────────────────┐',
+          '    │ Tier      │ Output E/s │ Notes                         │',
+          '    ├───────────┼────────────┼───────────────────────────────┤',
+          '    │ T1        │        100 │ Low network activity          │',
+          '    │ T2        │        200 │ Normal activity               │',
+          '    │ T3        │        300 │ Elevated activity             │',
+          '    │ T4        │        400 │ High activity                 │',
+          '    │ T5        │        500 │ Extreme volatility            │',
+          '    ├───────────┼────────────┼───────────────────────────────┤',
+          `    │ Self-Use  │ ${String(powerSpecs.selfConsume).padStart(10)} │ Internal consumption          │`,
+          `    │ Standby   │ ${String(powerSpecs.standby).padStart(10)} │ Minimal power mode            │`,
+          '    └───────────┴────────────┴───────────────────────────────┘',
+          '',
+          '  FEATURES:',
+          '    • Volatility tracking - Monitors blockchain TPS',
+          '    • Tier calculation    - Converts TPS to energy tiers',
+          '    • Field stabilizer    - Maintains stable energy output',
+          '    • Network sync        - Real-time blockchain connection',
+          '    • Auto-scaling        - Adjusts output based on demand',
+          '',
+          '  CONNECTED DEVICES:',
+          '    CDC-001  Crystal Data Cache      (Consumer)',
+          '    BAT-001  Battery Pack            (Storage)',
+          '    HMS-001  Handmade Synthesizer    (Consumer)',
+          '',
+          '  COMMANDS:',
+          '    uec status          - Show core status',
+          '    uec power [on|off]  - Toggle power state',
+          '    uec firmware        - View firmware info',
+          '    uec firmware update - Check for updates',
+          '    uec firmware patch  - Apply security patches',
+          '    uec test            - Run diagnostics',
+          '    uec reset           - Reboot core',
+          '',
+          '  LOCATION IN unOS:',
+          '    /sys/devices/uec-001/',
+          '    /var/log/uec/',
+          '    /etc/uec/firmware.conf',
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `unknown uec command: ${action}\n\ntype uec for available commands.`,
+    }
+  },
+}
+
+// ==================================================
+// BAT COMMAND - Portable Battery Pack management
+// ==================================================
+const batCommand: Command = {
+  name: 'bat',
+  aliases: ['battery', 'pack', 'batterypack'],
+  description: 'Portable Battery Pack management and firmware control',
+  execute: async (args, ctx) => {
+    const [action, ...params] = args
+
+    // Get BAT device from context (for bidirectional sync)
+    const batDevice = ctx.data.batDevice
+
+    // Get firmware and power specs from device or use defaults
+    const firmware = batDevice?.getFirmware() ?? {
+      version: '1.8.0',
+      build: '2024.01.20',
+      checksum: 'B4C7D9E2',
+      securityPatch: '2024.01.15',
+      features: ['cell-monitor', 'auto-regen', 'capacity-track', 'thermal-protect', 'cdc-handshake'],
+    }
+
+    const powerSpecs = batDevice?.getPowerSpecs() ?? {
+      capacity: 5000,
+      chargeRate: 100,
+      dischargeRate: 150,
+      selfDischarge: 0.5,
+      standbyDrain: 0.1,
+      category: 'storage',
+      priority: 2,
+    }
+
+    // Get current device state if available
+    const deviceState = batDevice?.getState()
+    const currentStatus = deviceState?.deviceState ?? 'online'
+    const isPowered = deviceState?.isPowered ?? true
+    const chargePercent = deviceState?.chargePercent ?? 100
+    const currentCharge = deviceState?.currentCharge ?? 5000
+    const cellHealth = deviceState?.cellHealth ?? [98, 99, 97, 100]
+    const temperature = deviceState?.temperature ?? 28
+    const autoRegen = deviceState?.autoRegen ?? true
+
+    // No action - show help
+    if (!action) {
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│          BAT-001: PORTABLE BATTERY PACK                     │',
+          '│              Management Console v1.0                        │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  COMMANDS:',
+          '    bat status       - Show battery status and charge level',
+          '    bat power [on|off] - Toggle power (standby mode)',
+          '    bat firmware     - Show firmware information',
+          '    bat firmware update - Check for firmware updates',
+          '    bat firmware patch  - Apply security patches',
+          '    bat test         - Run battery diagnostics',
+          '    bat reset        - Reboot device',
+          '    bat regen [on|off] - Toggle auto-regeneration',
+          '    bat info         - Show full device documentation',
+          '',
+          '  STORAGE CAPACITY:',
+          `    Capacity:  ${powerSpecs.capacity} E`,
+          `    Charge:    ${powerSpecs.chargeRate} E/s  |  Discharge: ${powerSpecs.dischargeRate} E/s (burst)`,
+          '',
+          `  Current State: ${currentStatus.toUpperCase()}`,
+          `  Charge Level:  ${chargePercent}% (${currentCharge}/${powerSpecs.capacity} E)`,
+          '',
+        ],
+      }
+    }
+
+    // STATUS command
+    if (action === 'status' || action === 'stat' || action === 's') {
+      const avgCellHealth = cellHealth.reduce((a, b) => a + b, 0) / cellHealth.length
+
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│              BAT-001 STATUS                                 │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          `  State:        ${currentStatus.toUpperCase()}`,
+          `  Powered:      ${isPowered ? 'YES' : 'NO (Standby)'}`,
+          '',
+          '  CHARGE STATUS:',
+          `    Level:      ${chargePercent}%`,
+          `    Stored:     ${currentCharge} / ${powerSpecs.capacity} E`,
+          `    Auto-Regen: ${autoRegen ? 'ACTIVE' : 'DISABLED'}`,
+          '',
+          '  CELL HEALTH:',
+          `    Cell 1:     ${cellHealth[0]}%`,
+          `    Cell 2:     ${cellHealth[1]}%`,
+          `    Cell 3:     ${cellHealth[2]}%`,
+          `    Cell 4:     ${cellHealth[3]}%`,
+          `    Average:    ${avgCellHealth.toFixed(1)}%`,
+          '',
+          '  THERMAL:',
+          `    Temperature: ${temperature}°C`,
+          `    Status:      ${temperature < 35 ? 'NOMINAL' : temperature < 45 ? 'WARM' : 'HOT'}`,
+          '',
+          '  TRANSFER RATES:',
+          `    Charge:     ${powerSpecs.chargeRate} E/s`,
+          `    Discharge:  ${powerSpecs.dischargeRate} E/s (burst)`,
+          `    Self-drain: ${powerSpecs.selfDischarge} E/s`,
+          '',
+        ],
+      }
+    }
+
+    // POWER command
+    if (action === 'power' || action === 'pwr') {
+      const powerState = params[0]?.toLowerCase()
+
+      if (!powerState) {
+        return {
+          success: true,
+          output: [
+            '',
+            '  BAT-001 POWER CONTROL:',
+            '',
+            '    bat power on   - Boot pack from standby',
+            '    bat power off  - Enter standby mode',
+            '',
+            `  Current State: ${currentStatus === 'standby' ? 'STANDBY' : 'ONLINE'}`,
+            `  Charge Level:  ${chargePercent}%`,
+            '',
+            '  NOTE: Battery retains charge in standby mode.',
+            '  Self-discharge rate in standby: 0.1 E/s',
+            '',
+          ],
+        }
+      }
+
+      if (powerState !== 'on' && powerState !== 'off') {
+        return {
+          success: false,
+          error: `invalid power state: ${powerState}\n\nUsage: bat power [on|off]`,
+        }
+      }
+
+      if (powerState === 'off' && currentStatus === 'standby') {
+        return {
+          success: false,
+          error: '[BAT-001] Pack already in standby mode.',
+        }
+      }
+
+      if (powerState === 'on' && currentStatus !== 'standby') {
+        return {
+          success: false,
+          error: '[BAT-001] Pack already online.',
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (powerState === 'off') {
+        if (batDevice) {
+          await batDevice.powerOff()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 600))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║   BAT-001 ENTERING STANDBY MODE           ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  [✓] State saved',
+            '  [✓] Connections paused',
+            '  [✓] Pack hibernating',
+            '',
+            '  Status: STANDBY',
+            '  Charge preserved at: ' + chargePercent + '%',
+            '',
+          ],
+        }
+      } else {
+        if (batDevice) {
+          await batDevice.powerOn()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 800))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║   BAT-001 BOOTING FROM STANDBY            ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  [✓] Cell array initialized',
+            '  [✓] Voltage calibrated',
+            '  [✓] CDC handshake complete',
+            '  [✓] Auto-regen active',
+            '',
+            '  Status: ONLINE',
+            '  Charge: ' + chargePercent + '%',
+            '',
+          ],
+        }
+      }
+    }
+
+    // FIRMWARE command
+    if (action === 'firmware' || action === 'fw') {
+      const subAction = params[0]?.toLowerCase()
+
+      if (!subAction) {
+        return {
+          success: true,
+          output: [
+            '',
+            '┌─────────────────────────────────────────────────────────────┐',
+            '│              BAT-001 FIRMWARE                               │',
+            '└─────────────────────────────────────────────────────────────┘',
+            '',
+            `  Version:        ${firmware.version}`,
+            `  Build:          ${firmware.build}`,
+            `  Checksum:       ${firmware.checksum}`,
+            `  Security Patch: ${firmware.securityPatch}`,
+            '',
+            '  INSTALLED FEATURES:',
+            ...firmware.features.map(f => `    • ${f}`),
+            '',
+            '  COMMANDS:',
+            '    bat firmware update - Check for updates',
+            '    bat firmware patch  - Apply security patches',
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'update') {
+        ctx.setTyping(true)
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  BAT-001 FIRMWARE UPDATE CHECK',
+            '  ─────────────────────────────',
+            '',
+            '  Checking UnstableLabs repository...',
+            '',
+            `  Current:   v${firmware.version}`,
+            '  Available: v1.8.0 (latest)',
+            '',
+            '  ✓ Firmware is up to date.',
+            '',
+            '  Last check: ' + new Date().toISOString().slice(0, 19).replace('T', ' '),
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'patch') {
+        ctx.setTyping(true)
+        await new Promise(resolve => setTimeout(resolve, 1200))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  BAT-001 SECURITY PATCH STATUS',
+            '  ─────────────────────────────',
+            '',
+            `  Current Patch: ${firmware.securityPatch}`,
+            '  Patch Status:  UP TO DATE',
+            '',
+            '  Recent Security Fixes:',
+            '    • Cell isolation improved',
+            '    • Thermal runaway protection',
+            '    • CDC handshake hardened',
+            '',
+            '  No patches required.',
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: false,
+        error: `unknown firmware command: ${subAction}\n\nUsage: bat firmware [update|patch]`,
+      }
+    }
+
+    // REGEN command
+    if (action === 'regen' || action === 'regenerate' || action === 'autoregen') {
+      const regenState = params[0]?.toLowerCase()
+
+      if (!regenState) {
+        return {
+          success: true,
+          output: [
+            '',
+            '  BAT-001 AUTO-REGENERATION:',
+            '',
+            '    bat regen on   - Enable auto-regeneration',
+            '    bat regen off  - Disable auto-regeneration',
+            '',
+            `  Current: ${autoRegen ? 'ENABLED' : 'DISABLED'}`,
+            '',
+            '  Auto-regen passively restores charge over time',
+            '  when connected to power sources.',
+            '',
+          ],
+        }
+      }
+
+      if (regenState !== 'on' && regenState !== 'off') {
+        return {
+          success: false,
+          error: `invalid regen state: ${regenState}\n\nUsage: bat regen [on|off]`,
+        }
+      }
+
+      if (batDevice) {
+        batDevice.setAutoRegen(regenState === 'on')
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          `  [BAT-001] Auto-regeneration ${regenState === 'on' ? 'ENABLED' : 'DISABLED'}.`,
+          '',
+        ],
+      }
+    }
+
+    // TEST command
+    if (action === 'test' || action === 'diag') {
+      if (currentStatus !== 'online') {
+        return {
+          success: false,
+          error: `[BAT-001] Cannot run diagnostics - pack is ${currentStatus.toUpperCase()}\n\nUse 'bat power on' to boot the pack first.`,
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (batDevice) {
+        await batDevice.runTest()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1800))
+      }
+      ctx.setTyping(false)
+
+      const avgHealth = cellHealth.reduce((a, b) => a + b, 0) / cellHealth.length
+
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│           BAT-001 DIAGNOSTICS REPORT                        │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  TEST RESULTS:',
+          '    [✓] Cell array integrity     PASS',
+          '    [✓] Voltage levels           PASS',
+          '    [✓] Capacity verification    PASS',
+          '    [✓] Discharge rate test      PASS',
+          '    [✓] Thermal sensors          PASS',
+          '',
+          '  SUMMARY:',
+          `    Overall Status:  HEALTHY`,
+          `    Cell Health:     ${avgHealth.toFixed(1)}%`,
+          `    Charge Level:    ${chargePercent}%`,
+          `    Temperature:     ${temperature}°C`,
+          '',
+          '  All systems operational.',
+          '',
+        ],
+      }
+    }
+
+    // RESET command
+    if (action === 'reset' || action === 'reboot') {
+      if (currentStatus === 'standby' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: `[BAT-001] Cannot reboot - pack is ${currentStatus.toUpperCase()}\n\nUse 'bat power on' to boot the pack first.`,
+        }
+      }
+      if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+        return {
+          success: false,
+          error: '[BAT-001] Cannot reboot - operation in progress.',
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (batDevice) {
+        await batDevice.reboot()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1200))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ╔═══════════════════════════════════════════╗',
+          '  ║      BAT-001 REBOOT SEQUENCE              ║',
+          '  ╚═══════════════════════════════════════════╝',
+          '',
+          '  [✓] State saved',
+          '  [✓] Connections closed',
+          '  [✓] Safe shutdown',
+          '  [✓] Cell check passed',
+          '  [✓] Voltage calibrated',
+          '  [✓] CDC handshake established',
+          '  [✓] Auto-regen active',
+          '',
+          '  Status: ONLINE',
+          `  Charge: ${chargePercent}%`,
+          '',
+        ],
+      }
+    }
+
+    // INFO command
+    if (action === 'info' || action === 'docs' || action === 'documentation') {
+      return {
+        success: true,
+        output: [
+          '',
+          '╔═════════════════════════════════════════════════════════════════╗',
+          '║                 BAT-001: PORTABLE BATTERY PACK                   ║',
+          '║                    Technical Documentation                       ║',
+          '╠═════════════════════════════════════════════════════════════════╣',
+          '',
+          '  DEVICE OVERVIEW:',
+          '    The Portable Battery Pack (BAT-001) provides energy storage',
+          '    for the laboratory. It stores excess power from generators',
+          '    and releases it during high-demand periods.',
+          '',
+          '  SPECIFICATIONS:',
+          '    Device ID:      BAT-001',
+          '    Category:       Storage',
+          '    Priority:       P2 (Secondary)',
+          '',
+          '  STORAGE CHARACTERISTICS:',
+          '    Capacity:       5,000 E',
+          '    Charge Rate:    100 E/s',
+          '    Discharge Rate: 150 E/s (burst)',
+          '    Self-Discharge: 0.5 E/s (idle)',
+          '    Standby Drain:  0.1 E/s',
+          '',
+          '  CELL ARRAY:',
+          '    4 independent cells with health monitoring.',
+          '    Each cell can be individually tested.',
+          '    Thermal protection prevents overheating.',
+          '',
+          `  FIRMWARE: v${firmware.version}`,
+          '  FEATURES:',
+          ...firmware.features.map(f => `    • ${f}`),
+          '',
+          '  CONNECTED DEVICES:',
+          '    UEC-001  Unstable Energy Core    (Charger)',
+          '    CDC-001  Crystal Data Cache      (Consumer)',
+          '    EXD-001  Explorer Drone          (Field Use)',
+          '',
+          '  COMMANDS:',
+          '    bat status          - Show battery status',
+          '    bat power [on|off]  - Toggle power state',
+          '    bat firmware        - View firmware info',
+          '    bat firmware update - Check for updates',
+          '    bat firmware patch  - Apply security patches',
+          '    bat regen [on|off]  - Toggle auto-regeneration',
+          '    bat test            - Run diagnostics',
+          '    bat reset           - Reboot pack',
+          '',
+          '  LOCATION IN unOS:',
+          '    /sys/devices/bat-001/',
+          '    /var/log/bat/',
+          '    /etc/bat/config',
+          '',
+          '╚═════════════════════════════════════════════════════════════════╝',
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `unknown bat command: ${action}\n\ntype bat for available commands.`,
+    }
+  },
+}
+
+// ==================================================
+// HMS - Handmade Synthesizer Management Command
+// ==================================================
+const hmsCommand: Command = {
+  name: 'hms',
+  aliases: ['synth', 'synthesizer'],
+  description: 'Handmade Synthesizer management and firmware control',
+  execute: async (args, ctx) => {
+    const [action, ...params] = args
+
+    // Get HMS device from context (for bidirectional sync)
+    const hmsDevice = ctx.data.hmsDevice
+
+    // Get firmware and power specs from device or use defaults
+    const firmware = hmsDevice?.getFirmware() ?? {
+      version: '3.2.1',
+      build: '2024.02.15',
+      checksum: 'C5D8E3F1',
+      securityPatch: '2024.02.10',
+      features: ['multi-osc', 'waveform-gen', 'filter-bank', 'slice-synthesis', 'trait-morph'],
+    }
+
+    const powerSpecs = hmsDevice?.getPowerSpecs() ?? {
+      full: 8,
+      idle: 3,
+      standby: 0.5,
+      resonance: 12,
+      category: 'medium',
+      priority: 3,
+    }
+
+    // Get current device state if available
+    const deviceState = hmsDevice?.getState()
+    const currentStatus = deviceState?.deviceState ?? 'online'
+    const isPowered = deviceState?.isPowered ?? true
+    const pulseValue = deviceState?.pulseValue ?? 35
+    const tempoValue = deviceState?.tempoValue ?? 40
+    const freqValue = deviceState?.freqValue ?? 37
+    const waveformType = deviceState?.waveformType ?? 'sine'
+    const oscillatorCount = deviceState?.oscillatorCount ?? 4
+    const currentTier = deviceState?.currentTier ?? 1
+
+    // Calculate current draw based on state
+    const currentDraw = currentStatus === 'standby' ? powerSpecs.standby :
+                       currentStatus === 'testing' ? powerSpecs.full :
+                       powerSpecs.idle
+
+    // Show help if no action
+    if (!action) {
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│          HMS-001: HANDMADE SYNTHESIZER                      │',
+          '│              Management Console v1.0                        │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  COMMANDS:',
+          '    hms status       - Show device status and parameters',
+          '    hms power [on|off] - Toggle power (standby mode)',
+          '    hms firmware     - Show firmware information',
+          '    hms firmware update - Check for firmware updates',
+          '    hms firmware patch  - Apply security patches',
+          '    hms test         - Run hardware diagnostics',
+          '    hms reset        - Reboot device',
+          '    hms wave [type]  - Set waveform (sine|square|saw|triangle)',
+          '    hms knob [p|t|f] [value] - Set knob value (0-100)',
+          '    hms info         - Show full device documentation',
+          '',
+          '  POWER INTEGRATION:',
+          `    Full: ${powerSpecs.full} E/s | Idle: ${powerSpecs.idle} E/s | Standby: ${powerSpecs.standby} E/s | Resonance: ${powerSpecs.resonance} E/s`,
+          '',
+        ],
+      }
+    }
+
+    // STATUS command
+    if (action === 'status' || action === 'stat') {
+      ctx.setTyping(true)
+      await new Promise(resolve => setTimeout(resolve, 500))
+      ctx.setTyping(false)
+
+      const stateLabel = currentStatus === 'standby' ? 'STANDBY' :
+                        currentStatus === 'booting' ? 'BOOTING' :
+                        currentStatus === 'testing' ? 'TESTING' :
+                        currentStatus === 'rebooting' ? 'REBOOTING' :
+                        currentStatus === 'shutdown' ? 'SHUTDOWN' : 'ONLINE'
+      const modeLabel = currentStatus === 'standby' ? 'STANDBY' :
+                       currentStatus === 'testing' ? 'FULL (DIAG)' : 'IDLE'
+
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│          HMS-001: STATUS REPORT                             │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  DEVICE INFO:',
+          '    Name:       Handmade Synthesizer',
+          '    ID:         HMS-001',
+          `    Firmware:   v${firmware.version} (build ${firmware.build})`,
+          '    Tech Tree:  Synthesizers',
+          `    Tier:       ${currentTier}/5`,
+          '',
+          '  POWER STATE:',
+          `    Status:     ${stateLabel}`,
+          `    Mode:       ${modeLabel}`,
+          `    Draw:       ${currentDraw} E/s`,
+          '    Priority:   P3 (Medium)',
+          '',
+          '  OSCILLATOR STATUS:',
+          `    Oscillators:  ${oscillatorCount} active`,
+          `    Waveform:     ${waveformType.toUpperCase()}`,
+          '',
+          '  KNOB VALUES:',
+          `    PULSE:  ${pulseValue.toString().padStart(3)} [${'#'.repeat(Math.floor(pulseValue / 10))}${'-'.repeat(10 - Math.floor(pulseValue / 10))}]`,
+          `    TEMPO:  ${tempoValue.toString().padStart(3)} [${'#'.repeat(Math.floor(tempoValue / 10))}${'-'.repeat(10 - Math.floor(tempoValue / 10))}]`,
+          `    FREQ:   ${freqValue.toString().padStart(3)} [${'#'.repeat(Math.floor(freqValue / 10))}${'-'.repeat(10 - Math.floor(freqValue / 10))}]`,
+          '',
+          '  CONNECTED DEVICES:',
+          '    CDC-001:    Connected (Data)',
+          '    UEC-001:    Connected (Power)',
+          '    IPL-001:    Connected (Optics)',
+          '',
+        ],
+      }
+    }
+
+    // POWER command
+    if (action === 'power') {
+      const powerState = params[0]?.toLowerCase()
+
+      if (!powerState || (powerState !== 'on' && powerState !== 'off')) {
+        return {
+          success: true,
+          output: [
+            '',
+            '  HMS-001 POWER CONTROL:',
+            '',
+            '    hms power on   - Boot synth from standby',
+            '    hms power off  - Enter standby mode (0.5 E/s)',
+            '',
+            `  Current State: ${currentStatus === 'standby' ? 'STANDBY' : 'ONLINE'}`,
+            `  Current Draw:  ${currentDraw} E/s`,
+            '',
+          ],
+        }
+      }
+
+      // Check if device is already in the requested state
+      if (powerState === 'off' && currentStatus === 'standby') {
+        return {
+          success: false,
+          error: '[HMS-001] Synthesizer is already in STANDBY mode',
+        }
+      }
+      if (powerState === 'on' && currentStatus === 'online') {
+        return {
+          success: false,
+          error: '[HMS-001] Synthesizer is already ONLINE',
+        }
+      }
+
+      // Check if device is busy
+      if (currentStatus === 'booting' || currentStatus === 'testing' || currentStatus === 'rebooting' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: `[HMS-001] Cannot change power state while synth is ${currentStatus.toUpperCase()}`,
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (powerState === 'off') {
+        // Trigger actual shutdown on device UI
+        if (hmsDevice) {
+          await hmsDevice.powerOff()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 800))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '[HMS-001] Initiating shutdown sequence...',
+            '[HMS-001] Draining oscillator buffers...',
+            '[HMS-001] Waveform generator offline...',
+            '[HMS-001] Filter bank discharged...',
+            '[HMS-001] System halted',
+            '',
+            '[HMS-001] Synthesizer entered STANDBY mode',
+            `[HMS-001] Power draw: ${powerSpecs.standby} E/s`,
+            '',
+          ],
+        }
+      } else {
+        // Trigger actual boot on device UI
+        if (hmsDevice) {
+          await hmsDevice.powerOn()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 800))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '[HMS-001] Initiating boot sequence...',
+            '[HMS-001] Power on................. OK',
+            '[HMS-001] Oscillator init.......... OK',
+            '[HMS-001] Waveform generator....... OK',
+            '[HMS-001] Filter bank.............. OK',
+            '[HMS-001] Calibration.............. OK',
+            '',
+            '[HMS-001] Synthesizer is now ONLINE',
+            `[HMS-001] Power draw: ${powerSpecs.idle} E/s`,
+            '',
+          ],
+        }
+      }
+    }
+
+    // FIRMWARE command
+    if (action === 'firmware' || action === 'fw') {
+      const fwAction = params[0]?.toLowerCase()
+
+      if (!fwAction) {
+        return {
+          success: true,
+          output: [
+            '',
+            '┌─────────────────────────────────────────────────────────────┐',
+            '│          HMS-001: FIRMWARE INFORMATION                      │',
+            '└─────────────────────────────────────────────────────────────┘',
+            '',
+            '  INSTALLED FIRMWARE:',
+            `    Version:        v${firmware.version}`,
+            `    Build Date:     ${firmware.build}`,
+            `    Checksum:       ${firmware.checksum}`,
+            `    Security Patch: ${firmware.securityPatch}`,
+            '',
+            '  INSTALLED FEATURES:',
+            ...firmware.features.map(f => `    • ${f}`),
+            '',
+            '  COMMANDS:',
+            '    hms firmware update  - Check for updates',
+            '    hms firmware patch   - Apply security patches',
+            '    hms firmware verify  - Verify firmware integrity',
+            '',
+          ],
+        }
+      }
+
+      if (fwAction === 'update' || fwAction === 'check') {
+        ctx.setTyping(true)
+        await new Promise(resolve => setTimeout(resolve, 1200))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '[FIRMWARE] Checking for updates...',
+            '[FIRMWARE] Contacting update server...',
+            '[FIRMWARE] Comparing versions...',
+            '',
+            `[FIRMWARE] Installed: v${firmware.version}`,
+            '[FIRMWARE] Latest:    v3.2.1',
+            '',
+            '[FIRMWARE] Your firmware is up to date.',
+            '',
+          ],
+        }
+      }
+
+      if (fwAction === 'patch') {
+        ctx.setTyping(true)
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '[SECURITY] Checking for security patches...',
+            '[SECURITY] Analyzing vulnerabilities...',
+            '[SECURITY] Verifying patch signatures...',
+            '',
+            `[SECURITY] Last patch: ${firmware.securityPatch}`,
+            '[SECURITY] No new security patches available.',
+            '',
+            '[SECURITY] Device is fully patched.',
+            '',
+          ],
+        }
+      }
+
+      if (fwAction === 'verify') {
+        ctx.setTyping(true)
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '[VERIFY] Running firmware integrity check...',
+            '[VERIFY] Calculating checksum...',
+            '[VERIFY] Comparing with manifest...',
+            '',
+            `[VERIFY] Expected: ${firmware.checksum}`,
+            `[VERIFY] Actual:   ${firmware.checksum}`,
+            '',
+            '[VERIFY] Firmware integrity: VERIFIED',
+            '',
+          ],
+        }
+      }
+    }
+
+    // WAVE command - set waveform type
+    if (action === 'wave' || action === 'waveform') {
+      const waveType = params[0]?.toLowerCase()
+
+      if (!waveType) {
+        return {
+          success: true,
+          output: [
+            '',
+            '  HMS-001 WAVEFORM CONTROL:',
+            '',
+            '    hms wave sine     - Smooth sine wave',
+            '    hms wave square   - Digital square wave',
+            '    hms wave saw      - Sawtooth wave',
+            '    hms wave triangle - Triangle wave',
+            '',
+            `  Current: ${waveformType.toUpperCase()}`,
+            '',
+          ],
+        }
+      }
+
+      if (currentStatus !== 'online') {
+        return {
+          success: false,
+          error: `[HMS-001] Cannot change waveform - synth is ${currentStatus.toUpperCase()}\n\nUse 'hms power on' to boot the synth first.`,
+        }
+      }
+
+      const validWaves = ['sine', 'square', 'saw', 'triangle']
+      if (!validWaves.includes(waveType)) {
+        return {
+          success: false,
+          error: `invalid waveform: ${waveType}\n\nValid types: sine, square, saw, triangle`,
+        }
+      }
+
+      if (hmsDevice) {
+        hmsDevice.setWaveform(waveType as 'sine' | 'square' | 'saw' | 'triangle')
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          `  [HMS-001] Waveform set to ${waveType.toUpperCase()}.`,
+          '',
+        ],
+      }
+    }
+
+    // KNOB command - set knob values
+    if (action === 'knob' || action === 'k') {
+      const knobType = params[0]?.toLowerCase()
+      const knobValue = params[1] ? parseInt(params[1], 10) : undefined
+
+      if (!knobType) {
+        return {
+          success: true,
+          output: [
+            '',
+            '  HMS-001 KNOB CONTROL:',
+            '',
+            '    hms knob p [value]  - Set PULSE (0-100)',
+            '    hms knob t [value]  - Set TEMPO (0-100)',
+            '    hms knob f [value]  - Set FREQ (0-100)',
+            '',
+            '  CURRENT VALUES:',
+            `    PULSE:  ${pulseValue}`,
+            `    TEMPO:  ${tempoValue}`,
+            `    FREQ:   ${freqValue}`,
+            '',
+          ],
+        }
+      }
+
+      if (currentStatus !== 'online') {
+        return {
+          success: false,
+          error: `[HMS-001] Cannot adjust knobs - synth is ${currentStatus.toUpperCase()}\n\nUse 'hms power on' to boot the synth first.`,
+        }
+      }
+
+      const knobMap: Record<string, 'pulse' | 'tempo' | 'freq'> = {
+        p: 'pulse', pulse: 'pulse',
+        t: 'tempo', tempo: 'tempo',
+        f: 'freq', freq: 'freq',
+      }
+
+      const knob = knobMap[knobType]
+      if (!knob) {
+        return {
+          success: false,
+          error: `invalid knob: ${knobType}\n\nValid knobs: p (pulse), t (tempo), f (freq)`,
+        }
+      }
+
+      if (knobValue === undefined || isNaN(knobValue) || knobValue < 0 || knobValue > 100) {
+        return {
+          success: false,
+          error: `invalid value: ${params[1] ?? 'missing'}\n\nValue must be 0-100`,
+        }
+      }
+
+      if (hmsDevice) {
+        hmsDevice.setKnobValue(knob, knobValue)
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          `  [HMS-001] ${knob.toUpperCase()} set to ${knobValue}.`,
+          '',
+        ],
+      }
+    }
+
+    // TEST command
+    if (action === 'test' || action === 'diag') {
+      if (currentStatus !== 'online') {
+        return {
+          success: false,
+          error: `[HMS-001] Cannot run diagnostics - synth is ${currentStatus.toUpperCase()}\n\nUse 'hms power on' to boot the synth first.`,
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (hmsDevice) {
+        await hmsDevice.runTest()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1800))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│           HMS-001 DIAGNOSTICS REPORT                        │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '  TEST RESULTS:',
+          '    [✓] Oscillator array        PASS',
+          '    [✓] Waveform generator      PASS',
+          '    [✓] Filter bank             PASS',
+          '    [✓] Output stage            PASS',
+          '    [✓] Calibration             PASS',
+          '',
+          '  SUMMARY:',
+          `    Oscillators:  ${oscillatorCount} active`,
+          `    Waveform:     ${waveformType.toUpperCase()}`,
+          `    Tier:         ${currentTier}/5`,
+          '',
+          '  All systems operational.',
+          '',
+        ],
+      }
+    }
+
+    // RESET command
+    if (action === 'reset' || action === 'reboot') {
+      if (currentStatus === 'standby' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: `[HMS-001] Cannot reboot - synth is ${currentStatus.toUpperCase()}\n\nUse 'hms power on' to boot the synth first.`,
+        }
+      }
+      if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+        return {
+          success: false,
+          error: '[HMS-001] Cannot reboot - operation in progress.',
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (hmsDevice) {
+        await hmsDevice.reboot()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1500))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ╔═══════════════════════════════════════════╗',
+          '  ║      HMS-001 REBOOT SEQUENCE              ║',
+          '  ╚═══════════════════════════════════════════╝',
+          '',
+          '  [✓] Buffers drained',
+          '  [✓] Power cycled',
+          '  [✓] Oscillators initialized',
+          '  [✓] Waveform generator ready',
+          '  [✓] Filter bank calibrated',
+          '  [✓] System online',
+          '',
+          '  Status: ONLINE',
+          `  Waveform: ${waveformType.toUpperCase()}`,
+          '',
+        ],
+      }
+    }
+
+    // INFO command
+    if (action === 'info' || action === 'docs' || action === 'documentation') {
+      return {
+        success: true,
+        output: [
+          '',
+          '╔═════════════════════════════════════════════════════════════════╗',
+          '║                 HMS-001: HANDMADE SYNTHESIZER                    ║',
+          '║                    Technical Documentation                       ║',
+          '╠═════════════════════════════════════════════════════════════════╣',
+          '',
+          '  DEVICE OVERVIEW:',
+          '    The Handmade Synthesizer (HMS-001) is a multi-oscillator',
+          '    waveform generator used for crystal slice synthesis and',
+          '    trait morphing operations in the laboratory.',
+          '',
+          '  SPECIFICATIONS:',
+          '    Device ID:      HMS-001',
+          '    Category:       Medium Consumer',
+          '    Priority:       P3 (Medium)',
+          '    Tech Tree:      Synthesizers',
+          '',
+          '  POWER CHARACTERISTICS:',
+          '    Full Operation: 8 E/s',
+          '    Idle Mode:      3 E/s',
+          '    Standby:        0.5 E/s',
+          '    Resonance Mode: 12 E/s',
+          '',
+          '  OSCILLATOR SYSTEM:',
+          '    Base oscillators: 4 (Tier 1)',
+          '    Max oscillators:  8 (Tier 5)',
+          '    Waveforms: sine, square, saw, triangle',
+          '',
+          '  KNOB CONTROLS:',
+          '    PULSE - Controls oscillator pulse width (0-100)',
+          '    TEMPO - Controls synthesis tempo/rate (0-100)',
+          '    FREQ  - Controls output frequency (0-100)',
+          '',
+          `  FIRMWARE: v${firmware.version}`,
+          '  FEATURES:',
+          ...firmware.features.map(f => `    • ${f}`),
+          '',
+          '  TIER CAPABILITIES:',
+          '    T1: Basic synthesis, 4 oscillators',
+          '    T2: Slice morphing, 5 oscillators',
+          '    T3: State manipulation, 6 oscillators',
+          '    T4: Advanced synthesis, 7 oscillators',
+          '    T5: Full spectrum, 8 oscillators',
+          '',
+          '  CONNECTED DEVICES:',
+          '    CDC-001  Crystal Data Cache    (Data Feed)',
+          '    UEC-001  Unstable Energy Core  (Power)',
+          '    IPL-001  Interpolator          (Optics)',
+          '',
+          '  COMMANDS:',
+          '    hms status          - Show synth status',
+          '    hms power [on|off]  - Toggle power state',
+          '    hms firmware        - View firmware info',
+          '    hms wave [type]     - Set waveform type',
+          '    hms knob [k] [val]  - Adjust knob values',
+          '    hms test            - Run diagnostics',
+          '    hms reset           - Reboot synth',
+          '',
+          '  LOCATION IN unOS:',
+          '    /sys/devices/hms-001/',
+          '    /var/log/hms/',
+          '    /etc/hms/config',
+          '',
+          '╚═════════════════════════════════════════════════════════════════╝',
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `unknown hms command: ${action}\n\ntype hms for available commands.`,
+    }
+  },
+}
+
+// ECR-001: Echo Recorder control command
+const ecrCommand: Command = {
+  name: 'ecr',
+  aliases: ['echo-recorder', 'ecr001'],
+  description: 'Echo Recorder management (ECR-001)',
+  usage: 'ecr [status|power|firmware|test|reset|record|knob|info]',
+  execute: async (args, ctx) => {
+    const ecrDevice = ctx.data.ecrDevice
+    const action = args[0]?.toLowerCase()
+
+    // Get current state from device if available
+    const state = ecrDevice?.getState() ?? {
+      deviceState: 'standby',
+      statusMessage: '',
+      isPowered: false,
+      pulseValue: 0,
+      bloomValue: 0,
+      tickerTap: 0,
+      isRecording: false,
+      signalStrength: 0,
+      currentTier: 1,
+    }
+    const firmware = ecrDevice?.getFirmware() ?? {
+      version: '1.1.0',
+      build: '2024.01.28',
+      checksum: 'D7E9F2A3',
+      features: ['blockchain-feed', 'rotation-track', 'oracle-sync', 'signal-decode', 'ticker-tap'],
+      securityPatch: '2024.01.25',
+    }
+    const powerSpecs = ecrDevice?.getPowerSpecs() ?? {
+      full: 5,
+      idle: 2,
+      standby: 0.3,
+      recording: 7,
+      category: 'low',
+      priority: 4,
+    }
+
+    const currentStatus = state.deviceState
+    const isPowered = state.isPowered
+    const pulseValue = state.pulseValue
+    const bloomValue = state.bloomValue
+    const tickerTap = state.tickerTap
+    const isRecording = state.isRecording
+    const signalStrength = state.signalStrength
+    const currentTier = state.currentTier
+
+    // No args - show usage
+    if (!action) {
+      return {
+        success: true,
+        output: [
+          '',
+          '╭─────────────────────────────────────────────────╮',
+          '│          ECR-001 :: ECHO RECORDER               │',
+          '╰─────────────────────────────────────────────────╯',
+          '',
+          '  USAGE:',
+          '    ecr status          Show recorder status',
+          '    ecr power [on|off]  Toggle power/standby',
+          '    ecr firmware        View firmware info',
+          '    ecr test            Run diagnostics',
+          '    ecr reset           Reboot device',
+          '    ecr record [on|off] Toggle recording mode',
+          '    ecr knob [k] [val]  Adjust knob values (p=pulse, b=bloom)',
+          '    ecr info            Full documentation',
+          '',
+          '  EXAMPLES:',
+          '    ecr power on        Boot the recorder',
+          '    ecr record on       Start recording blockchain feed',
+          '    ecr knob p 75       Set pulse to 75%',
+          '    ecr knob b 50       Set bloom to 50%',
+          '',
+        ],
+      }
+    }
+
+    // STATUS command
+    if (action === 'status' || action === 'stat' || action === 's') {
+      const stateSymbol = currentStatus === 'online' ? '●' : currentStatus === 'standby' ? '○' : '◐'
+      const stateColor = currentStatus === 'online' ? 'ONLINE' : currentStatus.toUpperCase()
+      const recordSymbol = isRecording ? '◉ REC' : '○ IDLE'
+
+      // Signal bar visualization
+      const signalBars = Math.round(signalStrength / 20)
+      const signalDisplay = '▁▂▃▅▆'.slice(0, signalBars).padEnd(5, ' ')
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌───────────────────────────────────────────┐',
+          '  │         ECR-001 STATUS REPORT             │',
+          '  └───────────────────────────────────────────┘',
+          '',
+          `     Device State:   ${stateSymbol} ${stateColor}`,
+          `     Power:          ${isPowered ? 'ACTIVE' : 'STANDBY'}`,
+          `     Recording:      ${recordSymbol}`,
+          `     Signal:         ${signalDisplay} ${signalStrength}%`,
+          '',
+          '  ┌─────────────────────────────────────────────┐',
+          '  │  KNOBS                 │  METRICS           │',
+          '  ├─────────────────────────┼────────────────────┤',
+          `  │  PULSE    [${String(pulseValue).padStart(3)}%]     │  Tier:      T${currentTier}      │`,
+          `  │  BLOOM    [${String(bloomValue).padStart(3)}%]     │  Ticker:    ${String(tickerTap).padStart(3)}      │`,
+          '  └─────────────────────────┴────────────────────┘',
+          '',
+          `  Firmware: v${firmware.version}   Category: ${powerSpecs.category.toUpperCase()}`,
+          '',
+        ],
+      }
+    }
+
+    // POWER command
+    if (action === 'power' || action === 'pwr' || action === 'p') {
+      const subAction = args[1]?.toLowerCase()
+
+      if (!subAction) {
+        return {
+          success: true,
+          output: [
+            '',
+            `  ECR-001 Power: ${isPowered ? 'ACTIVE' : 'STANDBY'}`,
+            '',
+            '  Usage: ecr power [on|off]',
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'on' || subAction === 'boot' || subAction === 'start') {
+        if (isPowered && (currentStatus === 'online' || currentStatus === 'booting')) {
+          return {
+            success: false,
+            error: `[ECR-001] Already ${currentStatus.toUpperCase()}.`,
+          }
+        }
+
+        ctx.setTyping(true)
+
+        if (ecrDevice) {
+          await ecrDevice.powerOn()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║      ECR-001 BOOT SEQUENCE                ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  [■□□□□□] Initializing blockchain receiver...',
+            '  [■■□□□□] Loading oracle connections...',
+            '  [■■■□□□] Calibrating signal decoder...',
+            '  [■■■■□□] Starting ticker tap interface...',
+            '  [■■■■■□] Syncing rotation tracker...',
+            '  [■■■■■■] System ready',
+            '',
+            '  Status: ONLINE',
+            '  Recording: STANDBY',
+            '  Signal Locked: YES',
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'off' || subAction === 'shutdown' || subAction === 'stop') {
+        if (!isPowered || currentStatus === 'standby' || currentStatus === 'shutdown') {
+          return {
+            success: false,
+            error: '[ECR-001] Already in standby mode.',
+          }
+        }
+        if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+          return {
+            success: false,
+            error: `[ECR-001] Cannot shutdown - operation in progress (${currentStatus}).`,
+          }
+        }
+
+        ctx.setTyping(true)
+
+        if (ecrDevice) {
+          await ecrDevice.powerOff()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 1500))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║      ECR-001 SHUTDOWN SEQUENCE            ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  [✓] Recording stopped',
+            '  [✓] Signal disconnected',
+            '  [✓] Oracle feed closed',
+            '  [✓] Buffers flushed',
+            '  [✓] Power state saved',
+            '',
+            '  Status: STANDBY',
+            '  Power Draw: 0.3 E/s',
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: false,
+        error: `Unknown power action: ${subAction}\n\nUsage: ecr power [on|off]`,
+      }
+    }
+
+    // FIRMWARE command
+    if (action === 'firmware' || action === 'fw' || action === 'f') {
+      const subAction = args[1]?.toLowerCase()
+
+      if (subAction === 'update' || subAction === 'upgrade') {
+        ctx.setTyping(true)
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ┌─────────────────────────────────────────────┐',
+            '  │       ECR-001 FIRMWARE UPDATE CHECK         │',
+            '  └─────────────────────────────────────────────┘',
+            '',
+            `  Current Version:   v${firmware.version}`,
+            '  Latest Version:    v1.1.0',
+            '',
+            '  [✓] Firmware is up to date.',
+            '',
+            `  Security Patch:    ${firmware.securityPatch}`,
+            '  Status:            NO UPDATE REQUIRED',
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌─────────────────────────────────────────────┐',
+          '  │         ECR-001 FIRMWARE INFO               │',
+          '  └─────────────────────────────────────────────┘',
+          '',
+          `  Version:       v${firmware.version}`,
+          `  Build:         ${firmware.build}`,
+          `  Checksum:      ${firmware.checksum}`,
+          `  Security:      ${firmware.securityPatch}`,
+          '',
+          '  FEATURES:',
+          ...firmware.features.map(f => `    ◆ ${f}`),
+          '',
+          '  Use: ecr firmware update - to check for updates',
+          '',
+        ],
+      }
+    }
+
+    // TEST command
+    if (action === 'test' || action === 'diag' || action === 'diagnostics') {
+      if (currentStatus === 'standby' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: `[ECR-001] Cannot run diagnostics - recorder is ${currentStatus.toUpperCase()}\n\nUse 'ecr power on' to boot the recorder first.`,
+        }
+      }
+      if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+        return {
+          success: false,
+          error: '[ECR-001] Cannot run diagnostics - operation in progress.',
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (ecrDevice) {
+        await ecrDevice.runTest()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 2500))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ╔═══════════════════════════════════════════╗',
+          '  ║      ECR-001 DIAGNOSTIC SEQUENCE          ║',
+          '  ╚═══════════════════════════════════════════╝',
+          '',
+          '  Running self-test...',
+          '',
+          '  [✓] Blockchain receiver      PASSED',
+          '  [✓] Oracle connection        PASSED',
+          '  [✓] Signal decoder           PASSED',
+          '  [✓] Ticker tap interface     PASSED',
+          '  [✓] Rotation tracker         PASSED',
+          '  [✓] Recording buffer         PASSED',
+          '  [✓] Memory integrity         PASSED',
+          '  [✓] Power subsystem          PASSED',
+          '',
+          '  ─────────────────────────────────────────────',
+          '  DIAGNOSTIC RESULT: ALL TESTS PASSED',
+          `  Signal Strength: ${signalStrength}%`,
+          `  Current Tier: T${currentTier}`,
+          '  ─────────────────────────────────────────────',
+          '',
+        ],
+      }
+    }
+
+    // RECORD command
+    if (action === 'record' || action === 'rec' || action === 'r') {
+      const subAction = args[1]?.toLowerCase()
+
+      if (currentStatus === 'standby' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: `[ECR-001] Cannot toggle recording - recorder is ${currentStatus.toUpperCase()}\n\nUse 'ecr power on' to boot the recorder first.`,
+        }
+      }
+
+      if (!subAction) {
+        return {
+          success: true,
+          output: [
+            '',
+            `  ECR-001 Recording: ${isRecording ? '◉ ACTIVE' : '○ STANDBY'}`,
+            '',
+            '  Usage: ecr record [on|off]',
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'on' || subAction === 'start') {
+        if (isRecording) {
+          return {
+            success: false,
+            error: '[ECR-001] Already recording.',
+          }
+        }
+
+        ctx.setTyping(true)
+
+        if (ecrDevice) {
+          ecrDevice.setRecording(true)
+        }
+        await new Promise(resolve => setTimeout(resolve, 800))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║      ECR-001 RECORDING STARTED            ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  [✓] Blockchain feed locked',
+            '  [✓] Oracle stream connected',
+            '  [✓] Recording buffer active',
+            '',
+            '  Status: ◉ RECORDING',
+            `  Power Draw: ${powerSpecs.recording} E/s`,
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'off' || subAction === 'stop') {
+        if (!isRecording) {
+          return {
+            success: false,
+            error: '[ECR-001] Not currently recording.',
+          }
+        }
+
+        ctx.setTyping(true)
+
+        if (ecrDevice) {
+          ecrDevice.setRecording(false)
+        }
+        await new Promise(resolve => setTimeout(resolve, 500))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║      ECR-001 RECORDING STOPPED            ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  [✓] Recording buffer saved',
+            '  [✓] Oracle stream paused',
+            '',
+            '  Status: ○ IDLE',
+            `  Power Draw: ${powerSpecs.idle} E/s`,
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: false,
+        error: `Unknown record action: ${subAction}\n\nUsage: ecr record [on|off]`,
+      }
+    }
+
+    // KNOB command
+    if (action === 'knob' || action === 'k' || action === 'set') {
+      const knobArg = args[1]?.toLowerCase()
+      const valueArg = args[2]
+
+      if (currentStatus === 'standby' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: `[ECR-001] Cannot adjust knobs - recorder is ${currentStatus.toUpperCase()}\n\nUse 'ecr power on' to boot the recorder first.`,
+        }
+      }
+
+      if (!knobArg) {
+        return {
+          success: true,
+          output: [
+            '',
+            '  ECR-001 Knob Values:',
+            '',
+            `    PULSE [P]  ${String(pulseValue).padStart(3)}%  - Signal pulse width`,
+            `    BLOOM [B]  ${String(bloomValue).padStart(3)}%  - Visual bloom intensity`,
+            '',
+            '  Usage: ecr knob [p|b] [0-100]',
+            '',
+            '  Examples:',
+            '    ecr knob p 75    Set pulse to 75%',
+            '    ecr knob b 50    Set bloom to 50%',
+            '',
+          ],
+        }
+      }
+
+      // Map knob argument to full name
+      let knobName: 'pulse' | 'bloom' | null = null
+      if (knobArg === 'p' || knobArg === 'pulse') {
+        knobName = 'pulse'
+      } else if (knobArg === 'b' || knobArg === 'bloom') {
+        knobName = 'bloom'
+      }
+
+      if (!knobName) {
+        return {
+          success: false,
+          error: `Unknown knob: ${knobArg}\n\nAvailable knobs: p (pulse), b (bloom)`,
+        }
+      }
+
+      if (!valueArg) {
+        const currentValue = knobName === 'pulse' ? pulseValue : bloomValue
+        return {
+          success: true,
+          output: [
+            '',
+            `  ECR-001 ${knobName.toUpperCase()}: ${currentValue}%`,
+            '',
+            `  Usage: ecr knob ${knobArg} [0-100]`,
+            '',
+          ],
+        }
+      }
+
+      const newValue = parseInt(valueArg, 10)
+      if (isNaN(newValue) || newValue < 0 || newValue > 100) {
+        return {
+          success: false,
+          error: `Invalid value: ${valueArg}\n\nValue must be between 0 and 100.`,
+        }
+      }
+
+      // Update knob via device actions
+      if (ecrDevice) {
+        ecrDevice.setKnobValue(knobName, newValue)
+      }
+
+      const displayName = knobName.toUpperCase()
+      const oldValue = knobName === 'pulse' ? pulseValue : bloomValue
+      const barLength = 20
+      const filledOld = Math.round((oldValue / 100) * barLength)
+      const filledNew = Math.round((newValue / 100) * barLength)
+      const oldBar = '█'.repeat(filledOld) + '░'.repeat(barLength - filledOld)
+      const newBar = '█'.repeat(filledNew) + '░'.repeat(barLength - filledNew)
+
+      return {
+        success: true,
+        output: [
+          '',
+          `  ECR-001 ${displayName} adjusted:`,
+          '',
+          `    Old: [${oldBar}] ${String(oldValue).padStart(3)}%`,
+          `    New: [${newBar}] ${String(newValue).padStart(3)}%`,
+          '',
+        ],
+      }
+    }
+
+    // RESET/REBOOT command
+    if (action === 'reset' || action === 'reboot') {
+      if (currentStatus === 'standby' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: `[ECR-001] Cannot reboot - recorder is ${currentStatus.toUpperCase()}\n\nUse 'ecr power on' to boot the recorder first.`,
+        }
+      }
+      if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+        return {
+          success: false,
+          error: '[ECR-001] Cannot reboot - operation in progress.',
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (ecrDevice) {
+        await ecrDevice.reboot()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1500))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ╔═══════════════════════════════════════════╗',
+          '  ║      ECR-001 REBOOT SEQUENCE              ║',
+          '  ╚═══════════════════════════════════════════╝',
+          '',
+          '  [✓] Recording stopped',
+          '  [✓] Buffers flushed',
+          '  [✓] Power cycled',
+          '  [✓] Blockchain receiver initialized',
+          '  [✓] Oracle connections restored',
+          '  [✓] System online',
+          '',
+          '  Status: ONLINE',
+          '  Recording: STANDBY',
+          '',
+        ],
+      }
+    }
+
+    // INFO command
+    if (action === 'info' || action === 'docs' || action === 'documentation') {
+      return {
+        success: true,
+        output: [
+          '',
+          '╔═════════════════════════════════════════════════════════════════╗',
+          '║                  ECR-001: ECHO RECORDER                         ║',
+          '║                    Technical Documentation                      ║',
+          '╠═════════════════════════════════════════════════════════════════╣',
+          '',
+          '  DEVICE OVERVIEW:',
+          '    The Echo Recorder (ECR-001) is a blockchain monitoring device',
+          '    that captures and decodes on-chain activity signals for',
+          '    crystal trait analysis and volatility tracking.',
+          '',
+          '  SPECIFICATIONS:',
+          '    Device ID:      ECR-001',
+          '    Category:       Low Consumer',
+          '    Priority:       P4 (Low)',
+          '    Tech Tree:      Signal Processing',
+          '',
+          '  POWER CHARACTERISTICS:',
+          '    Full Operation: 5 E/s',
+          '    Idle Mode:      2 E/s',
+          '    Standby:        0.3 E/s',
+          '    Recording Mode: 7 E/s',
+          '',
+          '  SIGNAL SYSTEM:',
+          '    Signal decode:   Blockchain TPS analysis',
+          '    Oracle sync:     Real-time price feeds',
+          '    Ticker tap:      Block confirmation tracking',
+          '    Rotation track:  Crystal spin direction analysis',
+          '',
+          '  KNOB CONTROLS:',
+          '    PULSE - Controls signal pulse width (0-100)',
+          '    BLOOM - Controls visual bloom intensity (0-100)',
+          '',
+          `  FIRMWARE: v${firmware.version}`,
+          '  FEATURES:',
+          ...firmware.features.map(f => `    • ${f}`),
+          '',
+          '  TIER CAPABILITIES:',
+          '    T1: Basic recording, signal decode',
+          '    T2: Oracle sync, price tracking',
+          '    T3: Advanced analysis, pattern recognition',
+          '    T4: Predictive algorithms, trend detection',
+          '    T5: Full spectrum analysis, AI integration',
+          '',
+          '  CONNECTED DEVICES:',
+          '    CDC-001  Crystal Data Cache    (Data Feed)',
+          '    UEC-001  Unstable Energy Core  (Power)',
+          '    HMS-001  Handmade Synthesizer  (Waveform Input)',
+          '',
+          '  COMMANDS:',
+          '    ecr status           - Show recorder status',
+          '    ecr power [on|off]   - Toggle power state',
+          '    ecr firmware         - View firmware info',
+          '    ecr record [on|off]  - Toggle recording mode',
+          '    ecr knob [k] [val]   - Adjust knob values',
+          '    ecr test             - Run diagnostics',
+          '    ecr reset            - Reboot recorder',
+          '',
+          '  LOCATION IN unOS:',
+          '    /sys/devices/ecr-001/',
+          '    /var/log/ecr/',
+          '    /etc/ecr/config',
+          '',
+          '╚═════════════════════════════════════════════════════════════════╝',
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `unknown ecr command: ${action}\n\ntype ecr for available commands.`,
+    }
+  },
+}
+
+// INT-001: Interpolator control command
+const iplCommand: Command = {
+  name: 'ipl',
+  aliases: ['interpolator', 'int001'],
+  description: 'Interpolator management (INT-001)',
+  usage: 'ipl [status|power|firmware|test|reset|info]',
+  execute: async (args, ctx) => {
+    const iplDevice = ctx.data.iplDevice
+    const action = args[0]?.toLowerCase()
+
+    // Get current state from device if available
+    const state = iplDevice?.getState() ?? {
+      deviceState: 'standby',
+      statusMessage: '',
+      isPowered: false,
+      spectrumWidth: 0,
+      interpolationAccuracy: 97.5,
+      inputStreams: 8,
+      predictionHorizon: 60,
+      currentTier: 1,
+    }
+    const firmware = iplDevice?.getFirmware() ?? {
+      version: '2.5.3',
+      build: '2024.02.10',
+      checksum: 'F3A8C5D7',
+      features: ['color-interp', 'era-manipulate', 'prism-array', 'spectrum-lock', 'prediction-engine'],
+      securityPatch: '2024.02.05',
+    }
+    const powerSpecs = iplDevice?.getPowerSpecs() ?? {
+      full: 20,
+      idle: 6,
+      standby: 1,
+      predictive: 30,
+      category: 'medium',
+      priority: 2,
+    }
+
+    const currentStatus = state.deviceState
+    const isPowered = state.isPowered
+    const accuracy = state.interpolationAccuracy
+    const streams = state.inputStreams
+    const horizon = state.predictionHorizon
+    const currentTier = state.currentTier
+    const spectrum = state.spectrumWidth
+
+    // No args - show usage
+    if (!action) {
+      return {
+        success: true,
+        output: [
+          '',
+          '╭─────────────────────────────────────────────────╮',
+          '│          INT-001 :: INTERPOLATOR                │',
+          '╰─────────────────────────────────────────────────╯',
+          '',
+          '  USAGE:',
+          '    ipl status          Show interpolator status',
+          '    ipl power [on|off]  Toggle power/standby',
+          '    ipl firmware        View firmware info',
+          '    ipl test            Run diagnostics',
+          '    ipl reset           Reboot device',
+          '    ipl info            Full documentation',
+          '',
+          '  EXAMPLES:',
+          '    ipl power on        Boot the interpolator',
+          '    ipl status          Check current state',
+          '    ipl firmware update Check for updates',
+          '',
+        ],
+      }
+    }
+
+    // STATUS command
+    if (action === 'status' || action === 'stat' || action === 's') {
+      const stateSymbol = currentStatus === 'online' ? '●' : currentStatus === 'standby' ? '○' : '◐'
+      const stateColor = currentStatus === 'online' ? 'ONLINE' : currentStatus.toUpperCase()
+
+      // Spectrum bar visualization
+      const barLen = 20
+      const filled = Math.round((spectrum / 100) * barLen)
+      const spectrumBar = '█'.repeat(filled) + '░'.repeat(barLen - filled)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌───────────────────────────────────────────┐',
+          '  │         INT-001 STATUS REPORT             │',
+          '  └───────────────────────────────────────────┘',
+          '',
+          `     Device State:   ${stateSymbol} ${stateColor}`,
+          `     Power:          ${isPowered ? 'ACTIVE' : 'STANDBY'}`,
+          `     Spectrum:       [${spectrumBar}] ${spectrum}%`,
+          '',
+          '  ┌─────────────────────────────────────────────┐',
+          '  │  OPTICS                 │  METRICS           │',
+          '  ├─────────────────────────┼────────────────────┤',
+          `  │  Accuracy   ${accuracy.toFixed(1)}%     │  Tier:      T${currentTier}      │`,
+          `  │  Streams    ${String(streams).padStart(3)}        │  Horizon:   ${horizon}s     │`,
+          '  └─────────────────────────┴────────────────────┘',
+          '',
+          `  Firmware: v${firmware.version}   Category: ${powerSpecs.category.toUpperCase()}`,
+          '',
+        ],
+      }
+    }
+
+    // POWER command
+    if (action === 'power' || action === 'pwr' || action === 'p') {
+      const subAction = args[1]?.toLowerCase()
+
+      if (!subAction) {
+        return {
+          success: true,
+          output: [
+            '',
+            `  INT-001 Power: ${isPowered ? 'ACTIVE' : 'STANDBY'}`,
+            '',
+            '  Usage: ipl power [on|off]',
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'on' || subAction === 'boot' || subAction === 'start') {
+        if (isPowered && (currentStatus === 'online' || currentStatus === 'booting')) {
+          return {
+            success: false,
+            error: `[INT-001] Already ${currentStatus.toUpperCase()}.`,
+          }
+        }
+
+        ctx.setTyping(true)
+
+        if (iplDevice) {
+          await iplDevice.powerOn()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║      INT-001 BOOT SEQUENCE                ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  [■□□□□□] Aligning prism array...',
+            '  [■■□□□□] Initializing spectrum engine...',
+            '  [■■■□□□] Focusing lens subsystem...',
+            '  [■■■■□□] Calibrating wavelengths...',
+            '  [■■■■■□] Starting output stage...',
+            '  [■■■■■■] System ready',
+            '',
+            '  Status: ONLINE',
+            `  Accuracy: ${accuracy.toFixed(1)}%`,
+            `  Input Streams: ${streams}`,
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'off' || subAction === 'shutdown' || subAction === 'stop') {
+        if (!isPowered || currentStatus === 'standby' || currentStatus === 'shutdown') {
+          return {
+            success: false,
+            error: '[INT-001] Already in standby mode.',
+          }
+        }
+        if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+          return {
+            success: false,
+            error: `[INT-001] Cannot shutdown - operation in progress (${currentStatus}).`,
+          }
+        }
+
+        ctx.setTyping(true)
+
+        if (iplDevice) {
+          await iplDevice.powerOff()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 1500))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║      INT-001 SHUTDOWN SEQUENCE            ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  [✓] Prism retracted',
+            '  [✓] Lens parked',
+            '  [✓] Spectrum engine off',
+            '  [✓] Prediction buffers flushed',
+            '  [✓] Power state saved',
+            '',
+            '  Status: STANDBY',
+            `  Power Draw: ${powerSpecs.standby} E/s`,
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: false,
+        error: `Unknown power action: ${subAction}\n\nUsage: ipl power [on|off]`,
+      }
+    }
+
+    // FIRMWARE command
+    if (action === 'firmware' || action === 'fw' || action === 'f') {
+      const subAction = args[1]?.toLowerCase()
+
+      if (subAction === 'update' || subAction === 'upgrade') {
+        ctx.setTyping(true)
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ┌─────────────────────────────────────────────┐',
+            '  │       INT-001 FIRMWARE UPDATE CHECK         │',
+            '  └─────────────────────────────────────────────┘',
+            '',
+            `  Current Version:   v${firmware.version}`,
+            '  Latest Version:    v2.5.3',
+            '',
+            '  [✓] Firmware is up to date.',
+            '',
+            `  Security Patch:    ${firmware.securityPatch}`,
+            '  Status:            NO UPDATE REQUIRED',
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌─────────────────────────────────────────────┐',
+          '  │         INT-001 FIRMWARE INFO               │',
+          '  └─────────────────────────────────────────────┘',
+          '',
+          `  Version:       v${firmware.version}`,
+          `  Build:         ${firmware.build}`,
+          `  Checksum:      ${firmware.checksum}`,
+          `  Security:      ${firmware.securityPatch}`,
+          '',
+          '  FEATURES:',
+          ...firmware.features.map(f => `    ◆ ${f}`),
+          '',
+          '  Use: ipl firmware update - to check for updates',
+          '',
+        ],
+      }
+    }
+
+    // TEST command
+    if (action === 'test' || action === 'diag' || action === 'diagnostics') {
+      if (currentStatus === 'standby' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: `[INT-001] Cannot run diagnostics - interpolator is ${currentStatus.toUpperCase()}\n\nUse 'ipl power on' to boot the device first.`,
+        }
+      }
+      if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+        return {
+          success: false,
+          error: '[INT-001] Cannot run diagnostics - operation in progress.',
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (iplDevice) {
+        await iplDevice.runTest()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 2500))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ╔═══════════════════════════════════════════╗',
+          '  ║      INT-001 DIAGNOSTIC SEQUENCE          ║',
+          '  ╚═══════════════════════════════════════════╝',
+          '',
+          '  Running self-test...',
+          '',
+          '  [✓] Prism array alignment    PASSED',
+          '  [✓] Spectrum engine          PASSED',
+          '  [✓] Lens focus system        PASSED',
+          '  [✓] Wavelength calibration   PASSED',
+          '  [✓] Output stage             PASSED',
+          '  [✓] Prediction engine        PASSED',
+          '  [✓] Memory integrity         PASSED',
+          '  [✓] Power subsystem          PASSED',
+          '',
+          '  ─────────────────────────────────────────────',
+          '  DIAGNOSTIC RESULT: ALL TESTS PASSED',
+          `  Interpolation Accuracy: ${accuracy.toFixed(1)}%`,
+          `  Current Tier: T${currentTier}`,
+          '  ─────────────────────────────────────────────',
+          '',
+        ],
+      }
+    }
+
+    // RESET/REBOOT command
+    if (action === 'reset' || action === 'reboot') {
+      if (currentStatus === 'standby' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: `[INT-001] Cannot reboot - interpolator is ${currentStatus.toUpperCase()}\n\nUse 'ipl power on' to boot the device first.`,
+        }
+      }
+      if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+        return {
+          success: false,
+          error: '[INT-001] Cannot reboot - operation in progress.',
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (iplDevice) {
+        await iplDevice.reboot()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 1500))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ╔═══════════════════════════════════════════╗',
+          '  ║      INT-001 REBOOT SEQUENCE              ║',
+          '  ╚═══════════════════════════════════════════╝',
+          '',
+          '  [✓] Prism retracted',
+          '  [✓] Lens parked',
+          '  [✓] Power cycled',
+          '  [✓] Prism aligned',
+          '  [✓] Spectrum initialized',
+          '  [✓] System online',
+          '',
+          '  Status: ONLINE',
+          `  Accuracy: ${accuracy.toFixed(1)}%`,
+          '',
+        ],
+      }
+    }
+
+    // INFO command
+    if (action === 'info' || action === 'docs' || action === 'documentation') {
+      return {
+        success: true,
+        output: [
+          '',
+          '╔═════════════════════════════════════════════════════════════════╗',
+          '║                   INT-001: INTERPOLATOR                         ║',
+          '║                    Technical Documentation                      ║',
+          '╠═════════════════════════════════════════════════════════════════╣',
+          '',
+          '  DEVICE OVERVIEW:',
+          '    The Interpolator (INT-001) is a data stream smoothing and',
+          '    prediction device that uses prism optics to analyze crystal',
+          '    color spectra and interpolate trait values with high accuracy.',
+          '',
+          '  SPECIFICATIONS:',
+          '    Device ID:      INT-001',
+          '    Category:       Medium Consumer',
+          '    Priority:       P2 (Standard)',
+          '    Tech Tree:      Optics',
+          '',
+          '  POWER CHARACTERISTICS:',
+          '    Full Operation:  20 E/s',
+          '    Idle Mode:       6 E/s',
+          '    Standby:         1 E/s',
+          '    Predictive Mode: 30 E/s',
+          '',
+          '  OPTICS SYSTEM:',
+          '    Prism array:     Multi-band refraction',
+          '    Spectrum engine: Full visible + UV/IR',
+          '    Lens focus:      Auto-calibrating',
+          '    Input streams:   8 simultaneous (base)',
+          '    Accuracy:        97.5% (base)',
+          '    Prediction:      60s horizon (base)',
+          '',
+          `  FIRMWARE: v${firmware.version}`,
+          '  FEATURES:',
+          ...firmware.features.map(f => `    • ${f}`),
+          '',
+          '  TIER CAPABILITIES:',
+          '    T1: Basic interpolation, 8 streams',
+          '    T2: Era manipulation, 10 streams',
+          '    T3: Color prediction, 12 streams',
+          '    T4: Advanced refraction, 14 streams',
+          '    T5: Full spectrum mastery, 16 streams',
+          '',
+          '  CONNECTED DEVICES:',
+          '    HMS-001  Handmade Synthesizer  (Waveform Source)',
+          '    OSC-001  Oscilloscope Array    (Signal Display)',
+          '    CDC-001  Crystal Data Cache    (Data Feed)',
+          '',
+          '  COMMANDS:',
+          '    ipl status          - Show device status',
+          '    ipl power [on|off]  - Toggle power state',
+          '    ipl firmware        - View firmware info',
+          '    ipl test            - Run diagnostics',
+          '    ipl reset           - Reboot device',
+          '',
+          '  LOCATION IN unOS:',
+          '    /sys/devices/int-001/',
+          '    /var/log/ipl/',
+          '    /etc/ipl/config',
+          '',
+          '╚═════════════════════════════════════════════════════════════════╝',
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `unknown ipl command: ${action}\n\ntype ipl for available commands.`,
+    }
+  },
+}
+
+// MFR-001: Microfusion Reactor control command
+const mfrCommand: Command = {
+  name: 'mfr',
+  aliases: ['reactor', 'microfusion', 'mfr001'],
+  description: 'Microfusion Reactor management (MFR-001)',
+  usage: 'mfr [status|power|firmware|test|reset|info]',
+  execute: async (args, ctx) => {
+    const mfrDevice = ctx.data.mfrDevice
+    const action = args[0]?.toLowerCase()
+
+    // Get current state from device if available
+    const state = mfrDevice?.getState() ?? {
+      deviceState: 'standby',
+      statusMessage: '',
+      isPowered: false,
+      powerOutput: 0,
+      stability: 0,
+      plasmaTemp: 0,
+      efficiency: 92,
+      ringSpeed: 0,
+    }
+    const firmware = mfrDevice?.getFirmware() ?? {
+      version: '2.3.0',
+      build: '2024.02.01',
+      checksum: 'B8D4E6F2',
+      features: ['plasma-contain', 'power-regulate', 'thermal-manage', 'auto-scram', 'efficiency-tune'],
+      securityPatch: '2024.01.28',
+    }
+    const powerSpecs = mfrDevice?.getPowerSpecs() ?? {
+      full: 250,
+      idle: 150,
+      standby: 25,
+      startupCost: 500,
+      efficiency: 92,
+      category: 'generator',
+      tier: 2,
+    }
+
+    const currentStatus = state.deviceState
+    const isPowered = state.isPowered
+    const powerOutput = state.powerOutput
+    const stability = state.stability
+    const plasmaTemp = state.plasmaTemp
+    const efficiency = state.efficiency
+
+    // No args - show usage
+    if (!action) {
+      return {
+        success: true,
+        output: [
+          '',
+          '╭─────────────────────────────────────────────────╮',
+          '│          MFR-001 :: MICROFUSION REACTOR         │',
+          '╰─────────────────────────────────────────────────╯',
+          '',
+          '  USAGE:',
+          '    mfr status          Show reactor status',
+          '    mfr power [on|off]  Ignite/SCRAM reactor',
+          '    mfr firmware        View firmware info',
+          '    mfr test            Run diagnostics',
+          '    mfr reset           Reboot reactor',
+          '    mfr info            Full documentation',
+          '',
+          '  EXAMPLES:',
+          '    mfr power on        Ignite plasma core',
+          '    mfr power off       Emergency SCRAM',
+          '    mfr status          Check reactor state',
+          '',
+        ],
+      }
+    }
+
+    // STATUS command
+    if (action === 'status' || action === 'stat' || action === 's') {
+      const stateSymbol = currentStatus === 'online' ? '●' : currentStatus === 'standby' ? '○' : '◐'
+      const stateColor = currentStatus === 'online' ? 'ONLINE' : currentStatus.toUpperCase()
+
+      // Power output bar
+      const barLen = 20
+      const outputPercent = (powerOutput / powerSpecs.full) * 100
+      const filled = Math.round((outputPercent / 100) * barLen)
+      const outputBar = '█'.repeat(filled) + '░'.repeat(barLen - filled)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌───────────────────────────────────────────┐',
+          '  │         MFR-001 STATUS REPORT             │',
+          '  └───────────────────────────────────────────┘',
+          '',
+          `     Reactor State:  ${stateSymbol} ${stateColor}`,
+          `     Plasma Core:    ${isPowered ? 'IGNITED' : 'COLD'}`,
+          `     Output:         [${outputBar}] ${Math.round(powerOutput)} E/s`,
+          '',
+          '  ┌─────────────────────────────────────────────┐',
+          '  │  PLASMA CORE            │  PERFORMANCE       │',
+          '  ├─────────────────────────┼────────────────────┤',
+          `  │  Stability   ${String(Math.round(stability)).padStart(3)}%     │  Efficiency: ${efficiency}%   │`,
+          `  │  Temp     ${String(Math.round(plasmaTemp)).padStart(5)}K     │  Tier:       T${powerSpecs.tier}     │`,
+          '  └─────────────────────────┴────────────────────┘',
+          '',
+          `  Firmware: v${firmware.version}   Type: ${powerSpecs.category.toUpperCase()}`,
+          '',
+        ],
+      }
+    }
+
+    // POWER command
+    if (action === 'power' || action === 'pwr' || action === 'p') {
+      const subAction = args[1]?.toLowerCase()
+
+      if (!subAction) {
+        return {
+          success: true,
+          output: [
+            '',
+            `  MFR-001 Reactor: ${isPowered ? 'IGNITED' : 'COLD'}`,
+            `  Output: ${Math.round(powerOutput)} E/s`,
+            '',
+            '  Usage: mfr power [on|off]',
+            '  Note: "off" initiates emergency SCRAM',
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'on' || subAction === 'ignite' || subAction === 'start') {
+        if (isPowered && (currentStatus === 'online' || currentStatus === 'booting')) {
+          return {
+            success: false,
+            error: `[MFR-001] Reactor already ${currentStatus.toUpperCase()}.`,
+          }
+        }
+
+        ctx.setTyping(true)
+
+        if (mfrDevice) {
+          await mfrDevice.powerOn()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 2500))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║      MFR-001 IGNITION SEQUENCE            ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  [■□□□□□] Plasma ignition...',
+            '  [■■□□□□] Containment field active...',
+            '  [■■■□□□] Coolant system online...',
+            '  [■■■■□□] Power ramping...',
+            '  [■■■■■□] Stabilizing plasma...',
+            '  [■■■■■■] Reactor online',
+            '',
+            '  Status: ONLINE',
+            `  Output: ${powerSpecs.full} E/s`,
+            '  Plasma: CONTAINED',
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'off' || subAction === 'scram' || subAction === 'stop') {
+        if (!isPowered || currentStatus === 'standby' || currentStatus === 'shutdown') {
+          return {
+            success: false,
+            error: '[MFR-001] Reactor already in cold standby.',
+          }
+        }
+        if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+          return {
+            success: false,
+            error: `[MFR-001] Cannot SCRAM - operation in progress (${currentStatus}).`,
+          }
+        }
+
+        ctx.setTyping(true)
+
+        if (mfrDevice) {
+          await mfrDevice.powerOff()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║      MFR-001 SCRAM SEQUENCE               ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  ⚠ EMERGENCY SCRAM INITIATED',
+            '',
+            '  [✓] Control rods inserted',
+            '  [✓] Plasma cooling initiated',
+            '  [✓] Containment field collapsed',
+            '  [✓] Core temperature falling',
+            '  [✓] Reactor safe',
+            '',
+            '  Status: STANDBY',
+            `  Output: ${powerSpecs.standby} E/s (containment minimum)`,
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: false,
+        error: `Unknown power action: ${subAction}\n\nUsage: mfr power [on|off]`,
+      }
+    }
+
+    // FIRMWARE command
+    if (action === 'firmware' || action === 'fw' || action === 'f') {
+      const subAction = args[1]?.toLowerCase()
+
+      if (subAction === 'update' || subAction === 'upgrade') {
+        ctx.setTyping(true)
+        await new Promise(resolve => setTimeout(resolve, 1500))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ┌─────────────────────────────────────────────┐',
+            '  │       MFR-001 FIRMWARE UPDATE CHECK         │',
+            '  └─────────────────────────────────────────────┘',
+            '',
+            `  Current Version:   v${firmware.version}`,
+            '  Latest Version:    v2.3.0',
+            '',
+            '  [✓] Firmware is up to date.',
+            '',
+            `  Security Patch:    ${firmware.securityPatch}`,
+            '  Status:            NO UPDATE REQUIRED',
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌─────────────────────────────────────────────┐',
+          '  │         MFR-001 FIRMWARE INFO               │',
+          '  └─────────────────────────────────────────────┘',
+          '',
+          `  Version:       v${firmware.version}`,
+          `  Build:         ${firmware.build}`,
+          `  Checksum:      ${firmware.checksum}`,
+          `  Security:      ${firmware.securityPatch}`,
+          '',
+          '  FEATURES:',
+          ...firmware.features.map(f => `    ◆ ${f}`),
+          '',
+          '  Use: mfr firmware update - to check for updates',
+          '',
+        ],
+      }
+    }
+
+    // TEST command
+    if (action === 'test' || action === 'diag' || action === 'diagnostics') {
+      if (currentStatus === 'standby' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: `[MFR-001] Cannot run diagnostics - reactor is ${currentStatus.toUpperCase()}\n\nUse 'mfr power on' to ignite the reactor first.`,
+        }
+      }
+      if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+        return {
+          success: false,
+          error: '[MFR-001] Cannot run diagnostics - operation in progress.',
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (mfrDevice) {
+        await mfrDevice.runTest()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 3000))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ╔═══════════════════════════════════════════╗',
+          '  ║      MFR-001 DIAGNOSTIC SEQUENCE          ║',
+          '  ╚═══════════════════════════════════════════╝',
+          '',
+          '  Running reactor self-test...',
+          '',
+          '  [✓] Plasma density           PASSED',
+          '  [✓] Containment field        PASSED',
+          '  [✓] Coolant system           PASSED',
+          '  [✓] Power output             PASSED',
+          '  [✓] Safety interlocks        PASSED',
+          '  [✓] Control rod mechanism    PASSED',
+          '  [✓] Thermal regulation       PASSED',
+          '  [✓] Emergency SCRAM          PASSED',
+          '',
+          '  ─────────────────────────────────────────────',
+          '  DIAGNOSTIC RESULT: ALL TESTS PASSED',
+          `  Plasma Stability: ${Math.round(stability)}%`,
+          `  Efficiency: ${efficiency}%`,
+          '  ─────────────────────────────────────────────',
+          '',
+        ],
+      }
+    }
+
+    // RESET/REBOOT command
+    if (action === 'reset' || action === 'reboot') {
+      if (currentStatus === 'standby' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: `[MFR-001] Cannot reboot - reactor is ${currentStatus.toUpperCase()}\n\nUse 'mfr power on' to ignite the reactor first.`,
+        }
+      }
+      if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+        return {
+          success: false,
+          error: '[MFR-001] Cannot reboot - operation in progress.',
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (mfrDevice) {
+        await mfrDevice.reboot()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 2500))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ╔═══════════════════════════════════════════╗',
+          '  ║      MFR-001 REBOOT SEQUENCE              ║',
+          '  ╚═══════════════════════════════════════════╝',
+          '',
+          '  [✓] SCRAM initiated',
+          '  [✓] Plasma cooling',
+          '  [✓] Field collapsed',
+          '  [✓] Plasma re-ignition',
+          '  [✓] Containment restored',
+          '  [✓] Reactor online',
+          '',
+          '  Status: ONLINE',
+          `  Output: ${powerSpecs.full} E/s`,
+          '',
+        ],
+      }
+    }
+
+    // INFO command
+    if (action === 'info' || action === 'docs' || action === 'documentation') {
+      return {
+        success: true,
+        output: [
+          '',
+          '╔═════════════════════════════════════════════════════════════════╗',
+          '║                  MFR-001: MICROFUSION REACTOR                   ║',
+          '║                    Technical Documentation                      ║',
+          '╠═════════════════════════════════════════════════════════════════╣',
+          '',
+          '  DEVICE OVERVIEW:',
+          '    The Microfusion Reactor (MFR-001) is a Tier 2 plasma fusion',
+          '    power generator providing stable, high-output energy for',
+          '    laboratory operations.',
+          '',
+          '  SPECIFICATIONS:',
+          '    Device ID:      MFR-001',
+          '    Category:       Power Generator',
+          '    Tier:           T2 (Mid-Game)',
+          '    Tech Tree:      Power Generation',
+          '',
+          '  POWER OUTPUT:',
+          '    Full Operation:  +250 E/s',
+          '    Idle Mode:       +150 E/s',
+          '    Standby:         +25 E/s (containment minimum)',
+          '    Startup Cost:    -500 E (one-time ignition)',
+          '',
+          '  PLASMA CORE:',
+          '    Plasma type:     Deuterium-Tritium',
+          '    Core temp:       15,000 K (nominal)',
+          '    Containment:     Magnetic confinement',
+          '    Efficiency:      92% (base)',
+          '',
+          `  FIRMWARE: v${firmware.version}`,
+          '  FEATURES:',
+          ...firmware.features.map(f => `    • ${f}`),
+          '',
+          '  SAFETY SYSTEMS:',
+          '    • Auto-SCRAM on containment breach',
+          '    • Thermal runaway protection',
+          '    • Control rod emergency insertion',
+          '    • Coolant backup system',
+          '',
+          '  CONNECTED DEVICES:',
+          '    UEC-001  Unstable Energy Core  (Energy Grid)',
+          '    BAT-001  Battery Pack          (Storage)',
+          '    QAN-001  Quantum Analyzer      (Monitoring)',
+          '',
+          '  COMMANDS:',
+          '    mfr status          - Show reactor status',
+          '    mfr power [on|off]  - Ignite/SCRAM',
+          '    mfr firmware        - View firmware info',
+          '    mfr test            - Run diagnostics',
+          '    mfr reset           - Reboot reactor',
+          '',
+          '  LOCATION IN unOS:',
+          '    /sys/devices/mfr-001/',
+          '    /var/log/mfr/',
+          '    /etc/mfr/config',
+          '',
+          '╚═════════════════════════════════════════════════════════════════╝',
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `unknown mfr command: ${action}\n\ntype mfr for available commands.`,
+    }
+  },
+}
+
+// AIC-001: AI Assistant Core control command
+const aicCommand: Command = {
+  name: 'aic',
+  aliases: ['ai', 'assistant', 'aic001'],
+  description: 'AI Assistant Core management (AIC-001)',
+  usage: 'aic [status|power|firmware|test|reset|learn|info]',
+  execute: async (args, ctx) => {
+    const aicDevice = ctx.data.aicDevice
+    const action = args[0]?.toLowerCase()
+
+    // Get current state from device if available
+    const state = aicDevice?.getState() ?? {
+      deviceState: 'standby',
+      statusMessage: '',
+      isPowered: false,
+      taskQueue: 0,
+      efficiency: 0,
+      isLearning: false,
+      nodeActivity: [0, 0, 0, 0, 0],
+      anomalyCount: 0,
+      uptime: 0,
+    }
+    const firmware = aicDevice?.getFirmware() ?? {
+      version: '2.4.0',
+      build: '2024.02.20',
+      checksum: 'E7A9C3B5',
+      features: ['neural-core', 'task-queue', 'auto-optimize', 'learning-mode', 'anomaly-detect'],
+      securityPatch: '2024.02.15',
+    }
+    const powerSpecs = aicDevice?.getPowerSpecs() ?? {
+      full: 35,
+      idle: 12,
+      standby: 3,
+      learning: 50,
+      category: 'heavy',
+      priority: 1,
+    }
+
+    const currentStatus = state.deviceState
+    const isPowered = state.isPowered
+    const taskQueue = state.taskQueue
+    const efficiency = state.efficiency
+    const isLearning = state.isLearning
+    const nodeActivity = state.nodeActivity
+    const anomalyCount = state.anomalyCount
+    const uptime = state.uptime
+
+    // No args - show usage
+    if (!action) {
+      return {
+        success: true,
+        output: [
+          '',
+          '╭─────────────────────────────────────────────────╮',
+          '│         AIC-001 :: AI ASSISTANT CORE            │',
+          '╰─────────────────────────────────────────────────╯',
+          '',
+          '  USAGE:',
+          '    aic status          Show core status',
+          '    aic power [on|off]  Power on/shutdown core',
+          '    aic firmware        View firmware info',
+          '    aic test            Run neural diagnostics',
+          '    aic reset           Reboot neural core',
+          '    aic learn [on|off]  Toggle learning mode',
+          '    aic info            Full documentation',
+          '',
+          '  EXAMPLES:',
+          '    aic power on        Boot the AI core',
+          '    aic learn off       Disable learning mode',
+          '    aic status          Check neural state',
+          '',
+        ],
+      }
+    }
+
+    // STATUS command
+    if (action === 'status' || action === 'stat' || action === 's') {
+      const stateSymbol = currentStatus === 'online' ? '●' : currentStatus === 'standby' ? '○' : '◐'
+      const stateColor = currentStatus === 'online' ? 'ONLINE' : currentStatus.toUpperCase()
+
+      // Node activity visualization
+      const nodeViz = nodeActivity.map(n => {
+        const level = Math.round(n * 5)
+        return '▁▂▃▄▅'[Math.min(level, 4)] || '▁'
+      }).join('')
+
+      // Efficiency bar
+      const barLen = 20
+      const effPercent = Math.min(efficiency / 200, 1) * 100
+      const filled = Math.round((effPercent / 100) * barLen)
+      const effBar = '█'.repeat(filled) + '░'.repeat(barLen - filled)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌───────────────────────────────────────────┐',
+          '  │         AIC-001 STATUS REPORT             │',
+          '  └───────────────────────────────────────────┘',
+          '',
+          `     Neural State:   ${stateSymbol} ${stateColor}`,
+          `     Learning Mode:  ${isLearning ? 'ENABLED' : 'DISABLED'}`,
+          `     Efficiency:     [${effBar}] ${efficiency}%`,
+          '',
+          '  ┌─────────────────────────────────────────────┐',
+          '  │  NEURAL NETWORK        │  PERFORMANCE       │',
+          '  ├────────────────────────┼────────────────────┤',
+          `  │  Task Queue   ${String(taskQueue).padStart(3)}     │  Uptime: ${String(Math.floor(uptime/60)).padStart(4)}m     │`,
+          `  │  Nodes:    [${nodeViz}]   │  Anomalies: ${String(anomalyCount).padStart(3)}  │`,
+          '  └────────────────────────┴────────────────────┘',
+          '',
+          `  Firmware: v${firmware.version}   Category: ${powerSpecs.category.toUpperCase()}`,
+          '',
+        ],
+      }
+    }
+
+    // POWER command
+    if (action === 'power' || action === 'pwr' || action === 'p') {
+      const subAction = args[1]?.toLowerCase()
+
+      if (!subAction) {
+        return {
+          success: true,
+          output: [
+            '',
+            `  AIC-001 Neural Core: ${isPowered ? 'ACTIVE' : 'OFFLINE'}`,
+            `  Power Draw: ${isPowered ? (isLearning ? powerSpecs.learning : powerSpecs.full) : powerSpecs.standby} E/s`,
+            '',
+            '  Usage: aic power [on|off]',
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'on' || subAction === 'boot' || subAction === 'start') {
+        if (isPowered && (currentStatus === 'online' || currentStatus === 'booting')) {
+          return {
+            success: false,
+            error: `[AIC-001] Neural core already ${currentStatus.toUpperCase()}.`,
+          }
+        }
+
+        ctx.setTyping(true)
+
+        if (aicDevice) {
+          await aicDevice.powerOn()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║      AIC-001 BOOT SEQUENCE                ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  [■□□□□□] Loading neural core...',
+            '  [■■□□□□] Initializing memory banks...',
+            '  [■■■□□□] Activating neural nodes...',
+            '  [■■■■□□] Training models...',
+            '  [■■■■■□] Calibrating efficiency...',
+            '  [■■■■■■] Core online',
+            '',
+            '  Status: ONLINE',
+            `  Power Draw: ${powerSpecs.full} E/s`,
+            '  Mode: LEARNING',
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'off' || subAction === 'shutdown' || subAction === 'stop') {
+        if (!isPowered || currentStatus === 'standby' || currentStatus === 'shutdown') {
+          return {
+            success: false,
+            error: '[AIC-001] Neural core already in standby.',
+          }
+        }
+        if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+          return {
+            success: false,
+            error: `[AIC-001] Cannot shutdown - operation in progress (${currentStatus}).`,
+          }
+        }
+
+        ctx.setTyping(true)
+
+        if (aicDevice) {
+          await aicDevice.powerOff()
+        } else {
+          await new Promise(resolve => setTimeout(resolve, 1500))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║      AIC-001 SHUTDOWN SEQUENCE            ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  [■■■■■■] Saving neural state...',
+            '  [■■■■□□] Halting processes...',
+            '  [■■□□□□] Neural shutdown...',
+            '  [□□□□□□] Core offline',
+            '',
+            '  Status: STANDBY',
+            `  Power Draw: ${powerSpecs.standby} E/s`,
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: false,
+        error: `Unknown power option: ${subAction}\n\nUsage: aic power [on|off]`,
+      }
+    }
+
+    // LEARN command
+    if (action === 'learn' || action === 'learning' || action === 'l') {
+      const subAction = args[1]?.toLowerCase()
+
+      if (!subAction) {
+        return {
+          success: true,
+          output: [
+            '',
+            `  AIC-001 Learning Mode: ${isLearning ? 'ENABLED' : 'DISABLED'}`,
+            `  Power Draw: ${isLearning ? powerSpecs.learning : powerSpecs.full} E/s`,
+            '',
+            '  Usage: aic learn [on|off]',
+            '  Note: Learning mode optimizes neural pathways',
+            '',
+          ],
+        }
+      }
+
+      if (currentStatus !== 'online') {
+        return {
+          success: false,
+          error: `[AIC-001] Neural core must be ONLINE to change learning mode (current: ${currentStatus.toUpperCase()}).`,
+        }
+      }
+
+      if (subAction === 'on' || subAction === 'enable') {
+        if (isLearning) {
+          return {
+            success: true,
+            output: ['', '  [AIC-001] Learning mode already enabled.', ''],
+          }
+        }
+
+        if (aicDevice) {
+          aicDevice.setLearningMode(true)
+        }
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  [AIC-001] Learning mode ENABLED',
+            `  Power Draw: ${powerSpecs.learning} E/s`,
+            '  Neural pathway optimization active.',
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'off' || subAction === 'disable') {
+        if (!isLearning) {
+          return {
+            success: true,
+            output: ['', '  [AIC-001] Learning mode already disabled.', ''],
+          }
+        }
+
+        if (aicDevice) {
+          aicDevice.setLearningMode(false)
+        }
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  [AIC-001] Learning mode DISABLED',
+            `  Power Draw: ${powerSpecs.full} E/s`,
+            '  Switched to monitoring mode.',
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: false,
+        error: `Unknown learn option: ${subAction}\n\nUsage: aic learn [on|off]`,
+      }
+    }
+
+    // FIRMWARE command
+    if (action === 'firmware' || action === 'fw' || action === 'f') {
+      const subAction = args[1]?.toLowerCase()
+
+      if (subAction === 'update' || subAction === 'upgrade') {
+        ctx.setTyping(true)
+        await new Promise(r => setTimeout(r, 1500))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  [AIC-001] Checking for firmware updates...',
+            '',
+            `  Current: v${firmware.version}`,
+            `  Latest:  v${firmware.version}`,
+            '',
+            '  ✓ Firmware is up to date.',
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌───────────────────────────────────────────┐',
+          '  │         AIC-001 FIRMWARE INFO             │',
+          '  └───────────────────────────────────────────┘',
+          '',
+          `  Version:        ${firmware.version}`,
+          `  Build:          ${firmware.build}`,
+          `  Checksum:       ${firmware.checksum}`,
+          `  Security Patch: ${firmware.securityPatch}`,
+          '',
+          '  Features:',
+          ...firmware.features.map(f => `    • ${f}`),
+          '',
+          '  Run "aic firmware update" to check for updates.',
+          '',
+        ],
+      }
+    }
+
+    // TEST command
+    if (action === 'test' || action === 'diag' || action === 't') {
+      if (currentStatus !== 'online') {
+        return {
+          success: false,
+          error: `[AIC-001] Neural core must be ONLINE to run diagnostics (current: ${currentStatus.toUpperCase()}).`,
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (aicDevice) {
+        await aicDevice.runTest()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 2500))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ╔═══════════════════════════════════════════╗',
+          '  ║      AIC-001 DIAGNOSTICS                  ║',
+          '  ╚═══════════════════════════════════════════╝',
+          '',
+          '  [✓] Neural pathways............ PASS',
+          '  [✓] Memory integrity........... PASS',
+          '  [✓] Logic gates................ PASS',
+          '  [✓] Learning rate.............. PASS',
+          '  [✓] Optimizer benchmark........ PASS',
+          '',
+          '  All diagnostics PASSED.',
+          '',
+          `  Efficiency: ${efficiency}%`,
+          `  Anomalies:  ${anomalyCount}`,
+          '',
+        ],
+      }
+    }
+
+    // RESET command
+    if (action === 'reset' || action === 'reboot' || action === 'r') {
+      if (currentStatus === 'standby' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: '[AIC-001] Neural core must be powered on to reboot.',
+        }
+      }
+      if (currentStatus === 'booting' || currentStatus === 'rebooting') {
+        return {
+          success: false,
+          error: `[AIC-001] Boot/reboot already in progress.`,
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (aicDevice) {
+        await aicDevice.reboot()
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 3000))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ╔═══════════════════════════════════════════╗',
+          '  ║      AIC-001 REBOOT SEQUENCE              ║',
+          '  ╚═══════════════════════════════════════════╝',
+          '',
+          '  [SAVE] Preserving neural state...',
+          '  [HALT] Stopping all processes...',
+          '  [DOWN] Core offline...',
+          '  [BOOT] Reinitializing...',
+          '  [LOAD] Restoring neural state...',
+          '  [ OK ] Core online',
+          '',
+          '  Reboot complete. All systems nominal.',
+          '',
+        ],
+      }
+    }
+
+    // INFO command
+    if (action === 'info' || action === 'help' || action === 'doc') {
+      return {
+        success: true,
+        output: [
+          '',
+          '╔═════════════════════════════════════════════════════════════════╗',
+          '║                    AIC-001 DOCUMENTATION                        ║',
+          '╠═════════════════════════════════════════════════════════════════╣',
+          '',
+          '  DEVICE OVERVIEW:',
+          '    The AI Assistant Core (AIC-001) is a Tier 2 heavy compute',
+          '    device providing neural processing, task automation, and',
+          '    learning-optimized operations for laboratory efficiency.',
+          '',
+          '  SPECIFICATIONS:',
+          '    Device ID:      AIC-001',
+          '    Category:       Heavy Compute',
+          '    Tier:           T2 (Mid-Game)',
+          '    Tech Tree:      Automation / Computing',
+          '',
+          '  POWER CONSUMPTION:',
+          '    Full Operation:  35 E/s',
+          '    Idle Mode:       12 E/s',
+          '    Standby:         3 E/s (wake-on-command)',
+          '    Learning Mode:   50 E/s (neural optimization)',
+          '',
+          '  NEURAL NETWORK:',
+          '    Node count:      5 primary nodes',
+          '    Task queue:      Up to 15 concurrent tasks',
+          '    Efficiency:      120-180% (optimized)',
+          '    Anomaly detect:  Automatic pattern recognition',
+          '',
+          `  FIRMWARE: v${firmware.version}`,
+          '  FEATURES:',
+          ...firmware.features.map(f => `    • ${f}`),
+          '',
+          '  OPERATIONAL MODES:',
+          '    LEARNING:    Neural pathway optimization (50 E/s)',
+          '    MONITORING:  Passive observation (35 E/s)',
+          '    STANDBY:     Minimal power, quick wake (3 E/s)',
+          '',
+          '  CONNECTED DEVICES:',
+          '    CDC-001  Crystal Data Cache  (Data Access)',
+          '    MFR-001  Microfusion Reactor (Power Supply)',
+          '    HMS-001  Handmade Synthesizer (Automation)',
+          '',
+          '  COMMANDS:',
+          '    aic status          - Show core status',
+          '    aic power [on|off]  - Boot/shutdown',
+          '    aic firmware        - View firmware info',
+          '    aic test            - Run neural diagnostics',
+          '    aic reset           - Reboot neural core',
+          '    aic learn [on|off]  - Toggle learning mode',
+          '',
+          '  LOCATION IN unOS:',
+          '    /sys/devices/aic-001/',
+          '    /var/log/aic/',
+          '    /etc/aic/config',
+          '',
+          '╚═════════════════════════════════════════════════════════════════╝',
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `unknown aic command: ${action}\n\ntype aic for available commands.`,
+    }
+  },
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EMC Command - Exotic Matter Containment
+// ═══════════════════════════════════════════════════════════════
+const emcCommand: Command = {
+  name: 'emc',
+  aliases: ['exotic', 'emc001', 'containment'],
+  description: 'Exotic Matter Containment management (EMC-001)',
+  usage: 'emc [status|power|firmware|test|reset|info]',
+  execute: async (args, ctx) => {
+    const emcDevice = ctx.data.emcDevice
+
+    // Default state for when device is not available
+    const state = emcDevice?.getState() ?? {
+      deviceState: 'online' as const,
+      statusMessage: 'CONTAINED',
+      isPowered: true,
+      units: 42,
+      stability: 76,
+      fieldStrength: 95,
+      temperature: 1050,
+      isContained: true,
+      currentDraw: 18,
+    }
+
+    const firmware = emcDevice?.getFirmware() ?? {
+      version: '4.0.1',
+      build: '2026.01.15',
+      checksum: 'E8X4M2C7',
+      features: ['containment-field', 'particle-tracking', 'stability-calc', 'matter-compress', 'field-harmonics'],
+      securityPatch: '2026.01.10',
+    }
+
+    const powerSpecs = emcDevice?.getPowerSpecs() ?? {
+      full: 40,
+      idle: 18,
+      standby: 2,
+      scan: 55,
+      category: 'heavy',
+      priority: 1,
+    }
+
+    const action = args[0]?.toLowerCase()
+
+    if (!action) {
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌──────────────────────────────────────────────┐',
+          '  │      EMC-001 :: EXOTIC MATTER CONTAINMENT    │',
+          '  │              Management Console               │',
+          '  └──────────────────────────────────────────────┘',
+          '',
+          '    emc status              Show containment status',
+          '    emc power [on|off]      Power on/shutdown field',
+          '    emc firmware            View firmware info',
+          '    emc firmware update     Check for firmware updates',
+          '    emc test                Run containment diagnostics',
+          '    emc reset               Reboot containment system',
+          '    emc info                Full documentation',
+          '',
+          '  Examples:',
+          '    emc power on            Boot containment field',
+          '    emc test                Run diagnostics',
+          '',
+        ],
+      }
+    }
+
+    if (action === 'status') {
+      const stateLabel = state.deviceState === 'online' ? 'ONLINE' : state.deviceState.toUpperCase()
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌──────────────────────────────────────────────┐',
+          '  │         EMC-001 STATUS REPORT                │',
+          '  └──────────────────────────────────────────────┘',
+          '',
+          `    State:          ${stateLabel}`,
+          `    Status:         ${state.statusMessage}`,
+          `    Contained:      ${state.isContained ? 'YES' : 'NO'}`,
+          `    Units:          ${state.units} particles`,
+          `    Stability:      ${state.stability}%`,
+          `    Field Strength: ${state.fieldStrength}%`,
+          `    Temperature:    ${state.temperature}°K`,
+          `    Power Draw:     ${state.currentDraw} E/s`,
+          '',
+          `    Firmware:       v${firmware.version}`,
+          '',
+        ],
+      }
+    }
+
+    if (action === 'power') {
+      const subAction = args[1]?.toLowerCase()
+      if (!subAction) {
+        return {
+          success: true,
+          output: [
+            '',
+            `  EMC-001 Power State: ${state.isPowered ? 'ON' : 'STANDBY'}`,
+            '  usage: emc power [on|off]',
+            '',
+          ],
+        }
+      }
+      if (subAction === 'on') {
+        if (state.isPowered) {
+          return { success: true, output: ['', '  EMC-001 is already powered on.', ''] }
+        }
+        ctx.addOutput('[emc] Initiating EMC-001 containment field boot...')
+        await emcDevice?.powerOn()
+        return {
+          success: true,
+          output: ['[emc] EMC-001 is now ONLINE', ''],
+        }
+      }
+      if (subAction === 'off') {
+        if (!state.isPowered) {
+          return { success: true, output: ['', '  EMC-001 is already in standby.', ''] }
+        }
+        ctx.addOutput('[emc] Initiating EMC-001 containment shutdown...')
+        await emcDevice?.powerOff()
+        return {
+          success: true,
+          output: ['[emc] EMC-001 is now in STANDBY', ''],
+        }
+      }
+      return { success: false, error: 'usage: emc power [on|off]' }
+    }
+
+    if (action === 'firmware') {
+      const subAction = args[1]?.toLowerCase()
+      if (subAction === 'update') {
+        return { success: true, output: ['', '  [emc] Checking for firmware updates...', '  EMC-001 firmware is up to date (v' + firmware.version + ')', ''] }
+      }
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌──────────────────────────────────────────────┐',
+          '  │         EMC-001 FIRMWARE INFO                │',
+          '  └──────────────────────────────────────────────┘',
+          '',
+          `    Version:        v${firmware.version}`,
+          `    Build:          ${firmware.build}`,
+          `    Checksum:       ${firmware.checksum}`,
+          `    Security Patch: ${firmware.securityPatch}`,
+          `    Features:       ${firmware.features.join(', ')}`,
+          '',
+        ],
+      }
+    }
+
+    if (action === 'test') {
+      if (!state.isPowered || state.deviceState === 'standby') {
+        return { success: false, error: 'EMC-001 must be online to run diagnostics.\nUse: emc power on' }
+      }
+      ctx.addOutput('[emc] Running EMC-001 containment diagnostics...')
+      await emcDevice?.runTest()
+      return {
+        success: true,
+        output: [
+          '',
+          '[emc] All diagnostics PASSED',
+          '',
+        ],
+      }
+    }
+
+    if (action === 'reset') {
+      if (!state.isPowered || state.deviceState === 'standby') {
+        return { success: false, error: 'EMC-001 is in standby. Use: emc power on' }
+      }
+      ctx.addOutput('[emc] Rebooting EMC-001...')
+      await emcDevice?.reboot()
+      return {
+        success: true,
+        output: ['[emc] EMC-001 reboot complete', ''],
+      }
+    }
+
+    if (action === 'info') {
+      return {
+        success: true,
+        output: [
+          '',
+          '╔════════════════════════════════════════════════════════╗',
+          '║            EMC-001 :: EXOTIC MATTER CONTAINMENT       ║',
+          '║                 Device Specification v4.0              ║',
+          '╚════════════════════════════════════════════════════════╝',
+          '',
+          '  OVERVIEW',
+          '    High-energy containment field for exotic matter',
+          '    particles. Monitors unit count, stability, and',
+          '    field strength in real-time.',
+          '',
+          '  SPECIFICATIONS',
+          `    Firmware:     v${firmware.version} (build ${firmware.build})`,
+          `    Checksum:     ${firmware.checksum}`,
+          '    Particles:    42 units (max capacity)',
+          '    Field Type:   Magnetic confinement (CERN-class)',
+          '',
+          '  POWER',
+          `    Full/Boot:    ${powerSpecs.full} E/s`,
+          `    Idle:         ${powerSpecs.idle} E/s`,
+          `    Standby:      ${powerSpecs.standby} E/s`,
+          `    Scan/Test:    ${powerSpecs.scan} E/s`,
+          `    Category:     ${powerSpecs.category} | Priority: P${powerSpecs.priority}`,
+          '',
+          '  COMMANDS',
+          '    emc status       Show containment status',
+          '    emc power on/off Power management',
+          '    emc firmware     View firmware',
+          '    emc test         Run diagnostics',
+          '    emc reset        Reboot system',
+          '    emc info         This documentation',
+          '',
+          '  TROUBLESHOOTING',
+          '    - Low stability: check field strength and temp',
+          '    - Field collapse: immediate reboot with emc reset',
+          '    - If containment offline, run: emc power on',
+          '    - Run emc test to verify all containment systems',
+          '',
+          '  See also: cat ~/.local/docs/emc001.txt',
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `unknown emc subcommand: ${action}\nusage: emc [status|power|firmware|test|reset|info]`,
+    }
+  },
+}
+
+// QUA Command - Quantum Analyzer
+// ═══════════════════════════════════════════════════════════════
+const quaCommand: Command = {
+  name: 'qua',
+  aliases: ['analyzer', 'qua001', 'quantum-analyzer'],
+  description: 'Quantum Analyzer management (QUA-001)',
+  usage: 'qua [status|power|firmware|test|reset|mode|sensitivity|depth|frequency|info]',
+  execute: async (args, ctx) => {
+    const quaDevice = ctx.data.quaDevice
+
+    const state = quaDevice?.getState() ?? {
+      deviceState: 'online' as const,
+      statusMessage: 'READY',
+      isPowered: true,
+      mode: 'ANOMALY',
+      sensitivity: 65,
+      depth: 50,
+      frequency: 40,
+      coherence: 87,
+      isAnalyzing: false,
+      currentDraw: 10,
+    }
+
+    const firmware = quaDevice?.getFirmware() ?? {
+      version: '3.7.2',
+      build: '2026.01.29',
+      checksum: 'Q7A3N5X8',
+      features: ['quantum-core', 'neural-network', 'multi-mode', 'waveform-gen', 'deep-scan'],
+      securityPatch: '2026.01.25',
+    }
+
+    const powerSpecs = quaDevice?.getPowerSpecs() ?? {
+      full: 25,
+      idle: 10,
+      standby: 2,
+      analysis: 35,
+      category: 'heavy',
+      priority: 2,
+    }
+
+    const action = args[0]?.toLowerCase()
+
+    if (!action) {
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌──────────────────────────────────────────────┐',
+          '  │       QUA-001 :: QUANTUM ANALYZER             │',
+          '  │            Management Console                  │',
+          '  └──────────────────────────────────────────────┘',
+          '',
+          '    qua status              Show analyzer status',
+          '    qua power [on|off]      Power on/standby',
+          '    qua firmware            View firmware info',
+          '    qua firmware update     Check for firmware updates',
+          '    qua test                Run diagnostics',
+          '    qua reset               Reboot analyzer',
+          '    qua mode <MODE>         Set analysis mode',
+          '    qua sensitivity <0-100> Set sensitivity knob',
+          '    qua depth <0-100>       Set depth knob',
+          '    qua frequency <0-100>   Set frequency knob',
+          '    qua info                Full documentation',
+          '',
+          '  Modes: ANOMALY, RESOURCE, DECRYPT, DIAGNOSE, SIMULATE, SCAN',
+          '',
+        ],
+      }
+    }
+
+    if (action === 'status') {
+      const stateLabel = state.deviceState === 'online' ? 'ONLINE' : state.deviceState.toUpperCase()
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌──────────────────────────────────────────────┐',
+          '  │         QUA-001 STATUS REPORT                 │',
+          '  └──────────────────────────────────────────────┘',
+          '',
+          `    State:          ${stateLabel}`,
+          `    Status:         ${state.statusMessage}`,
+          `    Mode:           ${state.mode}`,
+          `    Sensitivity:    ${state.sensitivity}%`,
+          `    Depth:          ${state.depth}%`,
+          `    Frequency:      ${state.frequency}Hz`,
+          `    Coherence:      ${state.coherence}%`,
+          `    Analyzing:      ${state.isAnalyzing ? 'YES' : 'NO'}`,
+          `    Power Draw:     ${state.currentDraw} E/s`,
+          '',
+          `    Firmware:       v${firmware.version}`,
+          '',
+        ],
+      }
+    }
+
+    if (action === 'power') {
+      const subAction = args[1]?.toLowerCase()
+      if (!subAction) {
+        return {
+          success: true,
+          output: [
+            '',
+            `  QUA-001 Power State: ${state.isPowered ? 'ON' : 'STANDBY'}`,
+            '  usage: qua power [on|off]',
+            '',
+          ],
+        }
+      }
+      if (subAction === 'on') {
+        if (state.isPowered) {
+          return { success: true, output: ['', '  QUA-001 is already powered on.', ''] }
+        }
+        ctx.addOutput('[qua] Initiating QUA-001 quantum analyzer boot...')
+        await quaDevice?.powerOn()
+        return {
+          success: true,
+          output: ['[qua] QUA-001 is now ONLINE', ''],
+        }
+      }
+      if (subAction === 'off') {
+        if (!state.isPowered) {
+          return { success: true, output: ['', '  QUA-001 is already in standby.', ''] }
+        }
+        ctx.addOutput('[qua] Initiating QUA-001 shutdown...')
+        await quaDevice?.powerOff()
+        return {
+          success: true,
+          output: ['[qua] QUA-001 is now in STANDBY', ''],
+        }
+      }
+      return { success: false, error: 'usage: qua power [on|off]' }
+    }
+
+    if (action === 'firmware') {
+      const subAction = args[1]?.toLowerCase()
+      if (subAction === 'update') {
+        return { success: true, output: ['', '  [qua] Checking for firmware updates...', '  QUA-001 firmware is up to date (v' + firmware.version + ')', ''] }
+      }
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌──────────────────────────────────────────────┐',
+          '  │         QUA-001 FIRMWARE INFO                 │',
+          '  └──────────────────────────────────────────────┘',
+          '',
+          `    Version:        v${firmware.version}`,
+          `    Build:          ${firmware.build}`,
+          `    Checksum:       ${firmware.checksum}`,
+          `    Security Patch: ${firmware.securityPatch}`,
+          `    Features:       ${firmware.features.join(', ')}`,
+          '',
+        ],
+      }
+    }
+
+    if (action === 'test') {
+      if (!state.isPowered || state.deviceState === 'standby') {
+        return { success: false, error: 'QUA-001 must be online to run diagnostics.\nUse: qua power on' }
+      }
+      ctx.addOutput('[qua] Running QUA-001 diagnostics...')
+      await quaDevice?.runTest()
+      return {
+        success: true,
+        output: [
+          '',
+          '[qua] All diagnostics PASSED',
+          '',
+        ],
+      }
+    }
+
+    if (action === 'reset') {
+      if (!state.isPowered || state.deviceState === 'standby') {
+        return { success: false, error: 'QUA-001 is in standby. Use: qua power on' }
+      }
+      ctx.addOutput('[qua] Rebooting QUA-001...')
+      await quaDevice?.reboot()
+      return {
+        success: true,
+        output: ['[qua] QUA-001 reboot complete', ''],
+      }
+    }
+
+    if (action === 'mode') {
+      const modeArg = args[1]?.toUpperCase()
+      const validModes = ['ANOMALY', 'RESOURCE', 'DECRYPT', 'DIAGNOSE', 'SIMULATE', 'SCAN'] as const
+      if (!modeArg) {
+        return {
+          success: true,
+          output: [
+            '',
+            `  Current mode: ${state.mode}`,
+            `  Available: ${validModes.join(', ')}`,
+            '  usage: qua mode <MODE>',
+            '',
+          ],
+        }
+      }
+      if (!validModes.includes(modeArg as typeof validModes[number])) {
+        return { success: false, error: `Invalid mode: ${modeArg}\nValid modes: ${validModes.join(', ')}` }
+      }
+      if (!state.isPowered) {
+        return { success: false, error: 'QUA-001 must be online. Use: qua power on' }
+      }
+      quaDevice?.setMode(modeArg as typeof validModes[number])
+      return {
+        success: true,
+        output: [`[qua] Analysis mode set to ${modeArg}`, ''],
+      }
+    }
+
+    if (action === 'sensitivity') {
+      const val = parseInt(args[1])
+      if (isNaN(val) || val < 0 || val > 100) {
+        return { success: false, error: 'usage: qua sensitivity <0-100>' }
+      }
+      if (!state.isPowered) {
+        return { success: false, error: 'QUA-001 must be online. Use: qua power on' }
+      }
+      quaDevice?.setSensitivity(val)
+      return {
+        success: true,
+        output: [`[qua] Sensitivity set to ${val}%`, ''],
+      }
+    }
+
+    if (action === 'depth') {
+      const val = parseInt(args[1])
+      if (isNaN(val) || val < 0 || val > 100) {
+        return { success: false, error: 'usage: qua depth <0-100>' }
+      }
+      if (!state.isPowered) {
+        return { success: false, error: 'QUA-001 must be online. Use: qua power on' }
+      }
+      quaDevice?.setDepth(val)
+      return {
+        success: true,
+        output: [`[qua] Depth set to ${val}%`, ''],
+      }
+    }
+
+    if (action === 'frequency') {
+      const val = parseInt(args[1])
+      if (isNaN(val) || val < 0 || val > 100) {
+        return { success: false, error: 'usage: qua frequency <0-100>' }
+      }
+      if (!state.isPowered) {
+        return { success: false, error: 'QUA-001 must be online. Use: qua power on' }
+      }
+      quaDevice?.setFrequency(val)
+      return {
+        success: true,
+        output: [`[qua] Frequency set to ${val}Hz`, ''],
+      }
+    }
+
+    if (action === 'info') {
+      return {
+        success: true,
+        output: [
+          '',
+          '╔════════════════════════════════════════════════════════╗',
+          '║            QUA-001 :: QUANTUM ANALYZER                ║',
+          '║              Device Specification v3.7                 ║',
+          '╚════════════════════════════════════════════════════════╝',
+          '',
+          '  OVERVIEW',
+          '    Universal problem solver with 6 analysis modes,',
+          '    neural network processing, waveform generation,',
+          '    and deep scan capability.',
+          '',
+          '  SPECIFICATIONS',
+          `    Firmware:     v${firmware.version} (build ${firmware.build})`,
+          `    Checksum:     ${firmware.checksum}`,
+          '    Manufacturer: QNTX Corporation',
+          '',
+          '  ANALYSIS MODES',
+          '    ANOMALY   - Detect dimensional anomalies',
+          '    RESOURCE  - Optimize resource allocation',
+          '    DECRYPT   - Decode encrypted signals',
+          '    DIAGNOSE  - System health & faults',
+          '    SIMULATE  - Predictive simulations',
+          '    SCAN      - Deep scan for hidden objects',
+          '',
+          '  POWER',
+          `    Full/Boot:    ${powerSpecs.full} E/s`,
+          `    Idle:         ${powerSpecs.idle} E/s`,
+          `    Standby:      ${powerSpecs.standby} E/s`,
+          `    Analysis:     ${powerSpecs.analysis} E/s`,
+          `    Category:     ${powerSpecs.category} | Priority: P${powerSpecs.priority}`,
+          '',
+          '  See also: cat ~/.local/docs/qua001.txt',
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `unknown qua subcommand: ${action}\nusage: qua [status|power|firmware|test|reset|mode|sensitivity|depth|frequency|info]`,
+    }
+  },
+}
+
+// VNT Command - Ventilation System
+// ═══════════════════════════════════════════════════════════════
+const qsmCommand: Command = {
+  name: 'qsm',
+  aliases: ['quantum', 'qsm001', 'qubit'],
+  description: 'Quantum State Monitor management (QSM-001)',
+  usage: 'qsm [status|power|firmware|test|reset|info]',
+  execute: async (args, ctx) => {
+    const qsmDevice = ctx.data.qsmDevice
+    const action = args[0]?.toLowerCase()
+
+    const state = qsmDevice?.getState() ?? {
+      deviceState: 'online' as const,
+      statusMessage: 'COHERENT',
+      isPowered: true,
+      coherence: 94,
+      qubits: 127,
+      isEntangled: true,
+      currentDraw: 7,
+      errorRate: 0.8,
+      temperature: 15,
+    }
+    const firmware = qsmDevice?.getFirmware() ?? {
+      version: '1.2.0',
+      build: '2026.01.20',
+      checksum: 'Q7S4M1N9',
+      features: ['qubit-array', 'coherence-tracking', 'entanglement-verify', 'error-correction', 'wave-function'],
+      securityPatch: '2026.01.18',
+    }
+    const powerSpecs = qsmDevice?.getPowerSpecs() ?? {
+      full: 12,
+      idle: 7,
+      standby: 1,
+      scan: 18,
+      category: 'medium',
+      priority: 2,
+    }
+
+    if (!action) {
+      return {
+        success: true,
+        output: [
+          '',
+          '╭─────────────────────────────────────────────────╮',
+          '│       QSM-001 :: QUANTUM STATE MONITOR           │',
+          '╰─────────────────────────────────────────────────╯',
+          '',
+          '  USAGE:',
+          '    qsm status              Show quantum state',
+          '    qsm power [on|off]      Power on/shutdown monitor',
+          '    qsm firmware            View firmware info',
+          '    qsm firmware update     Check for firmware updates',
+          '    qsm test                Run quantum diagnostics',
+          '    qsm reset               Reboot quantum monitor',
+          '    qsm info                Full documentation',
+          '',
+          '  EXAMPLES:',
+          '    qsm power on            Boot the quantum monitor',
+          '    qsm test                Run coherence diagnostics',
+          '    qsm status              Check qubit array state',
+          '',
+        ],
+      }
+    }
+
+    if (action === 'status' || action === 'stat' || action === 's') {
+      const stateSymbol = state.deviceState === 'online' ? '●' : state.deviceState === 'standby' ? '○' : '◐'
+      const stateColor = state.deviceState === 'online' ? 'ONLINE' : state.deviceState.toUpperCase()
+
+      const barLen = 15
+      const cohFilled = Math.round((state.coherence / 100) * barLen)
+      const cohBar = '█'.repeat(cohFilled) + '░'.repeat(barLen - cohFilled)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌───────────────────────────────────────────┐',
+          '  │         QSM-001 STATUS REPORT              │',
+          '  └───────────────────────────────────────────┘',
+          '',
+          `     System State:   ${stateSymbol} ${stateColor}`,
+          `     Power Draw:     ${state.currentDraw} E/s`,
+          '',
+          '  QUANTUM METRICS:',
+          `     Coherence:  [${cohBar}] ${state.coherence}%`,
+          `     Qubits:         ${state.qubits} active`,
+          `     Entangled:      ${state.isEntangled ? 'YES ◉' : 'NO  ○'}`,
+          `     Error Rate:     ${state.errorRate}%`,
+          `     Temperature:    ${state.temperature}°K`,
+          '',
+          `  Firmware: v${firmware.version}   Category: ${powerSpecs.category.toUpperCase()}`,
+          '',
+        ],
+      }
+    }
+
+    if (action === 'power') {
+      const subAction = args[1]?.toLowerCase()
+      if (!subAction) {
+        return {
+          success: true,
+          output: [
+            '',
+            `  QSM-001 Power State: ${state.isPowered ? 'ON' : 'STANDBY'}`,
+            '  usage: qsm power [on|off]',
+            '',
+          ],
+        }
+      }
+      if (subAction === 'on') {
+        if (state.deviceState !== 'standby') {
+          return { success: true, output: ['', '  QSM-001 is already powered on.', ''] }
+        }
+        ctx.addOutput('[qsm] Initiating QSM-001 boot sequence...')
+        ctx.addOutput('[qsm] Cooling qubit array to 15°K...')
+        await qsmDevice?.powerOn()
+        return {
+          success: true,
+          output: ['[qsm] QSM-001 is now ONLINE — 127 qubits entangled', ''],
+        }
+      }
+      if (subAction === 'off') {
+        if (state.deviceState === 'standby') {
+          return { success: true, output: ['', '  QSM-001 is already in standby.', ''] }
+        }
+        ctx.addOutput('[qsm] Initiating QSM-001 shutdown...')
+        ctx.addOutput('[qsm] Collapsing quantum states...')
+        await qsmDevice?.powerOff()
+        return {
+          success: true,
+          output: ['[qsm] QSM-001 is now in STANDBY', ''],
+        }
+      }
+      return { success: false, error: 'usage: qsm power [on|off]' }
+    }
+
+    if (action === 'firmware' || action === 'fw') {
+      const subAction = args[1]?.toLowerCase()
+
+      if (subAction === 'update' || subAction === 'upgrade') {
+        return {
+          success: true,
+          output: [
+            '',
+            '[qsm] Checking for firmware updates...',
+            '[qsm] Connecting to IBM Quantum Network...... OK',
+            `[qsm] Current version: v${firmware.version}`,
+            '[qsm] Latest version:  v1.2.0',
+            '',
+            `[qsm] Security patch: ${firmware.securityPatch}`,
+            '[qsm] Firmware is up to date.',
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌───────────────────────────────────────────┐',
+          '  │         QSM-001 FIRMWARE INFO              │',
+          '  └───────────────────────────────────────────┘',
+          '',
+          `     Version:        v${firmware.version}`,
+          `     Build:          ${firmware.build}`,
+          `     Checksum:       ${firmware.checksum}`,
+          `     Security Patch: ${firmware.securityPatch}`,
+          '',
+          '     Features:',
+          ...firmware.features.map(f => `       - ${f}`),
+          '',
+          '  use: qsm firmware update   to check for updates',
+          '',
+        ],
+      }
+    }
+
+    if (action === 'test' || action === 'diag') {
+      if (state.deviceState !== 'online') {
+        return { success: false, error: 'QSM-001 must be online to run diagnostics.\nUse: qsm power on' }
+      }
+      ctx.addOutput('[qsm] Running QSM-001 quantum diagnostics...')
+      ctx.addOutput('[qsm] Measuring coherence time...')
+      await qsmDevice?.runTest()
+      return {
+        success: true,
+        output: [
+          '[qsm] All diagnostics PASSED',
+          '  - Coherence:      OK  (T2 = 120μs)',
+          '  - Entanglement:   OK  (Bell state fidelity 99.2%)',
+          '  - Decoherence:    OK  (within tolerance)',
+          '  - Error correct:  OK  (surface code active)',
+          '',
+        ],
+      }
+    }
+
+    if (action === 'reset' || action === 'reboot') {
+      if (state.deviceState === 'standby') {
+        return { success: false, error: 'QSM-001 is in standby. Use: qsm power on' }
+      }
+      ctx.addOutput('[qsm] Rebooting QSM-001...')
+      ctx.addOutput('[qsm] Re-cooling qubit array...')
+      await qsmDevice?.reboot()
+      return {
+        success: true,
+        output: ['[qsm] QSM-001 reboot complete', ''],
+      }
+    }
+
+    if (action === 'info' || action === 'help') {
+      return {
+        success: true,
+        output: [
+          '',
+          '╔═══════════════════════════════════════════════════════════╗',
+          '║            QSM-001 :: QUANTUM STATE MONITOR               ║',
+          '║                 Device Documentation                      ║',
+          '╚═══════════════════════════════════════════════════════════╝',
+          '',
+          '  OVERVIEW:',
+          '    127-qubit quantum coherence monitor with real-time wave',
+          '    function display. Tracks entanglement state, coherence',
+          '    percentage, error rates, and cryogenic temperature.',
+          '',
+          '  SPECIFICATIONS:',
+          `    Firmware:      v${firmware.version} (build ${firmware.build})`,
+          `    Checksum:      ${firmware.checksum}`,
+          '    Qubit Array:   127 qubits (IBM Eagle topology)',
+          '    Coherence:     T2 ~ 120μs',
+          '    Error Correct: Surface code, distance 3',
+          '    Cryogenics:    15°K dilution refrigerator',
+          '',
+          '  POWER CONSUMPTION:',
+          `    Full Load:     ${powerSpecs.full} E/s`,
+          `    Idle:          ${powerSpecs.idle} E/s`,
+          `    Standby:       ${powerSpecs.standby} E/s`,
+          `    Scan/Test:     ${powerSpecs.scan} E/s`,
+          `    Category:      ${powerSpecs.category}`,
+          `    Priority:      P${powerSpecs.priority}`,
+          '',
+          '  FEATURES:',
+          ...firmware.features.map(f => `    - ${f}`),
+          '',
+          '  COMPATIBLE DEVICES:',
+          '    QAN-001  Quantum Analyzer (quantum operations)',
+          '    SCA-001  Supercomputer Array (classical control)',
+          '    AIC-001  AI Assistant Core (error optimization)',
+          '',
+          '  TROUBLESHOOTING:',
+          '    - Low coherence: check cryogenic system temperature',
+          '    - No entanglement: run qsm test to verify Bell states',
+          '    - High error rate: reboot with qsm reset',
+          '',
+          '  See also: cat ~/.local/docs/qsm001.txt',
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `unknown qsm subcommand: ${action}\nusage: qsm [status|power|firmware|test|reset|info]`,
+    }
+  },
+}
+
+const vntCommand: Command = {
+  name: 'vnt',
+  aliases: ['vent', 'ventilation', 'fan', 'vnt001', 'cooling'],
+  description: 'Ventilation System management (VNT-001)',
+  usage: 'vnt [status|power|firmware|test|reset|fan|info]',
+  execute: async (args, ctx) => {
+    const vntDevice = ctx.data.vntDevice
+    const action = args[0]?.toLowerCase()
+
+    // Get current state from device if available (fallback defaults for standalone terminal)
+    const state = vntDevice?.getState() ?? {
+      deviceState: 'online' as const,
+      statusMessage: 'Fans operational',
+      isPowered: true,
+      cpuFan: { speed: 50, rpm: 2800, mode: 'AUTO', isOn: true },
+      gpuFan: { speed: 45, rpm: 2600, mode: 'AUTO', isOn: true },
+      cpuTemp: 34,
+      gpuTemp: 38,
+      currentDraw: 2,
+      filterHealth: 98,
+      airQuality: 95,
+      humidity: 42,
+    }
+    const firmware = vntDevice?.getFirmware() ?? {
+      version: '1.0.0',
+      build: '2026.01.28',
+      checksum: 'V4F1N7E2',
+      features: ['air-exchange', 'hepa-filter', 'humidity-ctrl', 'damper-ctrl', 'dual-fan'],
+      securityPatch: '2026.01.20',
+    }
+    const powerSpecs = vntDevice?.getPowerSpecs() ?? {
+      full: 4,
+      idle: 2,
+      standby: 0.5,
+      emergency: 12,
+      category: 'light',
+      priority: 1,
+    }
+
+    const currentStatus = state.deviceState
+    const isPowered = state.isPowered
+    const cpuFan = state.cpuFan
+    const gpuFan = state.gpuFan
+    const cpuTemp = state.cpuTemp
+    const gpuTemp = state.gpuTemp
+
+    // No args - show usage
+    if (!action) {
+      return {
+        success: true,
+        output: [
+          '',
+          '╭─────────────────────────────────────────────────╮',
+          '│         VNT-001 :: VENTILATION SYSTEM            │',
+          '╰─────────────────────────────────────────────────╯',
+          '',
+          '  USAGE:',
+          '    vnt status              Show fan status',
+          '    vnt power [on|off]      Power on/shutdown system',
+          '    vnt firmware            View firmware info',
+          '    vnt test                Run fan diagnostics',
+          '    vnt reset               Reboot fan controller',
+          '    vnt fan <cpu|gpu> <cmd> Control individual fan',
+          '    vnt mode <mode>        Set all fans mode',
+          '    vnt emergency          Emergency purge (max airflow)',
+          '    vnt info               Full documentation',
+          '',
+          '  FAN COMMANDS:',
+          '    vnt fan cpu speed 75    Set CPU fan to 75%',
+          '    vnt fan gpu mode high   Set GPU fan mode',
+          '    vnt fan cpu on|off      Toggle CPU fan',
+          '',
+          '  EXAMPLES:',
+          '    vnt power on            Boot the ventilation system',
+          '    vnt fan cpu mode auto   Set CPU fan to auto mode',
+          '    vnt status              Check fan status',
+          '',
+        ],
+      }
+    }
+
+    // STATUS command
+    if (action === 'status' || action === 'stat' || action === 's') {
+      const stateSymbol = currentStatus === 'online' ? '●' : currentStatus === 'standby' ? '○' : '◐'
+      const stateColor = currentStatus === 'online' ? 'ONLINE' : currentStatus.toUpperCase()
+
+      // Fan speed bars
+      const barLen = 15
+      const cpuFilled = Math.round((cpuFan.speed / 100) * barLen)
+      const gpuFilled = Math.round((gpuFan.speed / 100) * barLen)
+      const cpuBar = '█'.repeat(cpuFilled) + '░'.repeat(barLen - cpuFilled)
+      const gpuBar = '█'.repeat(gpuFilled) + '░'.repeat(barLen - gpuFilled)
+
+      const getTempIndicator = (temp: number) => {
+        if (temp < 30) return '○'
+        if (temp < 40) return '◐'
+        if (temp < 50) return '●'
+        return '◉'
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌───────────────────────────────────────────┐',
+          '  │         VNT-001 STATUS REPORT             │',
+          '  └───────────────────────────────────────────┘',
+          '',
+          `     System State:   ${stateSymbol} ${stateColor}`,
+          `     Power Draw:     ${state.currentDraw} E/s`,
+          '',
+          '  ┌──────────────────────────────────────────────┐',
+          '  │  CPU FAN                │  GPU FAN            │',
+          '  ├────────────────────────┼─────────────────────┤',
+          `  │  State:  ${cpuFan.isOn ? 'ON ' : 'OFF'}           │  State:  ${gpuFan.isOn ? 'ON ' : 'OFF'}          │`,
+          `  │  Mode:   ${cpuFan.mode.padEnd(4)}          │  Mode:   ${gpuFan.mode.padEnd(4)}         │`,
+          `  │  Speed:  ${String(cpuFan.speed).padStart(3)}%          │  Speed:  ${String(gpuFan.speed).padStart(3)}%         │`,
+          `  │  RPM:    ${String(cpuFan.rpm).padStart(4)}          │  RPM:    ${String(gpuFan.rpm).padStart(4)}         │`,
+          `  │  [${cpuBar}]  │  [${gpuBar}] │`,
+          '  └────────────────────────┴─────────────────────┘',
+          '',
+          '  THERMAL READINGS:',
+          `     CPU: ${getTempIndicator(cpuTemp)} ${cpuTemp.toFixed(1)}°C     GPU: ${getTempIndicator(gpuTemp)} ${gpuTemp.toFixed(1)}°C`,
+          '',
+          '  ENVIRONMENT:',
+          `     Filter Health: ${state.filterHealth}%   Air Quality: ${state.airQuality}%`,
+          `     Humidity: ${state.humidity}%`,
+          '',
+          `  Firmware: v${firmware.version}   Category: ${powerSpecs.category.toUpperCase()}`,
+          '',
+        ],
+      }
+    }
+
+    // POWER command
+    if (action === 'power' || action === 'pwr' || action === 'p') {
+      const subAction = args[1]?.toLowerCase()
+
+      if (!subAction) {
+        return {
+          success: true,
+          output: [
+            '',
+            `  VNT-001 Ventilation System: ${isPowered ? 'ACTIVE' : 'OFFLINE'}`,
+            `  Power Draw: ${state.currentDraw} E/s`,
+            '',
+            '  Usage: vnt power [on|off]',
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'on' || subAction === 'boot' || subAction === 'start') {
+        if (isPowered && (currentStatus === 'online' || currentStatus === 'booting')) {
+          return {
+            success: false,
+            error: `[VNT-001] Ventilation system already ${currentStatus.toUpperCase()}.`,
+          }
+        }
+
+        ctx.setTyping(true)
+
+        if (vntDevice) {
+          await vntDevice.powerOn()
+        } else {
+          await new Promise(r => setTimeout(r, 1500))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║      VNT-001 BOOT SEQUENCE                ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  [■□□□□□] Power check...',
+            '  [■■□□□□] Motor init...',
+            '  [■■■□□□] HEPA filter check...',
+            '  [■■■■□□] Damper control...',
+            '  [■■■■■□] Calibrating sensors...',
+            '  [■■■■■■] System online',
+            '',
+            '  Status: ONLINE',
+            `  Power Draw: ${powerSpecs.idle} E/s`,
+            '  Fans: OPERATIONAL',
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'off' || subAction === 'shutdown' || subAction === 'stop') {
+        if (!isPowered || currentStatus === 'standby' || currentStatus === 'shutdown') {
+          return {
+            success: false,
+            error: '[VNT-001] Ventilation system already in standby.',
+          }
+        }
+        if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+          return {
+            success: false,
+            error: `[VNT-001] Cannot shutdown - operation in progress (${currentStatus}).`,
+          }
+        }
+
+        ctx.setTyping(true)
+
+        if (vntDevice) {
+          await vntDevice.powerOff()
+        } else {
+          await new Promise(r => setTimeout(r, 1200))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║      VNT-001 SHUTDOWN SEQUENCE            ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  [■■■■■■] Fan slowdown...',
+            '  [■■■□□□] Closing dampers...',
+            '  [□□□□□□] System offline',
+            '',
+            '  Status: STANDBY',
+            `  Power Draw: ${powerSpecs.standby} E/s`,
+            '',
+            '  ⚠ WARNING: Thermal protection offline.',
+            '    Ensure alternative cooling is available.',
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: false,
+        error: `Unknown power option: ${subAction}\n\nUsage: vnt power [on|off]`,
+      }
+    }
+
+    // FAN command
+    if (action === 'fan' || action === 'f') {
+      const fanId = args[1]?.toLowerCase()
+      const fanCmd = args[2]?.toLowerCase()
+
+      if (!fanId) {
+        return {
+          success: true,
+          output: [
+            '',
+            '  VNT-001 FAN CONTROL:',
+            '',
+            '  Usage: vnt fan <cpu|gpu> <command> [value]',
+            '',
+            '  Commands:',
+            '    speed <0-100>         Set fan speed percentage',
+            '    mode <auto|low|med|high>  Set fan mode',
+            '    on | off              Toggle fan power',
+            '',
+            '  Examples:',
+            '    vnt fan cpu speed 75',
+            '    vnt fan gpu mode auto',
+            '    vnt fan cpu off',
+            '',
+          ],
+        }
+      }
+
+      if (fanId !== 'cpu' && fanId !== 'gpu') {
+        return {
+          success: false,
+          error: `Unknown fan: ${fanId}\nAvailable fans: cpu, gpu`,
+        }
+      }
+
+      if (currentStatus !== 'online') {
+        return {
+          success: false,
+          error: `[VNT-001] System must be ONLINE to control fans (current: ${currentStatus.toUpperCase()}).`,
+        }
+      }
+
+      if (!fanCmd) {
+        const fan = fanId === 'cpu' ? cpuFan : gpuFan
+        const temp = fanId === 'cpu' ? cpuTemp : gpuTemp
+        return {
+          success: true,
+          output: [
+            '',
+            `  VNT-001 ${fanId.toUpperCase()} FAN:`,
+            `    State:  ${fan.isOn ? 'ON' : 'OFF'}`,
+            `    Mode:   ${fan.mode}`,
+            `    Speed:  ${fan.speed}%`,
+            `    RPM:    ${fan.rpm}`,
+            `    Temp:   ${temp.toFixed(1)}°C`,
+            '',
+          ],
+        }
+      }
+
+      if (fanCmd === 'speed' || fanCmd === 'spd') {
+        const speedVal = parseInt(args[3] ?? '', 10)
+        if (isNaN(speedVal) || speedVal < 0 || speedVal > 100) {
+          return {
+            success: false,
+            error: `Invalid speed value. Usage: vnt fan ${fanId} speed <0-100>`,
+          }
+        }
+
+        if (vntDevice) vntDevice.setFanSpeed(fanId as 'cpu' | 'gpu', speedVal)
+
+        return {
+          success: true,
+          output: [
+            '',
+            `  [VNT-001] ${fanId.toUpperCase()} fan speed set to ${speedVal}%`,
+            ...(vntDevice ? [] : ['  Note: open panel for bidirectional sync.']),
+            '',
+          ],
+        }
+      }
+
+      if (fanCmd === 'mode') {
+        const modeVal = args[3]?.toUpperCase()
+        if (!modeVal || !['AUTO', 'LOW', 'MED', 'HIGH'].includes(modeVal)) {
+          return {
+            success: false,
+            error: `Invalid mode. Usage: vnt fan ${fanId} mode <auto|low|med|high>`,
+          }
+        }
+
+        if (vntDevice) vntDevice.setFanMode(fanId as 'cpu' | 'gpu', modeVal as 'AUTO' | 'LOW' | 'MED' | 'HIGH')
+
+        return {
+          success: true,
+          output: [
+            '',
+            `  [VNT-001] ${fanId.toUpperCase()} fan mode set to ${modeVal}`,
+            '  Note: use panel fan controls for real-time adjustment.',
+            '',
+          ],
+        }
+      }
+
+      if (fanCmd === 'on' || fanCmd === 'start') {
+        if (vntDevice) vntDevice.toggleFan(fanId as 'cpu' | 'gpu', true)
+
+        return {
+          success: true,
+          output: [
+            '',
+            `  [VNT-001] ${fanId.toUpperCase()} fan started.`,
+            '',
+          ],
+        }
+      }
+
+      if (fanCmd === 'off' || fanCmd === 'stop') {
+        if (vntDevice) vntDevice.toggleFan(fanId as 'cpu' | 'gpu', false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            `  [VNT-001] ${fanId.toUpperCase()} fan stopped.`,
+            '  ⚠ WARNING: Reduced cooling capacity.',
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: false,
+        error: `Unknown fan command: ${fanCmd}\n\nUsage: vnt fan ${fanId} <speed|mode|on|off>`,
+      }
+    }
+
+    // FIRMWARE command
+    if (action === 'firmware' || action === 'fw') {
+      const subAction = args[1]?.toLowerCase()
+
+      if (subAction === 'update' || subAction === 'upgrade') {
+        ctx.setTyping(true)
+        await new Promise(r => setTimeout(r, 1500))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  [VNT-001] Checking for firmware updates...',
+            '',
+            `  Current: v${firmware.version}`,
+            `  Latest:  v${firmware.version}`,
+            '',
+            '  ✓ Firmware is up to date.',
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌───────────────────────────────────────────┐',
+          '  │         VNT-001 FIRMWARE INFO             │',
+          '  └───────────────────────────────────────────┘',
+          '',
+          `  Version:        ${firmware.version}`,
+          `  Build:          ${firmware.build}`,
+          `  Checksum:       ${firmware.checksum}`,
+          `  Security Patch: ${firmware.securityPatch}`,
+          '',
+          '  Features:',
+          ...firmware.features.map(f => `    • ${f}`),
+          '',
+          '  Run "vnt firmware update" to check for updates.',
+          '',
+        ],
+      }
+    }
+
+    // TEST command
+    if (action === 'test' || action === 'diag' || action === 't') {
+      if (currentStatus !== 'online') {
+        return {
+          success: false,
+          error: `[VNT-001] System must be ONLINE to run diagnostics (current: ${currentStatus.toUpperCase()}).`,
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (vntDevice) {
+        await vntDevice.runTest()
+      } else {
+        await new Promise(r => setTimeout(r, 2500))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ╔═══════════════════════════════════════════╗',
+          '  ║      VNT-001 DIAGNOSTICS                  ║',
+          '  ╚═══════════════════════════════════════════╝',
+          '',
+          '  [✓] Motor bearings............ PASS',
+          '  [✓] Airflow rate.............. PASS',
+          '  [✓] HEPA filter............... PASS',
+          '  [✓] Damper control............ PASS',
+          '  [✓] Sensor calibration........ PASS',
+          '',
+          '  All diagnostics PASSED.',
+          '',
+          `  CPU Fan: ${cpuFan.rpm} RPM @ ${cpuFan.speed}%`,
+          `  GPU Fan: ${gpuFan.rpm} RPM @ ${gpuFan.speed}%`,
+          '',
+        ],
+      }
+    }
+
+    // RESET command
+    if (action === 'reset' || action === 'reboot' || action === 'r') {
+      if (currentStatus === 'standby' || currentStatus === 'shutdown') {
+        return {
+          success: false,
+          error: '[VNT-001] System must be powered on to reboot.',
+        }
+      }
+      if (currentStatus === 'booting' || currentStatus === 'rebooting') {
+        return {
+          success: false,
+          error: '[VNT-001] Boot/reboot already in progress.',
+        }
+      }
+
+      ctx.setTyping(true)
+
+      if (vntDevice) {
+        await vntDevice.reboot()
+      } else {
+        await new Promise(r => setTimeout(r, 2500))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ╔═══════════════════════════════════════════╗',
+          '  ║      VNT-001 REBOOT SEQUENCE              ║',
+          '  ╚═══════════════════════════════════════════╝',
+          '',
+          '  [DECEL] Decelerating fans...',
+          '  [SAVE ] Saving fan profiles...',
+          '  [PARK ] Parking motors...',
+          '  [HALT ] System halted...',
+          '  [BOOT ] Reinitializing...',
+          '  [SPIN ] Spinning up fans...',
+          '  [ OK  ] System online',
+          '',
+          '  Reboot complete. All fans operational.',
+          '',
+        ],
+      }
+    }
+
+    // INFO command
+    if (action === 'info' || action === 'help' || action === 'doc') {
+      return {
+        success: true,
+        output: [
+          '',
+          '╔═════════════════════════════════════════════════════════════════╗',
+          '║                    VNT-001 DOCUMENTATION                       ║',
+          '╠═════════════════════════════════════════════════════════════════╣',
+          '',
+          '  DEVICE OVERVIEW:',
+          '    The Ventilation System (VNT-001) is a dual-fan cooling unit',
+          '    responsible for maintaining safe operating temperatures for',
+          '    all laboratory equipment. Operates in auto or manual modes.',
+          '',
+          '  SPECIFICATIONS:',
+          '    Device ID:      VNT-001',
+          '    Category:       Light Consumer',
+          '    Tier:           T1 (Starter)',
+          '    Fan Count:      2 (CPU + GPU)',
+          '    Max RPM:        4800',
+          '',
+          '  POWER CONSUMPTION:',
+          `    Full Operation:  ${powerSpecs.full} E/s`,
+          `    Idle Mode:       ${powerSpecs.idle} E/s`,
+          `    Standby:         ${powerSpecs.standby} E/s`,
+          `    Emergency:       ${powerSpecs.emergency} E/s (max cooling)`,
+          '',
+          '  FAN MODES:',
+          '    AUTO:  Speed adjusts based on temperature',
+          '    LOW:   25% speed (quiet operation)',
+          '    MED:   50% speed (balanced)',
+          '    HIGH:  100% speed (maximum cooling)',
+          '',
+          `  FIRMWARE: v${firmware.version}`,
+          '  FEATURES:',
+          ...firmware.features.map(f => `    • ${f}`),
+          '',
+          '  CONNECTED DEVICES:',
+          '    THM-001  Thermal Manager (Temperature Data)',
+          '    CPU-001  CPU Monitor (Load Data)',
+          '    TMP-001  Temperature Monitor (Ambient)',
+          '',
+          '  COMMANDS:',
+          '    vnt status              - Show fan status',
+          '    vnt power [on|off]      - Boot/shutdown',
+          '    vnt firmware            - View firmware info',
+          '    vnt test                - Run fan diagnostics',
+          '    vnt reset               - Reboot controller',
+          '    vnt fan <cpu|gpu> <cmd> - Control individual fan',
+          '',
+          '  LOCATION IN unOS:',
+          '    /sys/devices/vnt-001/',
+          '    /var/log/vnt/',
+          '    /etc/vnt/config',
+          '',
+          '╚═════════════════════════════════════════════════════════════════╝',
+          '',
+        ],
+      }
+    }
+
+    // EMERGENCY PURGE command
+    if (action === 'emergency' || action === 'purge') {
+      if (currentStatus !== 'online') {
+        return {
+          success: false,
+          error: `[VNT-001] System must be ONLINE for emergency purge (current: ${currentStatus.toUpperCase()}).`,
+        }
+      }
+
+      ctx.setTyping(true)
+      if (vntDevice) {
+        await vntDevice.emergencyPurge()
+      } else {
+        await new Promise(r => setTimeout(r, 3000))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ╔═══════════════════════════════════════════╗',
+          '  ║      ⚠ EMERGENCY PURGE ACTIVATED ⚠       ║',
+          '  ╚═══════════════════════════════════════════╝',
+          '',
+          '  All fans set to 100% - Maximum airflow',
+          `  Power Draw: ${powerSpecs.emergency} E/s`,
+          '',
+          '  Purge complete. Returning to normal operation.',
+          '',
+        ],
+      }
+    }
+
+    // MODE shortcut command (vnt mode auto/low/med/high)
+    if (action === 'mode') {
+      const modeVal = args[1]?.toUpperCase()
+      if (!modeVal || !['AUTO', 'LOW', 'MED', 'HIGH'].includes(modeVal)) {
+        return {
+          success: false,
+          error: 'Usage: vnt mode <auto|low|med|high>',
+        }
+      }
+
+      if (currentStatus !== 'online') {
+        return {
+          success: false,
+          error: `[VNT-001] System must be ONLINE to change mode (current: ${currentStatus.toUpperCase()}).`,
+        }
+      }
+
+      if (vntDevice) {
+        vntDevice.setFanMode('cpu', modeVal as 'AUTO' | 'LOW' | 'MED' | 'HIGH')
+        vntDevice.setFanMode('gpu', modeVal as 'AUTO' | 'LOW' | 'MED' | 'HIGH')
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          `  [VNT-001] All fans set to ${modeVal} mode.`,
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `unknown vnt command: ${action}\n\ntype vnt for available commands.`,
+    }
+  },
+}
+
+const scaCommand: Command = {
+  name: 'sca',
+  aliases: ['super', 'supercomputer', 'sca001', 'cluster'],
+  description: 'Supercomputer Array management (SCA-001)',
+  usage: 'sca [status|power|firmware|test|reset|info]',
+  execute: async (args, ctx) => {
+    const scaDevice = ctx.data.scaDevice
+    const action = args[0]?.toLowerCase()
+
+    // Get current state from device if available
+    const state = scaDevice?.getState() ?? {
+      deviceState: 'online' as const,
+      statusMessage: 'READY',
+      isPowered: true,
+      flops: 2.4,
+      utilization: 87,
+      activeNodes: 16,
+      jobQueue: 7,
+      temperature: 42,
+      memoryUsage: 62,
+      interconnectBandwidth: 156,
+      uptime: 0,
+      currentDraw: 15,
+    }
+    const firmware = scaDevice?.getFirmware() ?? {
+      version: '5.2.0',
+      build: '2026.01.28',
+      checksum: 'C8A5F2E7',
+      features: ['16-node-cluster', 'ecc-memory', 'job-scheduler', 'linpack-bench', 'interconnect-mesh'],
+      securityPatch: '2026.01.20',
+    }
+    const powerSpecs = scaDevice?.getPowerSpecs() ?? {
+      full: 45,
+      idle: 15,
+      standby: 5,
+      benchmark: 60,
+      category: 'heavy',
+      priority: 3,
+    }
+
+    const currentStatus = state.deviceState
+    const isPowered = state.isPowered
+
+    // No args - show usage
+    if (!action) {
+      return {
+        success: true,
+        output: [
+          '',
+          '╭─────────────────────────────────────────────────╮',
+          '│     SCA-001 :: SUPERCOMPUTER ARRAY               │',
+          '╰─────────────────────────────────────────────────╯',
+          '',
+          '  USAGE:',
+          '    sca status          Show cluster status',
+          '    sca power [on|off]  Power on/shutdown cluster',
+          '    sca firmware        View firmware info',
+          '    sca test            Run cluster diagnostics',
+          '    sca reset           Reboot cluster',
+          '    sca info            Full documentation',
+          '',
+          '  EXAMPLES:',
+          '    sca power on        Boot the cluster',
+          '    sca status          Check node status',
+          '    sca test            Run LINPACK benchmark',
+          '',
+        ],
+      }
+    }
+
+    // STATUS command
+    if (action === 'status' || action === 'stat' || action === 's') {
+      const stateSymbol = currentStatus === 'online' ? '●' : currentStatus === 'standby' ? '○' : '◐'
+      const stateColor = currentStatus === 'online' ? 'ONLINE' : currentStatus.toUpperCase()
+
+      // Node visualization
+      const nodeViz = Array.from({ length: 16 }).map((_, i) =>
+        i < state.activeNodes ? '■' : '□'
+      ).join('')
+
+      // Utilization bar
+      const barLen = 20
+      const filled = Math.round((state.utilization / 100) * barLen)
+      const utilBar = '█'.repeat(filled) + '░'.repeat(barLen - filled)
+
+      // Memory bar
+      const memFilled = Math.round((state.memoryUsage / 100) * barLen)
+      const memBar = '█'.repeat(memFilled) + '░'.repeat(barLen - memFilled)
+
+      const formatUptime = (s: number) => {
+        const h = Math.floor(s / 3600)
+        const m = Math.floor((s % 3600) / 60)
+        return `${h}h ${m}m`
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌───────────────────────────────────────────┐',
+          '  │         SCA-001 STATUS REPORT             │',
+          '  └───────────────────────────────────────────┘',
+          '',
+          `     Cluster State:  ${stateSymbol} ${stateColor}`,
+          `     Power Draw:     ${state.currentDraw.toFixed(1)} E/s`,
+          `     Uptime:         ${formatUptime(state.uptime)}`,
+          '',
+          '  COMPUTE NODES:',
+          `     [${nodeViz}]`,
+          `     Active: ${state.activeNodes}/16    Jobs: ${state.jobQueue}`,
+          '',
+          '  PERFORMANCE:',
+          `     PFLOPS:     ${state.flops.toFixed(1)}`,
+          `     Load:       [${utilBar}] ${Math.round(state.utilization)}%`,
+          `     Memory:     [${memBar}] ${Math.round(state.memoryUsage)}%`,
+          `     Interconn:  ${state.interconnectBandwidth.toFixed(0)} GB/s`,
+          '',
+          '  THERMAL:',
+          `     Avg Temp:   ${state.temperature.toFixed(1)}°C`,
+          '',
+          `  Firmware: v${firmware.version}   Category: ${powerSpecs.category.toUpperCase()}`,
+          '',
+        ],
+      }
+    }
+
+    // POWER command
+    if (action === 'power' || action === 'pwr' || action === 'p') {
+      const subAction = args[1]?.toLowerCase()
+
+      if (!subAction) {
+        return {
+          success: true,
+          output: [
+            '',
+            `  SCA-001 Power State: ${isPowered ? 'ON' : 'STANDBY'}`,
+            `  Current Draw: ${state.currentDraw.toFixed(1)} E/s`,
+            '',
+            '  Usage: sca power [on|off]',
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'on' || subAction === 'boot' || subAction === 'start') {
+        if (isPowered && (currentStatus === 'online' || currentStatus === 'booting')) {
+          return {
+            success: false,
+            error: `[SCA-001] Cluster already ${currentStatus.toUpperCase()}.`,
+          }
+        }
+
+        ctx.setTyping(true)
+        if (scaDevice) {
+          await scaDevice.powerOn()
+        } else {
+          await new Promise(r => setTimeout(r, 2000))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║      SCA-001 BOOT SEQUENCE                ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  [■□□□□□□] POST check...',
+            '  [■■□□□□□] Node discovery...',
+            '  [■■■□□□□] Interconnect init...',
+            '  [■■■■□□□] Memory allocation...',
+            '  [■■■■■□□] Scheduler online...',
+            '  [■■■■■■□] Benchmark calibrate...',
+            '  [■■■■■■■] Cluster online',
+            '',
+            '  Status: ONLINE',
+            `  Nodes: 16/16 active`,
+            `  Power Draw: ${powerSpecs.idle} E/s`,
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'off' || subAction === 'shutdown' || subAction === 'stop') {
+        if (!isPowered || currentStatus === 'standby' || currentStatus === 'shutdown') {
+          return {
+            success: false,
+            error: '[SCA-001] Cluster already in standby.',
+          }
+        }
+        if (currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'testing') {
+          return {
+            success: false,
+            error: `[SCA-001] Cannot shutdown - operation in progress (${currentStatus}).`,
+          }
+        }
+
+        ctx.setTyping(true)
+        if (scaDevice) {
+          await scaDevice.powerOff()
+        } else {
+          await new Promise(r => setTimeout(r, 1500))
+        }
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  ╔═══════════════════════════════════════════╗',
+            '  ║      SCA-001 SHUTDOWN SEQUENCE            ║',
+            '  ╚═══════════════════════════════════════════╝',
+            '',
+            '  [■■■■■■■] Draining job queue...',
+            '  [■■■□□□□] Node shutdown...',
+            '  [□□□□□□□] Cluster offline',
+            '',
+            '  Status: STANDBY',
+            `  Power Draw: ${powerSpecs.standby} E/s`,
+            '',
+            '  ⚠ WARNING: Compute resources unavailable.',
+            '    Research and simulations suspended.',
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: false,
+        error: `Unknown power option: ${subAction}\n\nUsage: sca power [on|off]`,
+      }
+    }
+
+    // FIRMWARE command
+    if (action === 'firmware' || action === 'fw') {
+      const subAction = args[1]?.toLowerCase()
+
+      if (subAction === 'update' || subAction === 'upgrade') {
+        ctx.setTyping(true)
+        await new Promise(r => setTimeout(r, 1500))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  [SCA-001] Checking for firmware updates...',
+            '',
+            `  Current: v${firmware.version}`,
+            `  Latest:  v${firmware.version}`,
+            '',
+            '  ✓ Firmware is up to date.',
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'patch') {
+        ctx.setTyping(true)
+        await new Promise(r => setTimeout(r, 1200))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  [SCA-001] Checking security patches...',
+            '',
+            `  Current Patch: ${firmware.securityPatch}`,
+            `  Latest Patch:  ${firmware.securityPatch}`,
+            '',
+            '  ✓ Security patches are current.',
+            '',
+          ],
+        }
+      }
+
+      if (subAction === 'verify') {
+        ctx.setTyping(true)
+        await new Promise(r => setTimeout(r, 1000))
+        ctx.setTyping(false)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  [SCA-001] Verifying firmware integrity...',
+            '',
+            `  Checksum: ${firmware.checksum}`,
+            '  Status: ✓ VERIFIED',
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌───────────────────────────────────────────┐',
+          '  │         SCA-001 FIRMWARE INFO             │',
+          '  └───────────────────────────────────────────┘',
+          '',
+          `  Version:        ${firmware.version}`,
+          `  Build:          ${firmware.build}`,
+          `  Checksum:       ${firmware.checksum}`,
+          `  Security Patch: ${firmware.securityPatch}`,
+          '',
+          '  Features:',
+          ...firmware.features.map(f => `    • ${f}`),
+          '',
+          '  Run "sca firmware update" to check for updates.',
+          '  Run "sca firmware verify" to verify integrity.',
+          '  Run "sca firmware patch" to check security patches.',
+          '',
+        ],
+      }
+    }
+
+    // TEST command
+    if (action === 'test' || action === 'diag' || action === 't' || action === 'bench' || action === 'benchmark') {
+      if (currentStatus !== 'online') {
+        return {
+          success: false,
+          error: `[SCA-001] Cluster must be ONLINE to run diagnostics (current: ${currentStatus.toUpperCase()}).`,
+        }
+      }
+
+      ctx.setTyping(true)
+      if (scaDevice) {
+        await scaDevice.runTest()
+      } else {
+        await new Promise(r => setTimeout(r, 3000))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ╔═══════════════════════════════════════════╗',
+          '  ║      SCA-001 DIAGNOSTICS                  ║',
+          '  ╚═══════════════════════════════════════════╝',
+          '',
+          '  [✓] Compute nodes............ PASS  (16/16)',
+          '  [✓] Interconnect mesh........ PASS',
+          '  [✓] ECC memory............... PASS',
+          '  [✓] L3 cache coherency....... PASS',
+          '  [✓] Job scheduler............ PASS',
+          '  [✓] LINPACK benchmark........ PASS',
+          '',
+          '  All diagnostics PASSED.',
+          '',
+          `  Peak PFLOPS: ${state.flops.toFixed(1)}`,
+          `  Active Nodes: ${state.activeNodes}/16`,
+          `  Cluster Temp: ${state.temperature.toFixed(1)}°C`,
+          '',
+        ],
+      }
+    }
+
+    // RESET command
+    if (action === 'reset' || action === 'reboot' || action === 'restart' || action === 'r') {
+      if (currentStatus !== 'online' && currentStatus !== 'testing') {
+        return {
+          success: false,
+          error: `[SCA-001] Cluster must be ONLINE to reboot (current: ${currentStatus.toUpperCase()}).`,
+        }
+      }
+
+      ctx.setTyping(true)
+      if (scaDevice) {
+        await scaDevice.reboot()
+      } else {
+        await new Promise(r => setTimeout(r, 3000))
+      }
+      ctx.setTyping(false)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ╔═══════════════════════════════════════════╗',
+          '  ║      SCA-001 REBOOT SEQUENCE              ║',
+          '  ╚═══════════════════════════════════════════╝',
+          '',
+          '  [DRAIN] Draining job queue...',
+          '  [SHUT ] Node shutdown...',
+          '  [CYCLE] Power cycle...',
+          '  [HALT ] Cluster offline...',
+          '  [BOOT ] Reinitializing...',
+          '  [BENCH] Benchmark calibrate...',
+          '  [ OK  ] Cluster online',
+          '',
+          '  Reboot complete. All 16 nodes operational.',
+          '',
+        ],
+      }
+    }
+
+    // INFO command
+    if (action === 'info' || action === 'help' || action === 'doc') {
+      return {
+        success: true,
+        output: [
+          '',
+          '╔═════════════════════════════════════════════════════════════════╗',
+          '║                    SCA-001 DOCUMENTATION                       ║',
+          '╠═════════════════════════════════════════════════════════════════╣',
+          '',
+          '  DEVICE OVERVIEW:',
+          '    The Supercomputer Array (SCA-001) is a 16-node high-performance',
+          '    computing cluster. Accelerates research, runs simulations, and',
+          '    provides heavy compute capacity for the laboratory.',
+          '',
+          '  SPECIFICATIONS:',
+          '    Device ID:      SCA-001',
+          '    Category:       Heavy Consumer',
+          '    Tier:           T3 (Advanced)',
+          '    Compute Nodes:  16 (mesh interconnect)',
+          '    Peak PFLOPS:    2.8',
+          '    Memory:         ECC Protected',
+          '',
+          '  POWER CONSUMPTION:',
+          `    Full Compute:    ${powerSpecs.full} E/s`,
+          `    Idle:            ${powerSpecs.idle} E/s`,
+          `    Standby:         ${powerSpecs.standby} E/s`,
+          `    Benchmark:       ${powerSpecs.benchmark} E/s (LINPACK)`,
+          '',
+          '  CLUSTER FEATURES:',
+          '    • 16-node mesh interconnect topology',
+          '    • ECC memory with automatic error correction',
+          '    • Job scheduler with priority queuing',
+          '    • LINPACK benchmark for performance validation',
+          '    • Automatic load balancing across nodes',
+          '',
+          `  FIRMWARE: v${firmware.version}`,
+          '  FEATURES:',
+          ...firmware.features.map(f => `    • ${f}`),
+          '',
+          '  COMPATIBLE DEVICES:',
+          '    AIC-001  AI Assistant Core (Neural compute offload)',
+          '    CDC-001  Crystal Data Cache (Data indexing)',
+          '    QAN-001  Quantum Analyzer (Quantum simulation)',
+          '    MFR-001  Microfusion Reactor (Power supply)',
+          '',
+          '  COMMANDS:',
+          '    sca status              - Show cluster status',
+          '    sca power [on|off]      - Boot/shutdown',
+          '    sca firmware            - View firmware info',
+          '    sca test                - Run cluster diagnostics',
+          '    sca reset               - Reboot cluster',
+          '',
+          '  LOCATION IN unOS:',
+          '    /sys/devices/sca-001/',
+          '    /var/log/sca/',
+          '    /etc/sca/config',
+          '',
+          '╚═════════════════════════════════════════════════════════════════╝',
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `unknown sca command: ${action}\n\ntype sca for available commands.`,
+    }
+  },
+}
+
+// ============================================================
+// EXD - Explorer Drone Command
+// ============================================================
+const exdCommand: Command = {
+  name: 'exd',
+  aliases: ['drone', 'explorer', 'exd001'],
+  description: 'Explorer Drone management (EXD-001)',
+  usage: 'exd [status|power|firmware|test|reset|deploy|recall|info]',
+  execute: async (args, ctx) => {
+    const exdDevice = ctx.data.exdDevice
+    const action = args[0]?.toLowerCase()
+
+    const state = exdDevice?.getState() ?? {
+      deviceState: 'online' as const,
+      statusMessage: 'DEPLOYED',
+      isPowered: true,
+      range: 2.4,
+      battery: 78,
+      altitude: 45,
+      speed: 25,
+      gpsSignal: 95,
+      cargoLoad: 12,
+      flightTime: 7200,
+      radarActive: true,
+      isDeployed: true,
+      currentDraw: 40,
+    }
+    const firmware = exdDevice?.getFirmware() ?? {
+      version: '3.1.2',
+      build: '2026.01.28',
+      checksum: 'D3X1F7A9',
+      features: ['autonomous-nav', 'resource-scan', 'cargo-haul', 'gps-lock', 'imu-stabilize'],
+      securityPatch: '2026.01.20',
+    }
+    const powerSpecs = exdDevice?.getPowerSpecs() ?? {
+      full: 40,
+      idle: 15,
+      standby: 1,
+      highSpeed: 65,
+      category: 'heavy',
+      priority: 3,
+    }
+
+    const currentStatus = state.deviceState
+    const isPowered = state.isPowered
+
+    if (!action) {
+      return {
+        success: true,
+        output: [
+          '',
+          '╭─────────────────────────────────────────────────╮',
+          '│       EXD-001 :: EXPLORER DRONE                  │',
+          '╰─────────────────────────────────────────────────╯',
+          '',
+          '  USAGE:',
+          '    exd status           Show drone status',
+          '    exd power [on|off]   Power on/shutdown drone',
+          '    exd firmware         View firmware info',
+          '    exd test             Run preflight diagnostics',
+          '    exd reset            Reboot drone systems',
+          '    exd deploy           Deploy drone to field',
+          '    exd recall           Recall drone to dock',
+          '    exd info             Full documentation',
+          '',
+          '  EXAMPLES:',
+          '    exd power on         Boot the drone',
+          '    exd status           Check flight telemetry',
+          '    exd deploy           Send drone to explore',
+          '',
+        ],
+      }
+    }
+
+    // STATUS command
+    if (action === 'status' || action === 'stat' || action === 's') {
+      const stateSymbol = currentStatus === 'online' ? '●' : currentStatus === 'standby' ? '○' : '◐'
+      const stateColor = currentStatus === 'online' ? (state.isDeployed ? 'DEPLOYED' : 'DOCKED') : currentStatus.toUpperCase()
+
+      const formatFlightTime = (s: number) => {
+        const h = Math.floor(s / 3600)
+        const m = Math.floor((s % 3600) / 60)
+        return `${h}h ${m}m`
+      }
+
+      // Battery bar
+      const barLen = 20
+      const batFilled = Math.round((state.battery / 100) * barLen)
+      const batBar = '█'.repeat(batFilled) + '░'.repeat(barLen - batFilled)
+
+      // GPS bar
+      const gpsFilled = Math.round((state.gpsSignal / 100) * barLen)
+      const gpsBar = '█'.repeat(gpsFilled) + '░'.repeat(barLen - gpsFilled)
+
+      // Cargo bar
+      const cargoFilled = Math.round((state.cargoLoad / 50) * barLen)
+      const cargoBar = '█'.repeat(cargoFilled) + '░'.repeat(barLen - cargoFilled)
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌───────────────────────────────────────────┐',
+          `  │  EXD-001 :: EXPLORER DRONE  [${stateSymbol} ${stateColor}]`,
+          '  ├───────────────────────────────────────────┤',
+          `  │  Range:        ${state.range.toFixed(1)} km`,
+          `  │  Altitude:     ${state.altitude.toFixed(0)} m`,
+          `  │  Speed:        ${state.speed.toFixed(0)} km/h`,
+          `  │  Flight Time:  ${formatFlightTime(state.flightTime)}`,
+          '  │',
+          `  │  Battery:      ${state.battery.toFixed(0)}%  [${batBar}]`,
+          `  │  GPS Signal:   ${state.gpsSignal.toFixed(0)}%  [${gpsBar}]`,
+          `  │  Cargo:        ${state.cargoLoad}/50  [${cargoBar}]`,
+          '  │',
+          `  │  Radar:        ${state.radarActive ? 'ACTIVE' : 'OFF'}`,
+          `  │  Power Draw:   ${state.currentDraw.toFixed(1)} E/s`,
+          `  │  Firmware:     v${firmware.version}`,
+          '  └───────────────────────────────────────────┘',
+          '',
+        ],
+      }
+    }
+
+    // POWER command
+    if (action === 'power') {
+      const sub = args[1]?.toLowerCase()
+
+      if (sub === 'on') {
+        if (currentStatus !== 'standby') {
+          return { success: false, error: `EXD-001 is already ${currentStatus}. Cannot power on.` }
+        }
+        if (exdDevice) {
+          ctx.addOutput('')
+          ctx.addOutput('  [EXD-001] Initiating boot sequence...')
+          await exdDevice.powerOn()
+          ctx.addOutput('  [EXD-001] Boot complete. Drone ONLINE.')
+          ctx.addOutput('')
+        }
+        return { success: true }
+      }
+
+      if (sub === 'off') {
+        if (currentStatus !== 'online') {
+          return { success: false, error: `EXD-001 is ${currentStatus}. Cannot shutdown.` }
+        }
+        if (exdDevice) {
+          ctx.addOutput('')
+          ctx.addOutput('  [EXD-001] Initiating shutdown sequence...')
+          await exdDevice.powerOff()
+          ctx.addOutput('  [EXD-001] Drone in STANDBY.')
+          ctx.addOutput('')
+        }
+        return { success: true }
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          `  EXD-001 Power: ${isPowered ? 'ON' : 'OFF'} (${currentStatus})`,
+          `  Current Draw:  ${state.currentDraw.toFixed(1)} E/s`,
+          '',
+          '  Usage: exd power [on|off]',
+          '',
+        ],
+      }
+    }
+
+    // FIRMWARE command
+    if (action === 'firmware' || action === 'fw') {
+      const sub = args[1]?.toLowerCase()
+
+      if (sub === 'update') {
+        return {
+          success: true,
+          output: [
+            '',
+            '  [EXD-001] Checking for firmware updates...',
+            `  Current:  v${firmware.version} (build ${firmware.build})`,
+            '  Latest:   v3.1.2',
+            '  Status:   Up to date.',
+            '',
+          ],
+        }
+      }
+      if (sub === 'verify') {
+        return {
+          success: true,
+          output: [
+            '',
+            '  [EXD-001] Verifying firmware integrity...',
+            `  Checksum:   ${firmware.checksum}`,
+            '  Expected:   D3X1F7A9',
+            `  Status:     ${firmware.checksum === 'D3X1F7A9' ? 'VERIFIED ✓' : 'MISMATCH ✗'}`,
+            '',
+          ],
+        }
+      }
+      if (sub === 'patch') {
+        return {
+          success: true,
+          output: [
+            '',
+            '  [EXD-001] Security patch status:',
+            `  Installed:  ${firmware.securityPatch}`,
+            '  Latest:     2026.01.20',
+            '  Status:     All patches applied.',
+            '',
+          ],
+        }
+      }
+
+      return {
+        success: true,
+        output: [
+          '',
+          '  ┌──────────────────────────────────────┐',
+          '  │  EXD-001 FIRMWARE                     │',
+          '  ├──────────────────────────────────────┤',
+          `  │  Version:     v${firmware.version}`,
+          `  │  Build:       ${firmware.build}`,
+          `  │  Checksum:    ${firmware.checksum}`,
+          `  │  Patch:       ${firmware.securityPatch}`,
+          '  │',
+          `  │  Features:    ${firmware.features.join(', ')}`,
+          '  └──────────────────────────────────────┘',
+          '',
+          '  Commands: exd firmware [update|verify|patch]',
+          '',
+        ],
+      }
+    }
+
+    // TEST command
+    if (action === 'test' || action === 'preflight' || action === 'diag') {
+      if (currentStatus !== 'online') {
+        return { success: false, error: `EXD-001 is ${currentStatus}. Power on first.` }
+      }
+
+      if (exdDevice) {
+        ctx.addOutput('')
+        ctx.addOutput('  [EXD-001] Running preflight diagnostics...')
+        ctx.addOutput('')
+        await exdDevice.runTest()
+        ctx.addOutput('  [EXD-001] All preflight checks PASSED.')
+        ctx.addOutput('')
+      } else {
+        return {
+          success: true,
+          output: [
+            '',
+            '  [EXD-001] Running preflight diagnostics...',
+            '  [1/6] Rotor motors ........... PASS',
+            '  [2/6] GPS fix ................ PASS',
+            '  [3/6] Camera calibration ..... PASS',
+            '  [4/6] Radio link ............. PASS',
+            '  [5/6] Battery health ......... PASS',
+            '  [6/6] Gyroscope .............. PASS',
+            '',
+            '  Result: ALL CHECKS PASSED',
+            '',
+          ],
+        }
+      }
+      return { success: true }
+    }
+
+    // RESET command
+    if (action === 'reset' || action === 'reboot') {
+      if (currentStatus === 'standby') {
+        return { success: false, error: 'EXD-001 is in STANDBY. Power on first.' }
+      }
+      if (exdDevice) {
+        ctx.addOutput('')
+        ctx.addOutput('  [EXD-001] Initiating reboot sequence...')
+        await exdDevice.reboot()
+        ctx.addOutput('  [EXD-001] Reboot complete. Drone ONLINE.')
+        ctx.addOutput('')
+      }
+      return { success: true }
+    }
+
+    // DEPLOY command
+    if (action === 'deploy' || action === 'launch') {
+      if (currentStatus !== 'online') {
+        return { success: false, error: `EXD-001 is ${currentStatus}. Power on first.` }
+      }
+      if (state.isDeployed) {
+        return { success: false, error: 'EXD-001 is already deployed.' }
+      }
+      if (exdDevice) {
+        exdDevice.deploy()
+      }
+      return {
+        success: true,
+        output: [
+          '',
+          '  [EXD-001] Drone deployed to field.',
+          '  Status: DEPLOYED',
+          '  Radar: ACTIVE',
+          '',
+        ],
+      }
+    }
+
+    // RECALL command
+    if (action === 'recall' || action === 'dock' || action === 'rth') {
+      if (currentStatus !== 'online') {
+        return { success: false, error: `EXD-001 is ${currentStatus}.` }
+      }
+      if (!state.isDeployed) {
+        return { success: false, error: 'EXD-001 is already docked.' }
+      }
+      if (exdDevice) {
+        exdDevice.recall()
+      }
+      return {
+        success: true,
+        output: [
+          '',
+          '  [EXD-001] Return-to-home initiated.',
+          '  Status: DOCKED',
+          '',
+        ],
+      }
+    }
+
+    // INFO command
+    if (action === 'info' || action === 'docs' || action === 'help' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          '╔═══════════════════════════════════════════════════════════╗',
+          '║          EXD-001 :: EXPLORER DRONE - MANUAL              ║',
+          '╠═══════════════════════════════════════════════════════════╣',
+          '║                                                           ║',
+          '║  OVERVIEW                                                 ║',
+          '║  Remote-controlled drone for field exploration and        ║',
+          '║  autonomous resource collection. Expands gathering        ║',
+          '║  radius and enables resource scanning.                    ║',
+          '║                                                           ║',
+          '║  SPECS                                                    ║',
+          '║  ┌──────────────────┬──────────────────┐                 ║',
+          `║  │ Firmware         │ v${firmware.version.padEnd(15)}│                 ║`,
+          `║  │ Build            │ ${firmware.build.padEnd(15)} │                 ║`,
+          `║  │ Checksum         │ ${firmware.checksum.padEnd(15)} │                 ║`,
+          '║  │ Category         │ Heavy            │                 ║',
+          '║  │ Priority         │ P3 (Non-essent.) │                 ║',
+          '║  │ Collection Range │ 200m             │                 ║',
+          '║  │ Cargo Capacity   │ 50 Abstractum    │                 ║',
+          '║  │ Flight Time      │ 2h (full load)   │                 ║',
+          '║  └──────────────────┴──────────────────┘                 ║',
+          '║                                                           ║',
+          '║  POWER                                                    ║',
+          `║  Full (Flight):     ${String(powerSpecs.full).padEnd(5)} E/s                        ║`,
+          `║  Idle (Hover):      ${String(powerSpecs.idle).padEnd(5)} E/s                        ║`,
+          `║  Standby (Docked):  ${String(powerSpecs.standby).padEnd(5)} E/s                        ║`,
+          `║  High-Speed Mode:   ${String(powerSpecs.highSpeed).padEnd(5)} E/s                        ║`,
+          '║                                                           ║',
+          '║  FEATURES                                                 ║',
+          '║  • Autonomous navigation with GPS lock                    ║',
+          '║  • Resource scanning and collection                       ║',
+          '║  • Cargo hauling (50 Abstractum units)                    ║',
+          '║  • IMU stabilization for stable flight                    ║',
+          '║  • Radar sweep for area mapping                           ║',
+          '║                                                           ║',
+          '║  COMPATIBLE DEVICES                                       ║',
+          '║  • AIC-001 - AI Assistant Core (nav planning)             ║',
+          '║  • QAN-001 - Quantum Analyzer (resource detection)        ║',
+          '║  • CDC-001 - Crystal Data Cache (cargo indexing)          ║',
+          '║  • BAT-001 - Battery Pack (+50% flight time)              ║',
+          '║                                                           ║',
+          '╚═══════════════════════════════════════════════════════════╝',
+          '',
+        ],
+      }
+    }
+
+    return {
+      success: false,
+      error: `unknown exd command: ${action}\n\ntype exd for available commands.`,
+    }
+  },
+}
+
+// ============================================================
+// Filesystem Commands
+// ============================================================
+
+const lsCommand: Command = {
+  name: 'ls',
+  aliases: ['dir'],
+  description: 'List directory contents',
+  usage: 'ls [-l] [-a] [path]',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+
+    let long = false
+    let all = false
+    let path: string | undefined
+
+    for (const arg of args) {
+      if (arg === '-l') long = true
+      else if (arg === '-a') all = true
+      else if (arg === '-la' || arg === '-al') { long = true; all = true }
+      else path = arg
+    }
+
+    const result = fs.ls(path, { long, all })
+    return { success: true, output: result.length > 0 ? result : [''] }
+  },
+}
+
+const cdCommand: Command = {
+  name: 'cd',
+  description: 'Change directory',
+  usage: 'cd <path>',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+
+    const path = args[0] || '~'
+    const err = fs.cd(path)
+    if (err) return { success: false, error: err }
+    return { success: true }
+  },
+}
+
+const pwdCommand: Command = {
+  name: 'pwd',
+  description: 'Print working directory',
+  execute: async (_args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    return { success: true, output: [fs.pwd()] }
+  },
+}
+
+const catCommand: Command = {
+  name: 'cat',
+  description: 'Display file contents',
+  usage: 'cat <file>',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    if (args.length === 0) return { success: false, error: 'cat: missing file operand' }
+
+    const user = ctx.data.userActions
+    const currentUser = user?.getCurrentUser()
+    const result = fs.cat(args[0], currentUser?.username ?? 'operator', currentUser?.groups ?? ['operator'])
+    if (result === null) return { success: false, error: `cat: ${args[0]}: No such file or directory` }
+    return { success: true, output: result.split('\n') }
+  },
+}
+
+const mkdirCommand: Command = {
+  name: 'mkdir',
+  description: 'Create directory',
+  usage: 'mkdir [-p] <path>',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+
+    let parents = false
+    let path: string | undefined
+
+    for (const arg of args) {
+      if (arg === '-p') parents = true
+      else path = arg
+    }
+
+    if (!path) return { success: false, error: 'mkdir: missing operand' }
+    const err = fs.mkdir(path, parents)
+    if (err) return { success: false, error: err }
+    return { success: true }
+  },
+}
+
+const touchCommand: Command = {
+  name: 'touch',
+  description: 'Create empty file',
+  usage: 'touch <file>',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    if (args.length === 0) return { success: false, error: 'touch: missing file operand' }
+
+    const err = fs.touch(args[0])
+    if (err) return { success: false, error: err }
+    return { success: true }
+  },
+}
+
+const rmCommand: Command = {
+  name: 'rm',
+  description: 'Remove file or directory',
+  usage: 'rm [-r] <path>',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+
+    let recursive = false
+    let path: string | undefined
+
+    for (const arg of args) {
+      if (arg === '-r' || arg === '-rf' || arg === '-R') recursive = true
+      else path = arg
+    }
+
+    if (!path) return { success: false, error: 'rm: missing operand' }
+    const err = fs.rm(path, recursive)
+    if (err) return { success: false, error: err }
+    return { success: true }
+  },
+}
+
+const treeCommand: Command = {
+  name: 'tree',
+  description: 'Display directory tree',
+  usage: 'tree [path] [depth]',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+
+    const path = args[0]
+    const depth = args[1] ? parseInt(args[1], 10) : 3
+    const result = fs.tree(path, depth)
+    return { success: true, output: result }
+  },
+}
+
+const chmodCommand: Command = {
+  name: 'chmod',
+  description: 'Change file permissions',
+  usage: 'chmod <mode> <path>',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    const user = ctx.data.userActions
+    if (user && !user.isRoot()) {
+      return { success: false, error: 'chmod: Operation not permitted' }
+    }
+
+    if (args.length < 2) return { success: false, error: 'chmod: missing operand' }
+    const mode = parseInt(args[0], 8)
+    if (isNaN(mode)) return { success: false, error: `chmod: invalid mode: '${args[0]}'` }
+
+    const err = fs.chmod(args[1], mode)
+    if (err) return { success: false, error: err }
+    return { success: true }
+  },
+}
+
+// ============================================================
+// User Management Commands
+// ============================================================
+
+const idCommand: Command = {
+  name: 'id',
+  description: 'Show user/group info',
+  usage: 'id [user]',
+  execute: async (args, ctx) => {
+    const user = ctx.data.userActions
+    if (!user) return { success: false, error: 'User management not available' }
+    return { success: true, output: [user.id(args[0])] }
+  },
+}
+
+const suCommand: Command = {
+  name: 'su',
+  description: 'Switch user',
+  usage: 'su <username>',
+  execute: async (args, ctx) => {
+    const user = ctx.data.userActions
+    if (!user) return { success: false, error: 'User management not available' }
+
+    if (args.length === 0) return { success: false, error: 'su: usage: su <username>' }
+    const target = args[0]
+
+    // For root, no password prompt — just check wheel membership
+    if (target === 'root') {
+      const result = user.su('root')
+      if (!result.success) return { success: false, error: result.message }
+      return { success: true, output: [`[su] ${result.message}`, `root@_unLAB:~#`] }
+    }
+
+    // For other users, password is args[1] or prompt simulation
+    const password = args[1]
+    if (!password) {
+      return { success: false, error: `Password: (hint: try 'su ${target} <password>')` }
+    }
+
+    const result = user.su(target, password)
+    if (!result.success) return { success: false, error: result.message }
+    return { success: true, output: [`[su] ${result.message}`] }
+  },
+}
+
+const sudoCommand: Command = {
+  name: 'sudo',
+  description: 'Run command as root',
+  usage: 'sudo <command>',
+  execute: async (args, ctx) => {
+    const user = ctx.data.userActions
+    if (!user) return { success: false, error: 'User management not available' }
+
+    if (args.length === 0) return { success: false, error: 'sudo: usage: sudo <command>' }
+
+    if (!user.canSudo()) {
+      return { success: false, error: `${user.whoami()} is not in the sudoers file. This incident will be reported.` }
+    }
+
+    // Save current user, escalate, run command, restore
+    const prevUser = user.whoami()
+    const wasRoot = user.isRoot()
+    if (!wasRoot) {
+      user.su('root')
+    }
+
+    const subInput = args.join(' ')
+    const result = await executeCommand(subInput, ctx)
+
+    if (!wasRoot) {
+      user.su(prevUser, '') // restore — use empty password since we're root
+    }
+
+    return result
+  },
+}
+
+const passwdCommand: Command = {
+  name: 'passwd',
+  description: 'Change password (simulated)',
+  usage: 'passwd [user]',
+  execute: async (args, ctx) => {
+    const user = ctx.data.userActions
+    if (!user) return { success: false, error: 'User management not available' }
+
+    const target = args[0] || user.whoami()
+    const newPass = args[1] || 'changed'
+    const result = user.passwd(target, newPass)
+    return { success: result.success, output: result.success ? [result.message] : undefined, error: result.success ? undefined : result.message }
+  },
+}
+
+const useraddCommand: Command = {
+  name: 'useradd',
+  description: 'Create new user (root only)',
+  usage: 'useradd <username>',
+  execute: async (args, ctx) => {
+    const user = ctx.data.userActions
+    if (!user) return { success: false, error: 'User management not available' }
+
+    if (args.length === 0) return { success: false, error: 'useradd: missing username' }
+    const result = user.useradd(args[0])
+    return { success: result.success, output: result.success ? [result.message] : undefined, error: result.success ? undefined : result.message }
+  },
+}
+
+const groupsCommand: Command = {
+  name: 'groups',
+  description: 'Show user groups',
+  usage: 'groups [user]',
+  execute: async (args, ctx) => {
+    const user = ctx.data.userActions
+    if (!user) return { success: false, error: 'User management not available' }
+    return { success: true, output: [user.groups(args[0])] }
+  },
+}
+
+// Theme command
+const themeCommand: Command = {
+  name: 'theme',
+  aliases: ['themes'],
+  description: 'Manage CRT display theme',
+  usage: 'theme [list|set|get|save|load]',
+  execute: async (args, ctx) => {
+    const ta = ctx.data.themeActions
+    if (!ta) return { success: false, error: 'Theme system not available' }
+
+    const sub = (args[0] || 'list').toLowerCase()
+
+    if (sub === 'list') {
+      const themes = ta.list()
+      const current = ta.get()
+      const lines = [
+        '',
+        '  _unOS THEME MANAGER v1.0',
+        '  ════════════════════════════════════════',
+        '',
+        '  #   NAME        PREVIEW',
+        '  ──  ──────────  ───────',
+      ]
+      for (const t of themes) {
+        const idx = String(t.index).padStart(2, ' ')
+        const name = t.name.padEnd(10, ' ')
+        const marker = t.index === current.index ? '  ← active' : ''
+        lines.push(`  ${idx}  ${name}  ██████${marker}`)
+      }
+      lines.push('')
+      lines.push(`  ${themes.length} themes available. Use: theme set <name|#>`)
+      lines.push('')
+      return { success: true, output: lines }
+    }
+
+    if (sub === 'set') {
+      const target = args.slice(1).join(' ')
+      if (!target) return { success: false, error: 'Usage: theme set <name|index>' }
+
+      // Try as number first
+      const asNum = parseInt(target, 10)
+      if (!isNaN(asNum)) {
+        const themes = ta.list()
+        if (asNum < 0 || asNum >= themes.length) {
+          return { success: false, error: `Invalid theme index. Use 0-${themes.length - 1}` }
+        }
+        ta.set(asNum)
+        return { success: true, output: [`  Theme set to ${themes[asNum].name}`] }
+      }
+
+      // Try as name
+      const idx = ta.getByName(target)
+      if (idx === null) return { success: false, error: `Unknown theme: ${target}` }
+      ta.set(idx)
+      const themes = ta.list()
+      return { success: true, output: [`  Theme set to ${themes[idx].name}`] }
+    }
+
+    if (sub === 'get') {
+      const current = ta.get()
+      return { success: true, output: [`  Active theme: ${current.name} (${current.fg})`] }
+    }
+
+    if (sub === 'save') {
+      const fs = ctx.data.filesystemActions
+      const user = ctx.data.userActions
+      if (!fs || !user) return { success: false, error: 'Filesystem not available' }
+      const current = ta.get()
+      const home = user.getCurrentUser().home
+      const rcPath = `${home}/.themerc`
+      fs.touch(rcPath)
+      // Write theme name by touching the file (VirtualFS doesn't have write, store in content via touch + metadata approach)
+      // Use a simpler approach: store in localStorage directly
+      try {
+        localStorage.setItem('unlabs_theme', current.name)
+      } catch { /* ignore */ }
+      return { success: true, output: [`  Theme saved to ~/.themerc`] }
+    }
+
+    if (sub === 'load') {
+      try {
+        const saved = localStorage.getItem('unlabs_theme')
+        if (!saved) return { success: false, error: 'No saved theme found. Use: theme save' }
+        const idx = ta.getByName(saved)
+        if (idx === null) return { success: false, error: `Saved theme "${saved}" not found` }
+        ta.set(idx)
+        return { success: true, output: [`  Loaded theme ${saved.toUpperCase()} from ~/.themerc`] }
+      } catch {
+        return { success: false, error: 'Could not load theme preferences' }
+      }
+    }
+
+    return { success: false, error: `Unknown subcommand: ${sub}. Use: theme [list|set|get|save|load]` }
+  },
+}
+
+// ============================================================================
+// SCREW BUTTON COMMANDS
+// ============================================================================
+
+const SCREW_IDS = ['SB-01', 'SB-02', 'SB-03', 'SB-04'] as const
+const SCREW_NAMES: Record<string, string> = {
+  'SB-01': 'NODE-SYNC',
+  'SB-02': 'POOL-LINK',
+  'SB-03': 'MESH-CAST',
+  'SB-04': 'QUANTUM-BRIDGE',
+}
+
+const screwstatCommand: Command = {
+  name: 'screwstat',
+  aliases: ['sbs', 'screws'],
+  description: 'Screw button status overview',
+  usage: 'screwstat [sb-id]',
+  execute: async (args, ctx) => {
+    const sb = ctx.data.screwButtons
+    if (!sb) {
+      return { success: false, error: 'Screw button system not available' }
+    }
+
+    const states = sb.getAllStates()
+
+    if (args.length > 0) {
+      const id = args[0].toUpperCase().replace('SB', 'SB-') as 'SB-01' | 'SB-02' | 'SB-03' | 'SB-04'
+      const normalized = id.startsWith('SB-') ? id : `SB-0${id}` as 'SB-01'
+      const state = states[normalized as keyof typeof states]
+      if (!state) {
+        return { success: false, error: `Unknown screw button: ${args[0]}. Valid: SB-01, SB-02, SB-03, SB-04` }
+      }
+      const feature = sb.getFeature(normalized as 'SB-01')
+      const output = [
+        '',
+        `  ┌─────────────────────────────────────────────┐`,
+        `  │  ${feature.name.padEnd(14)} ${normalized.padEnd(8)} DETAIL  │`,
+        `  └─────────────────────────────────────────────┘`,
+        `  Full Name:   ${feature.fullName}`,
+        `  Description: ${feature.description}`,
+        `  Status:      ${state.active ? '● ACTIVE' : state.unlocked ? '○ INACTIVE' : '✕ LOCKED'}`,
+        `  Unlocked:    ${state.unlocked ? 'YES' : 'NO'}`,
+        `  Active Time: ${state.totalActiveTime}s total`,
+        `  Cost:        ${feature.activationCost} _unSC`,
+        '',
+      ]
+      return { success: true, output }
+    }
+
+    const output = [
+      '',
+      '  ┌─────────────────────────────────────────────────────────┐',
+      '  │            SCREW BUTTON SYSTEM :: STATUS                 │',
+      '  └─────────────────────────────────────────────────────────┘',
+      '  ┌────────┬────────────────┬──────────┬──────────────────┐',
+      '  │  ID    │  FEATURE       │  STATUS  │  POSITION        │',
+      '  ├────────┼────────────────┼──────────┼──────────────────┤',
+    ]
+
+    const positions = ['Top-Left', 'Top-Right', 'Bottom-Left', 'Bottom-Right']
+    for (let i = 0; i < SCREW_IDS.length; i++) {
+      const id = SCREW_IDS[i]
+      const state = states[id]
+      const status = state.active ? '● ACTIVE' : state.unlocked ? '○ IDLE  ' : '✕ LOCKED'
+      output.push(`  │  ${id}  │  ${SCREW_NAMES[id].padEnd(14)}│  ${status}│  ${positions[i].padEnd(16)}│`)
+    }
+    output.push('  └────────┴────────────────┴──────────┴──────────────────┘')
+    output.push('')
+    output.push('  Use: screwstat <id> for detail. Commands: nodesync, poollink, meshcast, qbridge')
+    output.push('')
+
+    return { success: true, output }
+  },
+}
+
+const nodesyncCommand: Command = {
+  name: 'nodesync',
+  aliases: ['ns'],
+  description: 'NODE-SYNC network control (SB-01)',
+  usage: 'nodesync [status|enable|disable|stats|peers]',
+  execute: async (args, ctx) => {
+    const sb = ctx.data.screwButtons
+    if (!sb) return { success: false, error: 'Screw button system not available' }
+
+    const sub = (args[0] || 'status').toLowerCase()
+
+    if (sub === 'enable') {
+      const ok = await sb.activate('SB-01')
+      return ok
+        ? { success: true, output: ['', '  [NODE-SYNC] ● Activated — synchronizing with lab network...', '  LED: GREEN  |  SB-01 Top-Left screw now glowing', ''] }
+        : { success: false, error: 'Failed to activate NODE-SYNC' }
+    }
+
+    if (sub === 'disable') {
+      const ok = await sb.deactivate('SB-01')
+      return ok
+        ? { success: true, output: ['', '  [NODE-SYNC] ○ Deactivated — disconnected from network', ''] }
+        : { success: false, error: 'NODE-SYNC is not active' }
+    }
+
+    if (!sb.isActive('SB-01') && sub !== 'status') {
+      return { success: false, error: 'NODE-SYNC is not active. Enable with: nodesync enable' }
+    }
+
+    if (sub === 'status') {
+      const active = sb.isActive('SB-01')
+      const output = [
+        '',
+        '  ┌─────────────────────────────────────────┐',
+        '  │  NODE-SYNC :: SB-01 :: NETWORK STATUS    │',
+        '  └─────────────────────────────────────────┘',
+        `  Status:    ${active ? '● ONLINE' : '○ OFFLINE'}`,
+        `  Button:    Top-Left Screw`,
+      ]
+      if (active) {
+        const stats = sb.getNodeSyncStats()
+        output.push(
+          `  Nodes:     ${stats.connectedNodes}/${stats.totalNodes} connected`,
+          `  Sync Rate: ${stats.syncRate}%`,
+          `  Hash Rate: ${stats.hashRate}`,
+          `  Latency:   ${stats.latency}`,
+          `  Uptime:    ${stats.uptime}`,
+        )
+      }
+      output.push('')
+      return { success: true, output }
+    }
+
+    if (sub === 'stats') {
+      const stats = sb.getNodeSyncStats()
+      const output = [
+        '',
+        '  ┌─────────────────────────────────────────┐',
+        '  │  NODE-SYNC :: NETWORK STATISTICS          │',
+        '  └─────────────────────────────────────────┘',
+        `  Connected:  ${stats.connectedNodes}/${stats.totalNodes} nodes`,
+        `  Sync Rate:  ${stats.syncRate}%`,
+        `  Hash Rate:  ${stats.hashRate}`,
+        `  Latency:    ${stats.latency}`,
+        `  Uptime:     ${stats.uptime}`,
+        `  Last Sync:  ${stats.lastSync}`,
+        `  BW In:      ${stats.bandwidthIn}`,
+        `  BW Out:     ${stats.bandwidthOut}`,
+        '',
+      ]
+      return { success: true, output }
+    }
+
+    if (sub === 'peers') {
+      const stats = sb.getNodeSyncStats()
+      const output = [
+        '',
+        '  ┌─────────────────────────────────────────┐',
+        '  │  NODE-SYNC :: PEER LIST                   │',
+        '  └─────────────────────────────────────────┘',
+        `  Online Peers: ${stats.peersOnline}`,
+      ]
+      for (let i = 0; i < Math.min(stats.peersOnline, 8); i++) {
+        const latency = 5 + Math.floor(Math.random() * 50)
+        output.push(`  [${i + 1}] PEER-${String.fromCharCode(65 + i)}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}  ${latency}ms  ● SYNC`)
+      }
+      if (stats.peersOnline > 8) output.push(`  ... and ${stats.peersOnline - 8} more`)
+      output.push('')
+      return { success: true, output }
+    }
+
+    return { success: false, error: `Unknown subcommand: ${sub}. Use: nodesync [status|enable|disable|stats|peers]` }
+  },
+}
+
+const poollinkCommand: Command = {
+  name: 'poollink',
+  aliases: ['pl', 'pool'],
+  description: 'POOL-LINK mining pool control (SB-02)',
+  usage: 'poollink [status|join|leave|create|stats|list|members]',
+  execute: async (args, ctx) => {
+    const sb = ctx.data.screwButtons
+    if (!sb) return { success: false, error: 'Screw button system not available' }
+
+    const sub = (args[0] || 'status').toLowerCase()
+
+    if (sub === 'join' || sub === 'enable') {
+      const ok = await sb.activate('SB-02')
+      return ok
+        ? { success: true, output: ['', '  [POOL-LINK] ● Connected to mining pool', '  LED: GREEN  |  SB-02 Top-Right screw now glowing', ''] }
+        : { success: false, error: 'Failed to join pool' }
+    }
+
+    if (sub === 'leave' || sub === 'disable') {
+      const ok = await sb.deactivate('SB-02')
+      return ok
+        ? { success: true, output: ['', '  [POOL-LINK] ○ Left mining pool', ''] }
+        : { success: false, error: 'POOL-LINK is not active' }
+    }
+
+    if (!sb.isActive('SB-02') && sub !== 'status') {
+      return { success: false, error: 'POOL-LINK is not active. Join with: poollink join' }
+    }
+
+    if (sub === 'status') {
+      const active = sb.isActive('SB-02')
+      const output = [
+        '',
+        '  ┌─────────────────────────────────────────┐',
+        '  │  POOL-LINK :: SB-02 :: POOL STATUS       │',
+        '  └─────────────────────────────────────────┘',
+        `  Status:    ${active ? '● LINKED' : '○ DISCONNECTED'}`,
+        `  Button:    Top-Right Screw`,
+      ]
+      if (active) {
+        const stats = sb.getPoolStats()
+        output.push(
+          `  Pool:      ${stats.poolName}`,
+          `  Members:   ${stats.members}/${stats.maxMembers}`,
+          `  Hash Rate: ${stats.totalHashRate}`,
+          `  Your Share:${stats.yourContribution}`,
+          `  Pending:   ${stats.pendingRewards} _unSC`,
+        )
+      }
+      output.push('')
+      return { success: true, output }
+    }
+
+    if (sub === 'stats') {
+      const stats = sb.getPoolStats()
+      const output = [
+        '',
+        '  ┌─────────────────────────────────────────┐',
+        '  │  POOL-LINK :: MINING STATISTICS           │',
+        '  └─────────────────────────────────────────┘',
+        `  Pool Name:     ${stats.poolName}`,
+        `  Members:       ${stats.members}/${stats.maxMembers}`,
+        `  Total Hash:    ${stats.totalHashRate}`,
+        `  Contribution:  ${stats.yourContribution}`,
+        `  Pending:       ${stats.pendingRewards} _unSC`,
+        `  Blocks Found:  ${stats.blocksFound}`,
+        `  Efficiency:    ${stats.efficiency}`,
+        `  Pool Uptime:   ${stats.uptime}`,
+        '',
+      ]
+      return { success: true, output }
+    }
+
+    if (sub === 'list') {
+      const output = [
+        '',
+        '  ┌─────────────────────────────────────────┐',
+        '  │  AVAILABLE MINING POOLS                   │',
+        '  └─────────────────────────────────────────┘',
+      ]
+      for (let i = 0; i < 5; i++) {
+        const name = `POOL-${String.fromCharCode(65 + i)}${100 + Math.floor(Math.random() * 900)}`
+        const members = 4 + Math.floor(Math.random() * 28)
+        output.push(`  [${i + 1}] ${name}  ${members}/32 members  ● OPEN`)
+      }
+      output.push('')
+      return { success: true, output }
+    }
+
+    if (sub === 'members') {
+      const stats = sb.getPoolStats()
+      const output = [
+        '',
+        `  ┌─────────────────────────────────────────┐`,
+        `  │  ${stats.poolName} :: MEMBER LIST${' '.repeat(Math.max(0, 15 - stats.poolName.length))}│`,
+        `  └─────────────────────────────────────────┘`,
+      ]
+      for (let i = 0; i < Math.min(stats.members, 10); i++) {
+        const hash = (2 + Math.random() * 20).toFixed(1)
+        const you = i === 0 ? ' (YOU)' : ''
+        output.push(`  [${(i + 1).toString().padStart(2)}] LAB-${String.fromCharCode(65 + i)}  ${hash} TH/s${you}`)
+      }
+      if (stats.members > 10) output.push(`  ... and ${stats.members - 10} more`)
+      output.push('')
+      return { success: true, output }
+    }
+
+    if (sub === 'create') {
+      return { success: true, output: ['', '  [POOL-LINK] Pool creation not yet implemented', '  Pools are auto-assigned in current version', ''] }
+    }
+
+    return { success: false, error: `Unknown subcommand: ${sub}. Use: poollink [status|join|leave|stats|list|members]` }
+  },
+}
+
+const meshcastCommand: Command = {
+  name: 'meshcast',
+  aliases: ['mc', 'meme'],
+  description: 'MESH-CAST memetic broadcasting (SB-03)',
+  usage: 'meshcast [status|broadcast|receive|list|history|stats]',
+  execute: async (args, ctx) => {
+    const sb = ctx.data.screwButtons
+    if (!sb) return { success: false, error: 'Screw button system not available' }
+
+    const sub = (args[0] || 'status').toLowerCase()
+
+    if (sub === 'enable' || sub === 'broadcast') {
+      if (sub === 'enable') {
+        const ok = await sb.activate('SB-03')
+        return ok
+          ? { success: true, output: ['', '  [MESH-CAST] ● Broadcasting enabled', '  LED: GREEN  |  SB-03 Bottom-Left screw now glowing', ''] }
+          : { success: false, error: 'Failed to enable MESH-CAST' }
+      }
+      if (!sb.isActive('SB-03')) {
+        return { success: false, error: 'MESH-CAST is not active. Enable with: meshcast enable' }
+      }
+      const memes = ['+15% Crystal Yield', '+10% Hash Rate', '-20% Energy Cost', '+25% Research Speed']
+      const chosen = memes[Math.floor(Math.random() * memes.length)]
+      return { success: true, output: ['', `  [MESH-CAST] Broadcasting meme: ${chosen}`, '  Reaching nearby labs...', ''] }
+    }
+
+    if (sub === 'disable') {
+      const ok = await sb.deactivate('SB-03')
+      return ok
+        ? { success: true, output: ['', '  [MESH-CAST] ○ Broadcasting disabled', ''] }
+        : { success: false, error: 'MESH-CAST is not active' }
+    }
+
+    if (!sb.isActive('SB-03') && sub !== 'status') {
+      return { success: false, error: 'MESH-CAST is not active. Enable with: meshcast enable' }
+    }
+
+    if (sub === 'status') {
+      const active = sb.isActive('SB-03')
+      const output = [
+        '',
+        '  ┌─────────────────────────────────────────┐',
+        '  │  MESH-CAST :: SB-03 :: BROADCAST STATUS  │',
+        '  └─────────────────────────────────────────┘',
+        `  Status:    ${active ? '● BROADCASTING' : '○ OFFLINE'}`,
+        `  Button:    Bottom-Left Screw`,
+      ]
+      if (active) {
+        const stats = sb.getMeshCastStats()
+        output.push(
+          `  Active:    ${stats.activeBroadcasts} broadcasts`,
+          `  Reach:     ${stats.networkReach} labs`,
+          `  Signal:    ${stats.signalStrength}`,
+          `  Buffs:     ${stats.receivedBuffs.join(', ') || 'None'}`,
+        )
+      }
+      output.push('')
+      return { success: true, output }
+    }
+
+    if (sub === 'stats') {
+      const stats = sb.getMeshCastStats()
+      const output = [
+        '',
+        '  ┌─────────────────────────────────────────┐',
+        '  │  MESH-CAST :: BROADCAST STATISTICS        │',
+        '  └─────────────────────────────────────────┘',
+        `  Active:        ${stats.activeBroadcasts} broadcasts`,
+        `  Network Reach: ${stats.networkReach} labs`,
+        `  Signal:        ${stats.signalStrength}`,
+        `  Generated:     ${stats.memesGenerated} memes`,
+        `  Received:      ${stats.memesReceived} memes`,
+        `  Bandwidth:     ${stats.bandwidth}`,
+        '',
+        '  Active Buffs:',
+      ]
+      for (const buff of stats.receivedBuffs) {
+        output.push(`    ◈ ${buff}`)
+      }
+      output.push('')
+      return { success: true, output }
+    }
+
+    if (sub === 'list' || sub === 'receive') {
+      const stats = sb.getMeshCastStats()
+      const output = [
+        '',
+        '  ┌─────────────────────────────────────────┐',
+        '  │  INCOMING MEME BUFFS                      │',
+        '  └─────────────────────────────────────────┘',
+      ]
+      for (const buff of stats.receivedBuffs) {
+        const from = `LAB-${String.fromCharCode(65 + Math.floor(Math.random() * 26))}`
+        output.push(`  ◈ ${buff.padEnd(24)} from ${from}`)
+      }
+      if (stats.receivedBuffs.length === 0) output.push('  No active buffs received')
+      output.push('')
+      return { success: true, output }
+    }
+
+    if (sub === 'history') {
+      const output = [
+        '',
+        '  ┌─────────────────────────────────────────┐',
+        '  │  MESH-CAST :: RECENT HISTORY              │',
+        '  └─────────────────────────────────────────┘',
+      ]
+      const memes = ['+15% Crystal Yield', '+10% Hash Rate', '-20% Energy Cost', '+25% Research Speed', '+8% Stability']
+      for (let i = 0; i < 6; i++) {
+        const time = `${Math.floor(Math.random() * 24).toString().padStart(2, '0')}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`
+        const dir = Math.random() > 0.5 ? 'SENT' : 'RECV'
+        output.push(`  [${time}] ${dir}  ${memes[i % memes.length]}`)
+      }
+      output.push('')
+      return { success: true, output }
+    }
+
+    return { success: false, error: `Unknown subcommand: ${sub}. Use: meshcast [status|enable|disable|broadcast|list|stats|history]` }
+  },
+}
+
+const qbridgeCommand: Command = {
+  name: 'qbridge',
+  aliases: ['qb', 'bridge'],
+  description: 'QUANTUM-BRIDGE dimensional link (SB-04)',
+  usage: 'qbridge [status|link|unlink|share|coassemble|chat]',
+  execute: async (args, ctx) => {
+    const sb = ctx.data.screwButtons
+    if (!sb) return { success: false, error: 'Screw button system not available' }
+
+    const sub = (args[0] || 'status').toLowerCase()
+
+    if (sub === 'link' || sub === 'enable') {
+      const ok = await sb.activate('SB-04')
+      return ok
+        ? { success: true, output: ['', '  [Q-BRIDGE] ● Quantum bridge established', '  LED: GREEN  |  SB-04 Bottom-Right screw now glowing', '  Entanglement fidelity: NOMINAL', ''] }
+        : { success: false, error: 'Failed to establish quantum bridge' }
+    }
+
+    if (sub === 'unlink' || sub === 'disable') {
+      const ok = await sb.deactivate('SB-04')
+      return ok
+        ? { success: true, output: ['', '  [Q-BRIDGE] ○ Quantum bridge collapsed', ''] }
+        : { success: false, error: 'Q-BRIDGE is not active' }
+    }
+
+    if (!sb.isActive('SB-04') && sub !== 'status') {
+      return { success: false, error: 'Q-BRIDGE is not active. Link with: qbridge link' }
+    }
+
+    if (sub === 'status') {
+      const active = sb.isActive('SB-04')
+      const output = [
+        '',
+        '  ┌─────────────────────────────────────────┐',
+        '  │  Q-BRIDGE :: SB-04 :: BRIDGE STATUS      │',
+        '  └─────────────────────────────────────────┘',
+        `  Status:    ${active ? '● LINKED' : '○ OFFLINE'}`,
+        `  Button:    Bottom-Right Screw`,
+      ]
+      if (active) {
+        const stats = sb.getBridgeStats()
+        output.push(
+          `  Linked To: ${stats.linkedLab}`,
+          `  Stability: ${stats.bridgeStability}`,
+          `  Fidelity:  ${stats.entanglementFidelity}`,
+          `  Channel:   ${stats.quantumChannel}`,
+          `  Uptime:    ${stats.bridgeUptime}`,
+        )
+      }
+      output.push('')
+      return { success: true, output }
+    }
+
+    if (sub === 'share') {
+      const stats = sb.getBridgeStats()
+      return { success: true, output: [
+        '',
+        `  [Q-BRIDGE] Sharing resources with ${stats.linkedLab}...`,
+        `  Shared Crystals: ${stats.sharedCrystals}`,
+        `  Data Transferred: ${stats.dataTransferred}`,
+        '',
+      ] }
+    }
+
+    if (sub === 'coassemble') {
+      const stats = sb.getBridgeStats()
+      return { success: true, output: [
+        '',
+        `  [Q-BRIDGE] Co-assembly with ${stats.linkedLab}`,
+        `  Active Co-Assemblies: ${stats.coAssemblies}`,
+        '  Combined processing power applied to crystal synthesis',
+        '',
+      ] }
+    }
+
+    if (sub === 'chat') {
+      const stats = sb.getBridgeStats()
+      return { success: true, output: [
+        '',
+        `  [Q-BRIDGE] Quantum chat with ${stats.linkedLab}`,
+        `  Messages: ${stats.chatMessages}`,
+        '  (Quantum chat interface not yet available in terminal)',
+        '',
+      ] }
+    }
+
+    return { success: false, error: `Unknown subcommand: ${sub}. Use: qbridge [status|link|unlink|share|coassemble|chat]` }
+  },
+}
+
 // Command registry
 export const commands: Command[] = [
   helpCommand,
@@ -2353,6 +9846,21 @@ export const commands: Command[] = [
   researchCommand,
   scanCommand,
   whoamiCommand,
+  lsCommand,
+  cdCommand,
+  pwdCommand,
+  catCommand,
+  mkdirCommand,
+  touchCommand,
+  rmCommand,
+  treeCommand,
+  chmodCommand,
+  idCommand,
+  suCommand,
+  sudoCommand,
+  passwdCommand,
+  useraddCommand,
+  groupsCommand,
   echoCommand,
   aboutCommand,
   historyCommand,
@@ -2362,6 +9870,26 @@ export const commands: Command[] = [
   deviceCommand,
   thermalCommand,
   powerCommand,
+  cdcCommand,
+  uecCommand,
+  batCommand,
+  hmsCommand,
+  ecrCommand,
+  iplCommand,
+  mfrCommand,
+  aicCommand,
+  emcCommand,
+  quaCommand,
+  qsmCommand,
+  vntCommand,
+  scaCommand,
+  exdCommand,
+  themeCommand,
+  screwstatCommand,
+  nodesyncCommand,
+  poollinkCommand,
+  meshcastCommand,
+  qbridgeCommand,
 ]
 
 // Find command by name or alias

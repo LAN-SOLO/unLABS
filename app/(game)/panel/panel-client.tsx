@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   PanelToolbar,
@@ -53,8 +53,25 @@ import {
 import { ResourceBar } from '@/components/panel/modules/ResourceBar'
 import { VentilationFan } from '@/components/panel/modules/VentilationFan'
 import { NarrowSpeaker } from '@/components/panel/modules/NarrowSpeaker'
+import { loadPanelState } from '@/lib/panel/panelState'
+import type { PanelSaveData } from '@/lib/panel/panelState'
 import { ThermalManagerProvider } from '@/contexts/ThermalManager'
 import { PowerManagerProvider } from '@/contexts/PowerManager'
+import { CDCManagerProvider } from '@/contexts/CDCManager'
+import { UECManagerProvider } from '@/contexts/UECManager'
+import { BATManagerProvider } from '@/contexts/BATManager'
+import { HMSManagerProvider } from '@/contexts/HMSManager'
+import { ECRManagerProvider } from '@/contexts/ECRManager'
+import { IPLManagerProvider } from '@/contexts/IPLManager'
+import { MFRManagerProvider } from '@/contexts/MFRManager'
+import { AICManagerProvider } from '@/contexts/AICManager'
+import { VNTManagerProvider } from '@/contexts/VNTManager'
+import { SCAManagerProvider } from '@/contexts/SCAManager'
+import { EXDManagerProvider } from '@/contexts/EXDManager'
+import { QSMManagerProvider } from '@/contexts/QSMManager'
+import { EMCManagerProvider } from '@/contexts/EMCManager'
+import { QUAManagerProvider } from '@/contexts/QUAManager'
+import { ScrewButtonManagerProvider } from '@/contexts/ScrewButtonManager'
 import type { EquipmentData } from '../terminal/actions/equipment'
 
 interface PanelClientProps {
@@ -66,6 +83,11 @@ interface PanelClientProps {
 
 export function PanelClient({ userId, username, balance, equipmentData }: PanelClientProps) {
   const router = useRouter()
+  const savedStateRef = useRef<PanelSaveData | null>(null)
+  if (savedStateRef.current === null && typeof window !== 'undefined') {
+    savedStateRef.current = loadPanelState()
+  }
+  const saved = savedStateRef.current?.devices
   const [hasAccess, setHasAccess] = useState(false)
   const [isSystemOn, setIsSystemOn] = useState(false)
   const [isLaserOn, setIsLaserOn] = useState(false)
@@ -121,6 +143,21 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
   return (
     <PowerManagerProvider>
     <ThermalManagerProvider>
+    <CDCManagerProvider initialState={saved?.cdc}>
+    <UECManagerProvider initialState={saved?.uec}>
+    <BATManagerProvider initialState={saved?.bat}>
+    <HMSManagerProvider initialState={saved?.hms}>
+    <ECRManagerProvider initialState={saved?.ecr}>
+    <IPLManagerProvider initialState={saved?.ipl}>
+    <MFRManagerProvider initialState={saved?.mfr}>
+    <AICManagerProvider initialState={saved?.aic}>
+    <VNTManagerProvider initialState={saved?.vnt}>
+    <SCAManagerProvider initialState={saved?.sca}>
+    <EXDManagerProvider initialState={saved?.exd}>
+    <QSMManagerProvider initialState={saved?.qsm}>
+    <EMCManagerProvider initialState={saved?.emc}>
+    <QUAManagerProvider initialState={saved?.qua}>
+    <ScrewButtonManagerProvider initialState={saved?.screwButtons}>
     <WindowManagerProvider className="text-white">
       {/* Top Toolbar */}
       <PanelToolbar>
@@ -320,12 +357,12 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
             {/* Section: POWER */}
             <div className="border-l-2 border-[var(--neon-cyan)]/40 pl-1">
               <div className="font-mono text-[7px] text-[var(--neon-cyan)]/60 mb-1">POWER</div>
-              <MicrofusionReactor powerOutput={847} stability={94} isOnline={true} />
+              <MicrofusionReactor />
             </div>
             {/* Section: COMPUTE */}
             <div className="border-l-2 border-[var(--neon-green)]/40 pl-1">
               <div className="font-mono text-[7px] text-[var(--neon-green)]/60 mb-1">COMPUTE</div>
-              <AIAssistant taskQueue={7} efficiency={156} isLearning={true} />
+              <AIAssistant />
               <div className="mt-1">
                 <SupercomputerArray flops={2.4} utilization={87} isOnline={true} />
               </div>
@@ -679,15 +716,22 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
         <ResourceBar />
       </PanelBottom>
 
-      {/* Global scanline effect */}
-      <div
-        className="pointer-events-none fixed inset-0 z-[100]"
-        style={{
-          background:
-            'repeating-linear-gradient(0deg, rgba(0,0,0,0.03) 0px, rgba(0,0,0,0.03) 1px, transparent 1px, transparent 3px)',
-        }}
-      />
     </WindowManagerProvider>
+    </ScrewButtonManagerProvider>
+    </QUAManagerProvider>
+    </EMCManagerProvider>
+    </QSMManagerProvider>
+    </EXDManagerProvider>
+    </SCAManagerProvider>
+    </VNTManagerProvider>
+    </AICManagerProvider>
+    </MFRManagerProvider>
+    </IPLManagerProvider>
+    </ECRManagerProvider>
+    </HMSManagerProvider>
+    </BATManagerProvider>
+    </UECManagerProvider>
+    </CDCManagerProvider>
     </ThermalManagerProvider>
     </PowerManagerProvider>
   )

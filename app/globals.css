@@ -143,14 +143,14 @@ html, body {
 
 /* Panel Theme - Retro-Futuristic Laboratory */
 :root {
-  /* Panel Backgrounds */
-  --panel-void: #000000;
-  --panel-surface: #1a1a1a;
-  --panel-surface-light: #2a2a2a;
-  --panel-industrial: #3d3d3d;
-  --panel-military: #4a5040;
-  --panel-teal: #2d6b6b;
-  --panel-beige: #c4b998;
+  /* Panel Backgrounds - Dark Industrial */
+  --panel-void: #141618;
+  --panel-surface: #1a1d20;
+  --panel-surface-light: #242729;
+  --panel-industrial: #1e2124;
+  --panel-military: #1a1e16;
+  --panel-teal: #132e2e;
+  --panel-beige: #7a7060;
 
   /* Neon Accent Colors */
   --neon-amber: #ffb800;
@@ -189,7 +189,15 @@ html, body {
   gap: 4px;
   height: 100vh;
   width: 100vw;
-  background: var(--panel-void);
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      rgba(255, 255, 255, 0.02) 1px,
+      transparent 2px,
+      transparent 4px
+    ),
+    linear-gradient(180deg, #181a1e 0%, #141618 50%, #121416 100%);
   padding: 4px;
   overflow: hidden;
 }
@@ -208,8 +216,8 @@ html, body {
     to bottom,
     transparent 0px,
     transparent 2px,
-    rgba(0, 0, 0, 0.15) 2px,
-    rgba(0, 0, 0, 0.15) 4px
+    rgba(0, 0, 0, 0.06) 2px,
+    rgba(0, 0, 0, 0.06) 4px
   );
   pointer-events: none;
   z-index: 10;
@@ -249,25 +257,118 @@ html, body {
     0 0 10px var(--neon-cyan);
 }
 
-/* Panel Frame Styles */
+/* Panel Frame Styles - Worn Brushed Steel */
 .panel-frame {
-  background: linear-gradient(145deg, #2a2a2a, #1a1a1a);
-  border: 1px solid rgba(255, 184, 0, 0.2);
+  background:
+    /* Brush grain - horizontal hairlines */
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      rgba(255, 255, 255, 0.04) 1px,
+      transparent 2px,
+      rgba(0, 0, 0, 0.03) 3px,
+      transparent 4px
+    ),
+    /* Wear scuffs - diagonal scratches */
+    repeating-linear-gradient(
+      125deg,
+      transparent 0px,
+      transparent 12px,
+      rgba(255, 255, 255, 0.025) 13px,
+      transparent 14px,
+      transparent 22px,
+      rgba(0, 0, 0, 0.02) 23px,
+      transparent 24px
+    ),
+    /* Base worn steel */
+    linear-gradient(
+      170deg,
+      #1e2226 0%,
+      #1a1e22 12%,
+      #1c2024 28%,
+      #181c20 45%,
+      #1d2125 58%,
+      #191d21 72%,
+      #1b1f23 88%,
+      #171b1f 100%
+    );
+  border: 1px solid rgba(60, 65, 75, 0.5);
   border-radius: 4px;
+  border-top-color: rgba(255, 255, 255, 0.08);
+  border-left-color: rgba(255, 255, 255, 0.05);
+  border-bottom-color: rgba(0, 0, 0, 0.6);
+  border-right-color: rgba(0, 0, 0, 0.4);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.3),
-    0 2px 8px rgba(0, 0, 0, 0.5);
+    inset 0 -1px 0 rgba(0, 0, 0, 0.35),
+    inset 1px 0 0 rgba(255, 255, 255, 0.03),
+    inset -1px 0 0 rgba(0, 0, 0, 0.2),
+    0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .panel-frame-teal {
-  background: linear-gradient(145deg, #2a5a5a, #1a4a4a);
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      rgba(255, 255, 255, 0.035) 1px,
+      transparent 2px,
+      rgba(0, 0, 0, 0.02) 3px,
+      transparent 4px
+    ),
+    repeating-linear-gradient(
+      125deg,
+      transparent 0px, transparent 12px,
+      rgba(255, 255, 255, 0.02) 13px, transparent 14px
+    ),
+    linear-gradient(170deg, #162e2e 0%, #122828 30%, #142c2c 60%, #102626 100%);
   border-color: rgba(0, 255, 255, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.14);
+  border-left-color: rgba(255, 255, 255, 0.08);
+  border-bottom-color: rgba(0, 0, 0, 0.35);
 }
 
 .panel-frame-military {
-  background: linear-gradient(145deg, #5a5a52, #4a5040);
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      rgba(255, 255, 255, 0.035) 1px,
+      transparent 2px,
+      rgba(0, 0, 0, 0.02) 3px,
+      transparent 4px
+    ),
+    repeating-linear-gradient(
+      125deg,
+      transparent 0px, transparent 12px,
+      rgba(255, 255, 255, 0.02) 13px, transparent 14px
+    ),
+    linear-gradient(170deg, #242418 0%, #1e1e14 30%, #222218 60%, #1c1c12 100%);
   border-color: rgba(170, 255, 0, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.14);
+  border-left-color: rgba(255, 255, 255, 0.08);
+  border-bottom-color: rgba(0, 0, 0, 0.35);
+}
+
+/* Brushed Metal Surface - for panel area backgrounds */
+.panel-brushed-metal {
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      rgba(255, 255, 255, 0.025) 1px,
+      transparent 2px,
+      rgba(0, 0, 0, 0.015) 3px,
+      transparent 4px
+    ),
+    linear-gradient(
+      180deg,
+      #1e2124 0%,
+      #1a1d20 25%,
+      #1c1f22 50%,
+      #191c1f 75%,
+      #1b1e21 100%
+    ) !important;
 }
 
 /* Knob Base Style */
@@ -462,4 +563,44 @@ html, body {
 
 .animate-boot-line {
   animation: boot-line 0.1s ease-out forwards;
+}
+
+/* Screw Button LED Colors */
+:root {
+  --screw-led-off: transparent;
+  --screw-led-red: #ff3333;
+  --screw-led-red-glow: rgba(255, 51, 51, 0.6);
+  --screw-led-green: #33ff66;
+  --screw-led-green-glow: rgba(51, 255, 102, 0.6);
+  --screw-led-amber: #ffaa33;
+  --screw-led-amber-glow: rgba(255, 170, 51, 0.6);
+}
+
+/* Screw Button LED Animations */
+@keyframes screw-led-charge {
+  0% { box-shadow: 0 0 2px var(--screw-led-red-glow); }
+  100% { box-shadow: 0 0 12px var(--screw-led-red-glow); }
+}
+
+@keyframes screw-led-transition {
+  0% { border-color: var(--screw-led-red); box-shadow: 0 0 8px var(--screw-led-red-glow); }
+  50% { border-color: var(--screw-led-amber); box-shadow: 0 0 12px var(--screw-led-amber-glow); }
+  100% { border-color: var(--screw-led-green); box-shadow: 0 0 8px var(--screw-led-green-glow); }
+}
+
+@keyframes screw-led-active {
+  0%, 100% { box-shadow: 0 0 6px var(--screw-led-green-glow); opacity: 0.9; }
+  50% { box-shadow: 0 0 10px var(--screw-led-green-glow); opacity: 1; }
+}
+
+.animate-screw-led-charge {
+  animation: screw-led-charge 2s linear forwards;
+}
+
+.animate-screw-led-transition {
+  animation: screw-led-transition 0.5s ease-out forwards;
+}
+
+.animate-screw-led-active {
+  animation: screw-led-active 2s ease-in-out infinite;
 }

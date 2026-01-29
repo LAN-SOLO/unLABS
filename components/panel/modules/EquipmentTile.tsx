@@ -72,11 +72,14 @@ export function EquipmentTile({
 }
 
 // ==================================================
-// CRYSTAL DATA CACHE - Shows crystal inventory stats
-// Device ID: CDC-001 | Version: 1.4.2
-// Compatible: EnergyCore, BatteryPack, Synthesizers
-// unOS Commands: DEVICE CACHE [TEST|RESET|STATUS]
+// CRYSTAL DATA CACHE - CDC-001
+// Uses CDCManager context for bidirectional sync with terminal
+// Firmware: v1.4.2 | Tech Tree: Tech Tier 1
+// Function: Crystalline data storage for research archives
+// Power: Full 15 E/s | Idle 5 E/s | Standby 1 E/s
 // ==================================================
+import { CDC_FIRMWARE, CDC_POWER_SPECS, useCDCManagerOptional } from '@/contexts/CDCManager'
+
 interface CrystalDataCacheProps {
   crystalCount?: number
   sliceCount?: number
@@ -84,10 +87,8 @@ interface CrystalDataCacheProps {
   className?: string
   onTest?: () => void
   onReset?: () => void
+  onPowerChange?: (isOn: boolean) => void
 }
-
-type DeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type TestPhase = 'memory' | 'bus' | 'cache' | 'power' | 'protocol' | 'complete' | null
 
 export function CrystalDataCache({
   crystalCount = 0,
@@ -96,162 +97,233 @@ export function CrystalDataCache({
   className,
   onTest,
   onReset,
+  onPowerChange,
 }: CrystalDataCacheProps) {
-  const [deviceState, setDeviceState] = useState<DeviceState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<TestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Initializing...')
-  const [displayValues, setDisplayValues] = useState({ crystals: '--', slices: '--', power: '--' })
+  // Use shared CDCManager context for bidirectional sync
+  const cdcManager = useCDCManagerOptional()
 
-  const status = crystalCount > 0 ? 'active' : 'standby'
+  // Local state fallback when CDCManager not available
+  const [localDeviceState, setLocalDeviceState] = useState<'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'>('booting')
+  const [localBootPhase, setLocalBootPhase] = useState(0)
+  const [localTestPhase, setLocalTestPhase] = useState<'memory' | 'bus' | 'cache' | 'power' | 'protocol' | 'complete' | null>(null)
+  const [localShutdownPhase, setLocalShutdownPhase] = useState<'saving' | 'flushing' | 'releasing' | 'halted' | null>(null)
+  const [localTestResult, setLocalTestResult] = useState<'pass' | 'fail' | null>(null)
+  const [localStatusMessage, setLocalStatusMessage] = useState('Initializing...')
+  const [localDisplayValues, setLocalDisplayValues] = useState({ crystals: '--', slices: '--', power: '--' })
+  const [localIsPowered, setLocalIsPowered] = useState(true)
 
-  // Boot sequence on mount
+  // Use context state if available, otherwise local state
+  const deviceState = cdcManager?.deviceState ?? localDeviceState
+  const bootPhase = cdcManager?.bootPhase ?? (localBootPhase > 0 ? ['post', 'memory', 'cache', 'bus', 'sync', 'ready'][localBootPhase - 1] as 'post' | 'memory' | 'cache' | 'bus' | 'sync' | 'ready' : null)
+  const testPhase = cdcManager?.testPhase ?? localTestPhase
+  const shutdownPhase = cdcManager?.shutdownPhase ?? localShutdownPhase
+  const testResult = cdcManager?.testResult ?? localTestResult
+  const statusMessage = cdcManager?.statusMessage ?? localStatusMessage
+  const isPowered = cdcManager?.isPowered ?? localIsPowered
+
+  // Display values
+  const displayValues = cdcManager ? {
+    crystals: deviceState === 'standby' ? '0' : String(cdcManager.crystalCount),
+    slices: deviceState === 'standby' ? '0' : String(cdcManager.sliceCount),
+    power: deviceState === 'standby' ? '0.0' : cdcManager.totalPower.toFixed(1),
+  } : localDisplayValues
+
+  const bootPhaseNum = cdcManager ?
+    (bootPhase === 'post' ? 1 : bootPhase === 'memory' ? 2 : bootPhase === 'cache' ? 3 : bootPhase === 'bus' ? 4 : bootPhase === 'sync' ? 5 : bootPhase === 'ready' ? 6 : 0)
+    : localBootPhase
+
+  const status = crystalCount > 0 ? 'active' : 'idle'
+
+  // Update CDCManager with prop data when available
   useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('POST check...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Memory init...')
-      setBootPhase(2)
-      await new Promise(r => setTimeout(r, 250))
-
-      setStatusMessage('Cache allocate...')
-      setBootPhase(3)
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Bus connect...')
-      setBootPhase(4)
-      setDisplayValues({ crystals: '0', slices: '0', power: '0.0' })
-      await new Promise(r => setTimeout(r, 250))
-
-      setStatusMessage('Data sync...')
-      setBootPhase(5)
-      await new Promise(r => setTimeout(r, 400))
-
-      // Final boot - show real values
-      setDisplayValues({
-        crystals: String(crystalCount),
-        slices: String(sliceCount),
-        power: totalPower.toFixed(1),
-      })
-      setBootPhase(6)
-      setDeviceState('online')
-      setStatusMessage(crystalCount > 0 ? 'Cache synchronized' : 'Awaiting data')
+    if (cdcManager) {
+      cdcManager.updateData(crystalCount, sliceCount, totalPower)
     }
+  }, [cdcManager, crystalCount, sliceCount, totalPower])
 
-    bootSequence()
-  }, []) // Only run on mount
-
-  // Update display values when props change (after boot)
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayValues({
-        crystals: String(crystalCount),
-        slices: String(sliceCount),
-        power: totalPower.toFixed(1),
-      })
-      setStatusMessage(crystalCount > 0 ? 'Cache synchronized' : 'Awaiting data')
-    }
-  }, [crystalCount, sliceCount, totalPower, deviceState])
-
-  const handleTest = async () => {
-    if (deviceState !== 'online') return
-
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<TestPhase>[] = ['memory', 'bus', 'cache', 'power', 'protocol', 'complete']
-    const phaseMessages: Record<NonNullable<TestPhase>, string> = {
-      memory: 'Testing memory integrity...',
-      bus: 'Testing data bus...',
-      cache: 'Verifying cache coherence...',
-      power: 'Checking power supply...',
-      protocol: 'Testing protocol...',
-      complete: 'Diagnostics complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(phaseMessages[phase])
-      await new Promise(r => setTimeout(r, 400))
-    }
-
-    // All tests pass
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('All tests PASSED')
-    onTest?.()
-
-    // Clear result after 3 seconds
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage(crystalCount > 0 ? 'Cache synchronized' : 'Awaiting data')
-    }, 3000)
-  }
-
-  const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    // Shutdown sequence
-    setStatusMessage('Shutting down...')
+  // Local boot sequence (fallback when no CDCManager)
+  const runLocalBootSequence = useCallback(async () => {
+    setLocalDeviceState('booting')
+    setLocalStatusMessage('POST check...')
+    setLocalBootPhase(1)
     await new Promise(r => setTimeout(r, 300))
 
-    setStatusMessage('Flushing buffers...')
-    setDisplayValues({ crystals: '--', slices: '--', power: '--' })
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Releasing resources...')
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('System halted')
-    await new Promise(r => setTimeout(r, 400))
-
-    // Boot sequence
-    setDeviceState('booting')
-    setStatusMessage('POST check...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Memory init...')
-    setBootPhase(2)
+    setLocalStatusMessage('Memory init...')
+    setLocalBootPhase(2)
     await new Promise(r => setTimeout(r, 250))
 
-    setStatusMessage('Cache allocate...')
-    setBootPhase(3)
+    setLocalStatusMessage('Cache allocate...')
+    setLocalBootPhase(3)
     await new Promise(r => setTimeout(r, 300))
 
-    setStatusMessage('Bus connect...')
-    setBootPhase(4)
-    setDisplayValues({ crystals: '0', slices: '0', power: '0.0' })
+    setLocalStatusMessage('Bus connect...')
+    setLocalBootPhase(4)
+    setLocalDisplayValues({ crystals: '0', slices: '0', power: '0.0' })
     await new Promise(r => setTimeout(r, 250))
 
-    setStatusMessage('Data sync...')
-    setBootPhase(5)
+    setLocalStatusMessage('Data sync...')
+    setLocalBootPhase(5)
     await new Promise(r => setTimeout(r, 400))
 
-    // Final - show real values
-    setDisplayValues({
+    setLocalDisplayValues({
       crystals: String(crystalCount),
       slices: String(sliceCount),
       power: totalPower.toFixed(1),
     })
-    setBootPhase(6)
-    setDeviceState('online')
-    setStatusMessage(crystalCount > 0 ? 'Cache synchronized' : 'Awaiting data')
-    onReset?.()
+    setLocalBootPhase(6)
+    setLocalDeviceState('online')
+    setLocalStatusMessage(crystalCount > 0 ? 'Cache synchronized' : 'Awaiting data')
+  }, [crystalCount, sliceCount, totalPower])
+
+  // Local shutdown sequence (fallback)
+  const runLocalShutdownSequence = useCallback(async () => {
+    setLocalDeviceState('shutdown')
+
+    setLocalShutdownPhase('saving')
+    setLocalStatusMessage('Saving state...')
+    await new Promise(r => setTimeout(r, 300))
+
+    setLocalShutdownPhase('flushing')
+    setLocalStatusMessage('Flushing buffers...')
+    setLocalDisplayValues({ crystals: '--', slices: '--', power: '--' })
+    await new Promise(r => setTimeout(r, 300))
+
+    setLocalShutdownPhase('releasing')
+    setLocalStatusMessage('Releasing resources...')
+    setLocalBootPhase(0)
+    await new Promise(r => setTimeout(r, 300))
+
+    setLocalShutdownPhase('halted')
+    setLocalStatusMessage('System halted')
+    await new Promise(r => setTimeout(r, 200))
+
+    setLocalShutdownPhase(null)
+    setLocalDeviceState('standby')
+    setLocalStatusMessage('Standby mode')
+  }, [])
+
+  // Boot on mount (local fallback only)
+  useEffect(() => {
+    if (!cdcManager && localIsPowered) {
+      runLocalBootSequence()
+    }
+  }, []) // Only run on mount
+
+  // Update local display values when props change (local fallback)
+  useEffect(() => {
+    if (!cdcManager && localDeviceState === 'online') {
+      setLocalDisplayValues({
+        crystals: String(crystalCount),
+        slices: String(sliceCount),
+        power: totalPower.toFixed(1),
+      })
+      setLocalStatusMessage(crystalCount > 0 ? 'Cache synchronized' : 'Awaiting data')
+    }
+  }, [cdcManager, crystalCount, sliceCount, totalPower, localDeviceState])
+
+  // Power toggle handler - uses context or local
+  const handlePowerToggle = useCallback(async () => {
+    if (deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting') return
+
+    if (cdcManager) {
+      // Use shared context
+      if (isPowered && deviceState !== 'standby') {
+        await cdcManager.powerOff()
+        onPowerChange?.(false)
+      } else {
+        await cdcManager.powerOn()
+        onPowerChange?.(true)
+      }
+    } else {
+      // Local fallback
+      if (localIsPowered && localDeviceState !== 'standby') {
+        setLocalIsPowered(false)
+        await runLocalShutdownSequence()
+        onPowerChange?.(false)
+      } else {
+        setLocalIsPowered(true)
+        await runLocalBootSequence()
+        onPowerChange?.(true)
+      }
+    }
+  }, [cdcManager, isPowered, deviceState, localIsPowered, localDeviceState, runLocalShutdownSequence, runLocalBootSequence, onPowerChange])
+
+  // Test handler - uses context or local
+  const handleTest = async () => {
+    if (deviceState !== 'online') return
+
+    if (cdcManager) {
+      await cdcManager.runTest()
+      onTest?.()
+    } else {
+      // Local fallback
+      setLocalDeviceState('testing')
+      setLocalTestResult(null)
+
+      const phases: ('memory' | 'bus' | 'cache' | 'power' | 'protocol' | 'complete')[] = ['memory', 'bus', 'cache', 'power', 'protocol', 'complete']
+      const phaseMessages: Record<string, string> = {
+        memory: 'Testing memory integrity...',
+        bus: 'Testing data bus...',
+        cache: 'Verifying cache coherence...',
+        power: 'Checking power supply...',
+        protocol: 'Testing protocol...',
+        complete: 'Diagnostics complete',
+      }
+
+      for (const phase of phases) {
+        setLocalTestPhase(phase)
+        setLocalStatusMessage(phaseMessages[phase])
+        await new Promise(r => setTimeout(r, 400))
+      }
+
+      setLocalTestResult('pass')
+      setLocalTestPhase(null)
+      setLocalDeviceState('online')
+      setLocalStatusMessage('All tests PASSED')
+      onTest?.()
+
+      setTimeout(() => {
+        setLocalTestResult(null)
+        setLocalStatusMessage(crystalCount > 0 ? 'Cache synchronized' : 'Awaiting data')
+      }, 3000)
+    }
+  }
+
+  // Reboot handler - uses context or local
+  const handleReboot = async () => {
+    if (deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'standby' || deviceState === 'shutdown') return
+
+    if (cdcManager) {
+      await cdcManager.reboot()
+      onReset?.()
+    } else {
+      // Local fallback
+      setLocalDeviceState('rebooting')
+      setLocalTestResult(null)
+
+      setLocalStatusMessage('Shutting down...')
+      await new Promise(r => setTimeout(r, 300))
+
+      setLocalStatusMessage('Flushing buffers...')
+      setLocalDisplayValues({ crystals: '--', slices: '--', power: '--' })
+      await new Promise(r => setTimeout(r, 300))
+
+      setLocalStatusMessage('Releasing resources...')
+      setLocalBootPhase(0)
+      await new Promise(r => setTimeout(r, 300))
+
+      setLocalStatusMessage('System halted')
+      await new Promise(r => setTimeout(r, 400))
+
+      await runLocalBootSequence()
+      onReset?.()
+    }
   }
 
   // LED color based on state
   const getLedColor = () => {
-    if (deviceState === 'offline' || deviceState === 'rebooting') return 'red'
+    if (deviceState === 'standby') return 'amber'
+    if (deviceState === 'shutdown' || deviceState === 'rebooting') return 'red'
     if (deviceState === 'booting') return 'amber'
     if (deviceState === 'testing') return 'cyan'
     if (testResult === 'pass') return 'green'
@@ -259,12 +331,42 @@ export function CrystalDataCache({
     return status === 'active' ? 'green' : 'amber'
   }
 
-  const isLedOn = deviceState !== 'offline' && !(deviceState === 'rebooting' && bootPhase === 0)
+  const isLedOn = deviceState !== 'shutdown' || shutdownPhase !== null
 
   return (
-    <PanelFrame variant="default" className={cn('p-2', className)}>
+    <PanelFrame variant="default" className={cn('p-2 relative', className)}>
+      {/* Tiny power button - top right corner */}
+      <button
+        onClick={handlePowerToggle}
+        disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
+        className="absolute top-1.5 right-1.5 z-10 group"
+        title={isPowered && deviceState !== 'standby' ? 'Power Off' : 'Power On'}
+      >
+        <div
+          className="w-2.5 h-2.5 rounded-full border transition-all flex items-center justify-center"
+          style={{
+            background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+            borderColor: isPowered && deviceState !== 'standby'
+              ? 'var(--neon-green)'
+              : deviceState === 'standby' ? 'var(--neon-amber)' : '#3a3a4a',
+            boxShadow: isPowered && deviceState !== 'standby'
+              ? '0 0 4px var(--neon-green), inset 0 0 2px rgba(0,255,0,0.3)'
+              : deviceState === 'standby' ? '0 0 3px var(--neon-amber)' : 'none',
+          }}
+        >
+          <div
+            className="w-1 h-1 rounded-full"
+            style={{
+              backgroundColor: isPowered && deviceState !== 'standby'
+                ? 'var(--neon-green)'
+                : deviceState === 'standby' ? 'var(--neon-amber)' : '#333',
+            }}
+          />
+        </div>
+      </button>
+
       {/* Header with status LED */}
-      <div className="flex items-center justify-between mb-1.5">
+      <div className="flex items-center justify-between mb-1.5 pr-4">
         <div className="flex items-center gap-1.5">
           <LED
             on={isLedOn}
@@ -278,7 +380,7 @@ export function CrystalDataCache({
             <div className="font-mono text-[6px] text-white/30">CACHE</div>
           </div>
         </div>
-        <div className="font-mono text-[6px] text-white/20">CDC-001</div>
+        <div className="font-mono text-[5px] text-white/20">CDC-001</div>
       </div>
 
       {/* Data display grid */}
@@ -288,14 +390,14 @@ export function CrystalDataCache({
           <div
             className={cn(
               'font-mono text-sm tabular-nums transition-all duration-300',
-              deviceState === 'booting' && bootPhase < 4 && 'opacity-50'
+              (deviceState === 'booting' && bootPhaseNum < 4) || deviceState === 'standby' ? 'opacity-50' : ''
             )}
             style={{
               color: 'var(--neon-green)',
               textShadow: displayValues.crystals !== '--' && displayValues.crystals !== '0' ? '0 0 6px var(--neon-green)' : 'none',
             }}
           >
-            {displayValues.crystals}
+            {deviceState === 'standby' ? '0' : displayValues.crystals}
           </div>
           {deviceState === 'testing' && testPhase === 'cache' && (
             <div className="absolute inset-0 bg-[var(--neon-cyan)]/10 animate-pulse" />
@@ -306,14 +408,14 @@ export function CrystalDataCache({
           <div
             className={cn(
               'font-mono text-sm tabular-nums transition-all duration-300',
-              deviceState === 'booting' && bootPhase < 4 && 'opacity-50'
+              (deviceState === 'booting' && bootPhaseNum < 4) || deviceState === 'standby' ? 'opacity-50' : ''
             )}
             style={{
               color: 'var(--neon-cyan)',
               textShadow: displayValues.slices !== '--' && displayValues.slices !== '0' ? '0 0 6px var(--neon-cyan)' : 'none',
             }}
           >
-            {displayValues.slices}
+            {deviceState === 'standby' ? '0' : displayValues.slices}
           </div>
           {deviceState === 'testing' && testPhase === 'memory' && (
             <div className="absolute inset-0 bg-[var(--neon-cyan)]/10 animate-pulse" />
@@ -324,14 +426,14 @@ export function CrystalDataCache({
           <div
             className={cn(
               'font-mono text-sm tabular-nums transition-all duration-300',
-              deviceState === 'booting' && bootPhase < 4 && 'opacity-50'
+              (deviceState === 'booting' && bootPhaseNum < 4) || deviceState === 'standby' ? 'opacity-50' : ''
             )}
             style={{
               color: 'var(--neon-amber)',
               textShadow: displayValues.power !== '--' && displayValues.power !== '0.0' ? '0 0 6px var(--neon-amber)' : 'none',
             }}
           >
-            {displayValues.power}
+            {deviceState === 'standby' ? '0.0' : displayValues.power}
           </div>
           {deviceState === 'testing' && testPhase === 'power' && (
             <div className="absolute inset-0 bg-[var(--neon-amber)]/10 animate-pulse" />
@@ -344,7 +446,8 @@ export function CrystalDataCache({
         <span className={cn(
           'font-mono text-[5px] transition-colors flex-1 truncate',
           deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
-          deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+          deviceState === 'rebooting' || deviceState === 'booting' || deviceState === 'shutdown' ? 'text-[var(--neon-amber)]' :
+          deviceState === 'standby' ? 'text-white/40' :
           testResult === 'pass' ? 'text-[var(--neon-green)]' :
           testResult === 'fail' ? 'text-[var(--neon-red)]' :
           'text-white/30'
@@ -372,7 +475,7 @@ export function CrystalDataCache({
         </button>
         <button
           onClick={handleReboot}
-          disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+          disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
           className={cn(
             'w-3.5 h-3 rounded-sm font-mono text-[5px] transition-all border flex items-center justify-center',
             deviceState === 'rebooting' || deviceState === 'booting'
@@ -401,22 +504,26 @@ export function CrystalDataCache({
   )
 }
 
+// Export firmware and power specs for terminal access
+export { CDC_FIRMWARE, CDC_POWER_SPECS }
+
 // ==================================================
-// ENERGY CORE - Links to volatility/network energy
-// Device ID: UEC-001 | Version: 2.0.1
-// Compatible: CrystalDataCache, BatteryPack, QuantumAnalyzer
-// unOS Commands: DEVICE CORE [TEST|RESET|STATUS]
+// ENERGY CORE - UEC-001
+// Uses UECManager context for bidirectional sync with terminal
+// Firmware: v2.0.1 | Power Generator Device
+// Function: Converts blockchain volatility to energy output
+// Output: 100 E/s per tier | Self-consume: 10 E/s | Standby: 2 E/s
 // ==================================================
+import { UEC_FIRMWARE, UEC_POWER_SPECS, useUECManagerOptional } from '@/contexts/UECManager'
+
 interface EnergyCoreProps {
   volatilityTier?: number
   tps?: number
   className?: string
   onTest?: () => void
   onReset?: () => void
+  onPowerChange?: (isOn: boolean) => void
 }
-
-type EnergyCoreState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type EnergyCoreTestPhase = 'voltage' | 'frequency' | 'stability' | 'output' | 'sync' | 'complete' | null
 
 export function EnergyCore({
   volatilityTier = 1,
@@ -424,165 +531,226 @@ export function EnergyCore({
   className,
   onTest,
   onReset,
+  onPowerChange,
 }: EnergyCoreProps) {
-  const [deviceState, setDeviceState] = useState<EnergyCoreState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<EnergyCoreTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Initializing...')
-  const [displayValues, setDisplayValues] = useState({ tier: '--', level: 0, tps: '----' })
+  // Use shared UECManager context for bidirectional sync
+  const uecManager = useUECManagerOptional()
+
+  // Local state fallback when UECManager not available
+  const [localDeviceState, setLocalDeviceState] = useState<'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'>('booting')
+  const [localBootPhase, setLocalBootPhase] = useState(0)
+  const [localTestPhase, setLocalTestPhase] = useState<'voltage' | 'frequency' | 'stability' | 'output' | 'sync' | 'complete' | null>(null)
+  const [localShutdownPhase, setLocalShutdownPhase] = useState<'draining' | 'releasing' | 'halted' | null>(null)
+  const [localTestResult, setLocalTestResult] = useState<'pass' | 'fail' | null>(null)
+  const [localStatusMessage, setLocalStatusMessage] = useState('Initializing...')
+  const [localIsPowered, setLocalIsPowered] = useState(true)
+  const [localDisplayValues, setLocalDisplayValues] = useState({ tier: '--', level: 0, tps: '----' })
+
+  // Use context state if available, otherwise local state
+  const deviceState = uecManager?.deviceState ?? localDeviceState
+  const bootPhase = uecManager?.bootPhase
+  const testPhase = uecManager?.testPhase ?? localTestPhase
+  const shutdownPhase = uecManager?.shutdownPhase ?? localShutdownPhase
+  const testResult = uecManager?.testResult ?? localTestResult
+  const statusMessage = uecManager?.statusMessage ?? localStatusMessage
+  const isPowered = uecManager?.isPowered ?? localIsPowered
 
   // Energy level based on volatility tier (1-5 maps to 20-100%)
   const energyLevel = volatilityTier * 20
   const status = volatilityTier >= 3 ? 'active' : volatilityTier >= 2 ? 'standby' : 'offline'
 
-  // Boot sequence on mount
+  // Display values from context or local
+  const displayValues = uecManager ? {
+    tier: deviceState === 'standby' ? '--' : `T${uecManager.volatilityTier}`,
+    level: deviceState === 'standby' ? 0 : uecManager.volatilityTier * 20,
+    tps: deviceState === 'standby' ? '----' : uecManager.tps.toLocaleString(),
+  } : localDisplayValues
+
+  const bootPhaseNum = uecManager ?
+    (bootPhase === 'post' ? 1 : bootPhase === 'voltage' ? 2 : bootPhase === 'frequency' ? 3 : bootPhase === 'network' ? 4 : bootPhase === 'stabilize' ? 5 : bootPhase === 'ready' ? 6 : 0)
+    : localBootPhase
+
+  // Update UECManager with prop data when available
   useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('POST check...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 250))
-
-      setStatusMessage('Voltage calibration...')
-      setBootPhase(2)
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Frequency sync...')
-      setBootPhase(3)
-      setDisplayValues(prev => ({ ...prev, tier: '0', level: 0 }))
-      await new Promise(r => setTimeout(r, 250))
-
-      setStatusMessage('Network connect...')
-      setBootPhase(4)
-      setDisplayValues(prev => ({ ...prev, tps: '0' }))
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Energy stabilize...')
-      setBootPhase(5)
-      await new Promise(r => setTimeout(r, 350))
-
-      // Final boot - show real values
-      setDisplayValues({
-        tier: `T${volatilityTier}`,
-        level: energyLevel,
-        tps: tps.toLocaleString(),
-      })
-      setBootPhase(6)
-      setDeviceState('online')
-      setStatusMessage('Core stable')
+    if (uecManager) {
+      uecManager.updateVolatility(volatilityTier, tps)
     }
+  }, [uecManager, volatilityTier, tps])
 
-    bootSequence()
-  }, []) // Only run on mount
-
-  // Update display values when props change (after boot)
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayValues({
-        tier: `T${volatilityTier}`,
-        level: energyLevel,
-        tps: tps.toLocaleString(),
-      })
-    }
-  }, [volatilityTier, tps, energyLevel, deviceState])
-
-  const handleTest = async () => {
-    if (deviceState !== 'online') return
-
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<EnergyCoreTestPhase>[] = ['voltage', 'frequency', 'stability', 'output', 'sync', 'complete']
-    const phaseMessages: Record<NonNullable<EnergyCoreTestPhase>, string> = {
-      voltage: 'Testing voltage regulators...',
-      frequency: 'Checking frequency sync...',
-      stability: 'Verifying field stability...',
-      output: 'Measuring power output...',
-      sync: 'Testing network sync...',
-      complete: 'Diagnostics complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(phaseMessages[phase])
-      await new Promise(r => setTimeout(r, 350))
-    }
-
-    // All tests pass
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('All tests PASSED')
-    onTest?.()
-
-    // Clear result after 3 seconds
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('Core stable')
-    }, 3000)
-  }
-
-  const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    // Shutdown sequence
-    setStatusMessage('Shutting down...')
+  // Local boot sequence (fallback when no UECManager)
+  const runLocalBootSequence = useCallback(async () => {
+    setLocalDeviceState('booting')
+    setLocalStatusMessage('POST check...')
+    setLocalBootPhase(1)
     await new Promise(r => setTimeout(r, 250))
 
-    setStatusMessage('Draining capacitors...')
-    setDisplayValues({ tier: '--', level: 0, tps: '----' })
+    setLocalStatusMessage('Voltage calibration...')
+    setLocalBootPhase(2)
     await new Promise(r => setTimeout(r, 300))
 
-    setStatusMessage('Releasing field...')
-    setBootPhase(0)
+    setLocalStatusMessage('Frequency sync...')
+    setLocalBootPhase(3)
+    setLocalDisplayValues(prev => ({ ...prev, tier: '0', level: 0 }))
     await new Promise(r => setTimeout(r, 250))
 
-    setStatusMessage('Core halted')
+    setLocalStatusMessage('Network connect...')
+    setLocalBootPhase(4)
+    setLocalDisplayValues(prev => ({ ...prev, tps: '0' }))
+    await new Promise(r => setTimeout(r, 300))
+
+    setLocalStatusMessage('Energy stabilize...')
+    setLocalBootPhase(5)
     await new Promise(r => setTimeout(r, 350))
 
-    // Boot sequence
-    setDeviceState('booting')
-    setStatusMessage('POST check...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('Voltage calibration...')
-    setBootPhase(2)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Frequency sync...')
-    setBootPhase(3)
-    setDisplayValues(prev => ({ ...prev, tier: '0', level: 0 }))
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('Network connect...')
-    setBootPhase(4)
-    setDisplayValues(prev => ({ ...prev, tps: '0' }))
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Energy stabilize...')
-    setBootPhase(5)
-    await new Promise(r => setTimeout(r, 350))
-
-    // Final - show real values
-    setDisplayValues({
+    setLocalDisplayValues({
       tier: `T${volatilityTier}`,
       level: energyLevel,
       tps: tps.toLocaleString(),
     })
-    setBootPhase(6)
-    setDeviceState('online')
-    setStatusMessage('Core stable')
-    onReset?.()
+    setLocalBootPhase(6)
+    setLocalDeviceState('online')
+    setLocalStatusMessage('Core stable')
+  }, [volatilityTier, energyLevel, tps])
+
+  // Local shutdown sequence (fallback)
+  const runLocalShutdownSequence = useCallback(async () => {
+    setLocalDeviceState('shutdown')
+
+    setLocalShutdownPhase('draining')
+    setLocalStatusMessage('Draining capacitors...')
+    await new Promise(r => setTimeout(r, 300))
+
+    setLocalShutdownPhase('releasing')
+    setLocalStatusMessage('Releasing field...')
+    setLocalDisplayValues({ tier: '--', level: 0, tps: '----' })
+    await new Promise(r => setTimeout(r, 300))
+
+    setLocalShutdownPhase('halted')
+    setLocalStatusMessage('Core halted')
+    await new Promise(r => setTimeout(r, 200))
+
+    setLocalShutdownPhase(null)
+    setLocalDeviceState('standby')
+    setLocalStatusMessage('Standby mode')
+  }, [])
+
+  // Boot on mount (local fallback only)
+  useEffect(() => {
+    if (!uecManager && localIsPowered) {
+      runLocalBootSequence()
+    }
+  }, []) // Only run on mount
+
+  // Update local display values when props change (local fallback)
+  useEffect(() => {
+    if (!uecManager && localDeviceState === 'online') {
+      setLocalDisplayValues({
+        tier: `T${volatilityTier}`,
+        level: energyLevel,
+        tps: tps.toLocaleString(),
+      })
+    }
+  }, [uecManager, volatilityTier, tps, energyLevel, localDeviceState])
+
+  // Power toggle handler
+  const handlePowerToggle = useCallback(async () => {
+    if (deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting') return
+
+    if (uecManager) {
+      if (isPowered && deviceState !== 'standby') {
+        await uecManager.powerOff()
+        onPowerChange?.(false)
+      } else {
+        await uecManager.powerOn()
+        onPowerChange?.(true)
+      }
+    } else {
+      if (localIsPowered && localDeviceState !== 'standby') {
+        setLocalIsPowered(false)
+        await runLocalShutdownSequence()
+        onPowerChange?.(false)
+      } else {
+        setLocalIsPowered(true)
+        await runLocalBootSequence()
+        onPowerChange?.(true)
+      }
+    }
+  }, [uecManager, isPowered, deviceState, localIsPowered, localDeviceState, runLocalShutdownSequence, runLocalBootSequence, onPowerChange])
+
+  // Test handler
+  const handleTest = async () => {
+    if (deviceState !== 'online') return
+
+    if (uecManager) {
+      await uecManager.runTest()
+      onTest?.()
+    } else {
+      setLocalDeviceState('testing')
+      setLocalTestResult(null)
+
+      const phases: ('voltage' | 'frequency' | 'stability' | 'output' | 'sync' | 'complete')[] = ['voltage', 'frequency', 'stability', 'output', 'sync', 'complete']
+      const phaseMessages: Record<string, string> = {
+        voltage: 'Testing voltage regulators...',
+        frequency: 'Checking frequency sync...',
+        stability: 'Verifying field stability...',
+        output: 'Measuring power output...',
+        sync: 'Testing network sync...',
+        complete: 'Diagnostics complete',
+      }
+
+      for (const phase of phases) {
+        setLocalTestPhase(phase)
+        setLocalStatusMessage(phaseMessages[phase])
+        await new Promise(r => setTimeout(r, 350))
+      }
+
+      setLocalTestResult('pass')
+      setLocalTestPhase(null)
+      setLocalDeviceState('online')
+      setLocalStatusMessage('All tests PASSED')
+      onTest?.()
+
+      setTimeout(() => {
+        setLocalTestResult(null)
+        setLocalStatusMessage('Core stable')
+      }, 3000)
+    }
+  }
+
+  // Reboot handler
+  const handleReboot = async () => {
+    if (deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'standby' || deviceState === 'shutdown') return
+
+    if (uecManager) {
+      await uecManager.reboot()
+      onReset?.()
+    } else {
+      setLocalDeviceState('rebooting')
+      setLocalTestResult(null)
+
+      setLocalStatusMessage('Shutting down...')
+      await new Promise(r => setTimeout(r, 250))
+
+      setLocalStatusMessage('Draining capacitors...')
+      setLocalDisplayValues({ tier: '--', level: 0, tps: '----' })
+      await new Promise(r => setTimeout(r, 300))
+
+      setLocalStatusMessage('Releasing field...')
+      setLocalBootPhase(0)
+      await new Promise(r => setTimeout(r, 250))
+
+      setLocalStatusMessage('Core halted')
+      await new Promise(r => setTimeout(r, 350))
+
+      await runLocalBootSequence()
+      onReset?.()
+    }
   }
 
   // LED color based on state
   const getLedColor = () => {
-    if (deviceState === 'offline' || deviceState === 'rebooting') return 'red'
+    if (deviceState === 'standby') return 'amber'
+    if (deviceState === 'shutdown' || deviceState === 'rebooting') return 'red'
     if (deviceState === 'booting') return 'amber'
     if (deviceState === 'testing') return 'cyan'
     if (testResult === 'pass') return 'green'
@@ -590,12 +758,54 @@ export function EnergyCore({
     return status === 'active' ? 'green' : status === 'standby' ? 'amber' : 'red'
   }
 
-  const isLedOn = deviceState !== 'offline' && !(deviceState === 'rebooting' && bootPhase === 0)
+  const isLedOn = deviceState !== 'shutdown' || shutdownPhase !== null
 
   return (
-    <PanelFrame variant="default" className={cn('p-2', className)}>
+    <PanelFrame variant="default" className={cn('p-2 relative', className)}>
+      {/* Creative power button - hexagonal energy switch style */}
+      <button
+        onClick={handlePowerToggle}
+        disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
+        className="absolute top-1 right-1 z-10 group"
+        title={isPowered && deviceState !== 'standby' ? 'Power Off' : 'Power On'}
+      >
+        <div
+          className="w-3 h-3 relative flex items-center justify-center transition-all"
+          style={{
+            clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+            background: isPowered && deviceState !== 'standby'
+              ? 'linear-gradient(180deg, var(--neon-amber) 0%, var(--neon-orange) 100%)'
+              : deviceState === 'standby' ? 'linear-gradient(180deg, #4a3a0a 0%, #2a2a2a 100%)' : '#1a1a1a',
+            boxShadow: isPowered && deviceState !== 'standby'
+              ? '0 0 6px var(--neon-amber), inset 0 0 3px rgba(255,200,0,0.5)'
+              : 'none',
+          }}
+        >
+          {/* Inner glow effect */}
+          <div
+            className="w-1.5 h-1.5 rounded-full"
+            style={{
+              background: isPowered && deviceState !== 'standby'
+                ? 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,200,0,0.3) 100%)'
+                : deviceState === 'standby' ? 'radial-gradient(circle, rgba(255,180,0,0.3) 0%, transparent 100%)' : '#333',
+            }}
+          />
+        </div>
+        {/* Pulse effect when on */}
+        {isPowered && deviceState === 'online' && (
+          <div
+            className="absolute inset-0 animate-ping"
+            style={{
+              clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+              background: 'var(--neon-amber)',
+              opacity: 0.3,
+            }}
+          />
+        )}
+      </button>
+
       {/* Header with status LED */}
-      <div className="flex items-center justify-between mb-1.5">
+      <div className="flex items-center justify-between mb-1.5 pr-4">
         <div className="flex items-center gap-1.5">
           <LED
             on={isLedOn}
@@ -609,7 +819,7 @@ export function EnergyCore({
             <div className="font-mono text-[6px] text-white/30">UNSTABLE</div>
           </div>
         </div>
-        <div className="font-mono text-[6px] text-white/20">UEC-001</div>
+        <div className="font-mono text-[5px] text-white/20">UEC-001</div>
       </div>
 
       {/* Main display - Tier and Energy bar */}
@@ -622,7 +832,7 @@ export function EnergyCore({
           <div
             className={cn(
               'font-mono text-lg font-bold tabular-nums transition-all duration-300',
-              deviceState === 'booting' && bootPhase < 3 && 'opacity-50'
+              (deviceState === 'booting' && bootPhaseNum < 3) || deviceState === 'standby' ? 'opacity-50' : ''
             )}
             style={{
               color: volatilityTier >= 4 ? 'var(--neon-red)' : 'var(--neon-amber)',
@@ -675,7 +885,8 @@ export function EnergyCore({
         <span className={cn(
           'font-mono text-[5px] transition-colors flex-1 truncate',
           deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
-          deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+          deviceState === 'rebooting' || deviceState === 'booting' || deviceState === 'shutdown' ? 'text-[var(--neon-amber)]' :
+          deviceState === 'standby' ? 'text-white/40' :
           testResult === 'pass' ? 'text-[var(--neon-green)]' :
           testResult === 'fail' ? 'text-[var(--neon-red)]' :
           'text-white/30'
@@ -703,7 +914,7 @@ export function EnergyCore({
         </button>
         <button
           onClick={handleReboot}
-          disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+          disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
           className={cn(
             'w-4 h-3 rounded-sm font-mono text-[5px] transition-all border flex items-center justify-center',
             deviceState === 'rebooting' || deviceState === 'booting'
@@ -739,12 +950,22 @@ export function EnergyCore({
   )
 }
 
+// Export UEC firmware and power specs for terminal access
+export { UEC_FIRMWARE, UEC_POWER_SPECS }
+
 // ==================================================
 // BATTERY PACK - Shows user balance/staking
 // Device ID: BAT-001 | Version: 1.8.0
 // Compatible: EnergyCore, CrystalDataCache
-// unOS Commands: DEVICE BATTERY [TEST|RESET|STATUS]
+// unOS Commands: bat [STATUS|TEST|RESET|POWER]
+// Firmware: v1.8.0 | Features: cell-monitor, auto-regen, capacity-track, thermal-protect, cdc-handshake
 // ==================================================
+import { BAT_FIRMWARE, BAT_POWER_SPECS, useBATManagerOptional } from '@/contexts/BATManager'
+import { HMS_FIRMWARE, HMS_POWER_SPECS, useHMSManagerOptional } from '@/contexts/HMSManager'
+import { ECR_FIRMWARE, ECR_POWER_SPECS, useECRManagerOptional } from '@/contexts/ECRManager'
+import { IPL_FIRMWARE, IPL_POWER_SPECS, useIPLManagerOptional } from '@/contexts/IPLManager'
+import { MFR_FIRMWARE, MFR_POWER_SPECS, useMFRManagerOptional } from '@/contexts/MFRManager'
+
 interface BatteryPackProps {
   available?: number
   staked?: number
@@ -752,10 +973,12 @@ interface BatteryPackProps {
   className?: string
   onTest?: () => void
   onReset?: () => void
+  onPowerChange?: (isOn: boolean) => void
 }
 
-type BatteryState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type BatteryState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
 type BatteryTestPhase = 'cells' | 'voltage' | 'current' | 'capacity' | 'regen' | 'complete' | null
+type BatteryShutdownPhase = 'saving' | 'disconnect' | 'hibernate' | null
 
 export function BatteryPack({
   available = 100,
@@ -764,13 +987,32 @@ export function BatteryPack({
   className,
   onTest,
   onReset,
+  onPowerChange,
 }: BatteryPackProps) {
-  const [deviceState, setDeviceState] = useState<BatteryState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<BatteryTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Initializing...')
-  const [displayValues, setDisplayValues] = useState({ available: '--', staked: '--', segments: 0 })
+  // Use shared BATManager context for bidirectional sync
+  const batManager = useBATManagerOptional()
+
+  // Local state fallback when BATManager not available
+  const [localDeviceState, setLocalDeviceState] = useState<BatteryState>('booting')
+  const [localBootPhase, setLocalBootPhase] = useState(0)
+  const [localTestPhase, setLocalTestPhase] = useState<BatteryTestPhase>(null)
+  const [localShutdownPhase, setLocalShutdownPhase] = useState<BatteryShutdownPhase>(null)
+  const [localTestResult, setLocalTestResult] = useState<'pass' | 'fail' | null>(null)
+  const [localStatusMessage, setLocalStatusMessage] = useState('Initializing...')
+  const [localIsPowered, setLocalIsPowered] = useState(true)
+  const [localDisplayValues, setLocalDisplayValues] = useState({ available: '--', staked: '--', segments: 0 })
+
+  // Use context state if available, otherwise local state
+  const deviceState = batManager?.deviceState ?? localDeviceState
+  const testPhase = batManager?.testPhase ?? localTestPhase
+  const shutdownPhase = batManager?.shutdownPhase ?? localShutdownPhase
+  const testResult = batManager?.testResult ?? localTestResult
+  const statusMessage = batManager?.statusMessage ?? localStatusMessage
+  const isPowered = batManager?.isPowered ?? localIsPowered
+  const bootPhaseFromContext = batManager?.bootPhase
+  const bootPhase = batManager ?
+    (bootPhaseFromContext === 'init' ? 1 : bootPhaseFromContext === 'cells' ? 2 : bootPhaseFromContext === 'calibrate' ? 3 : bootPhaseFromContext === 'handshake' ? 4 : bootPhaseFromContext === 'ready' ? 6 : 0)
+    : localBootPhase
 
   const total = available + staked + locked
   const chargePercent = total > 0 ? Math.min(100, (available / 200) * 100) : 0
@@ -780,153 +1022,189 @@ export function BatteryPack({
   const segments = [100, 80, 60, 40, 20]
   const activeSegments = segments.filter(level => chargePercent >= level).length
 
-  // Boot sequence on mount
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Cell check...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 200))
+  // Display values from context or local
+  const displayValues = batManager ? {
+    available: deviceState === 'standby' ? '--' : available.toFixed(0),
+    staked: deviceState === 'standby' ? '--' : (staked > 0 ? `+${staked.toFixed(0)}` : ''),
+    segments: deviceState === 'standby' ? 0 : activeSegments,
+  } : localDisplayValues
 
-      setStatusMessage('Voltage sense...')
-      setBootPhase(2)
-      await new Promise(r => setTimeout(r, 250))
-
-      setStatusMessage('Current monitor...')
-      setBootPhase(3)
-      setDisplayValues(prev => ({ ...prev, segments: 1 }))
-      await new Promise(r => setTimeout(r, 200))
-
-      setStatusMessage('Capacity scan...')
-      setBootPhase(4)
-      setDisplayValues(prev => ({ ...prev, segments: 3, available: '0' }))
-      await new Promise(r => setTimeout(r, 250))
-
-      setStatusMessage('Regen link...')
-      setBootPhase(5)
-      await new Promise(r => setTimeout(r, 300))
-
-      // Final boot - show real values
-      setDisplayValues({
-        available: available.toFixed(0),
-        staked: staked > 0 ? `+${staked.toFixed(0)}` : '',
-        segments: activeSegments,
-      })
-      setBootPhase(6)
-      setDeviceState('online')
-      setStatusMessage('Auto-regen active')
-    }
-
-    bootSequence()
-  }, []) // Only run on mount
-
-  // Update display values when props change (after boot)
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayValues({
-        available: available.toFixed(0),
-        staked: staked > 0 ? `+${staked.toFixed(0)}` : '',
-        segments: activeSegments,
-      })
-    }
-  }, [available, staked, activeSegments, deviceState])
-
-  const handleTest = async () => {
-    if (deviceState !== 'online') return
-
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<BatteryTestPhase>[] = ['cells', 'voltage', 'current', 'capacity', 'regen', 'complete']
-    const phaseMessages: Record<NonNullable<BatteryTestPhase>, string> = {
-      cells: 'Testing cell integrity...',
-      voltage: 'Checking voltage levels...',
-      current: 'Measuring current flow...',
-      capacity: 'Verifying capacity...',
-      regen: 'Testing regeneration...',
-      complete: 'Diagnostics complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(phaseMessages[phase])
-      await new Promise(r => setTimeout(r, 300))
-    }
-
-    // All tests pass
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('All tests PASSED')
-    onTest?.()
-
-    // Clear result after 3 seconds
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('Auto-regen active')
-    }, 3000)
-  }
-
-  const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    // Shutdown sequence
-    setStatusMessage('Disconnecting...')
+  // Local boot sequence (fallback when no BATManager)
+  const runLocalBootSequence = useCallback(async () => {
+    setLocalDeviceState('booting')
+    setLocalStatusMessage('Cell check...')
+    setLocalBootPhase(1)
     await new Promise(r => setTimeout(r, 200))
 
-    setStatusMessage('Discharging caps...')
-    setDisplayValues({ available: '--', staked: '--', segments: 0 })
+    setLocalStatusMessage('Voltage sense...')
+    setLocalBootPhase(2)
     await new Promise(r => setTimeout(r, 250))
 
-    setStatusMessage('Safe mode...')
-    setBootPhase(0)
+    setLocalStatusMessage('Current monitor...')
+    setLocalBootPhase(3)
+    setLocalDisplayValues(prev => ({ ...prev, segments: 1 }))
     await new Promise(r => setTimeout(r, 200))
 
-    setStatusMessage('Pack offline')
+    setLocalStatusMessage('Capacity scan...')
+    setLocalBootPhase(4)
+    setLocalDisplayValues(prev => ({ ...prev, segments: 3, available: '0' }))
+    await new Promise(r => setTimeout(r, 250))
+
+    setLocalStatusMessage('Regen link...')
+    setLocalBootPhase(5)
     await new Promise(r => setTimeout(r, 300))
 
-    // Boot sequence
-    setDeviceState('booting')
-    setStatusMessage('Cell check...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 200))
-
-    setStatusMessage('Voltage sense...')
-    setBootPhase(2)
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('Current monitor...')
-    setBootPhase(3)
-    setDisplayValues(prev => ({ ...prev, segments: 1 }))
-    await new Promise(r => setTimeout(r, 200))
-
-    setStatusMessage('Capacity scan...')
-    setBootPhase(4)
-    setDisplayValues(prev => ({ ...prev, segments: 3, available: '0' }))
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('Regen link...')
-    setBootPhase(5)
-    await new Promise(r => setTimeout(r, 300))
-
-    // Final - show real values
-    setDisplayValues({
+    // Final boot - show real values
+    setLocalDisplayValues({
       available: available.toFixed(0),
       staked: staked > 0 ? `+${staked.toFixed(0)}` : '',
       segments: activeSegments,
     })
-    setBootPhase(6)
-    setDeviceState('online')
-    setStatusMessage('Auto-regen active')
-    onReset?.()
+    setLocalBootPhase(6)
+    setLocalDeviceState('online')
+    setLocalStatusMessage('Auto-regen: active')
+  }, [available, staked, activeSegments])
+
+  // Local shutdown sequence (fallback)
+  const runLocalShutdownSequence = useCallback(async () => {
+    setLocalDeviceState('shutdown')
+
+    setLocalShutdownPhase('saving')
+    setLocalStatusMessage('Saving state...')
+    await new Promise(r => setTimeout(r, 200))
+
+    setLocalShutdownPhase('disconnect')
+    setLocalStatusMessage('Disconnecting...')
+    setLocalDisplayValues({ available: '--', staked: '--', segments: 0 })
+    await new Promise(r => setTimeout(r, 200))
+
+    setLocalShutdownPhase('hibernate')
+    setLocalStatusMessage('Hibernating...')
+    await new Promise(r => setTimeout(r, 200))
+
+    setLocalShutdownPhase(null)
+    setLocalDeviceState('standby')
+    setLocalStatusMessage('Standby mode')
+  }, [])
+
+  // Boot on mount (local fallback only)
+  useEffect(() => {
+    if (!batManager && localIsPowered) {
+      runLocalBootSequence()
+    }
+  }, []) // Only run on mount
+
+  // Update local display values when props change (local fallback)
+  useEffect(() => {
+    if (!batManager && localDeviceState === 'online') {
+      setLocalDisplayValues({
+        available: available.toFixed(0),
+        staked: staked > 0 ? `+${staked.toFixed(0)}` : '',
+        segments: activeSegments,
+      })
+    }
+  }, [batManager, available, staked, activeSegments, localDeviceState])
+
+  // Power toggle handler
+  const handlePowerToggle = useCallback(async () => {
+    if (deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting') return
+
+    if (batManager) {
+      if (isPowered && deviceState !== 'standby') {
+        await batManager.powerOff()
+        onPowerChange?.(false)
+      } else {
+        await batManager.powerOn()
+        onPowerChange?.(true)
+      }
+    } else {
+      if (localIsPowered && localDeviceState !== 'standby') {
+        setLocalIsPowered(false)
+        await runLocalShutdownSequence()
+        onPowerChange?.(false)
+      } else {
+        setLocalIsPowered(true)
+        await runLocalBootSequence()
+        onPowerChange?.(true)
+      }
+    }
+  }, [batManager, isPowered, deviceState, localIsPowered, localDeviceState, runLocalShutdownSequence, runLocalBootSequence, onPowerChange])
+
+  // Test handler
+  const handleTest = async () => {
+    if (deviceState !== 'online') return
+
+    if (batManager) {
+      await batManager.runTest()
+      onTest?.()
+    } else {
+      setLocalDeviceState('testing')
+      setLocalTestResult(null)
+
+      const phases: NonNullable<BatteryTestPhase>[] = ['cells', 'voltage', 'current', 'capacity', 'regen', 'complete']
+      const phaseMessages: Record<NonNullable<BatteryTestPhase>, string> = {
+        cells: 'Testing cell integrity...',
+        voltage: 'Checking voltage levels...',
+        current: 'Measuring current flow...',
+        capacity: 'Verifying capacity...',
+        regen: 'Testing regeneration...',
+        complete: 'Diagnostics complete',
+      }
+
+      for (const phase of phases) {
+        setLocalTestPhase(phase)
+        setLocalStatusMessage(phaseMessages[phase])
+        await new Promise(r => setTimeout(r, 300))
+      }
+
+      setLocalTestResult('pass')
+      setLocalTestPhase(null)
+      setLocalDeviceState('online')
+      setLocalStatusMessage('All tests PASSED')
+      onTest?.()
+
+      setTimeout(() => {
+        setLocalTestResult(null)
+        setLocalStatusMessage('Auto-regen: active')
+      }, 3000)
+    }
+  }
+
+  // Reboot handler
+  const handleReboot = async () => {
+    if (deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'standby' || deviceState === 'shutdown') return
+
+    if (batManager) {
+      await batManager.reboot()
+      onReset?.()
+    } else {
+      setLocalDeviceState('rebooting')
+      setLocalTestResult(null)
+
+      setLocalStatusMessage('Disconnecting...')
+      await new Promise(r => setTimeout(r, 200))
+
+      setLocalStatusMessage('Discharging caps...')
+      setLocalDisplayValues({ available: '--', staked: '--', segments: 0 })
+      await new Promise(r => setTimeout(r, 250))
+
+      setLocalStatusMessage('Safe mode...')
+      setLocalBootPhase(0)
+      await new Promise(r => setTimeout(r, 200))
+
+      setLocalStatusMessage('Pack offline')
+      await new Promise(r => setTimeout(r, 300))
+
+      // Boot sequence
+      await runLocalBootSequence()
+      onReset?.()
+    }
   }
 
   // LED color based on state
   const getLedColor = () => {
-    if (deviceState === 'offline' || deviceState === 'rebooting') return 'red'
+    if (deviceState === 'standby' || deviceState === 'shutdown') return 'amber'
+    if (deviceState === 'rebooting') return 'red'
     if (deviceState === 'booting') return 'amber'
     if (deviceState === 'testing') return 'cyan'
     if (testResult === 'pass') return 'green'
@@ -934,10 +1212,57 @@ export function BatteryPack({
     return status === 'active' ? 'green' : status === 'standby' ? 'amber' : 'red'
   }
 
-  const isLedOn = deviceState !== 'offline' && !(deviceState === 'rebooting' && bootPhase === 0)
+  const isLedOn = deviceState !== 'standby' && deviceState !== 'shutdown' && !(deviceState === 'rebooting' && bootPhase === 0)
 
   return (
-    <PanelFrame variant="military" className={cn('p-2', className)}>
+    <PanelFrame variant="military" className={cn('p-2 relative', className)}>
+      {/* Creative power button - tiny battery cell style */}
+      <button
+        onClick={handlePowerToggle}
+        disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
+        className="absolute top-1 right-1 z-10 group"
+        title={isPowered && deviceState !== 'standby' ? 'Power Off' : 'Power On'}
+      >
+        <div
+          className="w-2.5 h-4 relative flex flex-col items-center justify-center gap-[1px] rounded-sm transition-all border"
+          style={{
+            background: isPowered && deviceState !== 'standby'
+              ? 'linear-gradient(180deg, #1a3a1a 0%, #0a1f0a 100%)'
+              : deviceState === 'standby' ? 'linear-gradient(180deg, #2a2a1a 0%, #1a1a0a 100%)' : '#0a0a0a',
+            borderColor: isPowered && deviceState !== 'standby'
+              ? 'var(--neon-lime, #bfff00)'
+              : deviceState === 'standby' ? '#4a4a2a' : '#2a2a2a',
+            boxShadow: isPowered && deviceState !== 'standby'
+              ? '0 0 4px rgba(191, 255, 0, 0.4), inset 0 0 3px rgba(191, 255, 0, 0.2)'
+              : 'none',
+          }}
+        >
+          {/* Battery terminal nub */}
+          <div
+            className="absolute -top-[2px] w-1 h-[2px] rounded-t-sm"
+            style={{
+              background: isPowered && deviceState !== 'standby' ? 'var(--neon-lime, #bfff00)' : '#3a3a3a',
+            }}
+          />
+          {/* Cell segments */}
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="w-1.5 h-[3px] rounded-[1px] transition-all"
+              style={{
+                background: isPowered && deviceState !== 'standby'
+                  ? i === 0 ? 'var(--neon-lime, #bfff00)' : i === 1 ? 'var(--neon-green)' : 'var(--neon-green)'
+                  : '#2a2a2a',
+                boxShadow: isPowered && deviceState !== 'standby' && i < 2
+                  ? '0 0 3px var(--neon-lime, #bfff00)'
+                  : 'none',
+                opacity: isPowered && deviceState !== 'standby' ? 1 - (i * 0.2) : 0.3,
+              }}
+            />
+          ))}
+        </div>
+      </button>
+
       {/* Header with status LED */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1.5">
@@ -950,10 +1275,12 @@ export function BatteryPack({
             <div className="font-mono text-[8px] uppercase tracking-wider text-[var(--neon-lime,#bfff00)]">
               01_Portable Battery Pack
             </div>
-            <div className="font-mono text-[5px] text-white/30">AUTOMATIC REGENERATION</div>
+            <div className="font-mono text-[5px] text-white/30">
+              {deviceState === 'standby' ? 'STANDBY MODE' : 'AUTOMATIC REGENERATION'}
+            </div>
           </div>
         </div>
-        <div className="font-mono text-[5px] text-white/20">BAT-001</div>
+        <div className="font-mono text-[5px] text-white/20 mr-4">BAT-001</div>
       </div>
 
       {/* Main display - Battery segments and value */}
@@ -1184,34 +1511,55 @@ export function TechTreeModule({
 // ==================================================
 // HANDMADE SYNTHESIZER - Synthesizers tech tree
 // Device ID: HMS-001 | Version: 3.2.1
-// Compatible: CrystalDataCache, Interpolator
-// unOS Commands: DEVICE SYNTH [TEST|RESET|STATUS]
-// Functions: Slice creation, State toggle, Color fuse
+// Uses HMSManager context for bidirectional sync with terminal
+// Firmware: v3.2.1 | Tech Tree: Synthesizers
+// Function: Slice creation, State toggle, Color fuse, Waveform generation
+// Power: Full 8 E/s | Idle 3 E/s | Standby 0.5 E/s | Resonance 12 E/s
 // ==================================================
 interface HandmadeSynthesizerProps {
   progress?: TechTreeProgress
   className?: string
   onTest?: () => void
   onReset?: () => void
+  onPowerChange?: (isOn: boolean) => void
 }
-
-type SynthState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type SynthTestPhase = 'oscillator' | 'waveform' | 'filter' | 'output' | 'calibrate' | 'complete' | null
 
 export function HandmadeSynthesizer({
   progress,
   className,
   onTest,
   onReset,
+  onPowerChange,
 }: HandmadeSynthesizerProps) {
-  const [deviceState, setDeviceState] = useState<SynthState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<SynthTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Initializing...')
-  const [knobValues, setKnobValues] = useState({ pulse: 0, tempo: 0, freq: 0 })
+  // Use shared HMSManager context for bidirectional sync
+  const hmsManager = useHMSManagerOptional()
 
-  const tier = progress?.currentTier ?? 0
+  // Local state fallback when HMSManager not available
+  const [localDeviceState, setLocalDeviceState] = useState<'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'>('booting')
+  const [localBootPhase, setLocalBootPhase] = useState(0)
+  const [localTestPhase, setLocalTestPhase] = useState<'oscillator' | 'waveform' | 'filter' | 'output' | 'calibrate' | 'complete' | null>(null)
+  const [localTestResult, setLocalTestResult] = useState<'pass' | 'fail' | null>(null)
+  const [localStatusMessage, setLocalStatusMessage] = useState('Initializing...')
+  const [localKnobValues, setLocalKnobValues] = useState({ pulse: 0, tempo: 0, freq: 0 })
+  const [localIsPowered, setLocalIsPowered] = useState(true)
+
+  // Use context state if available, otherwise local state
+  const deviceState = hmsManager?.deviceState ?? localDeviceState
+  const bootPhase = hmsManager?.bootPhase
+  const testPhase = hmsManager?.testPhase ?? localTestPhase
+  const testResult = hmsManager?.testResult ?? localTestResult
+  const statusMessage = hmsManager?.statusMessage ?? localStatusMessage
+  const isPowered = hmsManager?.isPowered ?? localIsPowered
+  const waveformType = hmsManager?.waveformType ?? 'sine'
+
+  // Knob values from context or local
+  const knobValues = hmsManager ? {
+    pulse: hmsManager.pulseValue,
+    tempo: hmsManager.tempoValue,
+    freq: hmsManager.freqValue,
+  } : localKnobValues
+
+  const tier = progress?.currentTier ?? (hmsManager?.currentTier ?? 1)
   const status = tier >= 2 ? 'active' : tier >= 1 ? 'standby' : 'offline'
 
   // Target knob values based on tier
@@ -1219,142 +1567,178 @@ export function HandmadeSynthesizer({
   const targetTempo = tier * 10 + 30
   const targetFreq = tier * 12 + 25
 
-  // Boot sequence on mount
+  const bootPhaseNum = bootPhase === 'power' ? 1 : bootPhase === 'oscillator' ? 2 : bootPhase === 'waveform' ? 3 : bootPhase === 'filter' ? 4 : bootPhase === 'calibrate' ? 5 : bootPhase === 'ready' ? 6 : localBootPhase
+
+  // Update HMS tier when progress changes
   useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Power on...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 200))
-
-      setStatusMessage('Oscillator init...')
-      setBootPhase(2)
-      setKnobValues({ pulse: 10, tempo: 10, freq: 10 })
-      await new Promise(r => setTimeout(r, 250))
-
-      setStatusMessage('Waveform gen...')
-      setBootPhase(3)
-      setKnobValues({ pulse: targetPulse / 2, tempo: targetTempo / 2, freq: targetFreq / 2 })
-      await new Promise(r => setTimeout(r, 200))
-
-      setStatusMessage('Filter bank...')
-      setBootPhase(4)
-      await new Promise(r => setTimeout(r, 250))
-
-      setStatusMessage('Calibrating...')
-      setBootPhase(5)
-      await new Promise(r => setTimeout(r, 300))
-
-      // Final boot - show real values
-      setKnobValues({ pulse: targetPulse, tempo: targetTempo, freq: targetFreq })
-      setBootPhase(6)
-      setDeviceState('online')
-      setStatusMessage(tier > 0 ? TIER_CAPABILITIES.synthesizers[tier] : 'Awaiting upgrade')
+    if (hmsManager && progress?.currentTier !== undefined) {
+      hmsManager.updateTier(progress.currentTier)
     }
+  }, [hmsManager, progress?.currentTier])
 
-    bootSequence()
-  }, []) // Only run on mount
+  // Local boot sequence (fallback when no HMSManager)
+  const runLocalBootSequence = useCallback(async () => {
+    setLocalDeviceState('booting')
+    setLocalStatusMessage('Power on...')
+    setLocalBootPhase(1)
+    await new Promise(r => setTimeout(r, 200))
 
-  // Update knob values when tier changes (after boot)
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setKnobValues({ pulse: targetPulse, tempo: targetTempo, freq: targetFreq })
-      setStatusMessage(tier > 0 ? TIER_CAPABILITIES.synthesizers[tier] : 'Awaiting upgrade')
+    setLocalStatusMessage('Oscillator init...')
+    setLocalBootPhase(2)
+    setLocalKnobValues({ pulse: 10, tempo: 10, freq: 10 })
+    await new Promise(r => setTimeout(r, 250))
+
+    setLocalStatusMessage('Waveform gen...')
+    setLocalBootPhase(3)
+    setLocalKnobValues({ pulse: targetPulse / 2, tempo: targetTempo / 2, freq: targetFreq / 2 })
+    await new Promise(r => setTimeout(r, 200))
+
+    setLocalStatusMessage('Filter bank...')
+    setLocalBootPhase(4)
+    await new Promise(r => setTimeout(r, 250))
+
+    setLocalStatusMessage('Calibrating...')
+    setLocalBootPhase(5)
+    await new Promise(r => setTimeout(r, 300))
+
+    setLocalKnobValues({ pulse: targetPulse, tempo: targetTempo, freq: targetFreq })
+    setLocalBootPhase(6)
+    setLocalDeviceState('online')
+    setLocalStatusMessage('Synth ready')
+  }, [targetPulse, targetTempo, targetFreq])
+
+  // Local shutdown sequence (fallback)
+  const runLocalShutdownSequence = useCallback(async () => {
+    setLocalDeviceState('shutdown')
+    setLocalStatusMessage('Draining buffers...')
+    setLocalKnobValues({ pulse: 0, tempo: 0, freq: 0 })
+    await new Promise(r => setTimeout(r, 250))
+
+    setLocalStatusMessage('Power down...')
+    await new Promise(r => setTimeout(r, 200))
+
+    setLocalStatusMessage('Standby mode')
+    setLocalBootPhase(0)
+    await new Promise(r => setTimeout(r, 150))
+
+    setLocalDeviceState('standby')
+    setLocalStatusMessage('Standby')
+  }, [])
+
+  // Power toggle handler
+  const handlePowerToggle = async () => {
+    if (deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown') return
+
+    if (hmsManager) {
+      if (deviceState === 'standby') {
+        await hmsManager.powerOn()
+        onPowerChange?.(true)
+      } else if (deviceState === 'online') {
+        await hmsManager.powerOff()
+        onPowerChange?.(false)
+      }
+    } else {
+      // Local fallback
+      if (deviceState === 'standby') {
+        setLocalIsPowered(true)
+        await runLocalBootSequence()
+        onPowerChange?.(true)
+      } else if (deviceState === 'online') {
+        setLocalIsPowered(false)
+        await runLocalShutdownSequence()
+        onPowerChange?.(false)
+      }
     }
-  }, [tier, targetPulse, targetTempo, targetFreq, deviceState])
+  }
 
+  // Test handler
   const handleTest = async () => {
     if (deviceState !== 'online') return
 
-    setDeviceState('testing')
-    setTestResult(null)
+    if (hmsManager) {
+      await hmsManager.runTest()
+    } else {
+      // Local fallback test sequence
+      setLocalDeviceState('testing')
+      setLocalTestResult(null)
 
-    const phases: NonNullable<SynthTestPhase>[] = ['oscillator', 'waveform', 'filter', 'output', 'calibrate', 'complete']
-    const phaseMessages: Record<NonNullable<SynthTestPhase>, string> = {
-      oscillator: 'Testing oscillators...',
-      waveform: 'Checking waveforms...',
-      filter: 'Verifying filters...',
-      output: 'Testing output stage...',
-      calibrate: 'Calibration check...',
-      complete: 'Diagnostics complete',
+      const phases: ('oscillator' | 'waveform' | 'filter' | 'output' | 'calibrate' | 'complete')[] = ['oscillator', 'waveform', 'filter', 'output', 'calibrate', 'complete']
+      const phaseMessages = {
+        oscillator: 'Testing oscillators...',
+        waveform: 'Checking waveforms...',
+        filter: 'Verifying filters...',
+        output: 'Testing output stage...',
+        calibrate: 'Calibration check...',
+        complete: 'Diagnostics complete',
+      }
+
+      for (const phase of phases) {
+        setLocalTestPhase(phase)
+        setLocalStatusMessage(phaseMessages[phase])
+        await new Promise(r => setTimeout(r, 300))
+      }
+
+      setLocalTestResult('pass')
+      setLocalTestPhase(null)
+      setLocalDeviceState('online')
+      setLocalStatusMessage('All tests PASSED')
+
+      setTimeout(() => {
+        setLocalTestResult(null)
+        setLocalStatusMessage('Synth ready')
+      }, 3000)
     }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(phaseMessages[phase])
-      await new Promise(r => setTimeout(r, 300))
-    }
-
-    // All tests pass
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('All tests PASSED')
     onTest?.()
-
-    // Clear result after 3 seconds
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage(tier > 0 ? TIER_CAPABILITIES.synthesizers[tier] : 'Awaiting upgrade')
-    }, 3000)
   }
 
+  // Reboot handler
   const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
+    if (deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'standby' || deviceState === 'shutdown') return
 
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    // Shutdown sequence
-    setStatusMessage('Shutting down...')
-    await new Promise(r => setTimeout(r, 200))
-
-    setStatusMessage('Draining buffers...')
-    setKnobValues({ pulse: 0, tempo: 0, freq: 0 })
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('Power off...')
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 200))
-
-    setStatusMessage('Synth offline')
-    await new Promise(r => setTimeout(r, 300))
-
-    // Boot sequence
-    setDeviceState('booting')
-    setStatusMessage('Power on...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 200))
-
-    setStatusMessage('Oscillator init...')
-    setBootPhase(2)
-    setKnobValues({ pulse: 10, tempo: 10, freq: 10 })
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('Waveform gen...')
-    setBootPhase(3)
-    setKnobValues({ pulse: targetPulse / 2, tempo: targetTempo / 2, freq: targetFreq / 2 })
-    await new Promise(r => setTimeout(r, 200))
-
-    setStatusMessage('Filter bank...')
-    setBootPhase(4)
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('Calibrating...')
-    setBootPhase(5)
-    await new Promise(r => setTimeout(r, 300))
-
-    // Final - show real values
-    setKnobValues({ pulse: targetPulse, tempo: targetTempo, freq: targetFreq })
-    setBootPhase(6)
-    setDeviceState('online')
-    setStatusMessage(tier > 0 ? TIER_CAPABILITIES.synthesizers[tier] : 'Awaiting upgrade')
+    if (hmsManager) {
+      await hmsManager.reboot()
+    } else {
+      // Local fallback reboot
+      setLocalDeviceState('rebooting')
+      setLocalTestResult(null)
+      setLocalStatusMessage('Shutting down...')
+      await new Promise(r => setTimeout(r, 200))
+      setLocalStatusMessage('Draining buffers...')
+      setLocalKnobValues({ pulse: 0, tempo: 0, freq: 0 })
+      await new Promise(r => setTimeout(r, 250))
+      setLocalStatusMessage('Power off...')
+      setLocalBootPhase(0)
+      await new Promise(r => setTimeout(r, 200))
+      setLocalStatusMessage('Synth offline')
+      await new Promise(r => setTimeout(r, 300))
+      await runLocalBootSequence()
+    }
     onReset?.()
   }
 
+  // Knob change handler - syncs with context
+  const handleKnobChange = (knob: 'pulse' | 'tempo' | 'freq', value: number) => {
+    if (deviceState !== 'online') return
+
+    if (hmsManager) {
+      hmsManager.setKnobValue(knob, value)
+    } else {
+      setLocalKnobValues(prev => ({ ...prev, [knob]: value }))
+    }
+  }
+
+  // Auto-boot on mount (when no HMSManager)
+  useEffect(() => {
+    if (!hmsManager) {
+      runLocalBootSequence()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // LED color based on state
   const getLedColor = () => {
-    if (deviceState === 'offline' || deviceState === 'rebooting') return 'red'
+    if (deviceState === 'standby' || deviceState === 'shutdown') return 'red'
+    if (deviceState === 'rebooting') return 'amber'
     if (deviceState === 'booting') return 'amber'
     if (deviceState === 'testing') return 'cyan'
     if (testResult === 'pass') return 'green'
@@ -1362,11 +1746,78 @@ export function HandmadeSynthesizer({
     return status === 'active' ? 'green' : status === 'standby' ? 'amber' : 'red'
   }
 
-  const isLedOn = deviceState !== 'offline' && !(deviceState === 'rebooting' && bootPhase === 0)
+  const isLedOn = deviceState !== 'standby' && deviceState !== 'shutdown' && !(deviceState === 'rebooting' && bootPhaseNum === 0)
+
+  // Waveform power button - creative sine wave shape
+  const WaveformPowerButton = () => {
+    const isOn = deviceState === 'online' || deviceState === 'testing'
+    const isTransitioning = deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting'
+    const canToggle = !isTransitioning && deviceState !== 'testing'
+
+    // Get waveform path based on current type
+    const getWaveformPath = () => {
+      switch (waveformType) {
+        case 'sine':
+          return 'M2,8 Q5,2 8,8 Q11,14 14,8 Q17,2 20,8'
+        case 'square':
+          return 'M2,10 L2,4 L8,4 L8,12 L14,12 L14,4 L20,4 L20,10'
+        case 'saw':
+          return 'M2,12 L8,4 L8,12 L14,4 L14,12 L20,4'
+        case 'triangle':
+          return 'M2,8 L6,3 L10,13 L14,3 L18,13 L20,8'
+        default:
+          return 'M2,8 Q5,2 8,8 Q11,14 14,8 Q17,2 20,8'
+      }
+    }
+
+    return (
+      <button
+        onClick={handlePowerToggle}
+        disabled={!canToggle}
+        className={cn(
+          'relative w-6 h-4 rounded transition-all duration-300',
+          canToggle ? 'cursor-pointer hover:scale-110' : 'cursor-not-allowed opacity-50',
+          isOn ? 'bg-[#0a1a1a]' : 'bg-[#0a0a0f]',
+        )}
+        title={isOn ? 'Power Off' : 'Power On'}
+        style={{
+          border: `1px solid ${isOn ? 'var(--neon-cyan)' : 'rgba(255,255,255,0.2)'}`,
+          boxShadow: isOn ? '0 0 8px var(--neon-cyan), inset 0 0 4px rgba(0,255,255,0.1)' : 'none',
+        }}
+      >
+        <svg
+          viewBox="0 0 22 16"
+          className={cn(
+            'absolute inset-0 w-full h-full transition-all',
+            isTransitioning && 'animate-pulse'
+          )}
+          style={{
+            filter: isOn ? 'drop-shadow(0 0 2px var(--neon-cyan))' : 'none',
+          }}
+        >
+          <path
+            d={getWaveformPath()}
+            fill="none"
+            stroke={isOn ? 'var(--neon-cyan)' : 'rgba(255,255,255,0.3)'}
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            className={cn(isOn && 'animate-pulse')}
+          />
+        </svg>
+        {/* Power indicator dot */}
+        <div
+          className={cn(
+            'absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full transition-all',
+            isOn ? 'bg-[var(--neon-cyan)] shadow-[0_0_4px_var(--neon-cyan)]' : 'bg-white/20'
+          )}
+        />
+      </button>
+    )
+  }
 
   return (
     <PanelFrame variant="teal" className={cn('p-2', className)}>
-      {/* Header with status LED and micro buttons */}
+      {/* Header with status LED, power button, and micro buttons */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1.5">
           <LED
@@ -1379,13 +1830,17 @@ export function HandmadeSynthesizer({
               Handmade Synthesizer
             </div>
             <div className="font-mono text-[6px] text-white/40">
-              {TIER_NAMES.synthesizers[tier]}
+              {deviceState === 'standby' ? 'Standby' : TIER_NAMES.synthesizers[tier]}
             </div>
           </div>
         </div>
 
-        {/* Micro LED-style buttons */}
-        <div className="flex gap-1 items-center">
+        {/* Control cluster: Waveform power + Test + Reset */}
+        <div className="flex gap-1.5 items-center">
+          {/* Waveform-shaped Power Button */}
+          <WaveformPowerButton />
+
+          {/* Test button */}
           <button
             onClick={handleTest}
             disabled={deviceState !== 'online'}
@@ -1404,9 +1859,11 @@ export function HandmadeSynthesizer({
             )} />
             <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 font-mono text-[4px] text-white/30">T</span>
           </button>
+
+          {/* Reset button */}
           <button
             onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
             className="group relative disabled:opacity-30"
             title="Reset"
           >
@@ -1418,53 +1875,86 @@ export function HandmadeSynthesizer({
             )} />
             <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 font-mono text-[4px] text-white/30">R</span>
           </button>
-          <div className="font-mono text-[5px] text-white/20 ml-1">HMS-001</div>
+
+          <div className="font-mono text-[5px] text-white/20 ml-0.5">HMS-001</div>
         </div>
       </div>
 
-      {/* Knobs row */}
+      {/* Knobs row - interactive when online, dim when standby */}
       <div className={cn(
         'flex items-center justify-between transition-opacity duration-300',
-        deviceState === 'booting' && bootPhase < 3 ? 'opacity-50' : 'opacity-100'
+        deviceState === 'standby' || deviceState === 'shutdown' ? 'opacity-30' :
+        deviceState === 'booting' && bootPhaseNum < 3 ? 'opacity-50' : 'opacity-100'
       )}>
         <div className={cn(
           'transition-all',
           deviceState === 'testing' && testPhase === 'oscillator' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded-full'
         )}>
-          <Knob value={knobValues.pulse} onChange={() => {}} size="sm" label="PULSE" accentColor="var(--neon-cyan)" />
+          <Knob
+            value={knobValues.pulse}
+            onChange={(v) => handleKnobChange('pulse', v)}
+            size="sm"
+            label="PULSE"
+            accentColor="var(--neon-cyan)"
+            disabled={deviceState !== 'online'}
+          />
         </div>
         <div className={cn(
           'transition-all',
           deviceState === 'testing' && testPhase === 'waveform' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded-full'
         )}>
-          <Knob value={knobValues.tempo} onChange={() => {}} size="sm" label="TEMPO" accentColor="var(--neon-amber)" />
+          <Knob
+            value={knobValues.tempo}
+            onChange={(v) => handleKnobChange('tempo', v)}
+            size="sm"
+            label="TEMPO"
+            accentColor="var(--neon-amber)"
+            disabled={deviceState !== 'online'}
+          />
         </div>
         <div className={cn(
           'transition-all',
           deviceState === 'testing' && testPhase === 'filter' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded-full'
         )}>
-          <Knob value={knobValues.freq} onChange={() => {}} size="sm" label="FREQ" accentColor="var(--neon-green)" />
+          <Knob
+            value={knobValues.freq}
+            onChange={(v) => handleKnobChange('freq', v)}
+            size="sm"
+            label="FREQ"
+            accentColor="var(--neon-green)"
+            disabled={deviceState !== 'online'}
+          />
         </div>
       </div>
 
-      {/* Status bar */}
+      {/* Status bar with waveform indicator */}
       <div className="mt-1.5 pt-1 border-t border-white/5 flex items-center justify-between">
-        <span className={cn(
-          'font-mono text-[6px] transition-colors truncate',
-          deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
-          deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
-          testResult === 'pass' ? 'text-[var(--neon-green)]' :
-          testResult === 'fail' ? 'text-[var(--neon-red)]' :
-          tier > 0 ? 'text-[var(--neon-cyan)]' : 'text-white/30'
-        )}>
-          {statusMessage}
-        </span>
+        <div className="flex items-center gap-1">
+          {/* Mini waveform type indicator */}
+          <div className={cn(
+            'font-mono text-[5px] px-1 rounded',
+            deviceState === 'online' ? 'bg-[var(--neon-cyan)]/20 text-[var(--neon-cyan)]' : 'bg-white/5 text-white/20'
+          )}>
+            {waveformType.toUpperCase().slice(0, 3)}
+          </div>
+          <span className={cn(
+            'font-mono text-[6px] transition-colors truncate',
+            deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
+            deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+            deviceState === 'standby' || deviceState === 'shutdown' ? 'text-white/30' :
+            testResult === 'pass' ? 'text-[var(--neon-green)]' :
+            testResult === 'fail' ? 'text-[var(--neon-red)]' :
+            tier > 0 ? 'text-[var(--neon-cyan)]' : 'text-white/30'
+          )}>
+            {statusMessage}
+          </span>
+        </div>
         <div className="flex gap-0.5">
           {[1, 2, 3, 4, 5].map(t => (
             <div
               key={t}
               className={cn('w-1 h-1 rounded-full transition-colors',
-                deviceState === 'online' && tier >= t ? 'bg-[var(--neon-cyan)]' : 'bg-white/10'
+                deviceState !== 'standby' && deviceState !== 'shutdown' && tier >= t ? 'bg-[var(--neon-cyan)]' : 'bg-white/10'
               )}
             />
           ))}
@@ -1477,171 +1967,245 @@ export function HandmadeSynthesizer({
 // ==================================================
 // ECHO RECORDER - Adapters tech tree visualization
 // Device ID: ECR-001 | Version: 1.1.0
-// Compatible: HandmadeSynthesizer, Oscilloscope
-// unOS Commands: DEVICE RECORDER [TEST|RESET|STATUS]
-// Functions: Blockchain data feeds, Rotation trait
+// Uses ECRManager context for bidirectional sync with terminal
+// Firmware: v1.1.0 | Tech Tree: Adapters
+// Function: Blockchain data feeds, Rotation trait, Oracle sync
+// Power: Full 5 E/s | Idle 2 E/s | Standby 0.3 E/s | Recording 7 E/s
 // ==================================================
 interface EchoRecorderProps {
   progress?: TechTreeProgress
   className?: string
   onTest?: () => void
   onReset?: () => void
+  onPowerChange?: (isOn: boolean) => void
 }
-
-type RecorderState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type RecorderTestPhase = 'antenna' | 'decoder' | 'buffer' | 'sync' | 'output' | 'complete' | null
 
 export function EchoRecorder({
   progress,
   className,
   onTest,
   onReset,
+  onPowerChange,
 }: EchoRecorderProps) {
-  const [deviceState, setDeviceState] = useState<RecorderState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<RecorderTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Initializing...')
-  const [knobValues, setKnobValues] = useState({ pulse: 0, bloom: 0 })
+  // Use shared ECRManager context for bidirectional sync
+  const ecrManager = useECRManagerOptional()
 
-  const tier = progress?.currentTier ?? 0
+  // Local state fallback when ECRManager not available
+  const [localDeviceState, setLocalDeviceState] = useState<'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'>('booting')
+  const [localBootPhase, setLocalBootPhase] = useState(0)
+  const [localTestPhase, setLocalTestPhase] = useState<'antenna' | 'decoder' | 'buffer' | 'sync' | 'output' | 'complete' | null>(null)
+  const [localTestResult, setLocalTestResult] = useState<'pass' | 'fail' | null>(null)
+  const [localStatusMessage, setLocalStatusMessage] = useState('Initializing...')
+  const [localKnobValues, setLocalKnobValues] = useState({ pulse: 0, bloom: 0 })
+  const [localIsPowered, setLocalIsPowered] = useState(true)
+  const [localTickerTap, setLocalTickerTap] = useState(0)
+
+  // Use context state if available, otherwise local state
+  const deviceState = ecrManager?.deviceState ?? localDeviceState
+  const bootPhase = ecrManager?.bootPhase
+  const testPhase = ecrManager?.testPhase ?? localTestPhase
+  const testResult = ecrManager?.testResult ?? localTestResult
+  const statusMessage = ecrManager?.statusMessage ?? localStatusMessage
+  const isPowered = ecrManager?.isPowered ?? localIsPowered
+  const tickerTap = ecrManager?.tickerTap ?? localTickerTap
+  const isRecording = ecrManager?.isRecording ?? false
+  const signalStrength = ecrManager?.signalStrength ?? 85
+
+  // Knob values from context or local
+  const knobValues = ecrManager ? {
+    pulse: ecrManager.pulseValue,
+    bloom: ecrManager.bloomValue,
+  } : localKnobValues
+
+  const tier = progress?.currentTier ?? (ecrManager?.currentTier ?? 1)
   const status = tier >= 2 ? 'active' : tier >= 1 ? 'standby' : 'offline'
 
   // Target knob values based on tier
   const targetPulse = 40 + tier * 10
   const targetBloom = 60 + tier * 5
 
-  // Boot sequence on mount
+  const bootPhaseNum = bootPhase === 'antenna' ? 1 : bootPhase === 'decoder' ? 2 : bootPhase === 'buffer' ? 3 : bootPhase === 'oracle' ? 4 : bootPhase === 'signal' ? 5 : bootPhase === 'ready' ? 6 : localBootPhase
+
+  // Update ECR tier when progress changes
   useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Antenna scan...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 200))
-
-      setStatusMessage('Decoder init...')
-      setBootPhase(2)
-      setKnobValues({ pulse: 20, bloom: 30 })
-      await new Promise(r => setTimeout(r, 250))
-
-      setStatusMessage('Buffer alloc...')
-      setBootPhase(3)
-      await new Promise(r => setTimeout(r, 200))
-
-      setStatusMessage('Oracle sync...')
-      setBootPhase(4)
-      setKnobValues({ pulse: targetPulse / 2, bloom: targetBloom / 2 })
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Signal lock...')
-      setBootPhase(5)
-      await new Promise(r => setTimeout(r, 250))
-
-      // Final boot
-      setKnobValues({ pulse: targetPulse, bloom: targetBloom })
-      setBootPhase(6)
-      setDeviceState('online')
-      setStatusMessage(TIER_NAMES.adapters[tier])
+    if (ecrManager && progress?.currentTier !== undefined) {
+      ecrManager.updateTier(progress.currentTier)
     }
+  }, [ecrManager, progress?.currentTier])
 
-    bootSequence()
+  // Local ticker simulation (fallback)
+  useEffect(() => {
+    if (!ecrManager && localDeviceState === 'online') {
+      const interval = setInterval(() => {
+        setLocalTickerTap(prev => prev + 1)
+      }, 2000)
+      return () => clearInterval(interval)
+    }
+  }, [ecrManager, localDeviceState])
+
+  // Local boot sequence (fallback when no ECRManager)
+  const runLocalBootSequence = useCallback(async () => {
+    setLocalDeviceState('booting')
+    setLocalStatusMessage('Antenna scan...')
+    setLocalBootPhase(1)
+    await new Promise(r => setTimeout(r, 200))
+
+    setLocalStatusMessage('Decoder init...')
+    setLocalBootPhase(2)
+    setLocalKnobValues({ pulse: 20, bloom: 30 })
+    await new Promise(r => setTimeout(r, 250))
+
+    setLocalStatusMessage('Buffer alloc...')
+    setLocalBootPhase(3)
+    await new Promise(r => setTimeout(r, 200))
+
+    setLocalStatusMessage('Oracle sync...')
+    setLocalBootPhase(4)
+    setLocalKnobValues({ pulse: targetPulse / 2, bloom: targetBloom / 2 })
+    await new Promise(r => setTimeout(r, 300))
+
+    setLocalStatusMessage('Signal lock...')
+    setLocalBootPhase(5)
+    await new Promise(r => setTimeout(r, 250))
+
+    setLocalKnobValues({ pulse: targetPulse, bloom: targetBloom })
+    setLocalBootPhase(6)
+    setLocalDeviceState('online')
+    setLocalStatusMessage('Ticker Tap 0')
+  }, [targetPulse, targetBloom])
+
+  // Local shutdown sequence (fallback)
+  const runLocalShutdownSequence = useCallback(async () => {
+    setLocalDeviceState('shutdown')
+    setLocalStatusMessage('Disconnecting...')
+    await new Promise(r => setTimeout(r, 250))
+
+    setLocalStatusMessage('Flush buffer...')
+    setLocalKnobValues({ pulse: 0, bloom: 0 })
+    await new Promise(r => setTimeout(r, 200))
+
+    setLocalStatusMessage('Antenna off...')
+    setLocalBootPhase(0)
+    await new Promise(r => setTimeout(r, 200))
+
+    setLocalDeviceState('standby')
+    setLocalStatusMessage('Standby')
   }, [])
 
-  // Update knob values when tier changes (after boot)
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setKnobValues({ pulse: targetPulse, bloom: targetBloom })
-      setStatusMessage(TIER_NAMES.adapters[tier])
-    }
-  }, [tier, targetPulse, targetBloom, deviceState])
+  // Power toggle handler
+  const handlePowerToggle = async () => {
+    if (deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown') return
 
+    if (ecrManager) {
+      if (deviceState === 'standby') {
+        await ecrManager.powerOn()
+        onPowerChange?.(true)
+      } else if (deviceState === 'online') {
+        await ecrManager.powerOff()
+        onPowerChange?.(false)
+      }
+    } else {
+      // Local fallback
+      if (deviceState === 'standby') {
+        setLocalIsPowered(true)
+        await runLocalBootSequence()
+        onPowerChange?.(true)
+      } else if (deviceState === 'online') {
+        setLocalIsPowered(false)
+        await runLocalShutdownSequence()
+        onPowerChange?.(false)
+      }
+    }
+  }
+
+  // Test handler
   const handleTest = async () => {
     if (deviceState !== 'online') return
 
-    setDeviceState('testing')
-    setTestResult(null)
+    if (ecrManager) {
+      await ecrManager.runTest()
+    } else {
+      // Local fallback test sequence
+      setLocalDeviceState('testing')
+      setLocalTestResult(null)
 
-    const phases: NonNullable<RecorderTestPhase>[] = ['antenna', 'decoder', 'buffer', 'sync', 'output', 'complete']
-    const phaseMessages: Record<NonNullable<RecorderTestPhase>, string> = {
-      antenna: 'Testing antenna...',
-      decoder: 'Checking decoder...',
-      buffer: 'Verifying buffer...',
-      sync: 'Testing oracle sync...',
-      output: 'Output check...',
-      complete: 'Diagnostics complete',
+      const phases: ('antenna' | 'decoder' | 'buffer' | 'sync' | 'output' | 'complete')[] = ['antenna', 'decoder', 'buffer', 'sync', 'output', 'complete']
+      const phaseMessages = {
+        antenna: 'Testing antenna...',
+        decoder: 'Checking decoder...',
+        buffer: 'Verifying buffer...',
+        sync: 'Testing oracle sync...',
+        output: 'Output check...',
+        complete: 'Diagnostics complete',
+      }
+
+      for (const phase of phases) {
+        setLocalTestPhase(phase)
+        setLocalStatusMessage(phaseMessages[phase])
+        await new Promise(r => setTimeout(r, 280))
+      }
+
+      setLocalTestResult('pass')
+      setLocalTestPhase(null)
+      setLocalDeviceState('online')
+      setLocalStatusMessage('All tests PASSED')
+
+      setTimeout(() => {
+        setLocalTestResult(null)
+        setLocalStatusMessage('Ticker Tap ' + localTickerTap)
+      }, 3000)
     }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(phaseMessages[phase])
-      await new Promise(r => setTimeout(r, 280))
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('All tests PASSED')
     onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage(TIER_NAMES.adapters[tier])
-    }, 3000)
   }
 
+  // Reboot handler
   const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
+    if (deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'standby' || deviceState === 'shutdown') return
 
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    setStatusMessage('Disconnecting...')
-    await new Promise(r => setTimeout(r, 200))
-
-    setStatusMessage('Flush buffer...')
-    setKnobValues({ pulse: 0, bloom: 0 })
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('Antenna off...')
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 200))
-
-    setStatusMessage('Recorder offline')
-    await new Promise(r => setTimeout(r, 300))
-
-    // Boot sequence
-    setDeviceState('booting')
-    setStatusMessage('Antenna scan...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 200))
-
-    setStatusMessage('Decoder init...')
-    setBootPhase(2)
-    setKnobValues({ pulse: 20, bloom: 30 })
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('Buffer alloc...')
-    setBootPhase(3)
-    await new Promise(r => setTimeout(r, 200))
-
-    setStatusMessage('Oracle sync...')
-    setBootPhase(4)
-    setKnobValues({ pulse: targetPulse / 2, bloom: targetBloom / 2 })
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Signal lock...')
-    setBootPhase(5)
-    await new Promise(r => setTimeout(r, 250))
-
-    setKnobValues({ pulse: targetPulse, bloom: targetBloom })
-    setBootPhase(6)
-    setDeviceState('online')
-    setStatusMessage(TIER_NAMES.adapters[tier])
+    if (ecrManager) {
+      await ecrManager.reboot()
+    } else {
+      // Local fallback reboot
+      setLocalDeviceState('rebooting')
+      setLocalTestResult(null)
+      setLocalStatusMessage('Disconnecting...')
+      await new Promise(r => setTimeout(r, 200))
+      setLocalStatusMessage('Flush buffer...')
+      setLocalKnobValues({ pulse: 0, bloom: 0 })
+      await new Promise(r => setTimeout(r, 250))
+      setLocalStatusMessage('Antenna off...')
+      setLocalBootPhase(0)
+      await new Promise(r => setTimeout(r, 200))
+      setLocalStatusMessage('Recorder offline')
+      await new Promise(r => setTimeout(r, 300))
+      await runLocalBootSequence()
+    }
     onReset?.()
   }
 
+  // Knob change handler - syncs with context
+  const handleKnobChange = (knob: 'pulse' | 'bloom', value: number) => {
+    if (deviceState !== 'online') return
+
+    if (ecrManager) {
+      ecrManager.setKnobValue(knob, value)
+    } else {
+      setLocalKnobValues(prev => ({ ...prev, [knob]: value }))
+    }
+  }
+
+  // Auto-boot on mount (when no ECRManager)
+  useEffect(() => {
+    if (!ecrManager) {
+      runLocalBootSequence()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // LED color based on state
   const getLedColor = () => {
-    if (deviceState === 'offline' || deviceState === 'rebooting') return 'red'
+    if (deviceState === 'standby' || deviceState === 'shutdown') return 'red'
+    if (deviceState === 'rebooting') return 'amber'
     if (deviceState === 'booting') return 'amber'
     if (deviceState === 'testing') return 'cyan'
     if (testResult === 'pass') return 'green'
@@ -1649,11 +2213,86 @@ export function EchoRecorder({
     return status === 'active' ? 'green' : status === 'standby' ? 'amber' : 'red'
   }
 
-  const isLedOn = deviceState !== 'offline' && !(deviceState === 'rebooting' && bootPhase === 0)
+  const isLedOn = deviceState !== 'standby' && deviceState !== 'shutdown' && !(deviceState === 'rebooting' && bootPhaseNum === 0)
+
+  // Signal pulse power button - creative radio wave shape
+  const SignalPowerButton = () => {
+    const isOn = deviceState === 'online' || deviceState === 'testing'
+    const isTransitioning = deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting'
+    const canToggle = !isTransitioning && deviceState !== 'testing'
+
+    return (
+      <button
+        onClick={handlePowerToggle}
+        disabled={!canToggle}
+        className={cn(
+          'relative w-5 h-5 rounded transition-all duration-300',
+          canToggle ? 'cursor-pointer hover:scale-110' : 'cursor-not-allowed opacity-50',
+          isOn ? 'bg-[#1a1810]' : 'bg-[#0a0a0f]',
+        )}
+        title={isOn ? 'Power Off' : 'Power On'}
+        style={{
+          border: `1px solid ${isOn ? 'var(--neon-amber)' : 'rgba(255,255,255,0.2)'}`,
+          boxShadow: isOn ? '0 0 6px rgba(255,170,0,0.4), inset 0 0 3px rgba(255,170,0,0.1)' : 'none',
+        }}
+      >
+        {/* Radio signal waves emanating from center */}
+        <svg
+          viewBox="0 0 20 20"
+          className={cn(
+            'absolute inset-0 w-full h-full transition-all',
+            isTransitioning && 'animate-pulse'
+          )}
+        >
+          {/* Center dot (antenna) */}
+          <circle
+            cx="10"
+            cy="10"
+            r="2"
+            fill={isOn ? 'var(--neon-amber)' : 'rgba(255,255,255,0.3)'}
+            className={cn(isOn && isRecording && 'animate-pulse')}
+          />
+          {/* Signal waves */}
+          <path
+            d="M6,10 Q6,6 10,6"
+            fill="none"
+            stroke={isOn ? 'var(--neon-amber)' : 'rgba(255,255,255,0.2)'}
+            strokeWidth="1"
+            strokeLinecap="round"
+            opacity={isOn ? 0.8 : 0.3}
+          />
+          <path
+            d="M4,10 Q4,4 10,4"
+            fill="none"
+            stroke={isOn ? 'var(--neon-amber)' : 'rgba(255,255,255,0.15)'}
+            strokeWidth="1"
+            strokeLinecap="round"
+            opacity={isOn ? 0.5 : 0.2}
+          />
+          <path
+            d="M14,10 Q14,6 10,6"
+            fill="none"
+            stroke={isOn ? 'var(--neon-amber)' : 'rgba(255,255,255,0.2)'}
+            strokeWidth="1"
+            strokeLinecap="round"
+            opacity={isOn ? 0.8 : 0.3}
+          />
+          <path
+            d="M16,10 Q16,4 10,4"
+            fill="none"
+            stroke={isOn ? 'var(--neon-amber)' : 'rgba(255,255,255,0.15)'}
+            strokeWidth="1"
+            strokeLinecap="round"
+            opacity={isOn ? 0.5 : 0.2}
+          />
+        </svg>
+      </button>
+    )
+  }
 
   return (
     <PanelFrame variant="default" className={cn('p-2', className)}>
-      {/* Header */}
+      {/* Header with power button */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1.5">
           <LED on={isLedOn} color={getLedColor()} size="sm" />
@@ -1662,8 +2301,11 @@ export function EchoRecorder({
           </div>
         </div>
 
-        {/* Micro push buttons with nano LEDs */}
-        <div className="flex gap-1.5 items-center">
+        {/* Control cluster: Signal power + Test + Reset */}
+        <div className="flex gap-1 items-center">
+          {/* Signal-shaped Power Button */}
+          <SignalPowerButton />
+
           {/* Test button - push style with nano LED */}
           <button
             onClick={handleTest}
@@ -1679,7 +2321,6 @@ export function EchoRecorder({
               'shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]',
               deviceState === 'testing' && 'from-[#1a1a2a] to-[#2a2a3a]'
             )}>
-              {/* Nano LED inside button */}
               <div className={cn(
                 'w-1 h-1 rounded-full transition-all',
                 deviceState === 'testing'
@@ -1693,10 +2334,10 @@ export function EchoRecorder({
             </div>
           </button>
 
-          {/* Reset button - push style with nano LED */}
+          {/* Reset button */}
           <button
             onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
             className="group relative disabled:opacity-30"
             title="Reset"
           >
@@ -1708,7 +2349,6 @@ export function EchoRecorder({
               'shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]',
               (deviceState === 'rebooting' || deviceState === 'booting') && 'from-[#1a1a2a] to-[#2a2a3a]'
             )}>
-              {/* Nano LED inside button */}
               <div className={cn(
                 'w-1 h-1 rounded-full transition-all',
                 deviceState === 'rebooting' || deviceState === 'booting'
@@ -1720,37 +2360,66 @@ export function EchoRecorder({
         </div>
       </div>
 
-      {/* Tier name */}
+      {/* Tier name with ticker */}
       <div className={cn(
-        'font-mono text-[7px] text-white/40 mb-1.5 transition-opacity',
-        deviceState === 'booting' && bootPhase < 4 ? 'opacity-50' : 'opacity-100'
+        'font-mono text-[7px] text-white/40 mb-1.5 transition-opacity flex items-center justify-between',
+        deviceState === 'standby' || deviceState === 'shutdown' ? 'opacity-50' :
+        deviceState === 'booting' && bootPhaseNum < 4 ? 'opacity-50' : 'opacity-100'
       )}>
-        {TIER_NAMES.adapters[tier]}
+        <span>{deviceState === 'standby' ? 'Standby' : `Ticker Tap ${tickerTap}`}</span>
+        {/* Signal strength indicator */}
+        <div className="flex gap-px">
+          {[1, 2, 3, 4].map(i => (
+            <div
+              key={i}
+              className={cn(
+                'w-0.5 transition-all',
+                deviceState === 'online' && signalStrength >= i * 25
+                  ? 'bg-[var(--neon-amber)]'
+                  : 'bg-white/10'
+              )}
+              style={{ height: `${i * 2 + 2}px` }}
+            />
+          ))}
+        </div>
       </div>
 
-      {/* Knobs row */}
+      {/* Knobs row - interactive when online */}
       <div className={cn(
         'flex items-center gap-2 transition-opacity duration-300',
-        deviceState === 'booting' && bootPhase < 2 ? 'opacity-50' : 'opacity-100'
+        deviceState === 'standby' || deviceState === 'shutdown' ? 'opacity-30' :
+        deviceState === 'booting' && bootPhaseNum < 2 ? 'opacity-50' : 'opacity-100'
       )}>
         <div className={cn(
           'transition-all',
           deviceState === 'testing' && testPhase === 'antenna' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded-full'
         )}>
-          <Knob value={knobValues.pulse} onChange={() => {}} size="sm" label="PULSE" />
+          <Knob
+            value={knobValues.pulse}
+            onChange={(v) => handleKnobChange('pulse', v)}
+            size="sm"
+            label="PULSE"
+            disabled={deviceState !== 'online'}
+          />
         </div>
         <div className={cn(
           'transition-all',
           deviceState === 'testing' && testPhase === 'output' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded-full'
         )}>
-          <Knob value={knobValues.bloom} onChange={() => {}} size="sm" label="BLOOM" />
+          <Knob
+            value={knobValues.bloom}
+            onChange={(v) => handleKnobChange('bloom', v)}
+            size="sm"
+            label="BLOOM"
+            disabled={deviceState !== 'online'}
+          />
         </div>
 
         {/* Recording indicator */}
         <div className="flex-1 flex justify-end">
           <div className={cn(
             'w-1.5 h-1.5 rounded-full transition-all',
-            deviceState === 'online' && tier > 0
+            deviceState === 'online' && (isRecording || tier > 0)
               ? 'bg-[var(--neon-amber)] shadow-[0_0_6px_var(--neon-amber)] animate-pulse'
               : 'bg-white/10'
           )} />
@@ -1763,9 +2432,10 @@ export function EchoRecorder({
           'font-mono text-[5px] transition-colors truncate',
           deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
           deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+          deviceState === 'standby' || deviceState === 'shutdown' ? 'text-white/30' :
           testResult === 'pass' ? 'text-[var(--neon-green)]' :
           testResult === 'fail' ? 'text-[var(--neon-red)]' :
-          'text-white/30'
+          'text-[var(--neon-amber)]/70'
         )}>
           {statusMessage}
         </span>
@@ -1779,31 +2449,36 @@ export function EchoRecorder({
 // INTERPOLATOR - Optics tech tree visualization
 // Device ID: INT-001 | Version: 2.5.3
 // Compatible: HandmadeSynthesizer, Oscilloscope
-// unOS Commands: DEVICE INTERPOLATOR [TEST|RESET|STATUS]
-// Functions: Color interpolation, Era manipulation
+// unOS Commands: ipl [status|power|firmware|test|reset|info]
+// Functions: Color interpolation, Era manipulation, Prediction engine
+// Power: Full 20 E/s | Idle 6 E/s | Standby 1 E/s | Predictive 30 E/s
 // ==================================================
 interface InterpolatorProps {
   progress?: TechTreeProgress
   className?: string
   onTest?: () => void
   onReset?: () => void
+  onPowerChange?: (powered: boolean) => void
 }
-
-type InterpolatorState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type InterpolatorTestPhase = 'prism' | 'spectrum' | 'lens' | 'calibrate' | 'output' | 'complete' | null
 
 export function Interpolator({
   progress,
   className,
   onTest,
   onReset,
+  onPowerChange,
 }: InterpolatorProps) {
-  const [deviceState, setDeviceState] = useState<InterpolatorState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<InterpolatorTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Initializing...')
-  const [spectrumWidth, setSpectrumWidth] = useState(0)
+  // Use shared IPLManager context for bidirectional sync
+  const iplManager = useIPLManagerOptional()
+
+  // Derive all state from context when available
+  const deviceState = iplManager?.deviceState ?? 'booting'
+  const testPhase = iplManager?.testPhase ?? null
+  const testResult = iplManager?.testResult ?? null
+  const statusMessage = iplManager?.statusMessage ?? 'Initializing...'
+  const spectrumWidth = iplManager?.spectrumWidth ?? 0
+  const isPowered = iplManager?.isPowered ?? true
+  const bootPhase = iplManager?.bootPhase
 
   const tier = progress?.currentTier ?? 0
   const status = tier >= 2 ? 'active' : tier >= 1 ? 'standby' : 'offline'
@@ -1812,137 +2487,43 @@ export function Interpolator({
   const colors = ['#800000', '#ff0000', '#ff6600', '#ffff00', '#00ff00', '#0000ff', '#4b0082', '#9400d3', '#ff00ff']
   const maxColorIndex = Math.min(tier * 2, colors.length - 1)
 
-  // Boot sequence on mount
+  // Update tier in manager when progress changes
   useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Prism align...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 200))
-
-      setStatusMessage('Spectrum init...')
-      setBootPhase(2)
-      setSpectrumWidth(20)
-      await new Promise(r => setTimeout(r, 250))
-
-      setStatusMessage('Lens focus...')
-      setBootPhase(3)
-      setSpectrumWidth(50)
-      await new Promise(r => setTimeout(r, 200))
-
-      setStatusMessage('Wavelength cal...')
-      setBootPhase(4)
-      setSpectrumWidth(80)
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Output ready...')
-      setBootPhase(5)
-      await new Promise(r => setTimeout(r, 250))
-
-      setSpectrumWidth(100)
-      setBootPhase(6)
-      setDeviceState('online')
-      setStatusMessage(tier > 0 ? TIER_CAPABILITIES.optics[tier] : 'Awaiting upgrade')
+    if (iplManager && tier > 0) {
+      iplManager.updateTier(tier)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tier])
 
-    bootSequence()
-  }, [])
+  const handlePowerToggle = async () => {
+    if (!iplManager) return
+    if (deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing') return
 
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setStatusMessage(tier > 0 ? TIER_CAPABILITIES.optics[tier] : 'Awaiting upgrade')
+    if (isPowered && deviceState === 'online') {
+      await iplManager.powerOff()
+      onPowerChange?.(false)
+    } else if (!isPowered && deviceState === 'standby') {
+      await iplManager.powerOn()
+      onPowerChange?.(true)
     }
-  }, [tier, deviceState])
+  }
 
   const handleTest = async () => {
-    if (deviceState !== 'online') return
-
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<InterpolatorTestPhase>[] = ['prism', 'spectrum', 'lens', 'calibrate', 'output', 'complete']
-    const phaseMessages: Record<NonNullable<InterpolatorTestPhase>, string> = {
-      prism: 'Testing prism array...',
-      spectrum: 'Checking spectrum...',
-      lens: 'Verifying lens focus...',
-      calibrate: 'Calibration test...',
-      output: 'Output verification...',
-      complete: 'Diagnostics complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(phaseMessages[phase])
-      await new Promise(r => setTimeout(r, 280))
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('All tests PASSED')
+    if (!iplManager || deviceState !== 'online') return
+    await iplManager.runTest()
     onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage(tier > 0 ? TIER_CAPABILITIES.optics[tier] : 'Awaiting upgrade')
-    }, 3000)
   }
 
   const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    setStatusMessage('Shutting down...')
-    await new Promise(r => setTimeout(r, 200))
-
-    setStatusMessage('Retracting prism...')
-    setSpectrumWidth(50)
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('Lens park...')
-    setSpectrumWidth(0)
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 200))
-
-    setStatusMessage('Interpolator offline')
-    await new Promise(r => setTimeout(r, 300))
-
-    // Boot
-    setDeviceState('booting')
-    setStatusMessage('Prism align...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 200))
-
-    setStatusMessage('Spectrum init...')
-    setBootPhase(2)
-    setSpectrumWidth(20)
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('Lens focus...')
-    setBootPhase(3)
-    setSpectrumWidth(50)
-    await new Promise(r => setTimeout(r, 200))
-
-    setStatusMessage('Wavelength cal...')
-    setBootPhase(4)
-    setSpectrumWidth(80)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Output ready...')
-    setBootPhase(5)
-    await new Promise(r => setTimeout(r, 250))
-
-    setSpectrumWidth(100)
-    setBootPhase(6)
-    setDeviceState('online')
-    setStatusMessage(tier > 0 ? TIER_CAPABILITIES.optics[tier] : 'Awaiting upgrade')
+    if (!iplManager) return
+    if (deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'standby' || deviceState === 'shutdown') return
+    await iplManager.reboot()
     onReset?.()
   }
 
   const getLedColor = () => {
-    if (deviceState === 'offline' || deviceState === 'rebooting') return 'red'
+    if (!isPowered || deviceState === 'standby' || deviceState === 'shutdown') return 'red'
+    if (deviceState === 'rebooting') return 'red'
     if (deviceState === 'booting') return 'amber'
     if (deviceState === 'testing') return 'cyan'
     if (testResult === 'pass') return 'green'
@@ -1950,11 +2531,11 @@ export function Interpolator({
     return status === 'active' ? 'green' : status === 'standby' ? 'amber' : 'red'
   }
 
-  const isLedOn = deviceState !== 'offline' && !(deviceState === 'rebooting' && bootPhase === 0)
+  const isLedOn = isPowered && deviceState !== 'standby' && deviceState !== 'shutdown'
 
   return (
     <PanelFrame variant="military" className={cn('p-2', className)}>
-      {/* Header with LED and micro toggle buttons */}
+      {/* Header with LED, power button, and micro toggle buttons */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1.5">
           <LED on={isLedOn} color={getLedColor()} size="sm" />
@@ -1963,8 +2544,51 @@ export function Interpolator({
           </div>
         </div>
 
-        {/* Micro toggle switch style buttons */}
         <div className="flex gap-1 items-center">
+          {/* Prism-shaped power button - tiny triangle */}
+          <button
+            onClick={handlePowerToggle}
+            disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
+            className="group relative disabled:opacity-30"
+            title={isPowered && deviceState === 'online' ? 'Power Off' : 'Power On'}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" className="transition-all">
+              {/* Prism triangle */}
+              <polygon
+                points="5,1 9,9 1,9"
+                fill="none"
+                stroke={isPowered && deviceState === 'online' ? 'var(--neon-lime, #bfff00)' : '#3a3a4a'}
+                strokeWidth="0.8"
+                className="transition-all"
+              />
+              {/* Inner refraction lines when powered */}
+              {isPowered && deviceState === 'online' && (
+                <>
+                  <line x1="4" y1="4" x2="2.5" y2="8" stroke="#ff0000" strokeWidth="0.4" opacity="0.7" />
+                  <line x1="5" y1="4" x2="5" y2="8" stroke="#00ff00" strokeWidth="0.4" opacity="0.7" />
+                  <line x1="6" y1="4" x2="7.5" y2="8" stroke="#0066ff" strokeWidth="0.4" opacity="0.7" />
+                </>
+              )}
+              {/* Center dot */}
+              <circle
+                cx="5" cy="6"
+                r="0.8"
+                fill={isPowered && deviceState === 'online' ? 'var(--neon-lime, #bfff00)' : '#2a2a3a'}
+                className="transition-all"
+              >
+                {isPowered && deviceState === 'online' && (
+                  <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" />
+                )}
+              </circle>
+            </svg>
+            {/* Glow effect */}
+            {isPowered && deviceState === 'online' && (
+              <div className="absolute inset-0 rounded-full opacity-30"
+                style={{ boxShadow: '0 0 4px var(--neon-lime, #bfff00)' }}
+              />
+            )}
+          </button>
+
           {/* Test - toggle switch */}
           <button
             onClick={handleTest}
@@ -1978,7 +2602,6 @@ export function Interpolator({
               'border border-[#3a3a4a]',
               'shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]'
             )}>
-              {/* Toggle knob with nano LED */}
               <div className={cn(
                 'absolute top-0 h-2 w-2 rounded-full transition-all',
                 'bg-gradient-to-b from-[#4a4a5a] to-[#2a2a3a]',
@@ -2003,7 +2626,7 @@ export function Interpolator({
           {/* Reset - toggle switch */}
           <button
             onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
             className="group relative disabled:opacity-30"
             title="Reset"
           >
@@ -2035,7 +2658,7 @@ export function Interpolator({
       {/* Tier name */}
       <div className={cn(
         'font-mono text-[7px] text-white/40 mb-1 transition-opacity',
-        deviceState === 'booting' && bootPhase < 3 ? 'opacity-50' : 'opacity-100'
+        deviceState === 'booting' && bootPhase ? 'opacity-50' : 'opacity-100'
       )}>
         {TIER_NAMES.optics[tier]}
       </div>
@@ -2047,7 +2670,7 @@ export function Interpolator({
           deviceState === 'testing' && testPhase === 'spectrum' && 'ring-1 ring-[var(--neon-cyan)]/50'
         )}
       >
-        {tier > 0 && deviceState !== 'offline' ? (
+        {tier > 0 && isPowered && deviceState !== 'standby' && deviceState !== 'shutdown' ? (
           <div
             className="h-full transition-all duration-500"
             style={{
@@ -2058,7 +2681,7 @@ export function Interpolator({
           />
         ) : (
           <span className="font-mono text-[8px] text-white/30">
-            {deviceState === 'booting' ? 'LOADING...' : 'OFFLINE'}
+            {deviceState === 'booting' ? 'LOADING...' : !isPowered || deviceState === 'standby' ? 'STANDBY' : 'OFFLINE'}
           </span>
         )}
 
@@ -2077,6 +2700,7 @@ export function Interpolator({
           'font-mono text-[5px] transition-colors truncate flex-1',
           deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
           deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+          !isPowered || deviceState === 'standby' ? 'text-white/20' :
           testResult === 'pass' ? 'text-[var(--neon-green)]' :
           testResult === 'fail' ? 'text-[var(--neon-red)]' :
           tier > 0 ? 'text-[var(--neon-lime,#bfff00)]' : 'text-white/30'
@@ -4294,183 +4918,79 @@ export function NanoSynthesizer({
 // MICROFUSION REACTOR - Tier 2 Tech power source
 // Device ID: MFR-001 | Version: 2.3.0
 // Compatible: EnergyCore, BatteryPack, QuantumAnalyzer
-// unOS Commands: DEVICE REACTOR [TEST|REBOOT|STATUS]
+// unOS Commands: mfr [status|power|firmware|test|reset|info]
 // Functions: Power generation, Plasma containment
+// Power: Full +250 E/s | Idle +150 E/s | Standby +25 E/s | Startup -500 E
 // ==================================================
 interface MicrofusionReactorProps {
-  powerOutput?: number
-  stability?: number
-  isOnline?: boolean
   className?: string
   onTest?: () => void
   onReset?: () => void
+  onPowerChange?: (powered: boolean) => void
 }
 
-type ReactorState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type ReactorTestPhase = 'plasma' | 'containment' | 'coolant' | 'output' | 'safety' | 'complete' | null
-
 export function MicrofusionReactor({
-  powerOutput = 847,
-  stability = 94,
-  isOnline = true,
   className,
   onTest,
   onReset,
+  onPowerChange,
 }: MicrofusionReactorProps) {
-  const [deviceState, setDeviceState] = useState<ReactorState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<ReactorTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Initializing...')
-  const [displayValues, setDisplayValues] = useState({ power: 0, stability: 0, ringSpeed: 0 })
+  // Use shared MFRManager context for bidirectional sync
+  const mfrManager = useMFRManagerOptional()
 
-  // Boot sequence on mount
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Plasma ignition...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 300))
+  // Derive all state from context when available
+  const deviceState = mfrManager?.deviceState ?? 'booting'
+  const bootPhase = mfrManager?.bootPhase
+  const testPhase = mfrManager?.testPhase ?? null
+  const testResult = mfrManager?.testResult ?? null
+  const statusMessage = mfrManager?.statusMessage ?? 'Initializing...'
+  const isPowered = mfrManager?.isPowered ?? true
+  const powerOutput = mfrManager?.powerOutput ?? 0
+  const stability = mfrManager?.stability ?? 0
+  const ringSpeed = mfrManager?.ringSpeed ?? 0
 
-      setStatusMessage('Containment field...')
-      setBootPhase(2)
-      setDisplayValues({ power: 0, stability: 20, ringSpeed: 0.3 })
-      await new Promise(r => setTimeout(r, 350))
+  const handlePowerToggle = async () => {
+    if (!mfrManager) return
+    if (deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing') return
 
-      setStatusMessage('Coolant flow...')
-      setBootPhase(3)
-      setDisplayValues({ power: 200, stability: 50, ringSpeed: 0.5 })
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Power ramp...')
-      setBootPhase(4)
-      setDisplayValues({ power: 500, stability: 75, ringSpeed: 0.8 })
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Stabilizing...')
-      setBootPhase(5)
-      await new Promise(r => setTimeout(r, 400))
-
-      // Final boot
-      setDisplayValues({ power: powerOutput, stability: stability, ringSpeed: 1 })
-      setBootPhase(6)
-      setDeviceState('online')
-      setStatusMessage(`${stability}% STABLE`)
+    if (isPowered && deviceState === 'online') {
+      await mfrManager.powerOff()
+      onPowerChange?.(false)
+    } else if (!isPowered && deviceState === 'standby') {
+      await mfrManager.powerOn()
+      onPowerChange?.(true)
     }
-
-    bootSequence()
-  }, [])
-
-  // Update values when props change (after boot)
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayValues({ power: powerOutput, stability: stability, ringSpeed: 1 })
-      setStatusMessage(`${stability}% STABLE`)
-    }
-  }, [powerOutput, stability, deviceState])
+  }
 
   const handleTest = async () => {
-    if (deviceState !== 'online') return
-
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<ReactorTestPhase>[] = ['plasma', 'containment', 'coolant', 'output', 'safety', 'complete']
-    const phaseMessages: Record<NonNullable<ReactorTestPhase>, string> = {
-      plasma: 'Testing plasma density...',
-      containment: 'Checking containment...',
-      coolant: 'Verifying coolant...',
-      output: 'Testing power output...',
-      safety: 'Safety systems check...',
-      complete: 'Diagnostics complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(phaseMessages[phase])
-      await new Promise(r => setTimeout(r, 350))
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('All tests PASSED')
+    if (!mfrManager || deviceState !== 'online') return
+    await mfrManager.runTest()
     onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage(`${stability}% STABLE`)
-    }, 3000)
   }
 
   const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    setStatusMessage('SCRAM initiated...')
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Plasma cooling...')
-    setDisplayValues(prev => ({ ...prev, power: 200, ringSpeed: 0.3 }))
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Field collapse...')
-    setDisplayValues({ power: 0, stability: 0, ringSpeed: 0 })
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Reactor offline')
-    await new Promise(r => setTimeout(r, 400))
-
-    // Boot sequence
-    setDeviceState('booting')
-    setStatusMessage('Plasma ignition...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Containment field...')
-    setBootPhase(2)
-    setDisplayValues({ power: 0, stability: 20, ringSpeed: 0.3 })
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Coolant flow...')
-    setBootPhase(3)
-    setDisplayValues({ power: 200, stability: 50, ringSpeed: 0.5 })
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Power ramp...')
-    setBootPhase(4)
-    setDisplayValues({ power: 500, stability: 75, ringSpeed: 0.8 })
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Stabilizing...')
-    setBootPhase(5)
-    await new Promise(r => setTimeout(r, 400))
-
-    setDisplayValues({ power: powerOutput, stability: stability, ringSpeed: 1 })
-    setBootPhase(6)
-    setDeviceState('online')
-    setStatusMessage(`${stability}% STABLE`)
+    if (!mfrManager) return
+    if (deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'standby' || deviceState === 'shutdown') return
+    await mfrManager.reboot()
     onReset?.()
   }
 
   const getLedColor = () => {
-    if (deviceState === 'offline' || deviceState === 'rebooting') return 'red'
+    if (!isPowered || deviceState === 'standby' || deviceState === 'shutdown') return 'red'
+    if (deviceState === 'rebooting') return 'red'
     if (deviceState === 'booting') return 'amber'
     if (deviceState === 'testing') return 'cyan'
     if (testResult === 'pass') return 'green'
     if (testResult === 'fail') return 'red'
-    return displayValues.stability > 80 ? 'green' : 'amber'
+    return stability > 80 ? 'green' : 'amber'
   }
 
-  const isLedOn = deviceState !== 'offline' && !(deviceState === 'rebooting' && bootPhase === 0)
-  const coreActive = deviceState === 'online' || deviceState === 'testing' || (deviceState === 'booting' && bootPhase >= 2)
+  const isLedOn = isPowered && deviceState !== 'standby' && deviceState !== 'shutdown'
+  const coreActive = isPowered && (deviceState === 'online' || deviceState === 'testing' || (deviceState === 'booting' && bootPhase && bootPhase !== 'ignition'))
 
   return (
     <PanelFrame variant="default" className={cn('p-2', className)}>
-      {/* Header with nano LED buttons */}
+      {/* Header with power button and nano LED buttons */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1.5">
           <LED on={isLedOn} color={getLedColor()} size="sm" />
@@ -4479,8 +4999,68 @@ export function MicrofusionReactor({
           </div>
         </div>
 
-        {/* Micro nano LED buttons - hexagonal style */}
+        {/* Controls: Atomic power button + hexagonal test/reboot */}
         <div className="flex items-center gap-1">
+          {/* Atomic power button - concentric rings with core */}
+          <button
+            onClick={handlePowerToggle}
+            disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
+            className="group relative disabled:opacity-30"
+            title={isPowered && deviceState === 'online' ? 'SCRAM (Power Off)' : 'Ignite (Power On)'}
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" className="transition-all">
+              {/* Outer electron orbit */}
+              <ellipse
+                cx="6" cy="6" rx="5" ry="2.5"
+                fill="none"
+                stroke={isPowered && deviceState === 'online' ? 'var(--neon-cyan)' : '#3a3a4a'}
+                strokeWidth="0.4"
+                transform="rotate(0 6 6)"
+                opacity="0.6"
+              />
+              <ellipse
+                cx="6" cy="6" rx="5" ry="2.5"
+                fill="none"
+                stroke={isPowered && deviceState === 'online' ? 'var(--neon-cyan)' : '#3a3a4a'}
+                strokeWidth="0.4"
+                transform="rotate(60 6 6)"
+                opacity="0.6"
+              />
+              <ellipse
+                cx="6" cy="6" rx="5" ry="2.5"
+                fill="none"
+                stroke={isPowered && deviceState === 'online' ? 'var(--neon-cyan)' : '#3a3a4a'}
+                strokeWidth="0.4"
+                transform="rotate(120 6 6)"
+                opacity="0.6"
+              />
+              {/* Nucleus core */}
+              <circle
+                cx="6" cy="6"
+                r="1.5"
+                fill={isPowered && deviceState === 'online' ? 'var(--neon-cyan)' : '#2a2a3a'}
+                className="transition-all"
+              >
+                {isPowered && deviceState === 'online' && (
+                  <animate attributeName="r" values="1.5;1.8;1.5" dur="1.5s" repeatCount="indefinite" />
+                )}
+              </circle>
+              {/* Inner glow */}
+              {isPowered && deviceState === 'online' && (
+                <circle cx="6" cy="6" r="0.6" fill="#ffffff" opacity="0.8">
+                  <animate attributeName="opacity" values="0.8;0.4;0.8" dur="1s" repeatCount="indefinite" />
+                </circle>
+              )}
+            </svg>
+            {/* Glow effect */}
+            {isPowered && deviceState === 'online' && (
+              <div className="absolute inset-0 rounded-full opacity-30"
+                style={{ boxShadow: '0 0 6px var(--neon-cyan)' }}
+              />
+            )}
+          </button>
+
+          {/* Test - hexagonal */}
           <button
             onClick={handleTest}
             disabled={deviceState !== 'online'}
@@ -4490,7 +5070,6 @@ export function MicrofusionReactor({
             <div className={cn(
               'w-2.5 h-2.5 transition-all',
               'bg-[#0a0a0f] border border-[var(--neon-cyan)]/30',
-              'clip-path-hexagon',
               'flex items-center justify-center',
               'group-hover:border-[var(--neon-cyan)]/60'
             )}
@@ -4508,9 +5087,11 @@ export function MicrofusionReactor({
               )} />
             </div>
           </button>
+
+          {/* Reboot - hexagonal */}
           <button
             onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
             className="group relative disabled:opacity-30"
             title="Reboot"
           >
@@ -4548,9 +5129,9 @@ export function MicrofusionReactor({
               width: `${ring * 25}%`,
               height: `${ring * 50}%`,
               borderColor: coreActive ? 'var(--neon-cyan)' : '#333',
-              opacity: coreActive ? (0.3 + ring * 0.15) * displayValues.ringSpeed : 0.1,
-              animation: coreActive && displayValues.ringSpeed > 0
-                ? `spin ${(3 + ring) / displayValues.ringSpeed}s linear infinite ${ring % 2 === 0 ? 'reverse' : ''}`
+              opacity: coreActive ? (0.3 + ring * 0.15) * ringSpeed : 0.1,
+              animation: coreActive && ringSpeed > 0
+                ? `spin ${(3 + ring) / ringSpeed}s linear infinite ${ring % 2 === 0 ? 'reverse' : ''}`
                 : 'none',
             }}
           />
@@ -4562,8 +5143,8 @@ export function MicrofusionReactor({
             background: coreActive
               ? `radial-gradient(circle, #fff 0%, var(--neon-cyan) 60%, transparent 100%)`
               : '#333',
-            boxShadow: coreActive ? `0 0 ${10 + displayValues.ringSpeed * 10}px var(--neon-cyan)` : 'none',
-            opacity: deviceState === 'booting' ? 0.5 + bootPhase * 0.1 : 1,
+            boxShadow: coreActive ? `0 0 ${10 + ringSpeed * 10}px var(--neon-cyan)` : 'none',
+            opacity: deviceState === 'booting' ? 0.6 : 1,
           }}
         />
 
@@ -4571,20 +5152,29 @@ export function MicrofusionReactor({
         {deviceState === 'testing' && testPhase === 'plasma' && (
           <div className="absolute inset-0 bg-[var(--neon-cyan)]/10 animate-pulse" />
         )}
+
+        {/* Standby indicator */}
+        {(!isPowered || deviceState === 'standby') && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="font-mono text-[8px] text-white/30">STANDBY</span>
+          </div>
+        )}
       </div>
 
       {/* Status bar with values - fixed layout to prevent shifts */}
       <div className="flex items-center font-mono text-[7px] mt-1 pt-1 border-t border-white/5">
         <span className={cn(
           'w-10 shrink-0 transition-colors',
-          deviceState === 'booting' && bootPhase < 4 ? 'text-white/30' : 'text-[var(--neon-cyan)]'
+          !isPowered || deviceState === 'standby' ? 'text-white/20' :
+          deviceState === 'booting' ? 'text-white/30' : 'text-[var(--neon-cyan)]'
         )}>
-          {displayValues.power} MW
+          {Math.round(powerOutput)} MW
         </span>
         <span className={cn(
           'flex-1 text-[5px] text-center transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
           deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
           deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+          !isPowered || deviceState === 'standby' ? 'text-white/20' :
           testResult === 'pass' ? 'text-[var(--neon-green)]' :
           testResult === 'fail' ? 'text-[var(--neon-red)]' :
           'text-white/30'
@@ -4593,9 +5183,10 @@ export function MicrofusionReactor({
         </span>
         <span className={cn(
           'w-6 shrink-0 text-right transition-colors',
-          displayValues.stability > 80 ? 'text-[var(--neon-green)]' : 'text-[var(--neon-amber)]'
+          !isPowered || deviceState === 'standby' ? 'text-white/20' :
+          stability > 80 ? 'text-[var(--neon-green)]' : 'text-[var(--neon-amber)]'
         )}>
-          {displayValues.stability}%
+          {Math.round(stability)}%
         </span>
       </div>
     </PanelFrame>
@@ -4604,167 +5195,53 @@ export function MicrofusionReactor({
 
 // ==================================================
 // AI ASSISTANT CORE - Tier 2 Tech automation
+// Uses AICManager context for bidirectional sync
 // ==================================================
-type AIState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type AITestPhase = 'neural' | 'memory' | 'logic' | 'learning' | 'optimization' | 'complete' | null
+import { useAICManagerOptional } from '@/contexts/AICManager'
 
 interface AIAssistantProps {
-  taskQueue?: number
-  efficiency?: number
-  isLearning?: boolean
   className?: string
-  onTest?: () => void
-  onReset?: () => void
 }
 
-export function AIAssistant({
-  taskQueue = 7,
-  efficiency = 156,
-  isLearning = true,
-  className,
-  onTest,
-  onReset,
-}: AIAssistantProps) {
-  const [deviceState, setDeviceState] = useState<AIState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<AITestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Initializing...')
-  const [displayValues, setDisplayValues] = useState({ queue: 0, efficiency: 0, nodeActivity: [0, 0, 0, 0, 0] })
+export function AIAssistant({ className }: AIAssistantProps) {
+  const aicManager = useAICManagerOptional()
 
-  // Boot sequence on mount
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Loading neural core...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 350))
+  // Get state from context with fallbacks
+  const deviceState = aicManager?.deviceState ?? 'standby'
+  const bootPhase = aicManager?.bootPhase
+  const testPhase = aicManager?.testPhase
+  const testResult = aicManager?.testResult ?? null
+  const statusMessage = aicManager?.statusMessage ?? 'No context'
+  const isPowered = aicManager?.isPowered ?? false
+  const taskQueue = aicManager?.taskQueue ?? 0
+  const efficiency = aicManager?.efficiency ?? 0
+  const isLearning = aicManager?.isLearning ?? false
+  const nodeActivity = aicManager?.nodeActivity ?? [0, 0, 0, 0, 0]
 
-      setStatusMessage('Initializing memory banks...')
-      setBootPhase(2)
-      setDisplayValues({ queue: 0, efficiency: 20, nodeActivity: [0.3, 0, 0, 0, 0] })
-      await new Promise(r => setTimeout(r, 300))
+  const handlePowerToggle = async () => {
+    if (!aicManager) return
+    if (deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing') return
 
-      setStatusMessage('Activating nodes...')
-      setBootPhase(3)
-      setDisplayValues({ queue: 2, efficiency: 50, nodeActivity: [0.5, 0.4, 0.3, 0, 0] })
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Training models...')
-      setBootPhase(4)
-      setDisplayValues({ queue: 4, efficiency: 80, nodeActivity: [0.7, 0.6, 0.5, 0.4, 0.3] })
-      await new Promise(r => setTimeout(r, 400))
-
-      setStatusMessage('Calibrating efficiency...')
-      setBootPhase(5)
-      await new Promise(r => setTimeout(r, 300))
-
-      // Final boot
-      setDisplayValues({ queue: taskQueue, efficiency: efficiency, nodeActivity: [0.9, 0.8, 0.7, 0.8, 0.9] })
-      setBootPhase(6)
-      setDeviceState('online')
-      setStatusMessage('LEARNING')
+    if (deviceState === 'standby') {
+      await aicManager.powerOn()
+    } else if (deviceState === 'online') {
+      await aicManager.powerOff()
     }
-
-    bootSequence()
-  }, [])
-
-  // Update values when props change (after boot)
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayValues(prev => ({ ...prev, queue: taskQueue, efficiency: efficiency }))
-    }
-  }, [taskQueue, efficiency, deviceState])
+  }
 
   const handleTest = async () => {
-    if (deviceState !== 'online') return
-
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<AITestPhase>[] = ['neural', 'memory', 'logic', 'learning', 'optimization', 'complete']
-    const phaseMessages: Record<NonNullable<AITestPhase>, string> = {
-      neural: 'Testing neural pathways...',
-      memory: 'Verifying memory integrity...',
-      logic: 'Checking logic gates...',
-      learning: 'Validating learning rate...',
-      optimization: 'Benchmarking optimizer...',
-      complete: 'Diagnostics complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(phaseMessages[phase])
-      await new Promise(r => setTimeout(r, 380))
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('All tests PASSED')
-    onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('LEARNING')
-    }, 3000)
+    if (!aicManager || deviceState !== 'online') return
+    await aicManager.runTest()
   }
 
   const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    setStatusMessage('Saving state...')
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Halting processes...')
-    setDisplayValues(prev => ({ ...prev, queue: 0, nodeActivity: [0.3, 0.2, 0.1, 0, 0] }))
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Neural shutdown...')
-    setDisplayValues({ queue: 0, efficiency: 0, nodeActivity: [0, 0, 0, 0, 0] })
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Core offline')
-    await new Promise(r => setTimeout(r, 400))
-
-    // Boot sequence
-    setDeviceState('booting')
-    setStatusMessage('Loading neural core...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Initializing memory banks...')
-    setBootPhase(2)
-    setDisplayValues({ queue: 0, efficiency: 20, nodeActivity: [0.3, 0, 0, 0, 0] })
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Activating nodes...')
-    setBootPhase(3)
-    setDisplayValues({ queue: 2, efficiency: 50, nodeActivity: [0.5, 0.4, 0.3, 0, 0] })
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Training models...')
-    setBootPhase(4)
-    setDisplayValues({ queue: 4, efficiency: 80, nodeActivity: [0.7, 0.6, 0.5, 0.4, 0.3] })
-    await new Promise(r => setTimeout(r, 400))
-
-    setStatusMessage('Calibrating efficiency...')
-    setBootPhase(5)
-    await new Promise(r => setTimeout(r, 300))
-
-    setDisplayValues({ queue: taskQueue, efficiency: efficiency, nodeActivity: [0.9, 0.8, 0.7, 0.8, 0.9] })
-    setBootPhase(6)
-    setDeviceState('online')
-    setStatusMessage('LEARNING')
-    onReset?.()
+    if (!aicManager) return
+    if (deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'standby' || deviceState === 'shutdown') return
+    await aicManager.reboot()
   }
 
   const getLedColor = () => {
-    if (deviceState === 'offline' || deviceState === 'rebooting') return 'red'
+    if (deviceState === 'standby' || deviceState === 'shutdown' || deviceState === 'rebooting') return 'red'
     if (deviceState === 'booting') return 'amber'
     if (deviceState === 'testing') return 'cyan'
     if (testResult === 'pass') return 'green'
@@ -4772,14 +5249,111 @@ export function AIAssistant({
     return 'green'
   }
 
-  const isLedOn = deviceState !== 'offline' && !(deviceState === 'rebooting' && bootPhase === 0)
-  const nodesActive = deviceState === 'online' || deviceState === 'testing' || (deviceState === 'booting' && bootPhase >= 3)
+  const isLedOn = deviceState !== 'standby' && deviceState !== 'shutdown' && !(deviceState === 'rebooting' && !bootPhase)
+  const nodesActive = deviceState === 'online' || deviceState === 'testing' || (deviceState === 'booting' && bootPhase && ['nodes', 'training', 'calibrate', 'ready'].includes(bootPhase))
+  const isTransitioning = deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting'
 
   return (
     <PanelFrame variant="default" className={cn('p-2', className)}>
-      {/* Header with worn rubber micro buttons */}
+      {/* Header with neural brain power button */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1.5">
+          {/* Neural Brain Power Button - tiny creative button */}
+          <button
+            onClick={handlePowerToggle}
+            disabled={isTransitioning || deviceState === 'testing'}
+            className="group relative disabled:opacity-50"
+            title={isPowered ? 'Power Off' : 'Power On'}
+          >
+            <div className={cn(
+              'w-4 h-4 rounded-full relative transition-all duration-300',
+              'border',
+              isPowered
+                ? 'border-[var(--neon-green)]/60 bg-[#0a1a0f]'
+                : 'border-white/20 bg-[#0a0a0a]',
+              'group-hover:border-[var(--neon-green)]/80',
+              'group-active:scale-95',
+              isTransitioning && 'animate-pulse'
+            )}
+            style={{
+              boxShadow: isPowered
+                ? '0 0 6px var(--neon-green), inset 0 0 4px rgba(0,255,100,0.2)'
+                : 'inset 0 1px 3px rgba(0,0,0,0.8)',
+            }}
+            >
+              {/* Neural brain pattern - 3 lobes */}
+              <svg viewBox="0 0 16 16" className="absolute inset-0 w-full h-full">
+                {/* Left lobe */}
+                <ellipse
+                  cx="5.5"
+                  cy="8"
+                  rx="2.5"
+                  ry="3"
+                  fill="none"
+                  stroke={isPowered ? 'var(--neon-green)' : '#333'}
+                  strokeWidth="0.5"
+                  className="transition-all duration-300"
+                  style={{
+                    opacity: isPowered ? 0.8 : 0.3,
+                    filter: isPowered ? 'drop-shadow(0 0 2px var(--neon-green))' : 'none',
+                  }}
+                />
+                {/* Right lobe */}
+                <ellipse
+                  cx="10.5"
+                  cy="8"
+                  rx="2.5"
+                  ry="3"
+                  fill="none"
+                  stroke={isPowered ? 'var(--neon-green)' : '#333'}
+                  strokeWidth="0.5"
+                  className="transition-all duration-300"
+                  style={{
+                    opacity: isPowered ? 0.8 : 0.3,
+                    filter: isPowered ? 'drop-shadow(0 0 2px var(--neon-green))' : 'none',
+                  }}
+                />
+                {/* Central connection (corpus callosum) */}
+                <line
+                  x1="6"
+                  y1="8"
+                  x2="10"
+                  y2="8"
+                  stroke={isPowered ? 'var(--neon-green)' : '#333'}
+                  strokeWidth="0.5"
+                  className="transition-all duration-300"
+                  style={{ opacity: isPowered ? 0.6 : 0.2 }}
+                />
+                {/* Synaptic nodes - firing when active */}
+                {[
+                  { cx: 4, cy: 6.5 },
+                  { cx: 5.5, cy: 5.5 },
+                  { cx: 7, cy: 7 },
+                  { cx: 9, cy: 7 },
+                  { cx: 10.5, cy: 5.5 },
+                  { cx: 12, cy: 6.5 },
+                  { cx: 5, cy: 9.5 },
+                  { cx: 8, cy: 10 },
+                  { cx: 11, cy: 9.5 },
+                ].map((node, i) => (
+                  <circle
+                    key={i}
+                    cx={node.cx}
+                    cy={node.cy}
+                    r={isPowered && isLearning ? 0.6 : 0.4}
+                    fill={isPowered ? 'var(--neon-green)' : '#222'}
+                    className="transition-all duration-300"
+                    style={{
+                      opacity: isPowered ? 0.4 + (nodeActivity[i % 5] || 0) * 0.6 : 0.2,
+                      filter: isPowered ? `drop-shadow(0 0 ${1 + (nodeActivity[i % 5] || 0) * 2}px var(--neon-green))` : 'none',
+                      animation: isPowered && isLearning ? `pulse ${0.6 + i * 0.15}s ease-in-out infinite` : 'none',
+                    }}
+                  />
+                ))}
+              </svg>
+            </div>
+          </button>
+
           <LED on={isLedOn} color={getLedColor()} size="sm" />
           <div className="font-mono text-[9px] text-[var(--neon-green)]">
             AI ASSISTANT CORE
@@ -4832,7 +5406,7 @@ export function AIAssistant({
           </button>
           <button
             onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
             className="group relative disabled:opacity-30"
             title="Reboot"
           >
@@ -4888,9 +5462,9 @@ export function AIAssistant({
                   deviceState === 'testing' && testPhase === 'neural' && 'ring-1 ring-[var(--neon-cyan)]'
                 )}
                 style={{
-                  opacity: nodesActive ? 0.4 + displayValues.nodeActivity[node] * 0.6 : 0.2,
+                  opacity: nodesActive ? 0.4 + nodeActivity[node] * 0.6 : 0.2,
                   animation: nodesActive && isLearning ? `pulse ${0.8 + node * 0.1}s ease-in-out infinite` : 'none',
-                  boxShadow: nodesActive ? `0 0 ${4 + displayValues.nodeActivity[node] * 4}px var(--neon-green)` : 'none',
+                  boxShadow: nodesActive ? `0 0 ${4 + nodeActivity[node] * 4}px var(--neon-green)` : 'none',
                 }}
               />
               <div
@@ -4931,9 +5505,9 @@ export function AIAssistant({
       <div className="flex items-center font-mono text-[7px] mt-1">
         <span className={cn(
           'w-12 shrink-0 transition-colors',
-          deviceState === 'booting' && bootPhase < 3 ? 'text-white/30' : 'text-white/40'
+          deviceState === 'booting' && bootPhase && ['neural', 'memory'].includes(bootPhase) ? 'text-white/30' : 'text-white/40'
         )}>
-          QUEUE: {displayValues.queue}
+          QUEUE: {taskQueue}
         </span>
         <span className={cn(
           'flex-1 text-[5px] text-center transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
@@ -4941,6 +5515,7 @@ export function AIAssistant({
           deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
           testResult === 'pass' ? 'text-[var(--neon-green)]' :
           testResult === 'fail' ? 'text-[var(--neon-red)]' :
+          deviceState === 'standby' ? 'text-white/20' :
           'text-white/30'
         )}>
           {statusMessage}
@@ -4949,7 +5524,7 @@ export function AIAssistant({
           'w-12 shrink-0 text-right transition-colors',
           nodesActive ? 'text-[var(--neon-green)]' : 'text-white/30'
         )}>
-          {displayValues.efficiency}% EFF
+          {efficiency}% EFF
         </span>
       </div>
     </PanelFrame>
@@ -4959,9 +5534,6 @@ export function AIAssistant({
 // ==================================================
 // EXPLORER DRONE - Tier 2 Tools field unit
 // ==================================================
-type DroneState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type DroneTestPhase = 'motors' | 'gps' | 'camera' | 'radio' | 'battery' | 'gyro' | 'complete' | null
-
 interface ExplorerDroneProps {
   range?: number
   battery?: number
@@ -4976,179 +5548,98 @@ export function ExplorerDrone({
   battery = 78,
   isDeployed = true,
   className,
-  onTest,
-  onReset,
 }: ExplorerDroneProps) {
-  const [deviceState, setDeviceState] = useState<DroneState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<DroneTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Initializing...')
-  const [displayValues, setDisplayValues] = useState({ range: 0, battery: 0, radarActive: false })
+  const exdManager = useEXDManagerOptional()
 
-  // Boot sequence on mount
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Power on...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 300))
+  // Derive all state from manager when available, otherwise use props
+  const deviceState = exdManager?.deviceState ?? 'online'
+  const testPhase = exdManager?.testPhase ?? null
+  const testResult = exdManager?.testResult ?? null
+  const statusMessage = exdManager?.statusMessage ?? 'DEPLOYED'
+  const displayRange = exdManager?.range ?? range
+  const displayBattery = exdManager?.battery ?? battery
+  const isRadarActive = exdManager?.radarActive ?? true
+  const exdStandby = exdManager?.deviceState === 'standby'
 
-      setStatusMessage('IMU calibration...')
-      setBootPhase(2)
-      setDisplayValues({ range: 0, battery: 20, radarActive: false })
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('GPS lock...')
-      setBootPhase(3)
-      setDisplayValues({ range: 0.5, battery: 40, radarActive: false })
-      await new Promise(r => setTimeout(r, 400))
-
-      setStatusMessage('Motor test...')
-      setBootPhase(4)
-      setDisplayValues({ range: 1.2, battery: 60, radarActive: true })
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Radio link...')
-      setBootPhase(5)
-      setDisplayValues({ range: 1.8, battery: 75, radarActive: true })
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Flight ready...')
-      setBootPhase(6)
-      await new Promise(r => setTimeout(r, 300))
-
-      // Final boot
-      setDisplayValues({ range: range, battery: battery, radarActive: true })
-      setBootPhase(7)
-      setDeviceState('online')
-      setStatusMessage('DEPLOYED')
+  const handlePowerToggle = () => {
+    if (!exdManager) return
+    if (exdManager.deviceState === 'standby') {
+      exdManager.powerOn()
+    } else if (exdManager.deviceState === 'online') {
+      exdManager.powerOff()
     }
-
-    bootSequence()
-  }, [])
-
-  // Update values when props change (after boot)
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayValues(prev => ({ ...prev, range: range, battery: battery }))
-    }
-  }, [range, battery, deviceState])
-
-  const handleTest = async () => {
-    if (deviceState !== 'online') return
-
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<DroneTestPhase>[] = ['motors', 'gps', 'camera', 'radio', 'battery', 'gyro', 'complete']
-    const phaseMessages: Record<NonNullable<DroneTestPhase>, string> = {
-      motors: 'Testing rotors...',
-      gps: 'Checking GPS fix...',
-      camera: 'Camera calibration...',
-      radio: 'Radio link test...',
-      battery: 'Battery health...',
-      gyro: 'Gyroscope check...',
-      complete: 'Preflight complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(phaseMessages[phase])
-      await new Promise(r => setTimeout(r, 380))
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('All tests PASSED')
-    onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('DEPLOYED')
-    }, 3000)
   }
 
-  const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
+  const handleTest = () => {
+    exdManager?.runTest()
+  }
 
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    setStatusMessage('RTH initiated...')
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Landing...')
-    setDisplayValues(prev => ({ ...prev, radarActive: false }))
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Motors off...')
-    setDisplayValues({ range: 0, battery: 0, radarActive: false })
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('System offline')
-    await new Promise(r => setTimeout(r, 400))
-
-    // Boot sequence
-    setDeviceState('booting')
-    setStatusMessage('Power on...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('IMU calibration...')
-    setBootPhase(2)
-    setDisplayValues({ range: 0, battery: 20, radarActive: false })
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('GPS lock...')
-    setBootPhase(3)
-    setDisplayValues({ range: 0.5, battery: 40, radarActive: false })
-    await new Promise(r => setTimeout(r, 400))
-
-    setStatusMessage('Motor test...')
-    setBootPhase(4)
-    setDisplayValues({ range: 1.2, battery: 60, radarActive: true })
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Radio link...')
-    setBootPhase(5)
-    setDisplayValues({ range: 1.8, battery: 75, radarActive: true })
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Flight ready...')
-    setBootPhase(6)
-    await new Promise(r => setTimeout(r, 300))
-
-    setDisplayValues({ range: range, battery: battery, radarActive: true })
-    setBootPhase(7)
-    setDeviceState('online')
-    setStatusMessage('DEPLOYED')
-    onReset?.()
+  const handleReboot = () => {
+    exdManager?.reboot()
   }
 
   const getLedColor = () => {
-    if (deviceState === 'offline' || deviceState === 'rebooting') return 'red'
+    if (exdStandby || deviceState === 'shutdown') return 'red'
+    if (deviceState === 'rebooting') return 'red'
     if (deviceState === 'booting') return 'amber'
     if (deviceState === 'testing') return 'cyan'
     if (testResult === 'pass') return 'green'
     if (testResult === 'fail') return 'red'
-    return displayValues.battery > 30 ? 'green' : 'amber'
+    return displayBattery > 30 ? 'green' : 'amber'
   }
 
-  const isLedOn = deviceState !== 'offline' && !(deviceState === 'rebooting' && bootPhase === 0)
-  const radarActive = displayValues.radarActive && (deviceState === 'online' || deviceState === 'testing')
+  const isLedOn = !exdStandby && deviceState !== 'shutdown'
+  const radarActive = isRadarActive && (deviceState === 'online' || deviceState === 'testing')
 
   return (
-    <PanelFrame variant="military" className={cn('p-2', className)}>
-      {/* Header with worn metal micro buttons */}
+    <PanelFrame variant="military" className={cn('p-2 transition-opacity', exdStandby && 'opacity-50', className)}>
+      {/* Header with power button and worn metal micro buttons */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1">
           <LED on={isLedOn} color={getLedColor()} size="sm" />
           <div className="font-mono text-[8px] text-[var(--neon-lime,#bfff00)]">
             EXPLORER DRONE
           </div>
+          {/* Power button - tiny propeller-shaped */}
+          <button
+            onClick={handlePowerToggle}
+            disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
+            className="group relative disabled:opacity-30"
+            title={exdStandby ? 'Power On' : 'Power Off'}
+          >
+            <div
+              className="w-3 h-3 flex items-center justify-center transition-all"
+              style={{
+                background: !exdStandby
+                  ? 'radial-gradient(circle, rgba(191,255,0,0.4) 0%, rgba(191,255,0,0.1) 50%, transparent 70%)'
+                  : 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 50%)',
+                borderRadius: '50%',
+                boxShadow: !exdStandby ? '0 0 4px rgba(191,255,0,0.3)' : 'none',
+                animation: !exdStandby && deviceState === 'online' ? 'spin 1s linear infinite' : 'none',
+              }}
+            >
+              {/* Propeller cross */}
+              <div className="relative w-2.5 h-2.5">
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background: !exdStandby
+                      ? 'linear-gradient(0deg, transparent 40%, var(--neon-lime, #bfff00) 40%, var(--neon-lime, #bfff00) 60%, transparent 60%), linear-gradient(90deg, transparent 40%, var(--neon-lime, #bfff00) 40%, var(--neon-lime, #bfff00) 60%, transparent 60%)'
+                      : 'linear-gradient(0deg, transparent 40%, rgba(255,255,255,0.3) 40%, rgba(255,255,255,0.3) 60%, transparent 60%), linear-gradient(90deg, transparent 40%, rgba(255,255,255,0.3) 40%, rgba(255,255,255,0.3) 60%, transparent 60%)',
+                    borderRadius: '50%',
+                  }}
+                />
+                {/* Center dot */}
+                <div className={cn(
+                  'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-1 rounded-full',
+                  !exdStandby ? 'bg-[var(--neon-lime,#bfff00)]' : 'bg-white/30'
+                )} />
+              </div>
+            </div>
+          </button>
+          {exdManager && (
+            <span className="font-mono text-[4px] text-white/20">v{EXD_FIRMWARE.version}</span>
+          )}
         </div>
 
         {/* Worn metal micro buttons - anodized aluminum style */}
@@ -5181,13 +5672,11 @@ export function ExplorerDrone({
               border: '0.5px solid #3a4a2a',
             }}
             >
-              {/* Scratched metal texture */}
               <div className="absolute inset-0 rounded-[1px] opacity-20"
                 style={{
                   backgroundImage: 'linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%)',
                 }}
               />
-              {/* Status LED */}
               <div className={cn(
                 'w-[3px] h-[3px] rounded-full transition-all z-10',
                 deviceState === 'testing'
@@ -5202,7 +5691,7 @@ export function ExplorerDrone({
           </button>
           <button
             onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || exdStandby}
             className="group relative disabled:opacity-30"
             title="Reboot"
           >
@@ -5218,13 +5707,11 @@ export function ExplorerDrone({
               border: '0.5px solid #4a3a2a',
             }}
             >
-              {/* Scratched metal texture */}
               <div className="absolute inset-0 rounded-[1px] opacity-20"
                 style={{
                   backgroundImage: 'linear-gradient(-45deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%)',
                 }}
               />
-              {/* Status LED */}
               <div className={cn(
                 'w-[3px] h-[3px] rounded-full transition-all z-10',
                 deviceState === 'rebooting' || deviceState === 'booting'
@@ -5242,6 +5729,12 @@ export function ExplorerDrone({
         'relative h-10 bg-black/40 rounded overflow-hidden',
         deviceState === 'testing' && testPhase === 'gps' && 'ring-1 ring-[var(--neon-lime,#bfff00)]/50'
       )}>
+        {/* Standby overlay */}
+        {exdStandby && (
+          <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/60">
+            <span className="font-mono text-[8px] text-white/40">STANDBY</span>
+          </div>
+        )}
         {/* Radar sweep */}
         <div className="absolute inset-0 flex items-center justify-center">
           <div
@@ -5294,12 +5787,13 @@ export function ExplorerDrone({
           'w-8 shrink-0 transition-colors',
           radarActive ? 'text-[var(--neon-lime,#bfff00)]' : 'text-white/30'
         )}>
-          {displayValues.range.toFixed(1)} km
+          {exdStandby ? '---' : `${displayRange.toFixed(1)} km`}
         </span>
         <span className={cn(
           'flex-1 text-[5px] text-center transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
           deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
           deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+          deviceState === 'shutdown' ? 'text-[var(--neon-red)]' :
           testResult === 'pass' ? 'text-[var(--neon-green)]' :
           testResult === 'fail' ? 'text-[var(--neon-red)]' :
           'text-white/30'
@@ -5308,9 +5802,10 @@ export function ExplorerDrone({
         </span>
         <span className={cn(
           'w-10 shrink-0 text-right transition-colors',
-          displayValues.battery > 30 ? 'text-white/40' : 'text-[var(--neon-amber)]'
+          exdStandby ? 'text-white/30' :
+          displayBattery > 30 ? 'text-white/40' : 'text-[var(--neon-amber)]'
         )}>
-          BAT: {displayValues.battery}%
+          {exdStandby ? 'BAT: ---' : `BAT: ${Math.round(displayBattery)}%`}
         </span>
       </div>
     </PanelFrame>
@@ -6620,8 +7115,10 @@ export function Printer3D({
 // EXOTIC MATTER CONTAINMENT - Tier 4 resource
 // ==================================================
 // EXOTIC MATTER CONTAINMENT - Tier 4+ rare resource storage
+// Uses EMCManager for bidirectional terminal<->UI sync
 // ==================================================
-type ExoticState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+import { useEMCManagerOptional } from '@/contexts/EMCManager'
+type ExoticState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline' | 'standby' | 'shutdown'
 type ExoticTestPhase = 'containment' | 'field' | 'stability' | 'particles' | 'complete' | null
 
 interface ExoticMatterProps {
@@ -6634,152 +7131,66 @@ interface ExoticMatterProps {
 }
 
 export function ExoticMatterContainment({
-  units = 42,
-  stability = 76,
-  isContained = true,
+  units: propUnits = 42,
+  stability: propStability = 76,
+  isContained: propContained = true,
   className,
   onTest,
   onReset,
 }: ExoticMatterProps) {
-  const [deviceState, setDeviceState] = useState<ExoticState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<ExoticTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Init...')
-  const [displayValues, setDisplayValues] = useState({ units: 0, stability: 0, contained: false })
+  // Use EMCManager for bidirectional sync
+  const emcManager = useEMCManagerOptional()
 
-  // Boot sequence on mount
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Field gen...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 350))
+  // Derive state from manager when available
+  const deviceState = emcManager?.deviceState ?? 'online'
+  const testResult = emcManager?.testResult ?? null
+  const statusMessage = emcManager?.statusMessage ?? 'CONTAINED'
+  const isStandby = deviceState === 'standby'
+  const isTransitioning = ['booting', 'shutdown', 'rebooting'].includes(deviceState)
 
-      setStatusMessage('Containment...')
-      setBootPhase(2)
-      setDisplayValues({ units: 0, stability: 30, contained: false })
-      await new Promise(r => setTimeout(r, 400))
-
-      setStatusMessage('Particle load...')
-      setBootPhase(3)
-      setDisplayValues({ units: Math.floor(units * 0.5), stability: 50, contained: true })
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Stabilizing...')
-      setBootPhase(4)
-      setDisplayValues({ units: units, stability: 65, contained: true })
-      await new Promise(r => setTimeout(r, 400))
-
-      // Final boot
-      setDisplayValues({ units: units, stability: stability, contained: isContained })
-      setBootPhase(5)
-      setDeviceState('online')
-      setStatusMessage('CONTAINED')
-    }
-
-    bootSequence()
-  }, [])
-
-  // Update display when props change
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayValues({ units: units, stability: stability, contained: isContained })
-    }
-  }, [units, stability, isContained, deviceState])
+  const displayUnits = emcManager?.units ?? propUnits
+  const displayStability = emcManager?.stability ?? propStability
+  const displayContained = emcManager?.isContained ?? propContained
 
   const handleTest = async () => {
-    if (deviceState !== 'online') return
-
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<ExoticTestPhase>[] = ['containment', 'field', 'stability', 'particles', 'complete']
-    const phaseMessages: Record<NonNullable<ExoticTestPhase>, string> = {
-      containment: 'Testing containment...',
-      field: 'Field integrity...',
-      stability: 'Stability check...',
-      particles: 'Particle scan...',
-      complete: 'Test complete',
+    if (emcManager) {
+      await emcManager.runTest()
     }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(phaseMessages[phase])
-      await new Promise(r => setTimeout(r, 420))
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('PASSED')
     onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('CONTAINED')
-    }, 2500)
   }
 
   const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    setStatusMessage('Field collapse...')
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Particle hold...')
-    setDisplayValues(prev => ({ ...prev, contained: false, stability: 40 }))
-    await new Promise(r => setTimeout(r, 400))
-
-    setStatusMessage('Standby...')
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 350))
-
-    // Boot sequence
-    setDeviceState('booting')
-    setStatusMessage('Field gen...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Containment...')
-    setBootPhase(2)
-    setDisplayValues({ units: displayValues.units, stability: 30, contained: false })
-    await new Promise(r => setTimeout(r, 400))
-
-    setStatusMessage('Particle load...')
-    setBootPhase(3)
-    setDisplayValues(prev => ({ ...prev, stability: 50, contained: true }))
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Stabilizing...')
-    setBootPhase(4)
-    setDisplayValues(prev => ({ ...prev, stability: 65 }))
-    await new Promise(r => setTimeout(r, 400))
-
-    setDisplayValues({ units: units, stability: stability, contained: isContained })
-    setBootPhase(5)
-    setDeviceState('online')
-    setStatusMessage('CONTAINED')
+    if (emcManager) {
+      await emcManager.reboot()
+    }
     onReset?.()
   }
 
   const getLedColor = () => {
-    if (deviceState === 'offline' || deviceState === 'rebooting') return 'red'
-    if (deviceState === 'booting') return 'amber'
+    if (isStandby) return 'red'
+    if (deviceState === 'rebooting') return 'red'
+    if (deviceState === 'booting' || deviceState === 'shutdown') return 'amber'
     if (deviceState === 'testing') return 'cyan'
     if (testResult === 'pass') return 'green'
     if (testResult === 'fail') return 'red'
-    return displayValues.stability > 70 ? 'green' : 'amber'
+    return displayStability > 70 ? 'green' : 'amber'
   }
 
-  const isLedOn = deviceState !== 'offline' && !(deviceState === 'rebooting' && bootPhase === 0)
-  const fieldActive = displayValues.contained && (deviceState === 'online' || deviceState === 'testing')
+  const isLedOn = !isStandby
+  const fieldActive = displayContained && (deviceState === 'online' || deviceState === 'testing')
+
+  // Biohazard power button rotation animation
+  const [btnRotation, setBtnRotation] = useState(0)
+  useEffect(() => {
+    if (isStandby) return
+    const interval = setInterval(() => {
+      setBtnRotation(r => (r + 1) % 360)
+    }, 50)
+    return () => clearInterval(interval)
+  }, [isStandby])
 
   return (
-    <PanelFrame variant="default" className={cn('p-1', className)}>
+    <PanelFrame variant="default" className={cn('p-1', isStandby && 'opacity-60', className)}>
       {/* Compact header */}
       <div className="flex items-center justify-between mb-0.5">
         <div className="flex items-center gap-0.5">
@@ -6796,6 +7207,61 @@ export function ExoticMatterContainment({
           >
             CERN
           </div>
+          {/* Biohazard-shaped power button — 3 overlapping crescents */}
+          {emcManager && (
+            <button
+              onClick={() => isStandby ? emcManager.powerOn() : emcManager.powerOff()}
+              disabled={isTransitioning}
+              className="relative transition-all"
+              style={{
+                width: '11px',
+                height: '11px',
+                opacity: isTransitioning ? 0.4 : 1,
+                cursor: isTransitioning ? 'not-allowed' : 'pointer',
+              }}
+              title={isStandby ? 'Power ON' : 'Power OFF'}
+            >
+              {/* Rotating outer ring */}
+              <div
+                className="absolute inset-0 rounded-full"
+                style={{
+                  border: `1px solid ${isStandby ? '#2a1a2a' : 'var(--neon-pink)'}`,
+                  boxShadow: isStandby ? 'none' : '0 0 4px var(--neon-pink), inset 0 0 2px rgba(255,0,255,0.3)',
+                  transform: `rotate(${btnRotation}deg)`,
+                }}
+              />
+              {/* Inner dot */}
+              <div
+                className="absolute rounded-full"
+                style={{
+                  width: '3px',
+                  height: '3px',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  background: isStandby ? '#1a0a1a' : 'var(--neon-pink)',
+                  boxShadow: isStandby ? 'none' : '0 0 3px var(--neon-pink)',
+                }}
+              />
+              {/* Three spokes (biohazard) */}
+              {[0, 120, 240].map(angle => (
+                <div
+                  key={angle}
+                  className="absolute"
+                  style={{
+                    width: '1px',
+                    height: '4px',
+                    background: isStandby ? '#2a1a2a' : 'var(--neon-pink)',
+                    top: '1px',
+                    left: '50%',
+                    transformOrigin: '50% 4.5px',
+                    transform: `translateX(-50%) rotate(${angle}deg)`,
+                    boxShadow: isStandby ? 'none' : '0 0 2px var(--neon-pink)',
+                  }}
+                />
+              ))}
+            </button>
+          )}
         </div>
 
         {/* Tiny LED buttons */}
@@ -6833,7 +7299,7 @@ export function ExoticMatterContainment({
           {/* Square LED reset button */}
           <button
             onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || isStandby}
             className="group relative disabled:opacity-30"
             title="Reboot"
           >
@@ -6862,96 +7328,96 @@ export function ExoticMatterContainment({
       {/* Tall containment field visualization - 3 rows */}
       <div className={cn(
         'relative h-14 bg-black/60 rounded overflow-hidden',
-        deviceState === 'testing' && testPhase === 'containment' && 'ring-1 ring-[var(--neon-pink)]/50'
+        deviceState === 'testing' && 'ring-1 ring-[var(--neon-pink)]/50'
       )}>
         {/* Containment field border */}
         <div
-          className={cn(
-            'absolute inset-[2px] rounded border transition-all duration-300',
-            deviceState === 'testing' && testPhase === 'field' && 'ring-1 ring-[var(--neon-cyan)]/50'
-          )}
+          className="absolute inset-[2px] rounded border transition-all duration-300"
           style={{
-            borderColor: fieldActive ? 'var(--neon-pink)' : '#333',
+            borderColor: fieldActive ? 'var(--neon-pink)' : isStandby ? '#1a1a1a' : '#333',
             boxShadow: fieldActive ? '0 0 6px var(--neon-pink), inset 0 0 12px rgba(255,0,255,0.15)' : 'none',
             animation: fieldActive ? 'containment-pulse 2s ease-in-out infinite' : 'none',
           }}
         />
 
+        {/* Standby message */}
+        {isStandby && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="font-mono text-[6px] text-white/15 tracking-widest">STANDBY</div>
+          </div>
+        )}
+
         {/* Exotic particles spread across full screen */}
-        <div className="absolute inset-[4px]">
-          {Array.from({ length: displayValues.units }).map((_, i) => {
-            const isTesting = deviceState === 'testing'
-            const isBooting = deviceState === 'booting' || deviceState === 'rebooting'
+        {!isStandby && (
+          <div className="absolute inset-[4px]">
+            {Array.from({ length: displayUnits }).map((_, i) => {
+              const isTesting = deviceState === 'testing'
+              const isBooting = deviceState === 'booting' || deviceState === 'rebooting'
+              const isShutdown = deviceState === 'shutdown'
 
-            // Different colors for different states
-            const testColors = ['var(--neon-pink)', 'var(--neon-cyan)', 'var(--neon-purple)', '#fff', 'var(--neon-green)']
-            const bootColors = ['var(--neon-amber)', 'var(--neon-pink)', '#ff6600', 'var(--neon-amber)']
+              const testColors = ['var(--neon-pink)', 'var(--neon-cyan)', 'var(--neon-purple)', '#fff', 'var(--neon-green)']
+              const bootColors = ['var(--neon-amber)', 'var(--neon-pink)', '#ff6600', 'var(--neon-amber)']
 
-            const particleColor = isTesting
-              ? testColors[i % testColors.length]
-              : isBooting
-              ? bootColors[i % bootColors.length]
-              : fieldActive ? 'var(--neon-pink)' : '#444'
+              const particleColor = isTesting
+                ? testColors[i % testColors.length]
+                : isBooting
+                ? bootColors[i % bootColors.length]
+                : isShutdown
+                ? '#663366'
+                : fieldActive ? 'var(--neon-pink)' : '#444'
 
-            // Distribute particles in a grid pattern across full area
-            const cols = 14
-            const rows = 3
-            const col = i % cols
-            const row = Math.floor(i / cols) % rows
-            const xPos = 4 + (col / (cols - 1)) * 92 // 4% to 96%
-            const yPos = 15 + (row / (rows - 1 || 1)) * 70 // 15% to 85%
+              const cols = 14
+              const rows = 3
+              const col = i % cols
+              const row = Math.floor(i / cols) % rows
+              const xPos = 4 + (col / (cols - 1)) * 92
+              const yPos = 15 + (row / (rows - 1 || 1)) * 70
 
-            // Different animations for boot vs test
-            let animationName = 'none'
-            let animationDuration = '1s'
-            let animationTimingFunction = 'ease-in-out'
-            let animationDelay = '0s'
+              let animationName = 'none'
+              let animationDuration = '1s'
+              let animationTimingFunction = 'ease-in-out'
+              let animationDelay = '0s'
 
-            if (isTesting) {
-              // Test: chaotic quantum fluctuation
-              animationName = 'exotic-test'
-              animationDuration = `${0.15 + (i % 6) * 0.08}s`
-              animationDelay = `${i * 0.015}s`
-            } else if (isBooting) {
-              // Boot: materialize from center outward
-              animationName = 'exotic-boot'
-              animationDuration = `${0.4 + (i % 4) * 0.15}s`
-              animationTimingFunction = 'ease-out'
-              animationDelay = `${(row * 0.1) + (col * 0.03)}s`
-            } else if (fieldActive) {
-              // Normal: gentle float
-              animationName = 'exotic-float'
-              animationDuration = `${1 + (i % 5) * 0.15}s`
-              animationDelay = `${i * 0.02}s`
-            }
+              if (isTesting) {
+                animationName = 'exotic-test'
+                animationDuration = `${0.15 + (i % 6) * 0.08}s`
+                animationDelay = `${i * 0.015}s`
+              } else if (isBooting) {
+                animationName = 'exotic-boot'
+                animationDuration = `${0.4 + (i % 4) * 0.15}s`
+                animationTimingFunction = 'ease-out'
+                animationDelay = `${(row * 0.1) + (col * 0.03)}s`
+              } else if (fieldActive) {
+                animationName = 'exotic-float'
+                animationDuration = `${1 + (i % 5) * 0.15}s`
+                animationDelay = `${i * 0.02}s`
+              }
 
-            return (
-              <div
-                key={i}
-                className="absolute w-[5px] h-[5px] rounded-full"
-                style={{
-                  left: `${xPos}%`,
-                  top: `${yPos}%`,
-                  background: particleColor,
-                  boxShadow: `0 0 ${isTesting ? '8' : isBooting ? '5' : '3'}px ${particleColor}`,
-                  animationName,
-                  animationDuration,
-                  animationTimingFunction,
-                  animationIterationCount: 'infinite',
-                  animationDelay,
-                }}
-              />
-            )
-          })}
-        </div>
+              return (
+                <div
+                  key={i}
+                  className="absolute w-[5px] h-[5px] rounded-full"
+                  style={{
+                    left: `${xPos}%`,
+                    top: `${yPos}%`,
+                    background: particleColor,
+                    boxShadow: `0 0 ${isTesting ? '8' : isBooting ? '5' : '3'}px ${particleColor}`,
+                    opacity: isShutdown ? 0.3 : 1,
+                    animationName,
+                    animationDuration,
+                    animationTimingFunction,
+                    animationIterationCount: 'infinite',
+                    animationDelay,
+                  }}
+                />
+              )
+            })}
+          </div>
+        )}
 
         {/* Test overlay - quantum interference */}
         {deviceState === 'testing' && (
           <>
-            {testPhase === 'stability' && (
-              <div className="absolute inset-0 bg-[var(--neon-pink)]/10 animate-pulse" />
-            )}
-            {/* Vertical scan lines */}
             <div
               className="absolute inset-0 pointer-events-none opacity-25"
               style={{
@@ -6959,7 +7425,6 @@ export function ExoticMatterContainment({
                 animation: 'exotic-scan 0.3s linear infinite',
               }}
             />
-            {/* Radial quantum distortion */}
             <div
               className="absolute inset-0 pointer-events-none"
               style={{
@@ -6968,7 +7433,6 @@ export function ExoticMatterContainment({
                 animation: 'exotic-quantum 0.4s ease-in-out infinite',
               }}
             />
-            {/* Horizontal wave */}
             <div
               className="absolute inset-0 pointer-events-none opacity-15"
               style={{
@@ -6979,10 +7443,9 @@ export function ExoticMatterContainment({
           </>
         )}
 
-        {/* Boot/reboot overlay - energy field forming */}
+        {/* Boot/reboot overlay */}
         {(deviceState === 'booting' || deviceState === 'rebooting') && (
           <>
-            {/* Expanding rings */}
             <div
               className="absolute inset-0 pointer-events-none"
               style={{
@@ -6991,7 +7454,6 @@ export function ExoticMatterContainment({
                 animation: 'exotic-materialize 0.8s ease-out infinite',
               }}
             />
-            {/* Grid forming effect */}
             <div
               className="absolute inset-0 pointer-events-none opacity-20"
               style={{
@@ -7013,23 +7475,25 @@ export function ExoticMatterContainment({
           'w-10 shrink-0 transition-colors',
           fieldActive ? 'text-[var(--neon-pink)]' : 'text-white/30'
         )}>
-          {displayValues.units} UNITS
+          {isStandby ? '--' : displayUnits} UNITS
         </span>
         <span className={cn(
           'flex-1 text-[4px] text-center transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
           deviceState === 'testing' ? 'text-[var(--neon-pink)]' :
           deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+          isStandby ? 'text-white/15' :
           testResult === 'pass' ? 'text-[var(--neon-green)]' :
           testResult === 'fail' ? 'text-[var(--neon-red)]' :
           'text-white/20'
         )}>
-          {statusMessage}
+          {isStandby ? 'STANDBY' : statusMessage}
         </span>
         <span className={cn(
           'w-12 shrink-0 text-right transition-colors',
-          displayValues.stability > 70 ? 'text-[var(--neon-green)]' : 'text-[var(--neon-red)]'
+          isStandby ? 'text-white/30' :
+          displayStability > 70 ? 'text-[var(--neon-green)]' : 'text-[var(--neon-red)]'
         )}>
-          {displayValues.stability}% STABLE
+          {isStandby ? '--' : displayStability}% STABLE
         </span>
       </div>
 
@@ -7042,7 +7506,6 @@ export function ExoticMatterContainment({
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-2px); }
         }
-        /* TEST: Chaotic quantum fluctuation - particles jitter wildly */
         @keyframes exotic-test {
           0% { transform: translate(0, 0) scale(1); filter: hue-rotate(0deg); }
           20% { transform: translate(3px, -4px) scale(1.4); filter: hue-rotate(60deg); }
@@ -7051,35 +7514,29 @@ export function ExoticMatterContainment({
           80% { transform: translate(-2px, -3px) scale(0.8); filter: hue-rotate(240deg); }
           100% { transform: translate(0, 0) scale(1); filter: hue-rotate(360deg); }
         }
-        /* BOOT: Particles materialize with pulsing glow */
         @keyframes exotic-boot {
           0% { transform: scale(0); opacity: 0; filter: brightness(3); }
           30% { transform: scale(1.5); opacity: 1; filter: brightness(2); }
           60% { transform: scale(0.8); opacity: 0.7; filter: brightness(1.5); }
           100% { transform: scale(1); opacity: 1; filter: brightness(1); }
         }
-        /* Scan line effect */
         @keyframes exotic-scan {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(100%); }
         }
-        /* Horizontal wave for test */
         @keyframes exotic-wave {
           0% { transform: translateY(-100%); }
           100% { transform: translateY(100%); }
         }
-        /* Quantum distortion pulse */
         @keyframes exotic-quantum {
           0%, 100% { transform: scale(0.5); opacity: 0.1; }
           50% { transform: scale(1.5); opacity: 0.4; }
         }
-        /* Materialize rings for boot */
         @keyframes exotic-materialize {
           0% { transform: scale(0.3); opacity: 0.5; }
           50% { transform: scale(1); opacity: 0.3; }
           100% { transform: scale(1.5); opacity: 0; }
         }
-        /* Grid formation for boot */
         @keyframes exotic-grid {
           0%, 100% { opacity: 0.1; }
           50% { opacity: 0.3; }
@@ -7091,8 +7548,10 @@ export function ExoticMatterContainment({
 
 // ==================================================
 // QUANTUM STATE MONITOR - Tech Tier 2 quantum coherence
+// Uses QSMManager for bidirectional terminal<->UI sync
 // ==================================================
-type QuantumState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+import { useQSMManagerOptional } from '@/contexts/QSMManager'
+type QuantumState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline' | 'standby' | 'shutdown'
 type QuantumTestPhase = 'coherence' | 'entanglement' | 'decoherence' | 'error' | 'complete' | null
 
 interface QuantumStateProps {
@@ -7105,148 +7564,66 @@ interface QuantumStateProps {
 }
 
 export function QuantumStateMonitor({
-  coherence = 94,
-  qubits = 127,
-  isEntangled = true,
+  coherence: propCoherence = 94,
+  qubits: propQubits = 127,
+  isEntangled: propEntangled = true,
   className,
   onTest,
   onReset,
 }: QuantumStateProps) {
-  const [deviceState, setDeviceState] = useState<QuantumState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<QuantumTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Init...')
-  const [displayValues, setDisplayValues] = useState({ coherence: 0, qubits: 0, entangled: false })
+  // Try to use QSMManager for bidirectional sync
+  const qsmManager = useQSMManagerOptional()
+
+  // Derive state from manager when available, otherwise use local state
+  const deviceState = qsmManager?.deviceState ?? 'online'
+  const testResult = qsmManager?.testResult ?? null
+  const statusMessage = qsmManager?.statusMessage ?? 'COHERENT'
+  const isStandby = deviceState === 'standby'
+  const isTransitioning = ['booting', 'shutdown', 'rebooting'].includes(deviceState)
+
+  const displayCoherence = qsmManager?.coherence ?? propCoherence
+  const displayQubits = qsmManager?.qubits ?? propQubits
+  const displayEntangled = qsmManager?.isEntangled ?? propEntangled
+
   const [wavePhase, setWavePhase] = useState(0)
 
   // Animate wave function
   useEffect(() => {
-    if (deviceState === 'offline') return
+    if (isStandby) return
     const interval = setInterval(() => {
       setWavePhase(p => (p + 0.15) % (Math.PI * 2))
     }, 50)
     return () => clearInterval(interval)
-  }, [deviceState])
-
-  // Boot sequence
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Cooling qubits...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 400))
-
-      setStatusMessage('Calibrating...')
-      setBootPhase(2)
-      setDisplayValues({ coherence: 30, qubits: Math.floor(qubits * 0.3), entangled: false })
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Entangling...')
-      setBootPhase(3)
-      setDisplayValues({ coherence: 60, qubits: Math.floor(qubits * 0.7), entangled: false })
-      await new Promise(r => setTimeout(r, 400))
-
-      setStatusMessage('Stabilizing...')
-      setBootPhase(4)
-      setDisplayValues({ coherence: 85, qubits: qubits, entangled: true })
-      await new Promise(r => setTimeout(r, 350))
-
-      setDisplayValues({ coherence, qubits, entangled: isEntangled })
-      setBootPhase(5)
-      setDeviceState('online')
-      setStatusMessage('COHERENT')
-    }
-    bootSequence()
-  }, [])
-
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayValues({ coherence, qubits, entangled: isEntangled })
-    }
-  }, [coherence, qubits, isEntangled, deviceState])
+  }, [isStandby])
 
   const handleTest = async () => {
-    if (deviceState !== 'online') return
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<QuantumTestPhase>[] = ['coherence', 'entanglement', 'decoherence', 'error', 'complete']
-    const msgs: Record<NonNullable<QuantumTestPhase>, string> = {
-      coherence: 'Measuring coherence...',
-      entanglement: 'Verifying entanglement...',
-      decoherence: 'Decoherence test...',
-      error: 'Error correction...',
-      complete: 'Test complete',
+    if (qsmManager) {
+      await qsmManager.runTest()
     }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(msgs[phase])
-      await new Promise(r => setTimeout(r, 380))
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('PASSED')
     onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('COHERENT')
-    }, 2500)
   }
 
   const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    setStatusMessage('Collapsing state...')
-    setDisplayValues(prev => ({ ...prev, coherence: 20, entangled: false }))
-    await new Promise(r => setTimeout(r, 400))
-
-    setStatusMessage('Re-cooling...')
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 350))
-
-    // Boot sequence
-    setDeviceState('booting')
-    setStatusMessage('Cooling qubits...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Calibrating...')
-    setBootPhase(2)
-    setDisplayValues({ coherence: 40, qubits: Math.floor(qubits * 0.5), entangled: false })
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Entangling...')
-    setBootPhase(3)
-    setDisplayValues({ coherence: 70, qubits: qubits, entangled: true })
-    await new Promise(r => setTimeout(r, 350))
-
-    setDisplayValues({ coherence, qubits, entangled: isEntangled })
-    setBootPhase(5)
-    setDeviceState('online')
-    setStatusMessage('COHERENT')
+    if (qsmManager) {
+      await qsmManager.reboot()
+    }
     onReset?.()
   }
 
   const getLedColor = () => {
-    if (deviceState === 'offline' || deviceState === 'rebooting') return 'red'
-    if (deviceState === 'booting') return 'amber'
+    if (isStandby) return 'red'
+    if (deviceState === 'rebooting') return 'red'
+    if (deviceState === 'booting' || deviceState === 'shutdown') return 'amber'
     if (deviceState === 'testing') return 'cyan'
     if (testResult === 'pass') return 'green'
-    return displayValues.coherence > 80 ? 'cyan' : 'amber'
+    return displayCoherence > 80 ? 'cyan' : 'amber'
   }
 
-  const isLedOn = deviceState !== 'offline'
+  const isLedOn = !isStandby
   const isActive = deviceState === 'online' || deviceState === 'testing'
 
   return (
-    <PanelFrame variant="teal" className={cn('p-1', className)}>
+    <PanelFrame variant="teal" className={cn('p-1', isStandby && 'opacity-60', className)}>
       {/* Header with wooden buttons */}
       <div className="flex items-center justify-between mb-0.5">
         <div className="flex items-center gap-0.5">
@@ -7263,6 +7640,25 @@ export function QuantumStateMonitor({
           >
             IBM
           </div>
+          {/* Triangular power button - unique crystal/prism shape */}
+          {qsmManager && (
+            <button
+              onClick={() => isStandby ? qsmManager.powerOn() : qsmManager.powerOff()}
+              disabled={isTransitioning}
+              className="transition-all"
+              style={{
+                width: '10px',
+                height: '10px',
+                background: isStandby ? '#0a1a2a' : 'rgba(0,220,255,0.1)',
+                border: `1px solid ${isStandby ? '#1a3a4a' : 'var(--neon-cyan)'}`,
+                boxShadow: isStandby ? 'none' : '0 0 4px var(--neon-cyan), inset 0 0 3px rgba(0,220,255,0.2)',
+                opacity: isTransitioning ? 0.4 : 1,
+                cursor: isTransitioning ? 'not-allowed' : 'pointer',
+                clipPath: 'polygon(50% 0%, 100% 100%, 0% 100%)',
+              }}
+              title={isStandby ? 'Power ON' : 'Power OFF'}
+            />
+          )}
         </div>
 
         {/* Worn wooden buttons */}
@@ -7299,7 +7695,7 @@ export function QuantumStateMonitor({
           {/* Square wooden reset button */}
           <button
             onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || isStandby}
             className="group relative disabled:opacity-30"
             title="Reboot"
           >
@@ -7340,14 +7736,16 @@ export function QuantumStateMonitor({
             <defs>
               <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
                 <stop offset="0%" stopColor="var(--neon-cyan)" stopOpacity="0" />
-                <stop offset="50%" stopColor="var(--neon-cyan)" stopOpacity={isActive ? "0.6" : "0.2"} />
+                <stop offset="50%" stopColor="var(--neon-cyan)" stopOpacity={isActive ? "0.6" : isStandby ? "0.05" : "0.2"} />
                 <stop offset="100%" stopColor="var(--neon-cyan)" stopOpacity="0" />
               </linearGradient>
             </defs>
             <path
               d={`M 0 20 ${Array.from({ length: 20 }, (_, i) => {
                 const x = (i / 19) * 100
-                const y = 20 + Math.sin(wavePhase + i * 0.5) * (isActive ? 8 : 3) * (deviceState === 'testing' ? 1.5 : 1)
+                const amplitude = isStandby ? 1 : isActive ? 8 : 3
+                const testMul = deviceState === 'testing' ? 1.5 : 1
+                const y = 20 + Math.sin(wavePhase + i * 0.5) * amplitude * testMul
                 return `L ${x} ${y}`
               }).join(' ')}`}
               stroke="url(#waveGrad)"
@@ -7363,7 +7761,9 @@ export function QuantumStateMonitor({
           <div
             className={cn(
               'relative z-10 font-mono text-[14px] transition-all',
-              isActive ? 'text-[var(--neon-cyan)]' : 'text-[var(--neon-cyan)]/30'
+              isActive ? 'text-[var(--neon-cyan)]' :
+              isStandby ? 'text-[var(--neon-cyan)]/10' :
+              'text-[var(--neon-cyan)]/30'
             )}
             style={{
               textShadow: isActive ? '0 0 8px var(--neon-cyan)' : 'none',
@@ -7406,22 +7806,23 @@ export function QuantumStateMonitor({
           'w-10 shrink-0 transition-colors',
           isActive ? 'text-[var(--neon-cyan)]' : 'text-white/30'
         )}>
-          {displayValues.coherence}% COH
+          {isStandby ? '--' : displayCoherence}% COH
         </span>
         <span className={cn(
           'flex-1 text-[4px] text-center whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
+          isStandby ? 'text-white/30' :
           deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
           deviceState === 'booting' || deviceState === 'rebooting' ? 'text-[var(--neon-amber)]' :
           testResult === 'pass' ? 'text-[var(--neon-green)]' :
           'text-white/20'
         )}>
-          {statusMessage}
+          {isStandby ? 'STANDBY' : statusMessage}
         </span>
         <span className={cn(
           'w-10 shrink-0 text-right transition-colors',
-          displayValues.entangled ? 'text-[var(--neon-cyan)]' : 'text-white/30'
+          !isStandby && displayEntangled ? 'text-[var(--neon-cyan)]' : 'text-white/30'
         )}>
-          {displayValues.qubits}Q
+          {isStandby ? '--' : displayQubits}Q
         </span>
       </div>
 
@@ -8078,12 +8479,10 @@ export function TemperatureMonitor({
 }
 
 // ==================================================
-// SUPERCOMPUTER ARRAY - Tier 3 Tech computation
-// ==================================================
 // SUPERCOMPUTER ARRAY - Tier 3 Tech heavy computation
 // ==================================================
-type SupercomputerState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type SupercomputerTestPhase = 'nodes' | 'interconnect' | 'memory' | 'cache' | 'scheduler' | 'benchmark' | 'complete' | null
+import { useSCAManagerOptional, SCA_FIRMWARE } from '@/contexts/SCAManager'
+import { useEXDManagerOptional, EXD_FIRMWARE } from '@/contexts/EXDManager'
 
 interface SupercomputerProps {
   flops?: number
@@ -8095,164 +8494,31 @@ interface SupercomputerProps {
 }
 
 export function SupercomputerArray({
-  flops = 2.4,
-  utilization = 87,
-  isOnline = true,
   className,
-  onTest,
-  onReset,
 }: SupercomputerProps) {
-  const [deviceState, setDeviceState] = useState<SupercomputerState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<SupercomputerTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Initializing...')
-  const [displayValues, setDisplayValues] = useState({ flops: 0, load: 0, activeNodes: 0 })
+  const scaManager = useSCAManagerOptional()
 
-  // Boot sequence on mount
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('POST check...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 300))
+  // Derive all state from manager when available
+  const deviceState = scaManager?.deviceState ?? 'online'
+  const testPhase = scaManager?.testPhase ?? null
+  const testResult = scaManager?.testResult ?? null
+  const statusMessage = scaManager?.statusMessage ?? 'READY'
+  const activeNodes = scaManager?.activeNodes ?? 16
+  const displayFlops = scaManager?.flops ?? 2.4
+  const displayLoad = scaManager?.utilization ?? 87
+  const isStandby = deviceState === 'standby'
+  const isTransitioning = ['booting', 'shutdown', 'rebooting', 'testing'].includes(deviceState)
 
-      setStatusMessage('Node discovery...')
-      setBootPhase(2)
-      setDisplayValues({ flops: 0, load: 5, activeNodes: 4 })
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Interconnect init...')
-      setBootPhase(3)
-      setDisplayValues({ flops: 0.4, load: 15, activeNodes: 8 })
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Memory allocation...')
-      setBootPhase(4)
-      setDisplayValues({ flops: 1.2, load: 35, activeNodes: 12 })
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Scheduler online...')
-      setBootPhase(5)
-      setDisplayValues({ flops: 1.8, load: 55, activeNodes: 14 })
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Benchmark calibrate...')
-      setBootPhase(6)
-      await new Promise(r => setTimeout(r, 400))
-
-      // Final boot
-      setDisplayValues({ flops: flops, load: utilization, activeNodes: 16 })
-      setBootPhase(7)
-      setDeviceState('online')
-      setStatusMessage('READY')
-    }
-
-    bootSequence()
-  }, [])
-
-  // Update values when props change (after boot)
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayValues(prev => ({ ...prev, flops: flops, load: utilization }))
-    }
-  }, [flops, utilization, deviceState])
-
-  const handleTest = async () => {
-    if (deviceState !== 'online') return
-
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<SupercomputerTestPhase>[] = ['nodes', 'interconnect', 'memory', 'cache', 'scheduler', 'benchmark', 'complete']
-    const phaseMessages: Record<NonNullable<SupercomputerTestPhase>, string> = {
-      nodes: 'Testing compute nodes...',
-      interconnect: 'Checking interconnect...',
-      memory: 'Verifying ECC memory...',
-      cache: 'Testing L3 cache...',
-      scheduler: 'Validating scheduler...',
-      benchmark: 'Running LINPACK...',
-      complete: 'Diagnostics complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(phaseMessages[phase])
-      await new Promise(r => setTimeout(r, 400))
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('All tests PASSED')
-    onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('READY')
-    }, 3000)
-  }
-
-  const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    setStatusMessage('Draining jobs...')
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Node shutdown...')
-    setDisplayValues(prev => ({ ...prev, activeNodes: 8, load: 20 }))
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Power cycle...')
-    setDisplayValues({ flops: 0, load: 0, activeNodes: 0 })
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 400))
-
-    setStatusMessage('Cluster offline')
-    await new Promise(r => setTimeout(r, 350))
-
-    // Boot sequence
-    setDeviceState('booting')
-    setStatusMessage('POST check...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Node discovery...')
-    setBootPhase(2)
-    setDisplayValues({ flops: 0, load: 5, activeNodes: 4 })
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Interconnect init...')
-    setBootPhase(3)
-    setDisplayValues({ flops: 0.4, load: 15, activeNodes: 8 })
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Memory allocation...')
-    setBootPhase(4)
-    setDisplayValues({ flops: 1.2, load: 35, activeNodes: 12 })
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Scheduler online...')
-    setBootPhase(5)
-    setDisplayValues({ flops: 1.8, load: 55, activeNodes: 14 })
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Benchmark calibrate...')
-    setBootPhase(6)
-    await new Promise(r => setTimeout(r, 400))
-
-    setDisplayValues({ flops: flops, load: utilization, activeNodes: 16 })
-    setBootPhase(7)
-    setDeviceState('online')
-    setStatusMessage('READY')
-    onReset?.()
+  const handleTest = () => scaManager?.runTest()
+  const handleReboot = () => scaManager?.reboot()
+  const handlePowerToggle = () => {
+    if (isStandby) scaManager?.powerOn()
+    else if (deviceState === 'online') scaManager?.powerOff()
   }
 
   const getLedColor = () => {
-    if (deviceState === 'offline' || deviceState === 'rebooting') return 'red'
+    if (isStandby || deviceState === 'shutdown') return 'red'
+    if (deviceState === 'rebooting') return 'amber'
     if (deviceState === 'booting') return 'amber'
     if (deviceState === 'testing') return 'cyan'
     if (testResult === 'pass') return 'green'
@@ -8260,11 +8526,11 @@ export function SupercomputerArray({
     return 'cyan'
   }
 
-  const isLedOn = deviceState !== 'offline' && !(deviceState === 'rebooting' && bootPhase === 0)
-  const nodesActive = deviceState === 'online' || deviceState === 'testing' || (deviceState === 'booting' && bootPhase >= 2)
+  const isLedOn = !isStandby
+  const nodesActive = deviceState === 'online' || deviceState === 'testing' || deviceState === 'booting'
 
   return (
-    <PanelFrame variant="teal" className={cn('p-2', className)}>
+    <PanelFrame variant="teal" className={cn('p-2', isStandby && 'opacity-50', className)}>
       {/* Header with worn metal micro buttons */}
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-1">
@@ -8272,6 +8538,7 @@ export function SupercomputerArray({
           <div className="font-mono text-[8px] text-[var(--neon-cyan)]">
             SUPERCOMPUTER
           </div>
+          <span className="font-mono text-[4px] text-white/15">v{SCA_FIRMWARE.version}</span>
         </div>
 
         {/* Worn metal micro buttons - brushed steel style */}
@@ -8285,6 +8552,36 @@ export function SupercomputerArray({
           >
             CRAY
           </div>
+          {/* Power toggle - hexagonal/diamond shape for uniqueness */}
+          {scaManager && (
+            <button
+              onClick={handlePowerToggle}
+              disabled={isTransitioning}
+              className="group relative"
+              title={isStandby ? 'Power ON' : 'Power OFF'}
+              style={{ opacity: isTransitioning ? 0.4 : 1, cursor: isTransitioning ? 'not-allowed' : 'pointer' }}
+            >
+              <div
+                className="flex items-center justify-center transition-all"
+                style={{
+                  width: '12px',
+                  height: '12px',
+                  clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+                  background: isStandby
+                    ? 'linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%)'
+                    : 'linear-gradient(180deg, rgba(0,255,255,0.3) 0%, rgba(0,180,200,0.2) 100%)',
+                  boxShadow: isStandby ? 'none' : '0 0 6px rgba(0,255,255,0.4)',
+                }}
+              >
+                <span style={{
+                  fontSize: '6px',
+                  color: isStandby ? '#444' : 'var(--neon-cyan)',
+                  textShadow: isStandby ? 'none' : '0 0 3px var(--neon-cyan)',
+                  lineHeight: 1,
+                }}>⏻</span>
+              </div>
+            </button>
+          )}
           <button
             onClick={handleTest}
             disabled={deviceState !== 'online'}
@@ -8303,13 +8600,11 @@ export function SupercomputerArray({
               boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.2), inset 0 -0.5px 0 rgba(0,0,0,0.3)',
             }}
             >
-              {/* Brushed metal texture + wear */}
               <div className="absolute inset-0 rounded-[1px] opacity-30"
                 style={{
                   backgroundImage: 'repeating-linear-gradient(90deg, transparent 0px, rgba(255,255,255,0.1) 1px, transparent 2px)',
                 }}
               />
-              {/* Status indicator dot */}
               <div className={cn(
                 'w-[3px] h-[3px] rounded-full transition-all z-10',
                 deviceState === 'testing'
@@ -8324,7 +8619,7 @@ export function SupercomputerArray({
           </button>
           <button
             onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || isStandby}
             className="group relative disabled:opacity-30"
             title="Reboot"
           >
@@ -8340,13 +8635,11 @@ export function SupercomputerArray({
               boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.2), inset 0 -0.5px 0 rgba(0,0,0,0.3)',
             }}
             >
-              {/* Brushed metal texture + wear */}
               <div className="absolute inset-0 rounded-[1px] opacity-30"
                 style={{
                   backgroundImage: 'repeating-linear-gradient(90deg, transparent 0px, rgba(255,255,255,0.1) 1px, transparent 2px)',
                 }}
               />
-              {/* Status indicator dot */}
               <div className={cn(
                 'w-[3px] h-[3px] rounded-full transition-all z-10',
                 deviceState === 'rebooting' || deviceState === 'booting'
@@ -8366,8 +8659,8 @@ export function SupercomputerArray({
       )}>
         <div className="grid grid-cols-8 grid-rows-2 gap-0.5 h-full">
           {Array.from({ length: 16 }).map((_, i) => {
-            const isActive = nodesActive && i < displayValues.activeNodes
-            const nodeLoad = i < Math.floor(displayValues.load / 6.25)
+            const isActive = nodesActive && i < activeNodes
+            const nodeLoad = i < Math.floor(displayLoad / 6.25)
             return (
               <div
                 key={i}
@@ -8382,7 +8675,7 @@ export function SupercomputerArray({
                     ? 'rgba(0,255,255,0.3)'
                     : 'rgba(255,255,255,0.1)',
                   opacity: isActive ? (nodeLoad ? 0.8 : 0.4) : 0.15,
-                  animation: isActive && nodeLoad
+                  animation: isActive && nodeLoad && !isStandby
                     ? `node-blink ${0.5 + (i % 4) * 0.1}s ease-in-out infinite`
                     : 'none',
                   boxShadow: isActive && nodeLoad ? '0 0 4px var(--neon-cyan)' : 'none',
@@ -8396,20 +8689,28 @@ export function SupercomputerArray({
         {deviceState === 'testing' && (testPhase === 'memory' || testPhase === 'cache') && (
           <div className="absolute inset-0 bg-[var(--neon-cyan)]/10 animate-pulse" />
         )}
+
+        {/* Standby overlay */}
+        {isStandby && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="font-mono text-[7px] text-white/30">STANDBY</span>
+          </div>
+        )}
       </div>
 
       {/* Status bar with fixed layout */}
       <div className="flex items-center font-mono text-[7px] mt-1">
         <span className={cn(
           'w-12 shrink-0 transition-colors',
-          nodesActive ? 'text-[var(--neon-cyan)]' : 'text-white/30'
+          nodesActive && !isStandby ? 'text-[var(--neon-cyan)]' : 'text-white/30'
         )}>
-          {displayValues.flops.toFixed(1)} PFLOPS
+          {isStandby ? '---' : `${displayFlops.toFixed(1)} PFLOPS`}
         </span>
         <span className={cn(
           'flex-1 text-[5px] text-center transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
           deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
           deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+          deviceState === 'shutdown' ? 'text-[var(--neon-red)]' :
           testResult === 'pass' ? 'text-[var(--neon-green)]' :
           testResult === 'fail' ? 'text-[var(--neon-red)]' :
           'text-white/30'
@@ -8420,7 +8721,7 @@ export function SupercomputerArray({
           'w-10 shrink-0 text-right transition-colors',
           'text-white/40'
         )}>
-          {displayValues.load}% LOAD
+          {isStandby ? '---' : `${Math.round(displayLoad)}% LOAD`}
         </span>
       </div>
     </PanelFrame>

@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { PanelFrame } from '../PanelFrame'
 import { LED } from '../controls/LED'
 import { Knob } from '../controls/Knob'
+import { useQUAManagerOptional } from '@/contexts/QUAManager'
 
 type DeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
 type TestPhase = 'quantum-core' | 'sensors' | 'neural-net' | 'calibration' | 'complete' | null
@@ -25,28 +26,44 @@ interface ScanResult {
 }
 
 export function QuantumAnalyzer({ className, onTest, onReset }: QuantumAnalyzerProps) {
-  // Device state machine
-  const [deviceState, setDeviceState] = useState<DeviceState>('booting')
+  const mgr = useQUAManagerOptional()
+
+  // Device state machine - use manager if available
+  const [localDeviceState, setDeviceState] = useState<DeviceState>('booting')
   const [testPhase, setTestPhase] = useState<TestPhase>(null)
+
+  // Map manager state to component state
+  const deviceState: DeviceState = mgr
+    ? (mgr.deviceState === 'standby' || mgr.deviceState === 'shutdown' ? 'offline' : mgr.deviceState as DeviceState)
+    : localDeviceState
 
   // Power state (derived from device state)
   const isPowered = deviceState === 'online' || deviceState === 'testing'
   const isBooting = deviceState === 'booting'
   const [bootProgress, setBootProgress] = useState(0)
 
-  // Analysis mode
-  const [mode, setMode] = useState<AnalysisMode>('ANOMALY')
+  // Analysis mode - use manager if available
+  const [localMode, setLocalMode] = useState<AnalysisMode>('ANOMALY')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisProgress, setAnalysisProgress] = useState(0)
+  const mode: AnalysisMode = mgr?.mode ?? localMode
+  const setMode = mgr ? mgr.setMode : setLocalMode
 
-  // Control values
-  const [sensitivity, setSensitivity] = useState(65)
-  const [depth, setDepth] = useState(50)
-  const [frequency, setFrequency] = useState(40)
+  // Control values - use manager if available
+  const [localSensitivity, setLocalSensitivity] = useState(65)
+  const [localDepth, setLocalDepth] = useState(50)
+  const [localFrequency, setLocalFrequency] = useState(40)
+  const sensitivity = mgr?.sensitivity ?? localSensitivity
+  const setSensitivity = mgr ? mgr.setSensitivity : setLocalSensitivity
+  const depth = mgr?.depth ?? localDepth
+  const setDepth = mgr ? mgr.setDepth : setLocalDepth
+  const frequency = mgr?.frequency ?? localFrequency
+  const setFrequency = mgr ? mgr.setFrequency : setLocalFrequency
 
   // Results
   const [scanResults, setScanResults] = useState<ScanResult[]>([])
   const [outputLog, setOutputLog] = useState<string[]>([])
+
 
   // Waveform data for display
   const [waveformData, setWaveformData] = useState<number[]>(Array(64).fill(50))
@@ -70,8 +87,29 @@ export function QuantumAnalyzer({ className, onTest, onReset }: QuantumAnalyzerP
     return positions[Math.floor(Math.random() * positions.length)]
   })
 
-  // Boot sequence effect
+  // Sync output log with manager state transitions
+  const prevMgrState = useRef(mgr?.deviceState)
   useEffect(() => {
+    if (!mgr) return
+    const prev = prevMgrState.current
+    prevMgrState.current = mgr.deviceState
+    if (prev !== 'online' && mgr.deviceState === 'online' && outputLog.length === 0) {
+      setOutputLog([
+        'QUANTUM ANALYZER v3.7.2',
+        '─────────────────────────────',
+        'QUANTUM CORE: INITIALIZED',
+        'SENSOR ARRAY: CALIBRATED',
+        'NEURAL NETWORK: ONLINE',
+        'ANALYSIS ENGINE: READY',
+        '─────────────────────────────',
+        '> System ready. Select analysis mode.',
+      ])
+    }
+  }, [mgr, mgr?.deviceState, outputLog.length])
+
+  // Boot sequence effect (only for local state - manager handles its own boot)
+  useEffect(() => {
+    if (mgr) return
     if (deviceState !== 'booting') return
 
     setBootProgress(0)
@@ -102,51 +140,78 @@ export function QuantumAnalyzer({ className, onTest, onReset }: QuantumAnalyzerP
 
   // Power toggle
   const handlePowerToggle = () => {
+    if (mgr) {
+      if (isPowered) {
+        mgr.powerOff()
+        setOutputLog([])
+        setScanResults([])
+        setAnalysisProgress(0)
+      } else {
+        mgr.powerOn()
+      }
+      return
+    }
     if (isPowered) {
-      // Shutdown
       setDeviceState('offline')
       setBootProgress(0)
       setOutputLog([])
       setScanResults([])
       setAnalysisProgress(0)
     } else {
-      // Boot
       setDeviceState('booting')
     }
   }
 
-  // Test sequence
+  // Test handler
   const handleTest = () => {
     if (deviceState !== 'online') return
-    setDeviceState('testing')
     onTest?.()
 
-    const runTest = async () => {
-      setOutputLog(prev => [...prev, '', '> INITIATING SYSTEM TEST...'])
-      setTestPhase('quantum-core')
-      setOutputLog(prev => [...prev, '  [TEST] Quantum core integrity...'])
-      await new Promise(r => setTimeout(r, 500))
-      setTestPhase('sensors')
-      setOutputLog(prev => [...prev, '  [TEST] Sensor array response...'])
-      await new Promise(r => setTimeout(r, 400))
-      setTestPhase('neural-net')
-      setOutputLog(prev => [...prev, '  [TEST] Neural network paths...'])
-      await new Promise(r => setTimeout(r, 450))
-      setTestPhase('calibration')
-      setOutputLog(prev => [...prev, '  [TEST] Calibration verification...'])
-      await new Promise(r => setTimeout(r, 400))
-      setTestPhase('complete')
-      setOutputLog(prev => [...prev, '  └─ ALL TESTS PASSED', '> System test complete.'])
-      await new Promise(r => setTimeout(r, 300))
-      setTestPhase(null)
-      setDeviceState('online')
+    if (mgr) {
+      mgr.runTest()
+    } else {
+      setDeviceState('testing')
+      setTimeout(() => {
+        setTestPhase(null)
+        setDeviceState('online')
+      }, 2000)
     }
-    runTest()
+
+    setOutputLog([
+      '',
+      '> QUANTUM ANALYZER DIAGNOSTICS',
+      '',
+      '  ■ QUANTUM CORE ─────── OK',
+      '  ■ SENSORS ──────────── OK',
+      '  ■ NEURAL NET ─────────── OK',
+      '  ■ CALIBRATION ────────── OK',
+      '',
+      '═══════════════════════════════',
+      '  ╔═══════════════════════════╗',
+      '  ║   ALL SYSTEMS NOMINAL     ║',
+      '  ║   4/4 TESTS PASSED        ║',
+      `  ║   COHERENCE: ${mgr?.coherence ?? 87}%${' '.repeat(12 - String(mgr?.coherence ?? 87).length)}║`,
+      '  ╚═══════════════════════════╝',
+      '═══════════════════════════════',
+      '',
+      '> System test complete.',
+    ])
   }
 
   // Reboot sequence
   const handleReboot = () => {
     onReset?.()
+
+    if (mgr) {
+      setOutputLog(prev => [...prev, '', '> SYSTEM REBOOT INITIATED...'])
+      setScanResults([])
+      setAnalysisProgress(0)
+      mgr.reboot().then(() => {
+        setOutputLog(['QUANTUM ANALYZER v3.7.2', '─────────────────────────────', '> System ready. Select analysis mode.'])
+      })
+      return
+    }
+
     setDeviceState('rebooting')
     setTestPhase(null)
     setOutputLog(prev => [...prev, '', '> SYSTEM REBOOT INITIATED...'])
@@ -611,9 +676,9 @@ export function QuantumAnalyzer({ className, onTest, onReset }: QuantumAnalyzerP
         <div className="flex items-center gap-2">
           <span className="font-mono text-[6px] text-white/30">QUANTUM COHERENCE</span>
           <div className="w-12 h-1.5 bg-[#1a1a2a] rounded overflow-hidden">
-            <div className="h-full bg-[var(--neon-cyan)]" style={{ width: isPowered ? '87%' : '0%' }} />
+            <div className="h-full bg-[var(--neon-cyan)]" style={{ width: isPowered ? `${mgr?.coherence ?? 87}%` : '0%' }} />
           </div>
-          <span className="font-mono text-[6px] text-[var(--neon-cyan)]">{isPowered ? '87%' : '0%'}</span>
+          <span className="font-mono text-[6px] text-[var(--neon-cyan)]">{isPowered ? `${mgr?.coherence ?? 87}%` : '0%'}</span>
           {/* Company logo - footer-right position */}
           {logoPosition === 'footer-right' && (
             <span

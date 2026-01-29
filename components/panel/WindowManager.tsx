@@ -140,24 +140,6 @@ export function WindowManagerProvider({ children, className }: WindowManagerProv
             borderRadius: '2px',
           }}
         >
-          {/* Wear marks and scratches */}
-          <div
-            className="absolute inset-0 rounded-sm overflow-hidden"
-            style={{
-              backgroundImage: `
-                repeating-linear-gradient(0deg, transparent 0px, transparent 8px, rgba(0,0,0,0.4) 8px, rgba(0,0,0,0.4) 9px, transparent 9px, transparent 20px),
-                repeating-linear-gradient(0deg, transparent 0px, transparent 15px, rgba(255,255,255,0.06) 15px, rgba(255,255,255,0.06) 16px)
-              `,
-            }}
-          />
-          {/* Deep scratches */}
-          <div className="absolute top-[8%] left-0.5 right-0.5 h-px bg-black/60" />
-          <div className="absolute top-[25%] left-0 right-0.5 h-px bg-black/40" />
-          <div className="absolute top-[63%] left-0.5 right-0 h-px bg-black/50" />
-          {/* Rust spots */}
-          <div className="absolute top-[15%] left-0 right-0 h-1.5 bg-gradient-to-r from-transparent via-[#4a3020]/50 to-transparent" />
-          <div className="absolute top-[45%] left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3a2515]/40 to-transparent" />
-          <div className="absolute top-[72%] left-0 right-0 h-1.5 bg-gradient-to-r from-transparent via-[#4a3525]/45 to-transparent" />
           {/* Top cap - rounded metal end */}
           <div className="absolute top-0 left-0 right-0 h-3 rounded-t-sm" style={{ background: 'linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 50%, transparent 100%)' }} />
           {/* Bottom cap - rounded metal end */}
@@ -178,24 +160,6 @@ export function WindowManagerProvider({ children, className }: WindowManagerProv
             borderRadius: '2px',
           }}
         >
-          {/* Wear marks and scratches */}
-          <div
-            className="absolute inset-0 rounded-sm overflow-hidden"
-            style={{
-              backgroundImage: `
-                repeating-linear-gradient(0deg, transparent 0px, transparent 12px, rgba(0,0,0,0.35) 12px, rgba(0,0,0,0.35) 13px, transparent 13px, transparent 25px),
-                repeating-linear-gradient(0deg, transparent 0px, transparent 18px, rgba(255,255,255,0.05) 18px, rgba(255,255,255,0.05) 19px)
-              `,
-            }}
-          />
-          {/* Deep scratches */}
-          <div className="absolute top-[12%] left-0 right-0.5 h-px bg-black/50" />
-          <div className="absolute top-[38%] left-0.5 right-0 h-px bg-black/45" />
-          <div className="absolute top-[78%] left-0 right-0.5 h-px bg-black/55" />
-          {/* Rust spots */}
-          <div className="absolute top-[22%] left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3a2515]/45 to-transparent" />
-          <div className="absolute top-[55%] left-0 right-0 h-1.5 bg-gradient-to-r from-transparent via-[#4a3020]/50 to-transparent" />
-          <div className="absolute top-[85%] left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#3a2520]/40 to-transparent" />
           {/* Top cap - rounded metal end */}
           <div className="absolute top-0 left-0 right-0 h-3 rounded-t-sm" style={{ background: 'linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 50%, transparent 100%)' }} />
           {/* Bottom cap - rounded metal end */}

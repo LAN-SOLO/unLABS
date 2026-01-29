@@ -1,8 +1,55 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { Terminal } from '@/components/terminal'
+import { ScrewButton } from '@/components/panel/ScrewButton'
+import { useScrewButtonManagerOptional } from '@/contexts/ScrewButtonManager'
+
+// CRT color themes
+const CRT_THEMES = [
+  { name: 'PHOSPHOR',  fg: '#33ff33', glow: '34,197,94',   screen: '#0a0f0a', bar: '#0a1a0a' },
+  { name: 'AMBER',     fg: '#ffaa00', glow: '255,170,0',   screen: '#0f0d08', bar: '#1a1508' },
+  { name: 'CYAN',      fg: '#00ffff', glow: '0,255,255',   screen: '#080f0f', bar: '#0a1a1a' },
+  { name: 'HOT PINK',  fg: '#ff3399', glow: '255,51,153',  screen: '#0f080c', bar: '#1a0a14' },
+  { name: 'ICE BLUE',  fg: '#66aaff', glow: '102,170,255', screen: '#080a0f', bar: '#0a0e1a' },
+  { name: 'LIME',      fg: '#aaff00', glow: '170,255,0',   screen: '#0c0f08', bar: '#141a0a' },
+  { name: 'VIOLET',    fg: '#aa66ff', glow: '170,102,255', screen: '#0c080f', bar: '#140a1a' },
+  { name: 'RED',       fg: '#ff3333', glow: '255,51,51',   screen: '#0f0808', bar: '#1a0a0a' },
+  { name: 'WHITE',     fg: '#cccccc', glow: '200,200,200', screen: '#0a0a0a', bar: '#111111' },
+  { name: 'SOLAR',     fg: '#ff8800', glow: '255,136,0',   screen: '#0f0c08', bar: '#1a140a' },
+  // Strange themes
+  { name: 'ACID',      fg: '#39ff14', glow: '57,255,20',   screen: '#0d0f04', bar: '#0a0d02' },
+  { name: 'BLOODMOON', fg: '#cc0033', glow: '204,0,51',    screen: '#10050a', bar: '#180610' },
+  { name: 'VOID',      fg: '#4400aa', glow: '68,0,170',    screen: '#06040c', bar: '#0a0614' },
+  { name: 'RUST',      fg: '#b85c2a', glow: '184,92,42',   screen: '#0e0a06', bar: '#16100a' },
+  { name: 'PLASMA',    fg: '#ff00ff', glow: '255,0,255',    screen: '#0f040f', bar: '#1a081a' },
+  { name: 'TOXIC',     fg: '#ccff00', glow: '204,255,0',    screen: '#0c0e04', bar: '#14180a' },
+  { name: 'GHOST',     fg: '#556677', glow: '85,102,119',   screen: '#070808', bar: '#0c0e0e' },
+  { name: 'CORAL',     fg: '#ff6f61', glow: '255,111,97',   screen: '#0f0908', bar: '#1a100e' },
+  { name: 'MATRIX',    fg: '#003b00', glow: '0,59,0',       screen: '#010400', bar: '#020600' },
+  { name: 'GLITCH',    fg: '#fe01b1', glow: '254,1,177',    screen: '#0e020c', bar: '#160416' },
+] as const
+
+// Hue rotation from base green (#33ff33 ≈ 120deg) to each theme's fg color
+function getHueShift(index: number): number {
+  const hueShifts = [
+    //green amber cyan  pink  blue  lime  violet red  white solar
+    0,     -75,   60,   -180, -150, -30,  -210, -120, 0,   -90,
+    //acid  blood void  rust  plasma toxic ghost coral matrix glitch
+    -5,    -135,  -240, -100, -180, -45,  -150, -110, 0,    -175,
+  ]
+  return hueShifts[index] ?? 0
+}
+function getSaturation(index: number): number {
+  const saturations = [
+    //green amber cyan pink blue lime violet red white solar
+    1,     1.2,  1,   1.2, 0.9, 1.1, 1,    1.2, 0,   1.2,
+    //acid  blood void rust plasma toxic ghost coral matrix glitch
+    1.4,   1.5,  1.3, 0.7, 1.8,  1.3, 0.3,  0.9, 0.6,  1.6,
+  ]
+  return saturations[index] ?? 1
+}
 
 interface TerminalModuleProps {
   userId: string
@@ -14,11 +61,29 @@ interface TerminalModuleProps {
 // Screw component for corners
 function Screw({ className }: { className?: string }) {
   return (
-    <div className={cn(
-      'w-3 h-3 rounded-full bg-gradient-to-br from-[#4a4a4a] to-[#2a2a2a] border border-[#1a1a1a] flex items-center justify-center',
-      className
-    )}>
-      <div className="w-1.5 h-0.5 bg-[#1a1a1a] rotate-45" />
+    <div
+      className={cn(
+        'w-4 h-4 rounded-full flex items-center justify-center relative',
+        className
+      )}
+      style={{
+        background: 'radial-gradient(circle at 40% 35%, #a8acb2 0%, #8a8e94 20%, #6e7278 45%, #555960 70%, #484c52 100%)',
+        boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.25), inset 0 -1px 1px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.6), 0 0 0 0.5px #33373d',
+      }}
+    >
+      {/* Outer rim / countersink ring */}
+      <div className="absolute inset-[1px] rounded-full" style={{
+        boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.15), inset 0 0 0 2px rgba(255,255,255,0.06)',
+      }} />
+      {/* Phillips cross slot */}
+      <div className="absolute w-[7px] h-[1.5px] rounded-[0.5px]" style={{
+        background: 'linear-gradient(180deg, #2a2e34 0%, #3a3e44 50%, #2a2e34 100%)',
+        boxShadow: '0 0.5px 0 rgba(255,255,255,0.08)',
+      }} />
+      <div className="absolute w-[1.5px] h-[7px] rounded-[0.5px]" style={{
+        background: 'linear-gradient(90deg, #2a2e34 0%, #3a3e44 50%, #2a2e34 100%)',
+        boxShadow: '0.5px 0 0 rgba(255,255,255,0.08)',
+      }} />
     </div>
   )
 }
@@ -31,7 +96,7 @@ function VentHoles({ count = 8, vertical = false }: { count?: number; vertical?:
         <div
           key={i}
           className={cn(
-            'bg-[#0a0a0a] rounded-sm',
+            'bg-[#2a2e34] rounded-sm',
             vertical ? 'w-3 h-0.5' : 'w-0.5 h-3'
           )}
         />
@@ -133,8 +198,19 @@ export function TerminalModule({
   balance,
   className,
 }: TerminalModuleProps) {
+  const screwManager = useScrewButtonManagerOptional()
   const [time, setTime] = useState<string>('--:--:--')
   const [powerLed, setPowerLed] = useState(true)
+  const [themeIndex, setThemeIndex] = useState(0)
+  const theme = CRT_THEMES[themeIndex]
+
+  const cycleTheme = useCallback(() => {
+    setThemeIndex(prev => (prev + 1) % CRT_THEMES.length)
+  }, [])
+
+  const resetTheme = useCallback(() => {
+    setThemeIndex(0)
+  }, [])
 
   useEffect(() => {
     const updateTime = () => {
@@ -174,27 +250,63 @@ export function TerminalModule({
         flexGrow: 0,
       }}
     >
-      {/* OUTER BEZEL - Main frame */}
+      {/* OUTER BEZEL - Worn brushed steel frame */}
       <div className="absolute inset-0 rounded-lg overflow-hidden"
         style={{
-          background: 'linear-gradient(145deg, #3a3a3a 0%, #252525 50%, #1a1a1a 100%)',
+          backgroundImage: `
+            repeating-linear-gradient(
+              0deg,
+              transparent 0px,
+              rgba(255,255,255,0.04) 1px,
+              transparent 2px,
+              rgba(0,0,0,0.03) 3px,
+              transparent 4px
+            ),
+            repeating-linear-gradient(
+              120deg,
+              transparent 0px,
+              transparent 30px,
+              rgba(255,255,255,0.02) 31px,
+              transparent 32px,
+              transparent 55px,
+              rgba(0,0,0,0.015) 56px,
+              transparent 57px
+            ),
+            radial-gradient(ellipse at 15% 10%, rgba(255,255,255,0.06) 0%, transparent 40%),
+            radial-gradient(ellipse at 85% 90%, rgba(0,0,0,0.08) 0%, transparent 40%),
+            linear-gradient(170deg, #686e76 0%, #5c6168 15%, #606670 30%, #585d64 48%, #636870 60%, #5a5f66 75%, #5e636a 90%, #555a62 100%)
+          `,
           boxShadow: `
-            inset 2px 2px 4px rgba(255,255,255,0.1),
-            inset -2px -2px 4px rgba(0,0,0,0.5),
+            inset 2px 2px 4px rgba(255,255,255,0.12),
+            inset -2px -2px 4px rgba(0,0,0,0.4),
             0 4px 20px rgba(0,0,0,0.8),
             0 0 40px rgba(0,0,0,0.5)
           `,
         }}
       >
         {/* Top bezel section */}
-        <div className="h-8 flex items-center justify-between px-3 border-b border-[#1a1a1a]"
+        <div className="h-8 flex items-center justify-between px-3 border-b border-[#484c52]"
           style={{
-            background: 'linear-gradient(180deg, #3a3a3a 0%, #2a2a2a 100%)',
+            backgroundImage: `
+              repeating-linear-gradient(0deg, transparent 0px, rgba(255,255,255,0.035) 1px, transparent 2px, transparent 4px),
+              linear-gradient(180deg, #6a6f76 0%, #5a5f66 100%)
+            `,
           }}
         >
           {/* Left: Brand and vents */}
           <div className="flex items-center gap-3">
-            <Screw />
+            {screwManager ? (
+              <ScrewButton
+                position="top-left"
+                featureId="SB-01"
+                isUnlocked={screwManager.isUnlocked('SB-01')}
+                isActive={screwManager.isActive('SB-01')}
+                onActivate={() => screwManager.activate('SB-01')}
+                onDeactivate={() => screwManager.deactivate('SB-01')}
+              />
+            ) : (
+              <Screw />
+            )}
             <VentHoles count={6} />
             <div className="flex flex-col">
               <span className="font-mono text-[8px] text-[#8a8a8a] font-bold tracking-wider">UNSTABLE</span>
@@ -229,7 +341,18 @@ export function TerminalModule({
               </div>
             </div>
             <VentHoles count={6} />
-            <Screw />
+            {screwManager ? (
+              <ScrewButton
+                position="top-right"
+                featureId="SB-02"
+                isUnlocked={screwManager.isUnlocked('SB-02')}
+                isActive={screwManager.isActive('SB-02')}
+                onActivate={() => screwManager.activate('SB-02')}
+                onDeactivate={() => screwManager.deactivate('SB-02')}
+              />
+            ) : (
+              <Screw />
+            )}
           </div>
         </div>
 
@@ -249,11 +372,11 @@ export function TerminalModule({
           >
             {/* SCREEN GLASS - Curved CRT effect */}
             <div
-              className="relative w-full h-full rounded overflow-hidden"
+              className="relative w-full h-full rounded overflow-hidden transition-colors duration-500"
               style={{
-                background: '#0a0f0a',
+                background: theme.screen,
                 boxShadow: `
-                  inset 0 0 100px rgba(34, 197, 94, 0.03),
+                  inset 0 0 100px rgba(${theme.glow}, 0.03),
                   inset 0 0 30px rgba(0, 0, 0, 0.8)
                 `,
               }}
@@ -263,7 +386,7 @@ export function TerminalModule({
                 className="pointer-events-none absolute inset-0 z-20"
                 style={{
                   background: `
-                    radial-gradient(ellipse at center, transparent 0%, transparent 70%, rgba(0,0,0,0.3) 100%)
+                    radial-gradient(ellipse at center, transparent 0%, transparent 75%, rgba(0,0,0,0.15) 100%)
                   `,
                   borderRadius: '4px',
                 }}
@@ -274,15 +397,15 @@ export function TerminalModule({
                 className="pointer-events-none absolute inset-0 z-10"
                 style={{
                   background:
-                    'repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 2px)',
+                    'repeating-linear-gradient(0deg, rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 1px, transparent 1px, transparent 2px)',
                 }}
               />
 
               {/* Horizontal scan line animation */}
               <div
-                className="pointer-events-none absolute left-0 right-0 h-[2px] z-10 opacity-30"
+                className="pointer-events-none absolute left-0 right-0 h-[2px] z-10 opacity-15"
                 style={{
-                  background: 'linear-gradient(180deg, transparent, rgba(34,197,94,0.5), transparent)',
+                  background: `linear-gradient(180deg, transparent, rgba(${theme.glow},0.5), transparent)`,
                   animation: 'scanline 8s linear infinite',
                 }}
               />
@@ -291,7 +414,7 @@ export function TerminalModule({
               <div
                 className="pointer-events-none absolute inset-0 z-[5]"
                 style={{
-                  boxShadow: 'inset 0 0 80px rgba(34, 197, 94, 0.06)',
+                  boxShadow: `inset 0 0 80px rgba(${theme.glow}, 0.06)`,
                 }}
               />
 
@@ -304,35 +427,50 @@ export function TerminalModule({
               />
 
               {/* Terminal title bar */}
-              <div className="relative z-[1] flex items-center justify-between px-2 py-1 border-b border-[var(--neon-green)]/20 bg-[#0a1a0a]/80">
+              <div
+                className="relative z-[1] flex items-center justify-between px-2 py-1 transition-colors duration-500"
+                style={{ borderBottom: `1px solid ${theme.fg}33`, background: `${theme.bar}cc` }}
+              >
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1">
                     <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-red)]/60" />
                     <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-amber)]/60" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-green)]/60" />
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: `${theme.fg}99` }} />
                   </div>
-                  <span className="text-[var(--neon-green)]/80 text-[9px] font-mono tracking-wide">
+                  <span className="text-[9px] font-mono tracking-wide transition-colors duration-500" style={{ color: `${theme.fg}cc` }}>
                     _unOS Terminal v1.0
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-green)] animate-pulse" />
-                  <span className="text-[7px] font-mono text-[var(--neon-green)]/60">ONLINE</span>
+                  <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: theme.fg }} />
+                  <span className="text-[7px] font-mono transition-colors duration-500" style={{ color: `${theme.fg}99` }}>ONLINE</span>
                 </div>
               </div>
 
               {/* Terminal content */}
-              <div className="relative z-[1] h-[calc(100%-44px)] overflow-hidden p-2">
-                <Terminal userId={userId} username={username} balance={balance} />
+              <div
+                className="relative z-[1] h-[calc(100%-44px)] overflow-hidden p-2 transition-colors duration-500 flex flex-col"
+                style={{
+                  '--tw-text-opacity': '1',
+                  color: theme.fg,
+                  caretColor: theme.fg,
+                } as React.CSSProperties}
+              >
+                <div className="flex flex-col flex-1 min-h-0" style={{ filter: themeIndex === 0 ? 'none' : `hue-rotate(${getHueShift(themeIndex)}deg) saturate(${getSaturation(themeIndex)})` }}>
+                  <Terminal userId={userId} username={username} balance={balance} themeIndex={themeIndex} setThemeIndex={setThemeIndex} themes={CRT_THEMES} />
+                </div>
               </div>
 
               {/* Terminal status bar */}
-              <div className="relative z-[1] flex items-center justify-between px-2 py-0.5 border-t border-[var(--neon-green)]/20 bg-[#0a1a0a]/80 text-[8px] font-mono">
-                <span className="text-[var(--neon-green)]/60">READY</span>
+              <div
+                className="relative z-[1] flex items-center justify-between px-2 py-0.5 text-[8px] font-mono transition-colors duration-500"
+                style={{ borderTop: `1px solid ${theme.fg}33`, background: `${theme.bar}cc` }}
+              >
+                <span style={{ color: `${theme.fg}99` }}>READY</span>
                 <div className="flex items-center gap-3">
-                  <span className="text-[var(--neon-green)]/40">MEM: 2.4M</span>
-                  <span className="text-[var(--neon-green)]/40">CPU: 12%</span>
-                  <span className="text-[var(--neon-green)]/80">{time}</span>
+                  <span style={{ color: `${theme.fg}66` }}>MEM: 2.4M</span>
+                  <span style={{ color: `${theme.fg}66` }}>CPU: 12%</span>
+                  <span style={{ color: `${theme.fg}cc` }}>{time}</span>
                 </div>
               </div>
             </div>
@@ -340,18 +478,32 @@ export function TerminalModule({
         </div>
 
         {/* Bottom bezel section */}
-        <div className="absolute bottom-0 left-0 right-0 h-10 flex items-center justify-between px-3 border-t border-[#3a3a3a]"
+        <div className="absolute bottom-0 left-0 right-0 h-10 flex items-center justify-between px-3 border-t border-[#6a6f76]"
           style={{
-            background: 'linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%)',
+            backgroundImage: `
+              repeating-linear-gradient(0deg, transparent 0px, rgba(255,255,255,0.035) 1px, transparent 2px, transparent 4px),
+              linear-gradient(180deg, #5e636a 0%, #525760 100%)
+            `,
           }}
         >
           {/* Left: Screw and model info */}
           <div className="flex items-center gap-3">
-            <Screw />
+            {screwManager ? (
+              <ScrewButton
+                position="bottom-left"
+                featureId="SB-03"
+                isUnlocked={screwManager.isUnlocked('SB-03')}
+                isActive={screwManager.isActive('SB-03')}
+                onActivate={() => screwManager.activate('SB-03')}
+                onDeactivate={() => screwManager.deactivate('SB-03')}
+              />
+            ) : (
+              <Screw />
+            )}
             <div className="flex items-center gap-2">
               <VentHoles count={4} vertical />
-              <div className="bg-[#1a1a1a] px-2 py-0.5 rounded border border-[#0a0a0a]">
-                <span className="font-mono text-[6px] text-[#4a4a4a]">MODEL: UDT-9000</span>
+              <div className="bg-[#3a3e44] px-2 py-0.5 rounded border border-[#33373d]">
+                <span className="font-mono text-[6px] text-[#8a8e94]">MODEL: UDT-9000</span>
               </div>
             </div>
           </div>
@@ -361,31 +513,56 @@ export function TerminalModule({
 
           {/* Right: Controls and screw */}
           <div className="flex items-center gap-3">
-            {/* Brightness/Contrast dials (decorative) */}
+            {/* Theme controls */}
             <div className="flex items-center gap-2">
               <div className="flex flex-col items-center">
-                <div className="w-4 h-4 rounded-full bg-gradient-to-br from-[#3a3a3a] to-[#1a1a1a] border border-[#0a0a0a] flex items-center justify-center">
-                  <div className="w-0.5 h-1.5 bg-[#5a5a5a] rounded" />
-                </div>
-                <span className="font-mono text-[4px] text-[#4a4a4a] mt-0.5">BRT</span>
+                <button
+                  onClick={cycleTheme}
+                  className="w-5 h-5 rounded-full border flex items-center justify-center cursor-pointer hover:brightness-110 active:brightness-90 transition-all"
+                  style={{
+                    background: `radial-gradient(circle at 38% 35%, #a8acb2 0%, #8a8e94 25%, #6e7278 50%, #555960 100%)`,
+                    borderColor: '#33373d',
+                    boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.2), 0 1px 2px rgba(0,0,0,0.5)',
+                  }}
+                  title={`Theme: ${theme.name}`}
+                >
+                  <div className="w-1 h-1 rounded-full" style={{ background: theme.fg, boxShadow: `0 0 3px ${theme.fg}` }} />
+                </button>
+                <span className="font-mono text-[4px] text-[#8a8e94] mt-0.5">CLR</span>
               </div>
               <div className="flex flex-col items-center">
-                <div className="w-4 h-4 rounded-full bg-gradient-to-br from-[#3a3a3a] to-[#1a1a1a] border border-[#0a0a0a] flex items-center justify-center">
-                  <div className="w-0.5 h-1.5 bg-[#5a5a5a] rounded rotate-45" />
-                </div>
-                <span className="font-mono text-[4px] text-[#4a4a4a] mt-0.5">CON</span>
+                <button
+                  onClick={resetTheme}
+                  className="w-5 h-5 rounded-full border flex items-center justify-center cursor-pointer hover:brightness-110 active:brightness-90 transition-all"
+                  style={{
+                    background: `radial-gradient(circle at 38% 35%, #a8acb2 0%, #8a8e94 25%, #6e7278 50%, #555960 100%)`,
+                    borderColor: '#33373d',
+                    boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.2), 0 1px 2px rgba(0,0,0,0.5)',
+                  }}
+                  title="Reset theme"
+                >
+                  <div className="w-1.5 h-[1px] bg-[#a0a4aa] rounded-full" />
+                </button>
+                <span className="font-mono text-[4px] text-[#8a8e94] mt-0.5">RST</span>
               </div>
             </div>
             <VentHoles count={4} vertical />
-            <Screw />
+            {screwManager ? (
+              <ScrewButton
+                position="bottom-right"
+                featureId="SB-04"
+                isUnlocked={screwManager.isUnlocked('SB-04')}
+                isActive={screwManager.isActive('SB-04')}
+                onActivate={() => screwManager.activate('SB-04')}
+                onDeactivate={() => screwManager.deactivate('SB-04')}
+              />
+            ) : (
+              <Screw />
+            )}
           </div>
         </div>
 
-        {/* Corner screws */}
-        <Screw className="absolute top-2 left-2" />
-        <Screw className="absolute top-2 right-2" />
-        <Screw className="absolute bottom-2 left-2" />
-        <Screw className="absolute bottom-2 right-2" />
+        {/* Corner screws removed - top and bottom bezels have inline screws */}
       </div>
 
       {/* CSS for scanline animation */}

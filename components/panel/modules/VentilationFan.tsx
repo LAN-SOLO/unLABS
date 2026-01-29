@@ -6,6 +6,7 @@ import { PanelFrame } from '../PanelFrame'
 import { LED } from '../controls/LED'
 import { KnurledWheel } from '../controls/KnurledWheel'
 import { useThermalManagerOptional } from '@/contexts/ThermalManager'
+import { useVNTManagerOptional, VNT_FIRMWARE } from '@/contexts/VNTManager'
 
 interface VentilationFanProps {
   className?: string
@@ -17,96 +18,72 @@ interface VentilationFanProps {
 
 // Individual fan unit with retro industrial design
 function FanUnit({ speed, isOn }: { speed: number; isOn: boolean }) {
-  const rpm = isOn && speed > 0 ? Math.round((speed / 100) * 4000 + 800) : 0
   // Smooth duration calculation - faster at high speed
   const duration = isOn && speed > 0 ? Math.max(0.04, 1.2 - (speed / 100) * 1.15) : 0
+  const bladeColor = isOn ? '#8899aa' : '#556677'
+  const bladeColorDark = isOn ? '#556677' : '#334455'
+  const hubColor = isOn ? '#667788' : '#445566'
 
   return (
     <div className="relative w-full aspect-square bg-[#050508] rounded-sm border border-[#1a1a2a] flex items-center justify-center overflow-hidden">
-      {/* Outer casing ring - perfectly round */}
+      {/* Outer casing ring */}
       <div
         className="absolute rounded-full border-2 border-[#2a2a3a]"
         style={{
-          top: '4px',
-          left: '4px',
-          right: '4px',
-          bottom: '4px',
-          background: 'radial-gradient(circle at 30% 30%, #1a1a2a 0%, #0a0a0f 60%, #050508 100%)',
-          boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.8), inset 0 -1px 4px rgba(255,255,255,0.05)'
+          top: '3px',
+          left: '3px',
+          right: '3px',
+          bottom: '3px',
+          background: 'radial-gradient(circle at 30% 30%, #1a1a2a 0%, #0a0a12 60%, #050508 100%)',
+          boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.8), inset 0 -1px 4px rgba(255,255,255,0.05)',
+        }}
+      />
+
+      {/* SVG fan blades - rendered on top for guaranteed visibility */}
+      <svg
+        viewBox="-50 -50 100 100"
+        className="absolute"
+        style={{
+          top: '6px',
+          left: '6px',
+          right: '6px',
+          bottom: '6px',
+          width: 'calc(100% - 12px)',
+          height: 'calc(100% - 12px)',
+          animation: isOn && speed > 0 ? `smoothSpin ${duration}s linear infinite` : 'none',
+          willChange: 'transform',
         }}
       >
-        {/* Wire mesh grill */}
+        {/* 6 curved fan blades */}
+        {[0, 60, 120, 180, 240, 300].map((angle) => (
+          <path
+            key={angle}
+            d="M 0,-4 C 4,-6 10,-30 6,-44 C 5,-46 1,-46 0,-44 C -1,-46 -5,-46 -6,-44 C -10,-30 -4,-6 0,-4 Z"
+            transform={`rotate(${angle})`}
+            fill={bladeColor}
+            stroke={bladeColorDark}
+            strokeWidth="0.5"
+            opacity={isOn ? 0.9 : 0.7}
+          />
+        ))}
+        {/* Center hub */}
+        <circle cx="0" cy="0" r="8" fill={hubColor} stroke="#3a4a5a" strokeWidth="1.5" />
+        <circle cx="0" cy="0" r="3" fill="#3a4a5a" stroke="#2a3a4a" strokeWidth="0.5" />
+        {/* Hub highlight */}
+        <circle cx="-2" cy="-2" r="2" fill="rgba(255,255,255,0.1)" />
+      </svg>
+
+      {/* Glow effect when running */}
+      {isOn && speed > 0 && (
         <div
-          className="absolute inset-0 rounded-full opacity-20"
+          className="absolute rounded-full pointer-events-none"
           style={{
-            backgroundImage: `
-              linear-gradient(0deg, transparent 49%, #3a3a4a 49%, #3a3a4a 51%, transparent 51%),
-              linear-gradient(90deg, transparent 49%, #3a3a4a 49%, #3a3a4a 51%, transparent 51%)
-            `,
-            backgroundSize: '8px 8px'
+            top: '3px', left: '3px', right: '3px', bottom: '3px',
+            background: 'radial-gradient(circle at center, rgba(0,255,255,0.06) 0%, transparent 70%)',
+            animation: 'pulse 2s ease-in-out infinite',
           }}
         />
-
-        {/* Rotating fan assembly */}
-        <div
-          className="absolute inset-2 rounded-full"
-          style={{
-            animation: isOn && speed > 0 ? `smoothSpin ${duration}s linear infinite` : 'none',
-            willChange: 'transform',
-          }}
-        >
-          {/* 5 Fan blades */}
-          {[0, 72, 144, 216, 288].map((angle) => (
-            <div
-              key={angle}
-              className="absolute inset-0 flex items-center justify-center"
-              style={{ transform: `rotate(${angle}deg)` }}
-            >
-              <div
-                className="absolute w-[14%] origin-bottom"
-                style={{
-                  height: '42%',
-                  bottom: '50%',
-                  background: isOn
-                    ? 'linear-gradient(to right, #4a4a5a 0%, #6a6a7a 30%, #5a5a6a 70%, #3a3a4a 100%)'
-                    : 'linear-gradient(to right, #2a2a3a 0%, #3a3a4a 50%, #2a2a3a 100%)',
-                  borderRadius: '2px 2px 0 0',
-                  boxShadow: isOn ? '0 0 4px rgba(0,255,255,0.1)' : 'none',
-                  transform: 'skewX(-8deg)',
-                }}
-              />
-            </div>
-          ))}
-
-          {/* Center hub */}
-          <div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[22%] h-[22%] rounded-full"
-            style={{
-              background: 'radial-gradient(circle at 40% 40%, #4a4a5a 0%, #2a2a3a 50%, #1a1a2a 100%)',
-              boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.1), 0 2px 4px rgba(0,0,0,0.5)'
-            }}
-          >
-            {/* Center screw */}
-            <div
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40%] h-[40%] rounded-full"
-              style={{
-                background: 'linear-gradient(135deg, #5a5a6a 0%, #2a2a3a 100%)',
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Glow effect when running */}
-        {isOn && speed > 0 && (
-          <div
-            className="absolute inset-0 rounded-full pointer-events-none"
-            style={{
-              background: 'radial-gradient(circle at center, rgba(0,255,255,0.05) 0%, transparent 70%)',
-              animation: 'pulse 2s ease-in-out infinite',
-            }}
-          />
-        )}
-      </div>
+      )}
 
       {/* Corner screws */}
       {[
@@ -136,8 +113,12 @@ export function VentilationFan({
   systemLoad = 50,
   targetTemp = 32
 }: VentilationFanProps) {
-  // Try to use thermal manager if available
+  // Try to use managers if available
   const thermalManager = useThermalManagerOptional()
+  const vntManager = useVNTManagerOptional()
+  const vntOnline = vntManager ? vntManager.deviceState === 'online' : true
+  const vntTransitioning = vntManager ? ['booting', 'shutdown', 'testing', 'rebooting'].includes(vntManager.deviceState) : false
+  const vntStandby = vntManager ? vntManager.deviceState === 'standby' : false
 
   // Local state (used when thermal manager not available)
   const [localIsOn, setLocalIsOn] = useState(true)
@@ -258,11 +239,11 @@ export function VentilationFan({
   const showWarningLed = (overallStatus === 'critical' || overallStatus === 'warning') && flashOn
 
   return (
-    <PanelFrame variant="default" className={cn('flex flex-col flex-1 min-h-0', className)}>
+    <PanelFrame variant="default" className={cn('flex flex-col flex-1 min-h-0', vntStandby && 'opacity-60', className)}>
       {/* Header */}
       <div className="flex items-center justify-between px-1.5 py-1 border-b border-white/10 shrink-0">
         <div className="flex items-center gap-1">
-          <LED on={isOn} color={isOn ? 'green' : 'red'} size="sm" />
+          <LED on={isOn && !vntStandby} color={isOn && !vntStandby ? 'green' : 'red'} size="sm" />
           {/* Warning LED - flashes when overheating */}
           <LED
             on={showWarningLed}
@@ -270,46 +251,95 @@ export function VentilationFan({
             size="sm"
           />
           <span className="font-mono text-[7px] text-[var(--neon-cyan)] font-bold">{label}</span>
+          {/* VNT Power button */}
+          {vntManager && (
+            <button
+              onClick={() => vntStandby ? vntManager.powerOn() : vntManager.powerOff()}
+              disabled={vntTransitioning}
+              className="flex items-center justify-center rounded-full transition-all"
+              style={{
+                width: '12px',
+                height: '12px',
+                fontSize: '7px',
+                lineHeight: 1,
+                background: vntStandby ? '#1a1a2a' : 'rgba(0,255,255,0.15)',
+                border: `1px solid ${vntStandby ? '#333' : 'var(--neon-cyan)'}`,
+                color: vntStandby ? '#555' : 'var(--neon-cyan)',
+                boxShadow: vntStandby ? 'none' : '0 0 4px var(--neon-cyan)',
+                opacity: vntTransitioning ? 0.5 : 1,
+                cursor: vntTransitioning ? 'not-allowed' : 'pointer',
+              }}
+              title={vntStandby ? 'Power ON' : 'Power OFF'}
+            >
+              ⏻
+            </button>
+          )}
+          <span className="font-mono text-[5px] text-white/20">v{VNT_FIRMWARE.version}</span>
         </div>
-        <span className="font-mono text-[6px] text-white/40">{rpm} RPM</span>
+        <span className="font-mono text-[6px] text-white/40">{vntStandby ? '---' : `${rpm} RPM`}</span>
       </div>
 
       {/* 4 Fans Vertical Stack */}
       <div className="flex-1 min-h-0 p-1.5 flex flex-col gap-1">
         <div className="flex-1 flex flex-col gap-1 justify-center">
-          <FanUnit speed={speed} isOn={isOn} />
-          <FanUnit speed={speed} isOn={isOn} />
-          <FanUnit speed={speed} isOn={isOn} />
-          <FanUnit speed={speed} isOn={isOn} />
+          <FanUnit speed={speed} isOn={isOn && !vntStandby} />
+          <FanUnit speed={speed} isOn={isOn && !vntStandby} />
+          <FanUnit speed={speed} isOn={isOn && !vntStandby} />
+          <FanUnit speed={speed} isOn={isOn && !vntStandby} />
         </div>
 
-        {/* Temperature display with warning indicator */}
+        {/* Temperature display / status display */}
         <div className="flex justify-center shrink-0">
-          <div
-            className={cn(
-              "font-mono text-[9px] px-2 py-0.5 rounded border relative",
-              (overallStatus === 'critical' || overallStatus === 'warning') && "animate-pulse"
-            )}
-            style={{
-              color: getTempColor(),
-              borderColor: `${getTempColor()}50`,
-              backgroundColor: `${getTempColor()}10`,
-              textShadow: `0 0 6px ${getTempColor()}`,
-            }}
-          >
-            {temp.toFixed(1)}°C
-            {/* Overheat indicator */}
-            {(overallStatus === 'critical' || overallStatus === 'warning') && (
-              <span
-                className="absolute -right-1 -top-1 w-2 h-2 rounded-full"
-                style={{
-                  backgroundColor: overallStatus === 'critical' ? 'var(--neon-red)' : 'var(--neon-amber)',
-                  boxShadow: `0 0 6px ${overallStatus === 'critical' ? 'var(--neon-red)' : 'var(--neon-amber)'}`,
-                  animation: 'pulse 0.5s ease-in-out infinite',
-                }}
-              />
-            )}
-          </div>
+          {vntTransitioning ? (
+            <div
+              className="font-mono text-[8px] px-2 py-0.5 rounded border animate-pulse"
+              style={{
+                color: 'var(--neon-amber)',
+                borderColor: 'rgba(255,191,0,0.3)',
+                backgroundColor: 'rgba(255,191,0,0.05)',
+                textShadow: '0 0 6px var(--neon-amber)',
+              }}
+            >
+              {vntManager?.statusMessage ?? '...'}
+            </div>
+          ) : vntStandby ? (
+            <div
+              className="font-mono text-[8px] px-2 py-0.5 rounded border"
+              style={{
+                color: '#555',
+                borderColor: '#333',
+                backgroundColor: '#111',
+              }}
+            >
+              STANDBY
+            </div>
+          ) : (
+            <div
+              className={cn(
+                "font-mono text-[9px] px-2 py-0.5 rounded border relative",
+                (overallStatus === 'critical' || overallStatus === 'warning') && "animate-pulse"
+              )}
+              style={{
+                color: getTempColor(),
+                borderColor: `${getTempColor()}50`,
+                backgroundColor: `${getTempColor()}10`,
+                textShadow: `0 0 6px ${getTempColor()}`,
+              }}
+            >
+              {temp.toFixed(1)}°C
+              {/* Overheat indicator */}
+              {(overallStatus === 'critical' || overallStatus === 'warning') && (
+                <span
+                  className="absolute -right-1 -top-1 w-2 h-2 rounded-full"
+                  style={{
+                    backgroundColor: overallStatus === 'critical' ? 'var(--neon-red)' : 'var(--neon-amber)',
+                    boxShadow: `0 0 6px ${overallStatus === 'critical' ? 'var(--neon-red)' : 'var(--neon-amber)'}`,
+                    animation: 'pulse 0.5s ease-in-out infinite',
+                  }}
+                />
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -324,7 +354,7 @@ export function VentilationFan({
               min={0}
               max={100}
               onChange={handleSpeedChange}
-              disabled={!isOn}
+              disabled={!isOn || vntStandby}
               label="SPD"
               size="sm"
             />
@@ -338,7 +368,7 @@ export function VentilationFan({
                 <button
                   key={m}
                   onClick={() => handleModeChange(m)}
-                  disabled={!isOn}
+                  disabled={!isOn || vntStandby}
                   className={cn(
                     'py-0.5 rounded font-mono text-[5px] transition-all border',
                     mode === m

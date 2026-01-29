@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import type { TerminalLine } from '@/lib/terminal/types'
 
 interface TerminalOutputProps {
@@ -10,10 +10,19 @@ interface TerminalOutputProps {
 
 export function TerminalOutput({ lines, isTyping }: TerminalOutputProps) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const isUserScrolledUp = useRef(false)
 
-  // Auto-scroll to bottom
+  // Track whether user has scrolled away from the bottom
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    isUserScrolledUp.current = distanceFromBottom > 30
+  }, [])
+
+  // Auto-scroll to bottom only if user hasn't scrolled up
   useEffect(() => {
-    if (containerRef.current) {
+    if (containerRef.current && !isUserScrolledUp.current) {
       containerRef.current.scrollTop = containerRef.current.scrollHeight
     }
   }, [lines, isTyping])
@@ -36,7 +45,8 @@ export function TerminalOutput({ lines, isTyping }: TerminalOutputProps) {
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-y-auto font-mono text-[10px] leading-tight"
+      onScroll={handleScroll}
+      className="flex-1 min-h-0 overflow-y-auto font-mono text-[10px] leading-tight"
       style={{ fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace' }}
     >
       <pre className="whitespace-pre">

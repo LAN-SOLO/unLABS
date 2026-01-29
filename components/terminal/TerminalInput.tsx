@@ -6,12 +6,14 @@ interface TerminalInputProps {
   onSubmit: (command: string) => void
   onNavigateHistory: (direction: 'up' | 'down') => string
   disabled?: boolean
+  prompt?: string
 }
 
 export function TerminalInput({
   onSubmit,
   onNavigateHistory,
   disabled = false,
+  prompt = '>',
 }: TerminalInputProps) {
   const [value, setValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -47,7 +49,7 @@ export function TerminalInput({
       className="flex items-center gap-2 border-t border-green-500/30 pt-2 mt-2 cursor-text"
       onClick={handleContainerClick}
     >
-      <span className="text-green-400 font-mono text-[10px] select-none">&gt;</span>
+      <span className="text-green-400 font-mono text-[10px] select-none whitespace-nowrap">{prompt}</span>
       <input
         ref={inputRef}
         type="text"
