@@ -6,6 +6,8 @@ import { PanelFrame } from '../PanelFrame'
 import { Knob } from '../controls/Knob'
 import { LED } from '../controls/LED'
 import { usePowerManagerOptional } from '@/contexts/PowerManager'
+import { usePWBManagerOptional } from '@/contexts/PWBManager'
+import { useBTKManagerOptional } from '@/contexts/BTKManager'
 import type { TechTreeProgress } from '@/app/(game)/terminal/actions/equipment'
 
 interface EquipmentTileProps {
@@ -2725,19 +2727,22 @@ export function Interpolator({
 // ==================================================
 // BASIC TOOLKIT - Tier 1 Hand Tools
 // ==================================================
-type ToolkitState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type ToolkitState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
 type ToolkitTestPhase = 'probe' | 'clamp' | 'laser' | 'drill' | 'calibrate' | 'complete' | null
-type ToolkitBootPhase = 'init' | 'tools' | 'interface' | 'ready' | null
+type ToolkitBootPhase = 'post' | 'tools' | 'interface' | 'ready' | null
 
 interface BasicToolkitProps {
   className?: string
 }
 
 export function BasicToolkit({ className }: BasicToolkitProps) {
-  const [deviceState, setDeviceState] = useState<ToolkitState>('booting')
-  const [testPhase, setTestPhase] = useState<ToolkitTestPhase>(null)
-  const [bootPhase, setBootPhase] = useState<ToolkitBootPhase>('init')
-  const [selectedTool, setSelectedTool] = useState<string | null>(null)
+  const btk = useBTKManagerOptional()
+  const deviceState = btk?.deviceState ?? 'online'
+  const testPhase = btk?.testPhase ?? null
+  const bootPhase = btk?.bootPhase ?? null
+  const shutdownPhase = btk?.shutdownPhase ?? null
+  const selectedTool = btk?.selectedTool ?? null
+  const isPowered = btk?.isPowered ?? true
 
   // Random logo position (memoized on mount)
   const [logoPosition] = useState(() => {
@@ -2758,62 +2763,9 @@ export function BasicToolkit({ className }: BasicToolkitProps) {
     { name: 'DRILL', active: deviceState === 'online', color: 'var(--neon-amber)', testPhase: 'drill' as const },
   ]
 
-  // Boot sequence
-  useEffect(() => {
-    if (deviceState === 'booting') {
-      const bootSequence = async () => {
-        setBootPhase('init')
-        await new Promise(r => setTimeout(r, 400))
-        setBootPhase('tools')
-        await new Promise(r => setTimeout(r, 500))
-        setBootPhase('interface')
-        await new Promise(r => setTimeout(r, 400))
-        setBootPhase('ready')
-        await new Promise(r => setTimeout(r, 300))
-        setDeviceState('online')
-        setBootPhase(null)
-      }
-      bootSequence()
-    }
-  }, [deviceState])
-
-  // Test sequence handler
-  const runTest = useCallback(() => {
-    if (deviceState !== 'online') return
-    setDeviceState('testing')
-    const testSequence = async () => {
-      setTestPhase('probe')
-      await new Promise(r => setTimeout(r, 600))
-      setTestPhase('clamp')
-      await new Promise(r => setTimeout(r, 500))
-      setTestPhase('laser')
-      await new Promise(r => setTimeout(r, 700))
-      setTestPhase('drill')
-      await new Promise(r => setTimeout(r, 600))
-      setTestPhase('calibrate')
-      await new Promise(r => setTimeout(r, 500))
-      setTestPhase('complete')
-      await new Promise(r => setTimeout(r, 400))
-      setTestPhase(null)
-      setDeviceState('online')
-    }
-    testSequence()
-  }, [deviceState])
-
-  // Reboot handler
-  const reboot = useCallback(() => {
-    setDeviceState('rebooting')
-    setTestPhase(null)
-    setTimeout(() => {
-      setDeviceState('booting')
-    }, 800)
-  }, [])
-
-  // Tool select handler
-  const selectTool = useCallback((toolName: string) => {
-    if (deviceState !== 'online') return
-    setSelectedTool(prev => prev === toolName ? null : toolName)
-  }, [deviceState])
+  const runTest = useCallback(() => btk?.runTest(), [btk])
+  const reboot = useCallback(() => btk?.reboot(), [btk])
+  const selectTool = useCallback((toolName: string) => btk?.selectTool(toolName), [btk])
 
   const getStatusColor = () => {
     switch (deviceState) {
@@ -2821,7 +2773,8 @@ export function BasicToolkit({ className }: BasicToolkitProps) {
       case 'booting': return 'var(--neon-cyan)'
       case 'testing': return 'var(--neon-purple)'
       case 'rebooting': return 'var(--neon-amber)'
-      case 'offline': return 'var(--neon-red)'
+      case 'standby': return 'var(--neon-red)'
+      case 'shutdown': return 'var(--neon-red)'
       default: return 'var(--neon-green)'
     }
   }
@@ -2830,6 +2783,30 @@ export function BasicToolkit({ className }: BasicToolkitProps) {
     <PanelFrame variant="default" className={cn('p-2 relative overflow-hidden', className)}>
       {/* Round nano buttons with illuminated edges - top */}
       <div className="absolute top-1 right-1 flex gap-1 z-10">
+        {/* Power rocker */}
+        <button
+          onClick={() => {
+            if (deviceState === 'online') btk?.powerOff()
+            else if (deviceState === 'standby') btk?.powerOn()
+          }}
+          disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown'}
+          className="group relative"
+          title="Power"
+        >
+          <div
+            className="rounded-sm border transition-all"
+            style={{
+              width: '7px',
+              height: '3px',
+              background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+              borderColor: isPowered && deviceState !== 'standby' ? 'var(--neon-green)' : deviceState === 'standby' ? 'var(--neon-red)' : '#3a3a4a',
+              boxShadow: isPowered && deviceState !== 'standby'
+                ? '0 0 3px var(--neon-green)'
+                : deviceState === 'standby' ? '0 0 3px var(--neon-red)' : 'none',
+              opacity: deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown' ? 0.3 : 1,
+            }}
+          />
+        </button>
         {/* Test button */}
         <button
           onClick={runTest}
@@ -2921,18 +2898,18 @@ export function BasicToolkit({ className }: BasicToolkitProps) {
           <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
             <div className="flex items-center gap-2">
               <span className="font-mono text-[6px] text-[var(--neon-cyan)]">
-                {bootPhase === 'init' && 'INIT'}
+                {bootPhase === 'post' && 'POST'}
                 {bootPhase === 'tools' && 'TOOLS'}
                 {bootPhase === 'interface' && 'I/O'}
                 {bootPhase === 'ready' && 'READY'}
               </span>
               <div className="flex gap-0.5">
-                {['init', 'tools', 'interface', 'ready'].map((phase, i) => (
+                {['post', 'tools', 'interface', 'ready'].map((phase, i) => (
                   <div
                     key={phase}
                     className="w-1 h-1 rounded-full"
                     style={{
-                      backgroundColor: ['init', 'tools', 'interface', 'ready'].indexOf(bootPhase) >= i
+                      backgroundColor: ['post', 'tools', 'interface', 'ready'].indexOf(bootPhase) >= i
                         ? 'var(--neon-cyan)'
                         : '#333',
                       boxShadow: bootPhase === phase ? '0 0 4px var(--neon-cyan)' : 'none',
@@ -2949,6 +2926,15 @@ export function BasicToolkit({ className }: BasicToolkitProps) {
           <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
             <span className="font-mono text-[6px] text-[var(--neon-amber)] animate-pulse">
               REBOOTING...
+            </span>
+          </div>
+        )}
+
+        {/* Standby/Shutdown overlay */}
+        {(deviceState === 'standby' || deviceState === 'shutdown') && (
+          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
+            <span className="font-mono text-[6px] text-[var(--neon-red)]/60">
+              {shutdownPhase ? shutdownPhase.toUpperCase() : 'STANDBY'}
             </span>
           </div>
         )}
@@ -3980,7 +3966,7 @@ export function QuantumCompass({
 // ==================================================
 // PWB-001 - Tier 1 Mobile Bench for prototyping
 // ==================================================
-type WorkbenchState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type WorkbenchState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline' | 'standby' | 'shutdown'
 type WorkbenchTestPhase = 'motors' | 'clamps' | 'sensors' | 'calibrate' | 'complete' | null
 type WorkbenchBootPhase = 'init' | 'motors' | 'surface' | 'ready' | null
 
@@ -3995,10 +3981,15 @@ export function PortableWorkbench({
   craftingProgress = 35,
   className,
 }: PortableWorkbenchProps) {
-  const [deviceState, setDeviceState] = useState<WorkbenchState>('booting')
-  const [testPhase, setTestPhase] = useState<WorkbenchTestPhase>(null)
-  const [bootPhase, setBootPhase] = useState<WorkbenchBootPhase>('init')
-  const [activeSlot, setActiveSlot] = useState<number | null>(null)
+  const pwb = usePWBManagerOptional()
+
+  // Use manager state if available, otherwise fall back to local defaults
+  const deviceState = pwb?.deviceState ?? 'online'
+  const testPhase = pwb?.testPhase ?? null
+  const bootPhase = pwb?.bootPhase ?? null
+  const activeSlot = pwb?.activeSlot ?? null
+  const isPowered = pwb?.isPowered ?? true
+  const shutdownPhase = pwb?.shutdownPhase ?? null
 
   const isCrafting = craftingProgress > 0 && craftingProgress < 100
 
@@ -4019,61 +4010,10 @@ export function PortableWorkbench({
     return positions[Math.floor(Math.random() * positions.length)]
   })
 
-  // Boot sequence
-  useEffect(() => {
-    if (deviceState === 'booting') {
-      const bootSequence = async () => {
-        setBootPhase('init')
-        await new Promise(r => setTimeout(r, 350))
-        setBootPhase('motors')
-        await new Promise(r => setTimeout(r, 450))
-        setBootPhase('surface')
-        await new Promise(r => setTimeout(r, 400))
-        setBootPhase('ready')
-        await new Promise(r => setTimeout(r, 300))
-        setDeviceState('online')
-        setBootPhase(null)
-      }
-      bootSequence()
-    }
-  }, [deviceState])
-
-  // Test sequence handler
-  const runTest = useCallback(() => {
-    if (deviceState !== 'online') return
-    setDeviceState('testing')
-    const testSequence = async () => {
-      setTestPhase('motors')
-      await new Promise(r => setTimeout(r, 550))
-      setTestPhase('clamps')
-      await new Promise(r => setTimeout(r, 500))
-      setTestPhase('sensors')
-      await new Promise(r => setTimeout(r, 600))
-      setTestPhase('calibrate')
-      await new Promise(r => setTimeout(r, 500))
-      setTestPhase('complete')
-      await new Promise(r => setTimeout(r, 350))
-      setTestPhase(null)
-      setDeviceState('online')
-    }
-    testSequence()
-  }, [deviceState])
-
-  // Reboot handler
-  const reboot = useCallback(() => {
-    setDeviceState('rebooting')
-    setTestPhase(null)
-    setActiveSlot(null)
-    setTimeout(() => {
-      setDeviceState('booting')
-    }, 700)
-  }, [])
-
-  // Slot select handler
-  const selectSlot = useCallback((slotIndex: number) => {
-    if (deviceState !== 'online') return
-    setActiveSlot(prev => prev === slotIndex ? null : slotIndex)
-  }, [deviceState])
+  // Manager-driven callbacks
+  const runTest = useCallback(() => pwb?.runTest(), [pwb])
+  const reboot = useCallback(() => pwb?.reboot(), [pwb])
+  const selectSlot = useCallback((slot: number) => pwb?.selectSlot(slot), [pwb])
 
   const getStatusColor = () => {
     switch (deviceState) {
@@ -4081,7 +4021,8 @@ export function PortableWorkbench({
       case 'booting': return 'var(--neon-cyan)'
       case 'testing': return 'var(--neon-purple)'
       case 'rebooting': return 'var(--neon-amber)'
-      case 'offline': return 'var(--neon-red)'
+      case 'standby': return 'var(--neon-red)'
+      case 'shutdown': return 'var(--neon-red)'
       default: return 'var(--neon-green)'
     }
   }
@@ -4162,26 +4103,39 @@ export function PortableWorkbench({
             }}
           />
         </button>
-        {/* Boot button (power on from offline) */}
+        {/* Power micro-toggle */}
         <button
           onClick={() => {
-            if (deviceState === 'offline') {
-              setDeviceState('booting')
-            }
+            if (deviceState === 'online') pwb?.powerOff()
+            else if (deviceState === 'standby') pwb?.powerOn()
           }}
-          disabled={deviceState !== 'offline'}
-          className="group relative"
-          title="Boot"
+          disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown'}
+          className="group relative flex items-center justify-center"
+          title="Power"
+          style={{ width: '6px', height: '6px' }}
         >
+          {/* Recessed housing */}
           <div
-            className={cn('transition-all border', getButtonClass(), getButtonSize())}
+            className="absolute inset-0 rounded-full"
             style={{
-              background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
-              borderColor: deviceState === 'offline' ? 'var(--neon-green)' : '#2a2a3a',
-              boxShadow: deviceState === 'offline'
-                ? '0 0 4px var(--neon-green)'
-                : 'inset 0 1px 2px rgba(0,0,0,0.5)',
-              opacity: deviceState === 'offline' ? 1 : 0.3,
+              background: 'radial-gradient(circle at 50% 50%, #0a0a0f 0%, #1a1a2a 70%)',
+              boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.8), 0 0.5px 0 rgba(255,255,255,0.05)',
+              border: '0.5px solid #2a2a3a',
+            }}
+          />
+          {/* Power indicator dot */}
+          <div
+            className="relative rounded-full"
+            style={{
+              width: '2px',
+              height: '2px',
+              backgroundColor: (deviceState === 'online' || deviceState === 'booting' || deviceState === 'testing' || deviceState === 'rebooting')
+                ? 'var(--neon-green)'
+                : 'var(--neon-red)',
+              boxShadow: (deviceState === 'online' || deviceState === 'booting' || deviceState === 'testing' || deviceState === 'rebooting')
+                ? '0 0 3px var(--neon-green)'
+                : '0 0 2px var(--neon-red)',
+              opacity: (deviceState === 'shutdown') ? 0.3 : 0.7,
             }}
           />
         </button>
@@ -4220,18 +4174,19 @@ export function PortableWorkbench({
           <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
             <div className="flex items-center gap-2">
               <span className="font-mono text-[6px] text-[var(--neon-cyan)]">
-                {bootPhase === 'init' && 'INIT'}
-                {bootPhase === 'motors' && 'MOTORS'}
-                {bootPhase === 'surface' && 'SURFACE'}
+                {bootPhase === 'post' && 'POST'}
+                {bootPhase === 'firmware' && 'FIRMWARE'}
+                {bootPhase === 'calibration' && 'CALIBRATE'}
+                {bootPhase === 'tools' && 'TOOLS'}
                 {bootPhase === 'ready' && 'READY'}
               </span>
               <div className="flex gap-0.5">
-                {['init', 'motors', 'surface', 'ready'].map((phase, i) => (
+                {['post', 'firmware', 'calibration', 'tools', 'ready'].map((phase, i) => (
                   <div
                     key={phase}
                     className="w-1 h-1 rounded-full"
                     style={{
-                      backgroundColor: ['init', 'motors', 'surface', 'ready'].indexOf(bootPhase) >= i
+                      backgroundColor: ['post', 'firmware', 'calibration', 'tools', 'ready'].indexOf(bootPhase) >= i
                         ? 'var(--neon-cyan)'
                         : '#333',
                       boxShadow: bootPhase === phase ? '0 0 4px var(--neon-cyan)' : 'none',
@@ -4252,11 +4207,13 @@ export function PortableWorkbench({
           </div>
         )}
 
-        {/* Offline state inside slots area */}
-        {deviceState === 'offline' && (
+        {/* (offline state removed — PWB uses standby instead) */}
+
+        {/* Standby/Shutdown overlay */}
+        {(deviceState === 'standby' || deviceState === 'shutdown') && (
           <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
-            <span className="font-mono text-[6px] text-[var(--neon-red)]">
-              OFFLINE
+            <span className="font-mono text-[6px] text-[var(--neon-red)]/60">
+              {shutdownPhase ? shutdownPhase.toUpperCase() : 'STANDBY'}
             </span>
           </div>
         )}

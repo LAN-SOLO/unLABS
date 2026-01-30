@@ -397,6 +397,21 @@ const helpCommand: Command = {
       '|  vnt        - ventilation management (VNT-001)           |',
       '|  sca        - supercomputer management (SCA-001)         |',
       '|  exd        - explorer drone management (EXD-001)        |',
+      '|  pwb        - portable workbench (PWB-001)               |',
+      '|  btk        - basic toolkit (BTK-001)                    |',
+      '|             btk status         - show device status       |',
+      '|             btk firmware       - view firmware info       |',
+      '|             btk test           - run diagnostics          |',
+      '|             btk config         - view configuration       |',
+      '|             btk tools          - tool status               |',
+      '|             btk reboot         - reboot device            |',
+      '|             pwb status         - show device status       |',
+      '|             pwb firmware       - view firmware info       |',
+      '|             pwb firmware update - check for updates       |',
+      '|             pwb test           - run diagnostics          |',
+      '|             pwb config         - view configuration       |',
+      '|             pwb slots          - show slot status         |',
+      '|             pwb reboot         - reboot device            |',
       '|             vnt status         - show fan status          |',
       '|             vnt power [on|off] - boot/shutdown system     |',
       '|             vnt fan <id> <cmd> - control individual fan   |',
@@ -1353,6 +1368,8 @@ const deviceCommand: Command = {
         'SCA-001': 'Supercomputer Array', 'EXD-001': 'Explorer Drone',
         'EMC-001': 'Exotic Matter Contain.', 'VNT-001': 'Ventilation System',
         'QAN-001': 'Quantum Analyzer', 'QSM-001': 'Quantum State Monitor',
+        'PWB-001': 'Portable Workbench',
+        'BTK-001': 'Basic Toolkit',
       }
 
       const devicePowerCtrl: Record<string, { on: () => Promise<void>; off: () => Promise<void>; isPowered: () => boolean } | undefined> = {
@@ -1370,6 +1387,8 @@ const deviceCommand: Command = {
         'VNT-001': ctx.data.vntDevice ? { on: () => ctx.data.vntDevice!.powerOn(), off: () => ctx.data.vntDevice!.powerOff(), isPowered: () => ctx.data.vntDevice!.getState().isPowered } : undefined,
         'QAN-001': ctx.data.quaDevice ? { on: () => ctx.data.quaDevice!.powerOn(), off: () => ctx.data.quaDevice!.powerOff(), isPowered: () => ctx.data.quaDevice!.getState().isPowered } : undefined,
         'QSM-001': ctx.data.qsmDevice ? { on: () => ctx.data.qsmDevice!.powerOn(), off: () => ctx.data.qsmDevice!.powerOff(), isPowered: () => ctx.data.qsmDevice!.getState().isPowered } : undefined,
+        'PWB-001': ctx.data.pwbDevice ? { on: () => ctx.data.pwbDevice!.powerOn(), off: () => ctx.data.pwbDevice!.powerOff(), isPowered: () => ctx.data.pwbDevice!.getState().isPowered } : undefined,
+        'BTK-001': ctx.data.btkDevice ? { on: () => ctx.data.btkDevice!.powerOn(), off: () => ctx.data.btkDevice!.powerOff(), isPowered: () => ctx.data.btkDevice!.getState().isPowered } : undefined,
       }
 
       const dName = idToName[powerId]
@@ -2042,6 +2061,8 @@ const deviceCommand: Command = {
         'VNT-001': ctx.data.vntDevice ? { on: () => ctx.data.vntDevice!.powerOn(), off: () => ctx.data.vntDevice!.powerOff(), isPowered: () => ctx.data.vntDevice!.getState().isPowered } : undefined,
         'QAN-001': ctx.data.quaDevice ? { on: () => ctx.data.quaDevice!.powerOn(), off: () => ctx.data.quaDevice!.powerOff(), isPowered: () => ctx.data.quaDevice!.getState().isPowered } : undefined,
         'QSM-001': ctx.data.qsmDevice ? { on: () => ctx.data.qsmDevice!.powerOn(), off: () => ctx.data.qsmDevice!.powerOff(), isPowered: () => ctx.data.qsmDevice!.getState().isPowered } : undefined,
+        'PWB-001': ctx.data.pwbDevice ? { on: () => ctx.data.pwbDevice!.powerOn(), off: () => ctx.data.pwbDevice!.powerOff(), isPowered: () => ctx.data.pwbDevice!.getState().isPowered } : undefined,
+        'BTK-001': ctx.data.btkDevice ? { on: () => ctx.data.btkDevice!.powerOn(), off: () => ctx.data.btkDevice!.powerOff(), isPowered: () => ctx.data.btkDevice!.getState().isPowered } : undefined,
       }
 
       const ctrl = devicePowerMap[device.id]
@@ -10518,6 +10539,256 @@ const ungitCommand: Command = {
   },
 }
 
+// Basic Toolkit command
+const btkCommand: Command = {
+  name: 'btk',
+  aliases: ['toolkit'],
+  description: 'Basic Toolkit management',
+  usage: 'btk <status|firmware|test|config|tools|reboot>',
+  execute: async (args, ctx) => {
+    const device = ctx.data.btkDevice
+    if (!device) {
+      return { success: false, output: ['[btk] Device not connected'] }
+    }
+
+    const sub = args[0]?.toLowerCase()
+
+    if (!sub || sub === 'help') {
+      return { success: true, output: [
+        '',
+        '  BTK-001 Basic Toolkit',
+        '  ─────────────────────────────',
+        '  btk status     Device status',
+        '  btk firmware   Firmware info',
+        '  btk test       Run diagnostics',
+        '  btk config     View configuration',
+        '  btk tools      Tool status',
+        '  btk reboot     Reboot device',
+        '',
+      ]}
+    }
+
+    const state = device.getState()
+
+    if (sub === 'status') {
+      const fw = device.getFirmware()
+      const ps = device.getPowerSpecs()
+      return { success: true, output: [
+        '',
+        '  ┌─ BTK-001 STATUS ────────────────┐',
+        `  │ State:    ${state.deviceState.toUpperCase().padEnd(22)}│`,
+        `  │ Power:    ${state.isPowered ? 'ON' : 'OFF'}${' '.repeat(state.isPowered ? 20 : 19)}│`,
+        `  │ Draw:     ${state.currentDraw.toFixed(1)} E/s${' '.repeat(17 - state.currentDraw.toFixed(1).length)}│`,
+        `  │ Firmware: v${fw.version}${' '.repeat(20 - fw.version.length)}│`,
+        `  │ Tool:     ${(state.selectedTool ?? 'none').padEnd(22)}│`,
+        '  └──────────────────────────────────┘',
+        '',
+      ]}
+    }
+
+    if (sub === 'firmware') {
+      const sub2 = args[1]?.toLowerCase()
+      const fw = device.getFirmware()
+      if (sub2 === 'update') {
+        if (!state.isPowered || state.deviceState !== 'online') {
+          return { success: false, output: ['[btk] Device must be online to update firmware'] }
+        }
+        ctx.addOutput('[btk] Checking for firmware updates...')
+        await new Promise(r => setTimeout(r, 800))
+        ctx.addOutput('[btk] Current version: v' + fw.version)
+        await new Promise(r => setTimeout(r, 500))
+        ctx.addOutput('[btk] No updates available. Firmware is up to date.')
+        return { success: true }
+      }
+      return { success: true, output: [
+        '',
+        '  BTK-001 FIRMWARE',
+        '  ─────────────────────────────',
+        `  Version:  v${fw.version}`,
+        `  Build:    ${fw.build}`,
+        `  Checksum: ${fw.checksum}`,
+        `  Patch:    ${fw.securityPatch}`,
+        `  Features: ${fw.features.join(', ')}`,
+        '',
+      ]}
+    }
+
+    if (sub === 'test' || sub === 'diag') {
+      if (!state.isPowered || state.deviceState !== 'online') {
+        return { success: false, output: ['[btk] Device must be online to run diagnostics'] }
+      }
+      ctx.addOutput('[btk] Starting diagnostics...')
+      await device.runTest()
+      return { success: true, output: ['[btk] Diagnostics complete — ALL PASSED'] }
+    }
+
+    if (sub === 'config') {
+      const ps = device.getPowerSpecs()
+      return { success: true, output: [
+        '',
+        '  BTK-001 CONFIGURATION',
+        '  ─────────────────────────────',
+        `  Category: ${ps.category}`,
+        `  Priority: ${ps.priority}`,
+        `  Power Full:    ${ps.full} E/s`,
+        `  Power Idle:    ${ps.idle} E/s`,
+        `  Power Standby: ${ps.standby} E/s`,
+        `  Tools:    4 (PROBE, CLAMP, LASER, DRILL)`,
+        '',
+      ]}
+    }
+
+    if (sub === 'tools') {
+      const toolList = ['PROBE', 'CLAMP', 'LASER', 'DRILL']
+      return { success: true, output: [
+        '',
+        '  BTK-001 TOOL STATUS',
+        '  ─────────────────────────────',
+        ...toolList.map(t => `  ${t.padEnd(8)} ${state.deviceState === 'online' ? (state.selectedTool === t ? 'ACTIVE' : 'READY') : 'OFFLINE'}`),
+        '',
+      ]}
+    }
+
+    if (sub === 'reboot') {
+      if (!state.isPowered) {
+        return { success: false, output: ['[btk] Device is not powered on'] }
+      }
+      ctx.addOutput('[btk] Rebooting BTK-001...')
+      await device.reboot()
+      return { success: true, output: ['[btk] Reboot complete'] }
+    }
+
+    return { success: false, output: [`[btk] Unknown subcommand: ${sub}`, 'Usage: btk <status|firmware|test|config|tools|reboot>'] }
+  }
+}
+
+// Portable Workbench command
+const pwbCommand: Command = {
+  name: 'pwb',
+  aliases: ['workbench', 'bench'],
+  description: 'Portable Workbench management',
+  usage: 'pwb <status|firmware|test|config|slots|reboot>',
+  execute: async (args, ctx) => {
+    const device = ctx.data.pwbDevice
+    if (!device) {
+      return { success: false, output: ['[pwb] Device not connected'] }
+    }
+
+    const sub = args[0]?.toLowerCase()
+
+    if (!sub || sub === 'help') {
+      return { success: true, output: [
+        '',
+        '  PWB-001 Portable Workbench',
+        '  ─────────────────────────────',
+        '  pwb status     Device status',
+        '  pwb firmware   Firmware info',
+        '  pwb test       Run diagnostics',
+        '  pwb config     View configuration',
+        '  pwb slots      Slot status',
+        '  pwb reboot     Reboot device',
+        '',
+      ]}
+    }
+
+    const state = device.getState()
+
+    if (sub === 'status') {
+      const fw = device.getFirmware()
+      const ps = device.getPowerSpecs()
+      return { success: true, output: [
+        '',
+        '  ┌─ PWB-001 STATUS ────────────────┐',
+        `  │ State:    ${state.deviceState.toUpperCase().padEnd(22)}│`,
+        `  │ Power:    ${state.isPowered ? 'ON' : 'OFF'}${' '.repeat(state.isPowered ? 20 : 19)}│`,
+        `  │ Draw:     ${state.currentDraw.toFixed(1)} E/s${' '.repeat(17 - state.currentDraw.toFixed(1).length)}│`,
+        `  │ Firmware: v${fw.version}${' '.repeat(20 - fw.version.length)}│`,
+        `  │ Slots:    3 (${state.activeSlot !== null ? 'Slot ' + state.activeSlot + ' active' : 'none active'})${' '.repeat(Math.max(0, 14 - (state.activeSlot !== null ? ('Slot ' + state.activeSlot + ' active').length : 'none active'.length)))}│`,
+        `  │ Queue:    ${String(state.queuedItems).padEnd(22)}│`,
+        `  │ Progress: ${String(state.craftingProgress + '%').padEnd(22)}│`,
+        '  └──────────────────────────────────┘',
+        '',
+      ]}
+    }
+
+    if (sub === 'firmware') {
+      const sub2 = args[1]?.toLowerCase()
+      const fw = device.getFirmware()
+      if (sub2 === 'update') {
+        if (!state.isPowered || state.deviceState !== 'online') {
+          return { success: false, output: ['[pwb] Device must be online to update firmware'] }
+        }
+        ctx.addOutput('[pwb] Checking for firmware updates...')
+        await new Promise(r => setTimeout(r, 800))
+        ctx.addOutput('[pwb] Current version: v' + fw.version)
+        await new Promise(r => setTimeout(r, 500))
+        ctx.addOutput('[pwb] No updates available. Firmware is up to date.')
+        return { success: true }
+      }
+      return { success: true, output: [
+        '',
+        '  PWB-001 FIRMWARE',
+        '  ─────────────────────────────',
+        `  Version:  v${fw.version}`,
+        `  Build:    ${fw.build}`,
+        `  Checksum: ${fw.checksum}`,
+        `  Patch:    ${fw.securityPatch}`,
+        `  Features: ${fw.features.join(', ')}`,
+        '',
+      ]}
+    }
+
+    if (sub === 'test' || sub === 'diag') {
+      if (!state.isPowered || state.deviceState !== 'online') {
+        return { success: false, output: ['[pwb] Device must be online to run diagnostics'] }
+      }
+      ctx.addOutput('[pwb] Starting diagnostics...')
+      await device.runTest()
+      return { success: true, output: ['[pwb] Diagnostics complete — ALL PASSED'] }
+    }
+
+    if (sub === 'config') {
+      const ps = device.getPowerSpecs()
+      return { success: true, output: [
+        '',
+        '  PWB-001 CONFIGURATION',
+        '  ─────────────────────────────',
+        `  Category: ${ps.category}`,
+        `  Priority: ${ps.priority}`,
+        `  Power Full:    ${ps.full} E/s`,
+        `  Power Idle:    ${ps.idle} E/s`,
+        `  Power Standby: ${ps.standby} E/s`,
+        `  Slots:    3`,
+        '',
+      ]}
+    }
+
+    if (sub === 'slots') {
+      return { success: true, output: [
+        '',
+        '  PWB-001 SLOT STATUS',
+        '  ─────────────────────────────',
+        `  Slot 0: ${state.queuedItems > 0 ? (state.activeSlot === 0 ? 'ACTIVE' : 'OCCUPIED') : 'EMPTY'}`,
+        `  Slot 1: ${state.queuedItems > 1 ? (state.activeSlot === 1 ? 'ACTIVE' : 'OCCUPIED') : 'EMPTY'}`,
+        `  Slot 2: ${state.queuedItems > 2 ? (state.activeSlot === 2 ? 'ACTIVE' : 'OCCUPIED') : 'EMPTY'}`,
+        `  Progress: ${state.craftingProgress}%`,
+        '',
+      ]}
+    }
+
+    if (sub === 'reboot') {
+      if (!state.isPowered) {
+        return { success: false, output: ['[pwb] Device is not powered on'] }
+      }
+      ctx.addOutput('[pwb] Rebooting PWB-001...')
+      await device.reboot()
+      return { success: true, output: ['[pwb] Reboot complete'] }
+    }
+
+    return { success: false, output: [`[pwb] Unknown subcommand: ${sub}`, 'Usage: pwb <status|firmware|test|config|slots|reboot>'] }
+  }
+}
+
 // Command registry
 export const commands: Command[] = [
   helpCommand,
@@ -10569,6 +10840,8 @@ export const commands: Command[] = [
   vntCommand,
   scaCommand,
   exdCommand,
+  btkCommand,
+  pwbCommand,
   themeCommand,
   screwstatCommand,
   nodesyncCommand,

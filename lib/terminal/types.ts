@@ -551,6 +551,70 @@ export interface QSMDeviceActions {
   }
 }
 
+// BTK Device state type for terminal sync
+export type BTKDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+
+export interface BTKDeviceActions {
+  powerOn: () => Promise<void>
+  powerOff: () => Promise<void>
+  runTest: () => Promise<void>
+  reboot: () => Promise<void>
+  getState: () => {
+    deviceState: BTKDeviceState
+    statusMessage: string
+    isPowered: boolean
+    currentDraw: number
+    selectedTool: string | null
+  }
+  getFirmware: () => {
+    version: string
+    build: string
+    checksum: string
+    features: string[]
+    securityPatch: string
+  }
+  getPowerSpecs: () => {
+    full: number
+    idle: number
+    standby: number
+    category: string
+    priority: number
+  }
+}
+
+// PWB Device state type for terminal sync
+export type PWBDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+
+export interface PWBDeviceActions {
+  powerOn: () => Promise<void>
+  powerOff: () => Promise<void>
+  runTest: () => Promise<void>
+  reboot: () => Promise<void>
+  getState: () => {
+    deviceState: PWBDeviceState
+    statusMessage: string
+    isPowered: boolean
+    currentDraw: number
+    activeSlot: number | null
+    queuedItems: number
+    craftingProgress: number
+  }
+  getFirmware: () => {
+    version: string
+    build: string
+    checksum: string
+    features: string[]
+    securityPatch: string
+  }
+  getPowerSpecs: () => {
+    full: number
+    idle: number
+    standby: number
+    category: string
+    priority: number
+  }
+}
+
 // ScrewButton types for terminal sync
 export type ScrewButtonId = 'SB-01' | 'SB-02' | 'SB-03' | 'SB-04'
 
@@ -649,6 +713,8 @@ export interface DataFetchers {
   emcDevice?: EMCDeviceActions
   qsmDevice?: QSMDeviceActions
   quaDevice?: QUADeviceActions
+  pwbDevice?: PWBDeviceActions
+  btkDevice?: BTKDeviceActions
   // Screw button actions
   screwButtons?: ScrewButtonDeviceActions
   // Filesystem and user management

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import type { TerminalLine, TerminalState, CommandContext, DataFetchers, CDCDeviceActions, UECDeviceActions, BATDeviceActions, HMSDeviceActions, ECRDeviceActions, IPLDeviceActions, MFRDeviceActions, AICDeviceActions, VNTDeviceActions, SCADeviceActions, EXDDeviceActions, QSMDeviceActions, EMCDeviceActions, QUADeviceActions, ScrewButtonDeviceActions, FilesystemActions, UserActions, ThemeActions } from '@/lib/terminal/types'
+import type { TerminalLine, TerminalState, CommandContext, DataFetchers, CDCDeviceActions, UECDeviceActions, BATDeviceActions, HMSDeviceActions, ECRDeviceActions, IPLDeviceActions, MFRDeviceActions, AICDeviceActions, VNTDeviceActions, SCADeviceActions, EXDDeviceActions, QSMDeviceActions, EMCDeviceActions, QUADeviceActions, PWBDeviceActions, BTKDeviceActions, ScrewButtonDeviceActions, FilesystemActions, UserActions, ThemeActions } from '@/lib/terminal/types'
 import { executeCommand, getWelcomeMessage } from '@/lib/terminal/commands'
 import { savePanelState } from '@/lib/panel/panelState'
 import type { PanelSaveData } from '@/lib/panel/panelState'
@@ -38,13 +38,15 @@ interface UseTerminalProps {
   qsmDeviceActions?: QSMDeviceActions
   emcDeviceActions?: EMCDeviceActions
   quaDeviceActions?: QUADeviceActions
+  pwbDeviceActions?: PWBDeviceActions
+  btkDeviceActions?: BTKDeviceActions
   screwButtonDeviceActions?: ScrewButtonDeviceActions
   filesystemActions?: FilesystemActions
   userActions?: UserActions
   themeActions?: ThemeActions
 }
 
-export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, screwButtonDeviceActions, filesystemActions, userActions, themeActions }: UseTerminalProps) {
+export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, screwButtonDeviceActions, filesystemActions, userActions, themeActions }: UseTerminalProps) {
   const router = useRouter()
   const [state, setState] = useState<TerminalState>(() => ({
     lines: [],
@@ -138,6 +140,8 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
     const qsmState = qsmDeviceActions?.getState()
     const emcState = emcDeviceActions?.getState()
     const quaState = quaDeviceActions?.getState()
+    const pwbState = pwbDeviceActions?.getState()
+    const btkState = btkDeviceActions?.getState()
     const screwStates = screwButtonDeviceActions?.getAllStates()
 
     const data: PanelSaveData = {
@@ -189,6 +193,8 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
           depth: quaState?.depth ?? 50,
           frequency: quaState?.frequency ?? 40,
         },
+        pwb: { isPowered: pwbState?.isPowered ?? true },
+        btk: { isPowered: btkState?.isPowered ?? true },
         screwButtons: screwStates ? Object.fromEntries(
           Object.entries(screwStates).map(([k, v]) => [k, { unlocked: v.unlocked, active: v.active, totalActiveTime: v.totalActiveTime }])
         ) : undefined,
@@ -196,7 +202,7 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
     }
 
     savePanelState(data)
-  }, [cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, screwButtonDeviceActions])
+  }, [cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, screwButtonDeviceActions])
 
   // Data fetchers for commands - memoized for stability
   const dataFetchers: DataFetchers = useMemo(() => ({
@@ -226,11 +232,13 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
     qsmDevice: qsmDeviceActions,
     emcDevice: emcDeviceActions,
     quaDevice: quaDeviceActions,
+    pwbDevice: pwbDeviceActions,
+    btkDevice: btkDeviceActions,
     screwButtons: screwButtonDeviceActions,
     filesystemActions,
     userActions,
     themeActions,
-  }), [cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, screwButtonDeviceActions, saveAllDeviceState, filesystemActions, userActions, themeActions])
+  }), [cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, screwButtonDeviceActions, saveAllDeviceState, filesystemActions, userActions, themeActions])
 
   // Initialize with welcome message
   useEffect(() => {

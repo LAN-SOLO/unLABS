@@ -22,8 +22,10 @@ import { useEXDManagerOptional } from '@/contexts/EXDManager'
 import { useQSMManagerOptional } from '@/contexts/QSMManager'
 import { useEMCManagerOptional } from '@/contexts/EMCManager'
 import { useQUAManagerOptional } from '@/contexts/QUAManager'
+import { usePWBManagerOptional } from '@/contexts/PWBManager'
+import { useBTKManagerOptional } from '@/contexts/BTKManager'
 import { useScrewButtonManagerOptional } from '@/contexts/ScrewButtonManager'
-import type { CDCDeviceActions, UECDeviceActions, BATDeviceActions, HMSDeviceActions, ECRDeviceActions, IPLDeviceActions, MFRDeviceActions, AICDeviceActions, VNTDeviceActions, SCADeviceActions, EXDDeviceActions, QSMDeviceActions, EMCDeviceActions, QUADeviceActions, ScrewButtonDeviceActions, ThemeActions } from '@/lib/terminal/types'
+import type { CDCDeviceActions, UECDeviceActions, BATDeviceActions, HMSDeviceActions, ECRDeviceActions, IPLDeviceActions, MFRDeviceActions, AICDeviceActions, VNTDeviceActions, SCADeviceActions, EXDDeviceActions, QSMDeviceActions, EMCDeviceActions, QUADeviceActions, PWBDeviceActions, BTKDeviceActions, ScrewButtonDeviceActions, ThemeActions } from '@/lib/terminal/types'
 
 interface TerminalProps {
   userId: string
@@ -49,6 +51,8 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   const qsmManager = useQSMManagerOptional()
   const emcManager = useEMCManagerOptional()
   const quaManager = useQUAManagerOptional()
+  const pwbManager = usePWBManagerOptional()
+  const btkManager = useBTKManagerOptional()
   const screwButtonManager = useScrewButtonManagerOptional()
 
   // Initialize VirtualFS and UserManager (persisted via refs, restored from localStorage)
@@ -191,6 +195,12 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
 
   const quaManagerRef = useRef(quaManager)
   quaManagerRef.current = quaManager
+
+  const pwbManagerRef = useRef(pwbManager)
+  pwbManagerRef.current = pwbManager
+
+  const btkManagerRef = useRef(btkManager)
+  btkManagerRef.current = btkManager
 
   const screwButtonManagerRef = useRef(screwButtonManager)
   screwButtonManagerRef.current = screwButtonManager
@@ -810,6 +820,78 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quaManager !== undefined])
 
+  const pwbDeviceActions: PWBDeviceActions | undefined = useMemo(() => {
+    if (!pwbManager) return undefined
+    return {
+      powerOn: () => pwbManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => pwbManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => pwbManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => pwbManagerRef.current?.reboot() ?? Promise.resolve(),
+      getState: () => {
+        const m = pwbManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          currentDraw: m?.currentDraw ?? 0,
+          activeSlot: m?.activeSlot ?? null,
+          queuedItems: m?.queuedItems ?? 0,
+          craftingProgress: m?.craftingProgress ?? 0,
+        }
+      },
+      getFirmware: () => pwbManagerRef.current?.firmware ?? {
+        version: '1.1.0',
+        build: '2024.02.20',
+        checksum: 'D4E8F1A3',
+        features: ['slot-management', 'auto-calibrate', 'tool-tracking', 'assembly-queue'],
+        securityPatch: '2024.02.15',
+      },
+      getPowerSpecs: () => pwbManagerRef.current?.powerSpecs ?? {
+        full: 3,
+        idle: 0.8,
+        standby: 0.15,
+        category: 'light',
+        priority: 2,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pwbManager !== undefined])
+
+  const btkDeviceActions: BTKDeviceActions | undefined = useMemo(() => {
+    if (!btkManager) return undefined
+    return {
+      powerOn: () => btkManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => btkManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => btkManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => btkManagerRef.current?.reboot() ?? Promise.resolve(),
+      getState: () => {
+        const m = btkManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          currentDraw: m?.currentDraw ?? 0,
+          selectedTool: m?.selectedTool ?? null,
+        }
+      },
+      getFirmware: () => btkManagerRef.current?.firmware ?? {
+        version: '1.2.0',
+        build: '2024.03.10',
+        checksum: 'B3A7C5D2',
+        features: ['probe-calibrate', 'clamp-feedback', 'laser-safety', 'drill-torque-ctrl'],
+        securityPatch: '2024.03.05',
+      },
+      getPowerSpecs: () => btkManagerRef.current?.powerSpecs ?? {
+        full: 0.5,
+        idle: 0.3,
+        standby: 0.05,
+        category: 'light',
+        priority: 2,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [btkManager !== undefined])
+
   // Build theme actions from props - use refs for stable reference
   const themeIndexRef = useRef(themeIndex)
   themeIndexRef.current = themeIndex
@@ -857,6 +939,8 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     qsmDeviceActions,
     emcDeviceActions,
     quaDeviceActions,
+    pwbDeviceActions,
+    btkDeviceActions,
     screwButtonDeviceActions,
     filesystemActions,
     userActions,
