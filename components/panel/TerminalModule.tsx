@@ -438,7 +438,7 @@ export function TerminalModule({
                     <div className="w-1.5 h-1.5 rounded-full" style={{ background: `${theme.fg}99` }} />
                   </div>
                   <span className="text-[9px] font-mono tracking-wide transition-colors duration-500" style={{ color: `${theme.fg}cc` }}>
-                    _unOS Terminal v1.0
+                    _unOS Terminal v2.0
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
