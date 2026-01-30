@@ -19,7 +19,7 @@ export function PanelToolbar({ children, className }: GamePanelProps) {
   return (
     <div
       className={cn(
-        'flex items-center gap-2 px-2 py-1 bg-[var(--panel-surface)] panel-brushed-metal',
+        'flex items-center gap-2 px-2 py-1 bg-[var(--panel-surface)] ',
         'border-b border-[rgba(255,184,0,0.15)]',
         className
       )}
@@ -36,7 +36,7 @@ export function PanelLeft({ children, className }: GamePanelProps) {
       className={cn(
         'flex flex-col gap-2 overflow-hidden p-1',
         'bg-[var(--panel-void)]',
-        'panel-brushed-metal',
+        '',
         className
       )}
       style={{ gridArea: 'left' }}
@@ -52,7 +52,7 @@ export function PanelMain({ children, className }: GamePanelProps) {
       className={cn(
         'flex flex-col gap-2 p-2',
         'bg-[var(--panel-void)]',
-        'panel-brushed-metal',
+        '',
         className
       )}
       style={{ gridArea: 'main' }}
@@ -68,7 +68,7 @@ export function PanelRight({ children, className }: GamePanelProps) {
       className={cn(
         'flex flex-col gap-2 overflow-hidden p-1',
         'bg-[var(--panel-void)]',
-        'panel-brushed-metal',
+        '',
         className
       )}
       style={{ gridArea: 'right' }}
@@ -83,7 +83,7 @@ export function PanelResources({ children, className }: GamePanelProps) {
     <div
       className={cn(
         'flex items-center gap-2 px-2 py-1',
-        'bg-[var(--panel-surface)] panel-brushed-metal',
+        'bg-[var(--panel-surface)] ',
         className
       )}
       style={{ gridArea: 'resources' }}
@@ -98,7 +98,7 @@ export function PanelBottom({ children, className }: GamePanelProps) {
     <div
       className={cn(
         'flex items-center justify-center gap-1 px-2 py-1',
-        'bg-[var(--panel-surface)] panel-brushed-metal border-t border-[rgba(255,184,0,0.15)]',
+        'bg-[var(--panel-surface)]  border-t border-[rgba(255,184,0,0.15)]',
         className
       )}
       style={{ gridArea: 'bottom' }}
