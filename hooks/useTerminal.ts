@@ -326,7 +326,7 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
   const prompt = useMemo(() => {
     const user = userActions?.whoami() ?? username ?? 'operator'
     const cwd = filesystemActions?.getCwd() ?? '~'
-    const home = userActions?.getCurrentUser()?.home ?? '/home/operator'
+    const home = userActions?.getCurrentUser()?.home ?? '/unhome/operator'
     const displayCwd = cwd === home ? '~' : cwd.startsWith(home + '/') ? '~' + cwd.slice(home.length) : cwd
     const suffix = user === 'root' ? '#' : '$'
     return `${user}@_unLAB:${displayCwd}${suffix}`

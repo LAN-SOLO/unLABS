@@ -1,8 +1,7 @@
 'use client'
 
 import { useCallback, useMemo, useRef } from 'react'
-import { VirtualFS } from '@/lib/terminal/filesystem'
-import { UserManager } from '@/lib/terminal/users'
+import { VirtualFS, UserManager } from '@/lib/unos'
 import { loadPanelState } from '@/lib/panel/panelState'
 import type { FilesystemActions, UserActions } from '@/lib/terminal/types'
 import { useTerminal } from '@/hooks/useTerminal'
