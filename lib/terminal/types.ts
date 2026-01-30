@@ -551,6 +551,71 @@ export interface QSMDeviceActions {
   }
 }
 
+// MSC Device state type for terminal sync
+export type MSCDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+
+export interface MSCDeviceActions {
+  powerOn: () => Promise<void>
+  powerOff: () => Promise<void>
+  runTest: () => Promise<void>
+  reboot: () => Promise<void>
+  getState: () => {
+    deviceState: MSCDeviceState
+    statusMessage: string
+    isPowered: boolean
+    currentDraw: number
+    scanLine: number
+    detectedMaterials: number
+  }
+  getFirmware: () => {
+    version: string
+    build: string
+    checksum: string
+    features: string[]
+    securityPatch: string
+  }
+  getPowerSpecs: () => {
+    full: number
+    idle: number
+    standby: number
+    category: string
+    priority: number
+  }
+}
+
+// RMG Device state type for terminal sync
+export type RMGDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+
+export interface RMGDeviceActions {
+  powerOn: () => Promise<void>
+  powerOff: () => Promise<void>
+  runTest: () => Promise<void>
+  reboot: () => Promise<void>
+  setStrength: (value: number) => void
+  getState: () => {
+    deviceState: RMGDeviceState
+    statusMessage: string
+    isPowered: boolean
+    currentDraw: number
+    strength: number
+    fieldActive: boolean
+  }
+  getFirmware: () => {
+    version: string
+    build: string
+    checksum: string
+    features: string[]
+    securityPatch: string
+  }
+  getPowerSpecs: () => {
+    full: number
+    idle: number
+    standby: number
+    category: string
+    priority: number
+  }
+}
+
 // BTK Device state type for terminal sync
 export type BTKDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
 
@@ -715,6 +780,8 @@ export interface DataFetchers {
   quaDevice?: QUADeviceActions
   pwbDevice?: PWBDeviceActions
   btkDevice?: BTKDeviceActions
+  rmgDevice?: RMGDeviceActions
+  mscDevice?: MSCDeviceActions
   // Screw button actions
   screwButtons?: ScrewButtonDeviceActions
   // Filesystem and user management
@@ -732,6 +799,7 @@ export interface CommandContext {
   clearScreen: () => void
   setTyping: (typing: boolean) => void
   data: DataFetchers
+  sessionHistory?: string[]
 }
 
 export interface CommandResult {

@@ -24,8 +24,10 @@ import { useEMCManagerOptional } from '@/contexts/EMCManager'
 import { useQUAManagerOptional } from '@/contexts/QUAManager'
 import { usePWBManagerOptional } from '@/contexts/PWBManager'
 import { useBTKManagerOptional } from '@/contexts/BTKManager'
+import { useRMGManagerOptional } from '@/contexts/RMGManager'
+import { useMSCManagerOptional } from '@/contexts/MSCManager'
 import { useScrewButtonManagerOptional } from '@/contexts/ScrewButtonManager'
-import type { CDCDeviceActions, UECDeviceActions, BATDeviceActions, HMSDeviceActions, ECRDeviceActions, IPLDeviceActions, MFRDeviceActions, AICDeviceActions, VNTDeviceActions, SCADeviceActions, EXDDeviceActions, QSMDeviceActions, EMCDeviceActions, QUADeviceActions, PWBDeviceActions, BTKDeviceActions, ScrewButtonDeviceActions, ThemeActions } from '@/lib/terminal/types'
+import type { CDCDeviceActions, UECDeviceActions, BATDeviceActions, HMSDeviceActions, ECRDeviceActions, IPLDeviceActions, MFRDeviceActions, AICDeviceActions, VNTDeviceActions, SCADeviceActions, EXDDeviceActions, QSMDeviceActions, EMCDeviceActions, QUADeviceActions, PWBDeviceActions, BTKDeviceActions, RMGDeviceActions, MSCDeviceActions, ScrewButtonDeviceActions, ThemeActions } from '@/lib/terminal/types'
 
 interface TerminalProps {
   userId: string
@@ -53,6 +55,8 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   const quaManager = useQUAManagerOptional()
   const pwbManager = usePWBManagerOptional()
   const btkManager = useBTKManagerOptional()
+  const rmgManager = useRMGManagerOptional()
+  const mscManager = useMSCManagerOptional()
   const screwButtonManager = useScrewButtonManagerOptional()
 
   // Initialize VirtualFS and UserManager (persisted via refs, restored from localStorage)
@@ -201,6 +205,12 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
 
   const btkManagerRef = useRef(btkManager)
   btkManagerRef.current = btkManager
+
+  const rmgManagerRef = useRef(rmgManager)
+  rmgManagerRef.current = rmgManager
+
+  const mscManagerRef = useRef(mscManager)
+  mscManagerRef.current = mscManager
 
   const screwButtonManagerRef = useRef(screwButtonManager)
   screwButtonManagerRef.current = screwButtonManager
@@ -892,6 +902,79 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [btkManager !== undefined])
 
+  const rmgDeviceActions: RMGDeviceActions | undefined = useMemo(() => {
+    if (!rmgManager) return undefined
+    return {
+      powerOn: () => rmgManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => rmgManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => rmgManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => rmgManagerRef.current?.reboot() ?? Promise.resolve(),
+      setStrength: (value: number) => rmgManagerRef.current?.setStrength(value),
+      getState: () => {
+        const m = rmgManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          currentDraw: m?.currentDraw ?? 0,
+          strength: m?.strength ?? 45,
+          fieldActive: m?.fieldActive ?? false,
+        }
+      },
+      getFirmware: () => rmgManagerRef.current?.firmware ?? {
+        version: '1.2.0',
+        build: '2024.03.15',
+        checksum: 'E2C4A8F6',
+        features: ['coil-feedback', 'flux-stabilize', 'field-calibrate', 'auto-attract'],
+        securityPatch: '2024.03.10',
+      },
+      getPowerSpecs: () => rmgManagerRef.current?.powerSpecs ?? {
+        full: 5,
+        idle: 3,
+        standby: 0.2,
+        category: 'medium',
+        priority: 3,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rmgManager !== undefined])
+
+  const mscDeviceActions: MSCDeviceActions | undefined = useMemo(() => {
+    if (!mscManager) return undefined
+    return {
+      powerOn: () => mscManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => mscManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => mscManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => mscManagerRef.current?.reboot() ?? Promise.resolve(),
+      getState: () => {
+        const m = mscManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          currentDraw: m?.currentDraw ?? 0,
+          scanLine: m?.scanLine ?? 0,
+          detectedMaterials: m?.detectedMaterials ?? 0,
+        }
+      },
+      getFirmware: () => mscManagerRef.current?.firmware ?? {
+        version: '1.3.0',
+        build: '2024.02.28',
+        checksum: 'F7A3C9D2',
+        features: ['material-detect', 'anomaly-flag', 'sweep-scan', 'auto-calibrate'],
+        securityPatch: '2024.02.20',
+      },
+      getPowerSpecs: () => mscManagerRef.current?.powerSpecs ?? {
+        full: 2,
+        idle: 1,
+        standby: 0.1,
+        category: 'light',
+        priority: 2,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mscManager !== undefined])
+
   // Build theme actions from props - use refs for stable reference
   const themeIndexRef = useRef(themeIndex)
   themeIndexRef.current = themeIndex
@@ -941,6 +1024,8 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     quaDeviceActions,
     pwbDeviceActions,
     btkDeviceActions,
+    rmgDeviceActions,
+    mscDeviceActions,
     screwButtonDeviceActions,
     filesystemActions,
     userActions,

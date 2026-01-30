@@ -23,6 +23,8 @@ export interface PanelSaveData {
     qua?: { isPowered: boolean; mode?: string; sensitivity?: number; depth?: number; frequency?: number }
     pwb?: { isPowered: boolean }
     btk?: { isPowered: boolean }
+    rmg?: { isPowered: boolean; strength?: number }
+    msc?: { isPowered: boolean }
     screwButtons?: { [key: string]: { unlocked: boolean; active: boolean; totalActiveTime: number } }
   }
 }

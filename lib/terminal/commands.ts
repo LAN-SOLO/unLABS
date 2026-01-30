@@ -399,6 +399,8 @@ const helpCommand: Command = {
       '|  exd        - explorer drone management (EXD-001)        |',
       '|  pwb        - portable workbench (PWB-001)               |',
       '|  btk        - basic toolkit (BTK-001)                    |',
+      '|  msc        - material scanner (MSC-001)                  |',
+      '|  rmg        - resource magnet (RMG-001)                  |',
       '|             btk status         - show device status       |',
       '|             btk firmware       - view firmware info       |',
       '|             btk test           - run diagnostics          |',
@@ -1034,7 +1036,24 @@ const unsystemctlCommand: Command = {
     if (!command) {
       return {
         success: false,
-        error: 'usage: unsystemctl <command> [flags]\n\navailable commands:\n  reboot    - reboot the system\n  shutdown  - shutdown panel and return to terminal\n  status    - show system status\n\nflags:\n  -now      - execute immediately',
+        error: 'usage: unsystemctl <command> [flags]\n\navailable commands:\n  reboot         - reboot the system\n  shutdown       - shutdown panel and return to terminal\n  status         - show system status\n  daemon-reload  - reload system daemon configuration\n\nflags:\n  -now      - execute immediately',
+      }
+    }
+
+    if (command === 'daemon-reload') {
+      ctx.addOutput('[systemd] Reloading daemon configuration...')
+      ctx.setTyping(true)
+      await new Promise(r => setTimeout(r, 400))
+      ctx.addOutput('[systemd] Scanning unit files...')
+      await new Promise(r => setTimeout(r, 350))
+      ctx.addOutput('[systemd] Rebuilding dependency tree...')
+      await new Promise(r => setTimeout(r, 300))
+      ctx.addOutput('[systemd] Reloading service manifests...')
+      await new Promise(r => setTimeout(r, 250))
+      ctx.setTyping(false)
+      return {
+        success: true,
+        output: ['[systemd] Daemon configuration reloaded successfully.'],
       }
     }
 
@@ -1157,7 +1176,7 @@ const unsystemctlCommand: Command = {
 
     return {
       success: false,
-      error: `Unknown command: ${command}\nAvailable: reboot, shutdown, status`,
+      error: `Unknown command: ${command}\nAvailable: reboot, shutdown, status, daemon-reload`,
     }
   },
 }
@@ -1283,6 +1302,36 @@ const historyCommand: Command = {
   },
 }
 
+const unhistoryCommand: Command = {
+  name: 'unhistory',
+  aliases: ['unhist'],
+  description: 'Show command history (persists across reboots)',
+  usage: 'unhistory [count] | unhistory -c',
+  execute: async (args, ctx) => {
+    if (args[0] === '-c') {
+      try { localStorage.setItem('unlabs_cmd_history', '[]') } catch { /* ignore */ }
+      return { success: true, output: ['  History cleared.'] }
+    }
+
+    const history = ctx.sessionHistory ?? []
+    if (history.length === 0) {
+      return { success: true, output: ['  No commands in history.'] }
+    }
+
+    const count = args[0] ? Math.min(parseInt(args[0]) || 200, history.length) : history.length
+    // history is newest-first, reverse for display (oldest first, like Linux)
+    const display = history.slice(0, count).reverse()
+
+    const output = ['']
+    display.forEach((cmd, i) => {
+      output.push(`  ${String(i + 1).padStart(4)}  ${cmd}`)
+    })
+    output.push('')
+
+    return { success: true, output }
+  },
+}
+
 // Device control command
 const deviceCommand: Command = {
   name: 'device',
@@ -1370,6 +1419,8 @@ const deviceCommand: Command = {
         'QAN-001': 'Quantum Analyzer', 'QSM-001': 'Quantum State Monitor',
         'PWB-001': 'Portable Workbench',
         'BTK-001': 'Basic Toolkit',
+        'RMG-001': 'Resource Magnet',
+        'MSC-001': 'Material Scanner',
       }
 
       const devicePowerCtrl: Record<string, { on: () => Promise<void>; off: () => Promise<void>; isPowered: () => boolean } | undefined> = {
@@ -1389,6 +1440,8 @@ const deviceCommand: Command = {
         'QSM-001': ctx.data.qsmDevice ? { on: () => ctx.data.qsmDevice!.powerOn(), off: () => ctx.data.qsmDevice!.powerOff(), isPowered: () => ctx.data.qsmDevice!.getState().isPowered } : undefined,
         'PWB-001': ctx.data.pwbDevice ? { on: () => ctx.data.pwbDevice!.powerOn(), off: () => ctx.data.pwbDevice!.powerOff(), isPowered: () => ctx.data.pwbDevice!.getState().isPowered } : undefined,
         'BTK-001': ctx.data.btkDevice ? { on: () => ctx.data.btkDevice!.powerOn(), off: () => ctx.data.btkDevice!.powerOff(), isPowered: () => ctx.data.btkDevice!.getState().isPowered } : undefined,
+        'RMG-001': ctx.data.rmgDevice ? { on: () => ctx.data.rmgDevice!.powerOn(), off: () => ctx.data.rmgDevice!.powerOff(), isPowered: () => ctx.data.rmgDevice!.getState().isPowered } : undefined,
+        'MSC-001': ctx.data.mscDevice ? { on: () => ctx.data.mscDevice!.powerOn(), off: () => ctx.data.mscDevice!.powerOff(), isPowered: () => ctx.data.mscDevice!.getState().isPowered } : undefined,
       }
 
       const dName = idToName[powerId]
@@ -2063,6 +2116,8 @@ const deviceCommand: Command = {
         'QSM-001': ctx.data.qsmDevice ? { on: () => ctx.data.qsmDevice!.powerOn(), off: () => ctx.data.qsmDevice!.powerOff(), isPowered: () => ctx.data.qsmDevice!.getState().isPowered } : undefined,
         'PWB-001': ctx.data.pwbDevice ? { on: () => ctx.data.pwbDevice!.powerOn(), off: () => ctx.data.pwbDevice!.powerOff(), isPowered: () => ctx.data.pwbDevice!.getState().isPowered } : undefined,
         'BTK-001': ctx.data.btkDevice ? { on: () => ctx.data.btkDevice!.powerOn(), off: () => ctx.data.btkDevice!.powerOff(), isPowered: () => ctx.data.btkDevice!.getState().isPowered } : undefined,
+        'RMG-001': ctx.data.rmgDevice ? { on: () => ctx.data.rmgDevice!.powerOn(), off: () => ctx.data.rmgDevice!.powerOff(), isPowered: () => ctx.data.rmgDevice!.getState().isPowered } : undefined,
+        'MSC-001': ctx.data.mscDevice ? { on: () => ctx.data.mscDevice!.powerOn(), off: () => ctx.data.mscDevice!.powerOff(), isPowered: () => ctx.data.mscDevice!.getState().isPowered } : undefined,
       }
 
       const ctrl = devicePowerMap[device.id]
@@ -10789,6 +10844,172 @@ const pwbCommand: Command = {
   }
 }
 
+// Resource Magnet command
+const rmgCommand: Command = {
+  name: 'rmg',
+  aliases: ['magnet'],
+  description: 'Resource Magnet management',
+  usage: 'rmg <status|firmware|test|config|field|reboot>',
+  execute: async (args, ctx) => {
+    const device = ctx.data.rmgDevice
+    if (!device) return { success: false, output: ['[rmg] Device not connected'] }
+    const sub = args[0]?.toLowerCase()
+    if (!sub || sub === 'help') {
+      return { success: true, output: [
+        '', '  RMG-001 Resource Magnet', '  ─────────────────────────────',
+        '  rmg status     Device status', '  rmg firmware   Firmware info',
+        '  rmg test       Run diagnostics', '  rmg config     View configuration',
+        '  rmg field      Field status', '  rmg strength   Set strength (0-100)',
+        '  rmg reboot     Reboot device', '',
+      ]}
+    }
+    const state = device.getState()
+    if (sub === 'status') {
+      const fw = device.getFirmware()
+      return { success: true, output: [
+        '', '  ┌─ RMG-001 STATUS ────────────────┐',
+        `  │ State:    ${state.deviceState.toUpperCase().padEnd(22)}│`,
+        `  │ Power:    ${state.isPowered ? 'ON' : 'OFF'}${' '.repeat(state.isPowered ? 20 : 19)}│`,
+        `  │ Draw:     ${state.currentDraw.toFixed(1)} E/s${' '.repeat(17 - state.currentDraw.toFixed(1).length)}│`,
+        `  │ Firmware: v${fw.version}${' '.repeat(20 - fw.version.length)}│`,
+        `  │ Strength: ${String(state.strength + '%').padEnd(22)}│`,
+        `  │ Field:    ${(state.fieldActive ? 'ACTIVE' : 'INACTIVE').padEnd(22)}│`,
+        '  └──────────────────────────────────┘', '',
+      ]}
+    }
+    if (sub === 'firmware') {
+      const sub2 = args[1]?.toLowerCase()
+      const fw = device.getFirmware()
+      if (sub2 === 'update') {
+        if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[rmg] Device must be online to update firmware'] }
+        ctx.addOutput('[rmg] Checking for firmware updates...')
+        await new Promise(r => setTimeout(r, 800))
+        ctx.addOutput('[rmg] Current version: v' + fw.version)
+        await new Promise(r => setTimeout(r, 500))
+        ctx.addOutput('[rmg] No updates available. Firmware is up to date.')
+        return { success: true }
+      }
+      return { success: true, output: [
+        '', '  RMG-001 FIRMWARE', '  ─────────────────────────────',
+        `  Version:  v${fw.version}`, `  Build:    ${fw.build}`,
+        `  Checksum: ${fw.checksum}`, `  Patch:    ${fw.securityPatch}`,
+        `  Features: ${fw.features.join(', ')}`, '',
+      ]}
+    }
+    if (sub === 'test' || sub === 'diag') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[rmg] Device must be online to run diagnostics'] }
+      ctx.addOutput('[rmg] Starting diagnostics...')
+      await device.runTest()
+      return { success: true, output: ['[rmg] Diagnostics complete — ALL PASSED'] }
+    }
+    if (sub === 'config') {
+      const ps = device.getPowerSpecs()
+      return { success: true, output: [
+        '', '  RMG-001 CONFIGURATION', '  ─────────────────────────────',
+        `  Category: ${ps.category}`, `  Priority: ${ps.priority}`,
+        `  Power Full:    ${ps.full} E/s`, `  Power Idle:    ${ps.idle} E/s`,
+        `  Power Standby: ${ps.standby} E/s`, '',
+      ]}
+    }
+    if (sub === 'field') {
+      return { success: true, output: [
+        '', '  RMG-001 FIELD STATUS', '  ─────────────────────────────',
+        `  Active:   ${state.fieldActive ? 'YES' : 'NO'}`,
+        `  Strength: ${state.strength}%`,
+        `  Draw:     ${state.currentDraw.toFixed(1)} E/s`, '',
+      ]}
+    }
+    if (sub === 'strength') {
+      const val = parseInt(args[1])
+      if (isNaN(val) || val < 0 || val > 100) return { success: false, output: ['[rmg] Usage: rmg strength <0-100>'] }
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[rmg] Device must be online'] }
+      device.setStrength(val)
+      return { success: true, output: [`[rmg] Strength set to ${val}%`] }
+    }
+    if (sub === 'reboot') {
+      if (!state.isPowered) return { success: false, output: ['[rmg] Device is not powered on'] }
+      ctx.addOutput('[rmg] Rebooting RMG-001...')
+      await device.reboot()
+      return { success: true, output: ['[rmg] Reboot complete'] }
+    }
+    return { success: false, output: [`[rmg] Unknown subcommand: ${sub}`, 'Usage: rmg <status|firmware|test|config|field|strength|reboot>'] }
+  }
+}
+
+const mscCommand: Command = {
+  name: 'msc',
+  aliases: ['scanner', 'matscan'],
+  description: 'Material Scanner management',
+  usage: 'msc <status|firmware|test|config|reboot>',
+  execute: async (args, ctx) => {
+    const device = ctx.data.mscDevice
+    if (!device) return { success: false, output: ['[msc] Device not connected'] }
+    const sub = args[0]?.toLowerCase()
+    if (!sub || sub === 'help') {
+      return { success: true, output: [
+        '', '  MSC-001 Material Scanner', '  ─────────────────────────────',
+        '  msc status     Device status', '  msc firmware   Firmware info',
+        '  msc test       Run diagnostics', '  msc config     View configuration',
+        '  msc reboot     Reboot device', '',
+      ]}
+    }
+    const state = device.getState()
+    if (sub === 'status') {
+      const fw = device.getFirmware()
+      return { success: true, output: [
+        '', '  ┌─ MSC-001 STATUS ────────────────┐',
+        `  │ State:    ${state.deviceState.toUpperCase().padEnd(22)}│`,
+        `  │ Power:    ${state.isPowered ? 'ON' : 'OFF'}${' '.repeat(state.isPowered ? 20 : 19)}│`,
+        `  │ Draw:     ${state.currentDraw.toFixed(1)} E/s${' '.repeat(17 - state.currentDraw.toFixed(1).length)}│`,
+        `  │ Firmware: v${fw.version}${' '.repeat(20 - fw.version.length)}│`,
+        `  │ Detected: ${String(state.detectedMaterials).padEnd(22)}│`,
+        '  └──────────────────────────────────┘', '',
+      ]}
+    }
+    if (sub === 'firmware') {
+      const sub2 = args[1]?.toLowerCase()
+      const fw = device.getFirmware()
+      if (sub2 === 'update') {
+        if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[msc] Device must be online to update firmware'] }
+        ctx.addOutput('[msc] Checking for firmware updates...')
+        await new Promise(r => setTimeout(r, 800))
+        ctx.addOutput('[msc] Current version: v' + fw.version)
+        await new Promise(r => setTimeout(r, 500))
+        ctx.addOutput('[msc] No updates available. Firmware is up to date.')
+        return { success: true }
+      }
+      return { success: true, output: [
+        '', '  MSC-001 FIRMWARE', '  ─────────────────────────────',
+        `  Version:  v${fw.version}`, `  Build:    ${fw.build}`,
+        `  Checksum: ${fw.checksum}`, `  Patch:    ${fw.securityPatch}`,
+        `  Features: ${fw.features.join(', ')}`, '',
+      ]}
+    }
+    if (sub === 'test' || sub === 'diag') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[msc] Device must be online to run diagnostics'] }
+      ctx.addOutput('[msc] Starting diagnostics...')
+      await device.runTest()
+      return { success: true, output: ['[msc] Diagnostics complete — ALL PASSED'] }
+    }
+    if (sub === 'config') {
+      const ps = device.getPowerSpecs()
+      return { success: true, output: [
+        '', '  MSC-001 CONFIGURATION', '  ─────────────────────────────',
+        `  Category: ${ps.category}`, `  Priority: ${ps.priority}`,
+        `  Power Full:    ${ps.full} E/s`, `  Power Idle:    ${ps.idle} E/s`,
+        `  Power Standby: ${ps.standby} E/s`, '',
+      ]}
+    }
+    if (sub === 'reboot') {
+      if (!state.isPowered) return { success: false, output: ['[msc] Device is not powered on'] }
+      ctx.addOutput('[msc] Rebooting MSC-001...')
+      await device.reboot()
+      return { success: true, output: ['[msc] Reboot complete'] }
+    }
+    return { success: false, output: [`[msc] Unknown subcommand: ${sub}`, 'Usage: msc <status|firmware|test|config|reboot>'] }
+  }
+}
+
 // Command registry
 export const commands: Command[] = [
   helpCommand,
@@ -10820,6 +11041,7 @@ export const commands: Command[] = [
   echoCommand,
   aboutCommand,
   historyCommand,
+  unhistoryCommand,
   runCommand,
   killCommand,
   unsystemctlCommand,
@@ -10842,6 +11064,8 @@ export const commands: Command[] = [
   exdCommand,
   btkCommand,
   pwbCommand,
+  rmgCommand,
+  mscCommand,
   themeCommand,
   screwstatCommand,
   nodesyncCommand,

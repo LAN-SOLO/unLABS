@@ -73,6 +73,8 @@ import { EMCManagerProvider } from '@/contexts/EMCManager'
 import { QUAManagerProvider } from '@/contexts/QUAManager'
 import { PWBManagerProvider } from '@/contexts/PWBManager'
 import { BTKManagerProvider } from '@/contexts/BTKManager'
+import { RMGManagerProvider } from '@/contexts/RMGManager'
+import { MSCManagerProvider } from '@/contexts/MSCManager'
 import { ScrewButtonManagerProvider } from '@/contexts/ScrewButtonManager'
 import type { EquipmentData } from '../terminal/actions/equipment'
 
@@ -161,6 +163,8 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
     <QUAManagerProvider initialState={saved?.qua}>
     <PWBManagerProvider initialState={saved?.pwb}>
     <BTKManagerProvider initialState={saved?.btk}>
+    <RMGManagerProvider initialState={saved?.rmg}>
+    <MSCManagerProvider initialState={saved?.msc}>
     <ScrewButtonManagerProvider initialState={saved?.screwButtons}>
     <WindowManagerProvider className="text-white">
       {/* Top Toolbar */}
@@ -722,6 +726,8 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
 
     </WindowManagerProvider>
     </ScrewButtonManagerProvider>
+    </MSCManagerProvider>
+    </RMGManagerProvider>
     </BTKManagerProvider>
     </PWBManagerProvider>
     </QUAManagerProvider>

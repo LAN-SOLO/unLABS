@@ -143,6 +143,40 @@ export class VirtualFS {
         'calibration.auto=true',
       ].join('\n'),
     }))
+    this.addChild(etcDevices, this.mknode('rmg.conf', 'file', {
+      content: [
+        '# RMG-001 Configuration',
+        'device.id=RMG-001',
+        'device.name=Resource Magnet',
+        'device.tier=1',
+        'device.maker=TESLA',
+        'power.full=5.0',
+        'power.idle=3.0',
+        'power.standby=0.2',
+        'power.category=medium',
+        'power.priority=3',
+        'field.strength=45',
+        'field.auto_calibrate=true',
+        'coils.count=3',
+      ].join('\n'),
+    }))
+    this.addChild(etcDevices, this.mknode('msc.conf', 'file', {
+      content: [
+        '# MSC-001 Configuration',
+        'device.id=MSC-001',
+        'device.name=Material Scanner',
+        'device.tier=1',
+        'device.maker=SCNR',
+        'power.full=2.0',
+        'power.idle=1.0',
+        'power.standby=0.1',
+        'power.category=light',
+        'power.priority=2',
+        'scan.sweep_speed=50',
+        'scan.auto_calibrate=true',
+        'emitter.power=75',
+      ].join('\n'),
+    }))
     this.addChild(etcDevices, this.mknode('pwb.conf', 'file', {
       content: [
         '# PWB-001 Configuration',
@@ -461,6 +495,92 @@ export class VirtualFS {
       ].join('\n'),
     }))
 
+    this.addChild(opLocalDocs, this.mknode('rmg001.txt', 'file', {
+      owner: 'operator', group: 'operator',
+      content: [
+        'RMG-001 RESOURCE MAGNET',
+        '===========================',
+        'Type:     Passive Resource Attractor',
+        'Tier:     1',
+        'Maker:    TESLA (Tesla Coil Systems)',
+        'Firmware: v1.2.0',
+        '',
+        'OVERVIEW',
+        '--------',
+        'Electromagnetic resource attractor using concentric',
+        'field rings. Variable strength control via integrated',
+        'coil system. Auto-calibration for optimal flux density.',
+        '',
+        'POWER SPECS',
+        '-----------',
+        'Full:     5.0 E/s',
+        'Idle:     3.0 E/s',
+        'Standby:  0.2 E/s',
+        'Category: Medium',
+        'Priority: 3',
+        '',
+        'FEATURES',
+        '--------',
+        '- Variable strength coil control (0-100%)',
+        '- Concentric field ring visualization',
+        '- Flux density monitoring',
+        '- Auto-calibration system',
+        '- Field stability feedback',
+        '',
+        'COMMANDS',
+        '--------',
+        'rmg status     - Device status',
+        'rmg firmware   - Firmware information',
+        'rmg test       - Run diagnostics',
+        'rmg config     - View configuration',
+        'rmg field      - Field status',
+        'rmg strength N - Set strength (0-100)',
+        'rmg reboot     - Reboot device',
+      ].join('\n'),
+    }))
+
+    this.addChild(opLocalDocs, this.mknode('msc001.txt', 'file', {
+      owner: 'operator', group: 'operator',
+      content: [
+        'MSC-001 MATERIAL SCANNER',
+        '===========================',
+        'Type:     Handheld Resource Detector',
+        'Tier:     1',
+        'Maker:    SCNR (Scanner Technologies)',
+        'Firmware: v1.3.0',
+        '',
+        'OVERVIEW',
+        '--------',
+        'Handheld scanning device for resource detection.',
+        'Identifies nearby resource nodes and small anomalies.',
+        'Helps locate Abstractum deposits and flags minor',
+        'anomaly signals via sweep-scan emitter/receiver pair.',
+        '',
+        'POWER SPECS',
+        '-----------',
+        'Full:     2.0 E/s',
+        'Idle:     1.0 E/s',
+        'Standby:  0.1 E/s',
+        'Category: Light',
+        'Priority: 2',
+        '',
+        'FEATURES',
+        '--------',
+        '- Material detection sweep scanning',
+        '- Anomaly signal flagging',
+        '- Auto-calibration system',
+        '- Real-time scan line visualization',
+        '',
+        'COMMANDS',
+        '--------',
+        'msc status     - Device status',
+        'msc firmware   - Firmware information',
+        'msc test       - Run diagnostics',
+        'msc config     - View configuration',
+        'msc reboot     - Reboot device',
+      ].join('\n'),
+    }))
+
     this.addChild(opLocalDocs, this.mknode('btk001.txt', 'file', {
       owner: 'operator', group: 'operator',
       content: [
@@ -667,6 +787,32 @@ export class VirtualFS {
     }))
     this.addChild(varLogUnos, this.mknode('screwbutton.log', 'file', {
       content: '[2026-01-28 00:00:03] ScrewButton subsystem initialized\n[2026-01-28 00:00:03] 4 buttons registered: SB-01, SB-02, SB-03, SB-04\n',
+    }))
+    this.addChild(varLogUnos, this.mknode('rmg.log', 'file', {
+      content: [
+        '[2024-03-15 08:00:01] RMG-001 boot: POST check passed',
+        '[2024-03-15 08:00:01] RMG-001 boot: Coil check OK',
+        '[2024-03-15 08:00:02] RMG-001 boot: Flux generator online',
+        '[2024-03-15 08:00:02] RMG-001 boot: Field initialized',
+        '[2024-03-15 08:00:03] RMG-001 boot: Calibration complete',
+        '[2024-03-15 08:00:03] RMG-001 status: ONLINE',
+        '[2024-03-15 10:45:10] RMG-001 diag: Coils PASS',
+        '[2024-03-15 10:45:11] RMG-001 diag: Field PASS',
+        '[2024-03-15 10:45:11] RMG-001 diag: Flux PASS',
+        '[2024-03-15 10:45:12] RMG-001 diag: Calibration PASS',
+      ].join('\n'),
+    }))
+    this.addChild(varLogUnos, this.mknode('msc.log', 'file', {
+      content: [
+        '[2024-02-28 09:00:01] MSC-001 boot: POST check passed',
+        '[2024-02-28 09:00:01] MSC-001 boot: Sensor init OK',
+        '[2024-02-28 09:00:02] MSC-001 boot: Calibration complete',
+        '[2024-02-28 09:00:02] MSC-001 status: SCANNING',
+        '[2024-02-28 11:30:05] MSC-001 diag: Emitter PASS',
+        '[2024-02-28 11:30:05] MSC-001 diag: Receiver PASS',
+        '[2024-02-28 11:30:06] MSC-001 diag: Calibration PASS',
+        '[2024-02-28 11:30:06] MSC-001 diag: Sweep PASS',
+      ].join('\n'),
     }))
     this.addChild(varLogUnos, this.mknode('btk.log', 'file', {
       content: [

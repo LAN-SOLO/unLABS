@@ -8,6 +8,8 @@ import { LED } from '../controls/LED'
 import { usePowerManagerOptional } from '@/contexts/PowerManager'
 import { usePWBManagerOptional } from '@/contexts/PWBManager'
 import { useBTKManagerOptional } from '@/contexts/BTKManager'
+import { useRMGManagerOptional } from '@/contexts/RMGManager'
+import { useMSCManagerOptional } from '@/contexts/MSCManager'
 import type { TechTreeProgress } from '@/app/(game)/terminal/actions/equipment'
 
 interface EquipmentTileProps {
@@ -2984,9 +2986,9 @@ export function BasicToolkit({ className }: BasicToolkitProps) {
 // ==================================================
 // MATERIAL SCANNER - Tier 1 Resource Detection
 // ==================================================
-type ScannerState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type ScannerState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
 type ScannerTestPhase = 'emitter' | 'receiver' | 'calibrate' | 'sweep' | 'complete' | null
-type ScannerBootPhase = 'init' | 'sensors' | 'calibrate' | 'ready' | null
+type ScannerBootPhase = 'post' | 'sensors' | 'calibrate' | 'ready' | null
 
 interface MaterialScannerProps {
   scanProgress?: number
@@ -2999,9 +3001,10 @@ export function MaterialScanner({
   detectedMaterials = 3,
   className,
 }: MaterialScannerProps) {
-  const [deviceState, setDeviceState] = useState<ScannerState>('booting')
-  const [testPhase, setTestPhase] = useState<ScannerTestPhase>(null)
-  const [bootPhase, setBootPhase] = useState<ScannerBootPhase>('init')
+  const manager = useMSCManagerOptional()
+  const deviceState: ScannerState = manager?.deviceState ?? 'booting'
+  const testPhase: ScannerTestPhase = manager?.testPhase ?? null
+  const bootPhase: ScannerBootPhase = manager?.bootPhase ?? null
   const [scanLine, setScanLine] = useState(0)
   const [foundMaterials, setFoundMaterials] = useState<number[]>([])
 
@@ -3014,25 +3017,6 @@ export function MaterialScanner({
     ]
     return positions[Math.floor(Math.random() * positions.length)]
   })
-
-  // Boot sequence
-  useEffect(() => {
-    if (deviceState === 'booting') {
-      const bootSequence = async () => {
-        setBootPhase('init')
-        await new Promise(r => setTimeout(r, 350))
-        setBootPhase('sensors')
-        await new Promise(r => setTimeout(r, 400))
-        setBootPhase('calibrate')
-        await new Promise(r => setTimeout(r, 450))
-        setBootPhase('ready')
-        await new Promise(r => setTimeout(r, 300))
-        setDeviceState('online')
-        setBootPhase(null)
-      }
-      bootSequence()
-    }
-  }, [deviceState])
 
   // Scanning animation when online
   useEffect(() => {
@@ -3066,37 +3050,13 @@ export function MaterialScanner({
     }
   }, [deviceState, detectedMaterials, foundMaterials.length])
 
-  // Test sequence handler
-  const runTest = useCallback(() => {
-    if (deviceState !== 'online') return
-    setDeviceState('testing')
-    const testSequence = async () => {
-      setTestPhase('emitter')
-      await new Promise(r => setTimeout(r, 500))
-      setTestPhase('receiver')
-      await new Promise(r => setTimeout(r, 500))
-      setTestPhase('calibrate')
-      await new Promise(r => setTimeout(r, 600))
-      setTestPhase('sweep')
-      await new Promise(r => setTimeout(r, 700))
-      setTestPhase('complete')
-      await new Promise(r => setTimeout(r, 400))
-      setTestPhase(null)
-      setDeviceState('online')
+  // Clear scan data when powered off
+  useEffect(() => {
+    if (deviceState === 'standby' || deviceState === 'shutdown') {
+      setScanLine(0)
+      setFoundMaterials([])
     }
-    testSequence()
   }, [deviceState])
-
-  // Reboot handler
-  const reboot = useCallback(() => {
-    setDeviceState('rebooting')
-    setTestPhase(null)
-    setFoundMaterials([])
-    setScanLine(0)
-    setTimeout(() => {
-      setDeviceState('booting')
-    }, 600)
-  }, [])
 
   const getStatusColor = () => {
     switch (deviceState) {
@@ -3104,18 +3064,52 @@ export function MaterialScanner({
       case 'booting': return 'var(--neon-green)'
       case 'testing': return 'var(--neon-purple)'
       case 'rebooting': return 'var(--neon-amber)'
-      case 'offline': return 'var(--neon-red)'
+      case 'standby': case 'shutdown': return 'var(--neon-red)'
       default: return 'var(--neon-cyan)'
     }
   }
 
   return (
     <PanelFrame variant="teal" className={cn('p-2 relative overflow-hidden', className)}>
+      {/* Standby / Shutdown overlay */}
+      {(deviceState === 'standby' || deviceState === 'shutdown') && (
+        <div className="absolute inset-0 bg-black/80 z-20 flex items-center justify-center">
+          <span className="font-mono text-[7px] text-white/30">
+            {deviceState === 'shutdown' ? 'SHUTTING DOWN...' : 'STANDBY'}
+          </span>
+        </div>
+      )}
+
+      {/* Tiny power button — 5x5px flush circular dot, bottom-left */}
+      <button
+        onClick={() => {
+          if (!manager) return
+          if (deviceState === 'standby') manager.powerOn()
+          else if (deviceState === 'online') manager.powerOff()
+        }}
+        disabled={!manager || (deviceState !== 'online' && deviceState !== 'standby')}
+        className="absolute bottom-1 left-1 z-30 group"
+        title={deviceState === 'standby' ? 'Power On' : 'Power Off'}
+      >
+        <div
+          className="w-[5px] h-[5px] rounded-full border transition-all"
+          style={{
+            background: deviceState === 'standby'
+              ? 'radial-gradient(circle, #1a1a2a 40%, #0a0a1a 100%)'
+              : 'radial-gradient(circle, #2a3a2a 40%, #1a2a1a 100%)',
+            borderColor: deviceState === 'online' ? 'var(--neon-cyan)' : '#333',
+            boxShadow: deviceState === 'online'
+              ? '0 0 3px var(--neon-cyan), inset 0 0 1px var(--neon-cyan)'
+              : 'inset 0 0.5px 1px rgba(0,0,0,0.5)',
+          }}
+        />
+      </button>
+
       {/* Ultra thin stacked nano buttons - top right */}
       <div className="absolute top-1 right-1 flex flex-col gap-px z-10">
         {/* Test button - ultra thin */}
         <button
-          onClick={runTest}
+          onClick={() => manager?.runTest()}
           disabled={deviceState !== 'online'}
           className="group relative"
           title="Test"
@@ -3142,8 +3136,8 @@ export function MaterialScanner({
         </button>
         {/* Reboot button - ultra thin */}
         <button
-          onClick={reboot}
-          disabled={deviceState === 'booting' || deviceState === 'rebooting'}
+          onClick={() => manager?.reboot()}
+          disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'standby' || deviceState === 'shutdown'}
           className="group relative"
           title="Reboot"
         >
@@ -3201,18 +3195,18 @@ export function MaterialScanner({
           <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center">
             <div className="flex items-center gap-2">
               <span className="font-mono text-[6px] text-[var(--neon-cyan)]">
-                {bootPhase === 'init' && 'INIT'}
+                {bootPhase === 'post' && 'POST'}
                 {bootPhase === 'sensors' && 'SENSORS'}
                 {bootPhase === 'calibrate' && 'CALIBRATE'}
                 {bootPhase === 'ready' && 'READY'}
               </span>
               <div className="flex gap-0.5">
-                {['init', 'sensors', 'calibrate', 'ready'].map((phase, i) => (
+                {(['post', 'sensors', 'calibrate', 'ready'] as const).map((phase, i) => (
                   <div
                     key={phase}
                     className="w-1 h-1 rounded-full"
                     style={{
-                      backgroundColor: ['init', 'sensors', 'calibrate', 'ready'].indexOf(bootPhase) >= i
+                      backgroundColor: (['post', 'sensors', 'calibrate', 'ready'] as const).indexOf(bootPhase!) >= i
                         ? 'var(--neon-cyan)'
                         : '#333',
                       boxShadow: bootPhase === phase ? '0 0 4px var(--neon-cyan)' : 'none',
@@ -3241,15 +3235,15 @@ export function MaterialScanner({
                 {testPhase.toUpperCase()}
               </span>
               <div className="flex gap-0.5">
-                {['emitter', 'receiver', 'calibrate', 'sweep'].map((phase) => (
+                {(['emitter', 'receiver', 'calibrate', 'sweep'] as const).map((phase) => (
                   <div
                     key={phase}
                     className="w-1 h-1 rounded-full"
                     style={{
                       backgroundColor:
                         testPhase === phase ? 'var(--neon-purple)' :
-                        ['emitter', 'receiver', 'calibrate', 'sweep'].indexOf(phase) <
-                        ['emitter', 'receiver', 'calibrate', 'sweep'].indexOf(testPhase || 'emitter')
+                        (['emitter', 'receiver', 'calibrate', 'sweep'] as const).indexOf(phase) <
+                        (['emitter', 'receiver', 'calibrate', 'sweep'] as const).indexOf(testPhase as 'emitter' | 'receiver' | 'calibrate' | 'sweep')
                           ? 'var(--neon-green)' : '#333',
                       boxShadow: testPhase === phase ? '0 0 4px var(--neon-purple)' : 'none',
                     }}
@@ -3310,7 +3304,7 @@ export function MaterialScanner({
 // ==================================================
 // RESOURCE MAGNET - Tier 1 Gadget passive resource attraction
 // ==================================================
-type MagnetState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
+type MagnetState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
 type MagnetTestPhase = 'coils' | 'field' | 'flux' | 'calibrate' | 'complete' | null
 
 interface ResourceMagnetProps {
@@ -3328,135 +3322,24 @@ export function ResourceMagnet({
   onTest,
   onReset,
 }: ResourceMagnetProps) {
-  const [deviceState, setDeviceState] = useState<MagnetState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<MagnetTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Init...')
-  const [displayValues, setDisplayValues] = useState({ strength: 0, fieldActive: false })
-  const [strength, setStrength] = useState(magnetStrength)
+  const rmg = useRMGManagerOptional()
+  const deviceState = rmg?.deviceState ?? 'online'
+  const testPhase = rmg?.testPhase ?? null
+  const bootPhase = rmg?.bootPhase ?? null
+  const shutdownPhase = rmg?.shutdownPhase ?? null
+  const testResult = rmg?.testResult ?? null
+  const statusMessage = rmg?.statusMessage ?? 'ACTIVE'
+  const isPowered = rmg?.isPowered ?? true
+  const strength = rmg?.strength ?? magnetStrength
+  const fieldActive = (rmg?.fieldActive ?? true) && (deviceState === 'online' || deviceState === 'testing')
+  const displayStrength = deviceState === 'online' || deviceState === 'testing' ? strength : 0
 
-  // Boot sequence on mount
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Coil check...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 280))
-
-      setStatusMessage('Flux gen...')
-      setBootPhase(2)
-      setDisplayValues({ strength: 10, fieldActive: false })
-      await new Promise(r => setTimeout(r, 320))
-
-      setStatusMessage('Field init...')
-      setBootPhase(3)
-      setDisplayValues({ strength: 25, fieldActive: true })
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Calibrate...')
-      setBootPhase(4)
-      setDisplayValues({ strength: 35, fieldActive: true })
-      await new Promise(r => setTimeout(r, 350))
-
-      // Final boot
-      setDisplayValues({ strength: magnetStrength, fieldActive: true })
-      setBootPhase(5)
-      setDeviceState('online')
-      setStatusMessage('ACTIVE')
-    }
-
-    bootSequence()
-  }, [])
-
-  // Update strength display when knob changes
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayValues(prev => ({ ...prev, strength: strength }))
-    }
-  }, [strength, deviceState])
-
-  const handleTest = async () => {
-    if (deviceState !== 'online') return
-
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<MagnetTestPhase>[] = ['coils', 'field', 'flux', 'calibrate', 'complete']
-    const phaseMessages: Record<NonNullable<MagnetTestPhase>, string> = {
-      coils: 'Testing coils...',
-      field: 'Field strength...',
-      flux: 'Flux density...',
-      calibrate: 'Calibrating...',
-      complete: 'Test complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(phaseMessages[phase])
-      await new Promise(r => setTimeout(r, 350))
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('PASSED')
-    onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('ACTIVE')
-    }, 2500)
-  }
-
-  const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    setStatusMessage('Field off...')
-    setDisplayValues(prev => ({ ...prev, fieldActive: false }))
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Discharge...')
-    setDisplayValues({ strength: 0, fieldActive: false })
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Offline')
-    await new Promise(r => setTimeout(r, 300))
-
-    // Boot sequence
-    setDeviceState('booting')
-    setStatusMessage('Coil check...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 280))
-
-    setStatusMessage('Flux gen...')
-    setBootPhase(2)
-    setDisplayValues({ strength: 10, fieldActive: false })
-    await new Promise(r => setTimeout(r, 320))
-
-    setStatusMessage('Field init...')
-    setBootPhase(3)
-    setDisplayValues({ strength: 25, fieldActive: true })
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Calibrate...')
-    setBootPhase(4)
-    setDisplayValues({ strength: 35, fieldActive: true })
-    await new Promise(r => setTimeout(r, 350))
-
-    setDisplayValues({ strength: strength, fieldActive: true })
-    setBootPhase(5)
-    setDeviceState('online')
-    setStatusMessage('ACTIVE')
-    onReset?.()
-  }
+  const handleTest = useCallback(() => { rmg?.runTest(); onTest?.() }, [rmg, onTest])
+  const handleReboot = useCallback(() => { rmg?.reboot(); onReset?.() }, [rmg, onReset])
+  const handleSetStrength = useCallback((value: number) => rmg?.setStrength(value), [rmg])
 
   const getLedColor = () => {
-    if (deviceState === 'offline' || deviceState === 'rebooting') return 'red'
+    if (deviceState === 'standby' || deviceState === 'shutdown' || deviceState === 'rebooting') return 'red'
     if (deviceState === 'booting') return 'amber'
     if (deviceState === 'testing') return 'cyan'
     if (testResult === 'pass') return 'green'
@@ -3464,8 +3347,7 @@ export function ResourceMagnet({
     return 'green'
   }
 
-  const isLedOn = deviceState !== 'offline' && !(deviceState === 'rebooting' && bootPhase === 0)
-  const fieldActive = displayValues.fieldActive && (deviceState === 'online' || deviceState === 'testing')
+  const isLedOn = deviceState !== 'standby' && deviceState !== 'shutdown' && !(deviceState === 'rebooting')
 
   return (
     <PanelFrame variant="military" className={cn('p-2', className)}>
@@ -3557,6 +3439,34 @@ export function ResourceMagnet({
               )} />
             </div>
           </button>
+          {/* Power toggle - copper style */}
+          <button
+            onClick={() => {
+              if (deviceState === 'online') rmg?.powerOff()
+              else if (deviceState === 'standby') rmg?.powerOn()
+            }}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown'}
+            className="group relative disabled:opacity-30"
+            title="Power"
+          >
+            <div className="flex items-center justify-center group-active:scale-95"
+              style={{
+                width: '3px',
+                height: '5px',
+                background: 'linear-gradient(180deg, #c09060 0%, #906030 50%, #604020 100%)',
+                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.3), 0 1px 1px rgba(0,0,0,0.4)',
+                border: '0.5px solid #7a5030',
+                borderRadius: '1px',
+              }}
+            >
+              <div className="w-0.5 h-0.5 rounded-full"
+                style={{
+                  backgroundColor: isPowered && deviceState !== 'standby' ? 'var(--neon-green)' : deviceState === 'standby' ? 'var(--neon-red)' : '#5a4020',
+                  boxShadow: isPowered && deviceState !== 'standby' ? '0 0 2px var(--neon-green)' : deviceState === 'standby' ? '0 0 2px var(--neon-red)' : 'none',
+                }}
+              />
+            </div>
+          </button>
           <div className="font-mono text-[5px] text-white/30">T1</div>
         </div>
       </div>
@@ -3599,13 +3509,22 @@ export function ResourceMagnet({
         {deviceState === 'testing' && testPhase === 'calibrate' && (
           <div className="absolute inset-0 bg-[var(--neon-green)]/10 animate-pulse" />
         )}
+
+        {/* Standby/Shutdown overlay */}
+        {(deviceState === 'standby' || deviceState === 'shutdown') && (
+          <div className="absolute inset-0 bg-black/80 z-10 flex items-center justify-center rounded">
+            <span className="font-mono text-[6px] text-[var(--neon-red)]/60">
+              {shutdownPhase ? shutdownPhase.toUpperCase() : 'STANDBY'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Controls row with fixed layout */}
       <div className="flex items-center justify-between mt-1">
         <Knob
           value={strength}
-          onChange={setStrength}
+          onChange={handleSetStrength}
           size="sm"
           label="STR"
           accentColor="var(--neon-green)"
@@ -3623,7 +3542,7 @@ export function ResourceMagnet({
               {statusMessage}
             </span>
           </div>
-          <div className="font-mono text-[10px] text-[var(--neon-green)]">{displayValues.strength}%</div>
+          <div className="font-mono text-[10px] text-[var(--neon-green)]">{displayStrength}%</div>
           <div className="font-mono text-[6px] text-white/30">FIELD</div>
         </div>
       </div>
