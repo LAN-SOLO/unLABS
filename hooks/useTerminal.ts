@@ -115,6 +115,13 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
     }))
   }, [])
 
+  // Password input mode for su/sudo
+  const [passwordMode, setPasswordMode] = useState(false)
+  const pendingPasswordAction = useRef<{ command: 'su'; target: string } | null>(null)
+
+  // Prompt refresh trigger — incremented after commands that change user/cwd
+  const [promptTick, setPromptTick] = useState(0)
+
   // Save all device state to localStorage
   const saveAllDeviceState = useCallback(() => {
     const cdcState = cdcDeviceActions?.getState()
@@ -238,11 +245,32 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
 
   const processCommand = useCallback(
     async (input: string) => {
+      // Handle password mode - input is the password for a pending su command
+      if (passwordMode && pendingPasswordAction.current) {
+        const action = pendingPasswordAction.current
+        pendingPasswordAction.current = null
+        setPasswordMode(false)
+
+        // Show masked password line
+        addLine(`Password: ${'*'.repeat(input.length)}`, 'input')
+
+        if (action.command === 'su') {
+          const result = userActions?.su(action.target, input)
+          if (result?.success) {
+            addLine(`[su] ${result.message}`, 'output')
+            setPromptTick(t => t + 1)
+          } else {
+            addLine(result?.message ?? 'su: Authentication failure', 'error')
+          }
+        }
+        return
+      }
+
       // Add input line with prompt
       const currentPrompt = userActions?.whoami() ? (() => {
         const user = userActions.whoami()
         const cwd = filesystemActions?.getCwd() ?? '~'
-        const home = userActions.getCurrentUser()?.home ?? '/home/operator'
+        const home = userActions.getCurrentUser()?.home ?? '/unhome/operator'
         const displayCwd = cwd === home ? '~' : cwd.startsWith(home + '/') ? '~' + cwd.slice(home.length) : cwd
         const suffix = user === 'root' ? '#' : '$'
         return `${user}@_unLAB:${displayCwd}${suffix}`
@@ -255,6 +283,18 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
         history: [input, ...prev.history.filter((h) => h !== input)].slice(0, 50),
         historyIndex: -1,
       }))
+
+      // Intercept su commands to use password mode instead of cleartext args
+      const parts = input.trim().split(/\s+/)
+      const cmd = parts[0]?.toLowerCase()
+      if ((cmd === 'su' || cmd === 'unsu') && parts[1] && parts[1] !== 'root' && !parts[2]) {
+        // Check if current user is root (no password needed)
+        if (!userActions?.isRoot()) {
+          pendingPasswordAction.current = { command: 'su', target: parts[1] }
+          setPasswordMode(true)
+          return
+        }
+      }
 
       // Create command context
       const context: CommandContext = {
@@ -299,8 +339,11 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
           window.location.reload()
         }, 1500) // Delay to let user see the output
       }
+
+      // Refresh prompt after any command (user/cwd may have changed)
+      setPromptTick(t => t + 1)
     },
-    [userId, username, balance, addLine, addOutput, clearScreen, setTyping, dataFetchers, router]
+    [userId, username, balance, addLine, addLines, addOutput, clearScreen, setTyping, dataFetchers, router, passwordMode, userActions, filesystemActions]
   )
 
   const navigateHistory = useCallback(
@@ -330,7 +373,8 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
     const displayCwd = cwd === home ? '~' : cwd.startsWith(home + '/') ? '~' + cwd.slice(home.length) : cwd
     const suffix = user === 'root' ? '#' : '$'
     return `${user}@_unLAB:${displayCwd}${suffix}`
-  }, [userActions, filesystemActions, username])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userActions, filesystemActions, username, promptTick])
 
   return {
     lines: state.lines,
@@ -341,5 +385,6 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
     clearScreen,
     addOutput,
     prompt,
+    passwordMode,
   }
 }

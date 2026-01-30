@@ -739,10 +739,10 @@ export class VirtualFS {
     }
 
     return entries.map(([, child]) => {
-      if (child.type === 'dir') return `\x1b[36m${child.name}/\x1b[0m`
-      if (child.type === 'symlink') return `\x1b[35m${child.name}\x1b[0m`
-      if (child.type === 'device') return `\x1b[33m${child.name}\x1b[0m`
-      if ((child.permissions & 0o111) !== 0) return `\x1b[32m${child.name}\x1b[0m`
+      if (child.type === 'dir') return `${child.name}/`
+      if (child.type === 'symlink') return `${child.name}`
+      if (child.type === 'device') return `${child.name}`
+      if ((child.permissions & 0o111) !== 0) return `${child.name}`
       return child.name
     })
   }
@@ -755,10 +755,10 @@ export class VirtualFS {
       ? `${node.major ?? 0}, ${node.minor ?? 0}`.padStart(6)
       : node.size.toString().padStart(6)
     const date = new Date(node.modified).toLocaleDateString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-    const name = node.type === 'dir' ? `\x1b[36m${node.name}/\x1b[0m` :
-                 node.type === 'symlink' ? `\x1b[35m${node.name} -> ${node.target}\x1b[0m` :
-                 node.type === 'device' ? `\x1b[33m${node.name}\x1b[0m` :
-                 (node.permissions & 0o111) !== 0 ? `\x1b[32m${node.name}\x1b[0m` :
+    const name = node.type === 'dir' ? `${node.name}/` :
+                 node.type === 'symlink' ? `${node.name} -> ${node.target}` :
+                 node.type === 'device' ? `${node.name}` :
+                 (node.permissions & 0o111) !== 0 ? `${node.name}` :
                  node.name
     return `${perms} ${owner} ${group} ${size} ${date} ${name}`
   }
@@ -872,8 +872,8 @@ export class VirtualFS {
     entries.forEach(([, child], i) => {
       const isLast = i === entries.length - 1
       const connector = isLast ? '└── ' : '├── '
-      const name = child.type === 'dir' ? `\x1b[36m${child.name}/\x1b[0m` :
-                   child.type === 'device' ? `\x1b[33m${child.name}\x1b[0m` :
+      const name = child.type === 'dir' ? `${child.name}/` :
+                   child.type === 'device' ? `${child.name}` :
                    child.name
       lines.push(prefix + connector + name)
       if (child.type === 'dir') {
@@ -893,11 +893,118 @@ export class VirtualFS {
     return null
   }
 
-  chown(path: string, owner: string): string | null {
+  chown(path: string, owner: string, group?: string): string | null {
     const node = this.resolve(path)
     if (!node) return `chown: cannot access '${path}': No such file or directory`
     node.owner = owner
+    if (group) node.group = group
     return null
+  }
+
+  cp(src: string, dest: string, recursive: boolean = false): string | null {
+    const srcNode = this.resolve(src)
+    if (!srcNode) return `cp: cannot stat '${src}': No such file or directory`
+    if (srcNode.type === 'dir' && !recursive) return `cp: -r not specified; omitting directory '${src}'`
+
+    const absDestPath = this.resolvePath(dest)
+    const destNode = this.resolve(dest)
+
+    // If dest is a directory, copy into it
+    if (destNode && destNode.type === 'dir') {
+      const clone = this.cloneNode(srcNode)
+      this.addChild(destNode, clone)
+      return null
+    }
+
+    // Otherwise copy to dest path (rename)
+    const parts = absDestPath.split('/').filter(Boolean)
+    const newName = parts.pop()
+    if (!newName) return `cp: missing destination`
+    const parentPath = '/' + parts.join('/')
+    const parent = this.resolve(parentPath)
+    if (!parent || parent.type !== 'dir') return `cp: cannot create '${dest}': No such file or directory`
+
+    const clone = this.cloneNode(srcNode)
+    clone.name = newName
+    this.addChild(parent, clone)
+    return null
+  }
+
+  mv(src: string, dest: string): string | null {
+    const cpErr = this.cp(src, dest, true)
+    if (cpErr) return cpErr.replace('cp:', 'mv:')
+    const rmErr = this.rm(src, true)
+    if (rmErr) return rmErr.replace('rm:', 'mv:')
+    return null
+  }
+
+  ln(target: string, linkName: string, symbolic: boolean = true): string | null {
+    if (!symbolic) return `ln: hard links not supported`
+    const absLinkPath = this.resolvePath(linkName)
+    const parts = absLinkPath.split('/').filter(Boolean)
+    const name = parts.pop()
+    if (!name) return `ln: missing link name`
+    const parentPath = '/' + parts.join('/')
+    const parent = this.resolve(parentPath)
+    if (!parent || parent.type !== 'dir') return `ln: cannot create '${linkName}': No such file or directory`
+
+    const link = this.mknode(name, 'symlink', {
+      owner: this._homeUser,
+      group: this._homeUser,
+      target: this.resolvePath(target),
+    })
+    this.addChild(parent, link)
+    return null
+  }
+
+  head(path: string, lines: number = 10): string | null {
+    const content = this.cat(path)
+    if (content === null) return null
+    return content.split('\n').slice(0, lines).join('\n')
+  }
+
+  tail(path: string, lines: number = 10): string | null {
+    const content = this.cat(path)
+    if (content === null) return null
+    const allLines = content.split('\n')
+    return allLines.slice(Math.max(0, allLines.length - lines)).join('\n')
+  }
+
+  write(path: string, content: string): string | null {
+    const node = this.resolve(path)
+    if (node) {
+      if (node.type === 'dir') return `write: '${path}': Is a directory`
+      node.content = content
+      node.size = content.length
+      node.modified = Date.now()
+      return null
+    }
+    // Create if doesn't exist
+    const err = this.touch(path)
+    if (err) return err
+    const newNode = this.resolve(path)
+    if (newNode) {
+      newNode.content = content
+      newNode.size = content.length
+    }
+    return null
+  }
+
+  private cloneNode(node: VNode): VNode {
+    const now = Date.now()
+    const clone: VNode = {
+      ...node,
+      created: now,
+      modified: now,
+      accessed: now,
+    }
+    if (node.children) {
+      clone.children = new Map()
+      for (const [k, v] of node.children) {
+        clone.children.set(k, this.cloneNode(v))
+      }
+    }
+    return clone
   }
 
   // --- Serialization ---
@@ -941,16 +1048,30 @@ export class VirtualFS {
     return obj
   }
 
+  private static migratePath(p: string): string {
+    // Migrate old /home/ paths to /unhome/
+    if (p.startsWith('/home/')) return '/unhome/' + p.slice(6)
+    if (p === '/home') return '/unhome'
+    return p
+  }
+
   static fromJSON(json: string): VirtualFS {
     const fs = new VirtualFS()
     try {
       const data = JSON.parse(json)
-      fs._cwd = data.cwd || '/unhome/operator'
-      fs._previousCwd = data.previousCwd || '/unhome/operator'
+      fs._cwd = VirtualFS.migratePath(data.cwd || '/unhome/operator')
+      fs._previousCwd = VirtualFS.migratePath(data.previousCwd || '/unhome/operator')
       fs._homeUser = data.homeUser || 'operator'
       if (data.mounts) fs._mounts = data.mounts
       if (data.tree) {
         fs.root = fs.deserializeNode(data.tree)
+      }
+      // Validate cwd exists, fall back to home if not
+      if (!fs.resolve(fs._cwd)) {
+        fs._cwd = `/unhome/${fs._homeUser}`
+        if (!fs.resolve(fs._cwd)) {
+          fs._cwd = '/'
+        }
       }
     } catch {
       // Return default FS on parse error

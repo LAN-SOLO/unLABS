@@ -201,6 +201,12 @@ const helpCommand: Command = {
       '|  rm        - remove file/directory (-r recursive)           |',
       '|  tree      - display directory tree                         |',
       '|  chmod     - change file permissions                        |',
+      '|  chown     - change file owner/group (root)                |',
+      '|  cp        - copy files and directories                    |',
+      '|  mv        - move/rename files                             |',
+      '|  ln        - create symbolic links (-s)                    |',
+      '|  head      - display first lines of file                   |',
+      '|  tail      - display last lines of file                    |',
       '+------------------------------------------------------------+',
       '|                  user management                            |',
       '+------------------------------------------------------------+',
@@ -210,13 +216,36 @@ const helpCommand: Command = {
       '|  sudo      - run command as root                            |',
       '|  passwd    - change password (simulated)                    |',
       '|  useradd   - create new user (root only)                    |',
+      '|  userdel   - delete user account (root only)               |',
+      '|  usermod   - modify user groups (root only)                |',
       '|  groups    - show user groups                               |',
+      '+------------------------------------------------------------+',
+      '|                     packages                                |',
+      '+------------------------------------------------------------+',
+      '|  unapt     - package manager (apt/dnf)                     |',
+      '|             unapt update/install/remove/search/list         |',
+      '+------------------------------------------------------------+',
+      '|                    containers                               |',
+      '+------------------------------------------------------------+',
+      '|  unpod     - container runtime                              |',
+      '|             unpod ps/run/stop/rm/images/pull/logs           |',
+      '+------------------------------------------------------------+',
+      '|                      network                                |',
+      '+------------------------------------------------------------+',
+      '|  unnet     - network management                             |',
+      '|             unnet show/up/down/addr/ping/scan/fw            |',
+      '+------------------------------------------------------------+',
+      '|                    version control                          |',
+      '+------------------------------------------------------------+',
+      '|  ungit     - simulated version control                      |',
+      '|             ungit status/add/commit/push/pull/log           |',
       '+------------------------------------------------------------+',
       '|                       other                                |',
       '+------------------------------------------------------------+',
       '|  history   - view command history                          |',
       '|  echo      - echo text back                                |',
       '|  about     - about UnstableLabs                            |',
+      '|  exit      - exit current session                          |',
       '+------------------------------------------------------------+',
       '|                      modules                               |',
       '+------------------------------------------------------------+',
@@ -623,7 +652,7 @@ const scanCommand: Command = {
 
 const whoamiCommand: Command = {
   name: 'whoami',
-  aliases: ['who'],
+  aliases: ['who', 'unwhoami'],
   description: 'Display current user information',
   execute: async (_args, ctx) => {
     const userActions = ctx.data.userActions
@@ -1242,7 +1271,7 @@ const historyCommand: Command = {
 // Device control command
 const deviceCommand: Command = {
   name: 'device',
-  aliases: ['dev', 'devices'],
+  aliases: ['dev', 'devices', 'undev'],
   description: 'Control and monitor lab devices',
   usage: 'device [name] [command]',
   execute: async (args, ctx) => {
@@ -1303,6 +1332,66 @@ const deviceCommand: Command = {
           '  example: device cache test',
           '',
         ],
+      }
+    }
+
+    // Handle "device power <id> <on|off>" syntax
+    if (deviceName === 'power' && action) {
+      const powerId = action.toUpperCase()
+      const powerAction = args[2]?.toLowerCase()
+
+      if (!powerAction || (powerAction !== 'on' && powerAction !== 'off')) {
+        return { success: false, error: 'usage: device power <device-id> <on|off>\nexample: device power UEC-001 on' }
+      }
+
+      // Build a temporary device lookup to find the name
+      const idToName: Record<string, string> = {
+        'CDC-001': 'Crystal Data Cache', 'UEC-001': 'Unstable Energy Core',
+        'BAT-001': 'Battery Pack', 'HMS-001': 'Handmade Synthesizer',
+        'ECR-001': 'Echo Recorder', 'INT-001': 'Interpolator',
+        'MFR-001': 'Microfusion Reactor', 'AIC-001': 'AI Assistant Core',
+        'SCA-001': 'Supercomputer Array', 'EXD-001': 'Explorer Drone',
+        'EMC-001': 'Exotic Matter Contain.', 'VNT-001': 'Ventilation System',
+        'QAN-001': 'Quantum Analyzer', 'QSM-001': 'Quantum State Monitor',
+      }
+
+      const devicePowerCtrl: Record<string, { on: () => Promise<void>; off: () => Promise<void>; isPowered: () => boolean } | undefined> = {
+        'CDC-001': ctx.data.cdcDevice ? { on: () => ctx.data.cdcDevice!.powerOn(), off: () => ctx.data.cdcDevice!.powerOff(), isPowered: () => ctx.data.cdcDevice!.getState().isPowered } : undefined,
+        'UEC-001': ctx.data.uecDevice ? { on: () => ctx.data.uecDevice!.powerOn(), off: () => ctx.data.uecDevice!.powerOff(), isPowered: () => ctx.data.uecDevice!.getState().isPowered } : undefined,
+        'BAT-001': ctx.data.batDevice ? { on: () => ctx.data.batDevice!.powerOn(), off: () => ctx.data.batDevice!.powerOff(), isPowered: () => ctx.data.batDevice!.getState().isPowered } : undefined,
+        'HMS-001': ctx.data.hmsDevice ? { on: () => ctx.data.hmsDevice!.powerOn(), off: () => ctx.data.hmsDevice!.powerOff(), isPowered: () => ctx.data.hmsDevice!.getState().isPowered } : undefined,
+        'ECR-001': ctx.data.ecrDevice ? { on: () => ctx.data.ecrDevice!.powerOn(), off: () => ctx.data.ecrDevice!.powerOff(), isPowered: () => ctx.data.ecrDevice!.getState().isPowered } : undefined,
+        'INT-001': ctx.data.iplDevice ? { on: () => ctx.data.iplDevice!.powerOn(), off: () => ctx.data.iplDevice!.powerOff(), isPowered: () => ctx.data.iplDevice!.getState().isPowered } : undefined,
+        'MFR-001': ctx.data.mfrDevice ? { on: () => ctx.data.mfrDevice!.powerOn(), off: () => ctx.data.mfrDevice!.powerOff(), isPowered: () => ctx.data.mfrDevice!.getState().isPowered } : undefined,
+        'AIC-001': ctx.data.aicDevice ? { on: () => ctx.data.aicDevice!.powerOn(), off: () => ctx.data.aicDevice!.powerOff(), isPowered: () => ctx.data.aicDevice!.getState().isPowered } : undefined,
+        'SCA-001': ctx.data.scaDevice ? { on: () => ctx.data.scaDevice!.powerOn(), off: () => ctx.data.scaDevice!.powerOff(), isPowered: () => ctx.data.scaDevice!.getState().isPowered } : undefined,
+        'EXD-001': ctx.data.exdDevice ? { on: () => ctx.data.exdDevice!.powerOn(), off: () => ctx.data.exdDevice!.powerOff(), isPowered: () => ctx.data.exdDevice!.getState().isPowered } : undefined,
+        'EMC-001': ctx.data.emcDevice ? { on: () => ctx.data.emcDevice!.powerOn(), off: () => ctx.data.emcDevice!.powerOff(), isPowered: () => ctx.data.emcDevice!.getState().isPowered } : undefined,
+        'VNT-001': ctx.data.vntDevice ? { on: () => ctx.data.vntDevice!.powerOn(), off: () => ctx.data.vntDevice!.powerOff(), isPowered: () => ctx.data.vntDevice!.getState().isPowered } : undefined,
+        'QAN-001': ctx.data.quaDevice ? { on: () => ctx.data.quaDevice!.powerOn(), off: () => ctx.data.quaDevice!.powerOff(), isPowered: () => ctx.data.quaDevice!.getState().isPowered } : undefined,
+        'QSM-001': ctx.data.qsmDevice ? { on: () => ctx.data.qsmDevice!.powerOn(), off: () => ctx.data.qsmDevice!.powerOff(), isPowered: () => ctx.data.qsmDevice!.getState().isPowered } : undefined,
+      }
+
+      const dName = idToName[powerId]
+      if (!dName) {
+        return { success: false, error: `device not found: ${powerId}\nuse device list to see available devices.` }
+      }
+
+      const ctrl = devicePowerCtrl[powerId]
+      if (!ctrl) {
+        return { success: true, output: ['', `[device] ${powerId} power control not available (no manager connected)`, ''] }
+      }
+
+      if (powerAction === 'on') {
+        if (ctrl.isPowered()) return { success: true, output: ['', `[device] ${powerId} is already powered ON`, ''] }
+        await ctrl.on()
+        ctx.data.saveAllDeviceState?.()
+        return { success: true, output: ['', `[device] ${dName} (${powerId}) powered ON`, ''] }
+      } else {
+        if (!ctrl.isPowered()) return { success: true, output: ['', `[device] ${powerId} is already powered OFF`, ''] }
+        await ctrl.off()
+        ctx.data.saveAllDeviceState?.()
+        return { success: true, output: ['', `[device] ${dName} (${powerId}) powered OFF`, ''] }
       }
     }
 
@@ -1930,9 +2019,56 @@ const deviceCommand: Command = {
       }
     }
 
+    // Device power on/off
+    if (action === 'power') {
+      const powerAction = args[2]?.toLowerCase()
+      if (!powerAction || (powerAction !== 'on' && powerAction !== 'off')) {
+        return { success: false, error: `usage: device <name> power <on|off>` }
+      }
+
+      // Map device IDs to their context managers
+      const devicePowerMap: Record<string, { on: () => Promise<void>; off: () => Promise<void>; isPowered: () => boolean } | undefined> = {
+        'CDC-001': ctx.data.cdcDevice ? { on: () => ctx.data.cdcDevice!.powerOn(), off: () => ctx.data.cdcDevice!.powerOff(), isPowered: () => ctx.data.cdcDevice!.getState().isPowered } : undefined,
+        'UEC-001': ctx.data.uecDevice ? { on: () => ctx.data.uecDevice!.powerOn(), off: () => ctx.data.uecDevice!.powerOff(), isPowered: () => ctx.data.uecDevice!.getState().isPowered } : undefined,
+        'BAT-001': ctx.data.batDevice ? { on: () => ctx.data.batDevice!.powerOn(), off: () => ctx.data.batDevice!.powerOff(), isPowered: () => ctx.data.batDevice!.getState().isPowered } : undefined,
+        'HMS-001': ctx.data.hmsDevice ? { on: () => ctx.data.hmsDevice!.powerOn(), off: () => ctx.data.hmsDevice!.powerOff(), isPowered: () => ctx.data.hmsDevice!.getState().isPowered } : undefined,
+        'ECR-001': ctx.data.ecrDevice ? { on: () => ctx.data.ecrDevice!.powerOn(), off: () => ctx.data.ecrDevice!.powerOff(), isPowered: () => ctx.data.ecrDevice!.getState().isPowered } : undefined,
+        'INT-001': ctx.data.iplDevice ? { on: () => ctx.data.iplDevice!.powerOn(), off: () => ctx.data.iplDevice!.powerOff(), isPowered: () => ctx.data.iplDevice!.getState().isPowered } : undefined,
+        'MFR-001': ctx.data.mfrDevice ? { on: () => ctx.data.mfrDevice!.powerOn(), off: () => ctx.data.mfrDevice!.powerOff(), isPowered: () => ctx.data.mfrDevice!.getState().isPowered } : undefined,
+        'AIC-001': ctx.data.aicDevice ? { on: () => ctx.data.aicDevice!.powerOn(), off: () => ctx.data.aicDevice!.powerOff(), isPowered: () => ctx.data.aicDevice!.getState().isPowered } : undefined,
+        'SCA-001': ctx.data.scaDevice ? { on: () => ctx.data.scaDevice!.powerOn(), off: () => ctx.data.scaDevice!.powerOff(), isPowered: () => ctx.data.scaDevice!.getState().isPowered } : undefined,
+        'EXD-001': ctx.data.exdDevice ? { on: () => ctx.data.exdDevice!.powerOn(), off: () => ctx.data.exdDevice!.powerOff(), isPowered: () => ctx.data.exdDevice!.getState().isPowered } : undefined,
+        'EMC-001': ctx.data.emcDevice ? { on: () => ctx.data.emcDevice!.powerOn(), off: () => ctx.data.emcDevice!.powerOff(), isPowered: () => ctx.data.emcDevice!.getState().isPowered } : undefined,
+        'VNT-001': ctx.data.vntDevice ? { on: () => ctx.data.vntDevice!.powerOn(), off: () => ctx.data.vntDevice!.powerOff(), isPowered: () => ctx.data.vntDevice!.getState().isPowered } : undefined,
+        'QAN-001': ctx.data.quaDevice ? { on: () => ctx.data.quaDevice!.powerOn(), off: () => ctx.data.quaDevice!.powerOff(), isPowered: () => ctx.data.quaDevice!.getState().isPowered } : undefined,
+        'QSM-001': ctx.data.qsmDevice ? { on: () => ctx.data.qsmDevice!.powerOn(), off: () => ctx.data.qsmDevice!.powerOff(), isPowered: () => ctx.data.qsmDevice!.getState().isPowered } : undefined,
+      }
+
+      const ctrl = devicePowerMap[device.id]
+      if (!ctrl) {
+        return { success: true, output: ['', `[device] ${device.id} power control not available (no manager connected)`, ''] }
+      }
+
+      if (powerAction === 'on') {
+        if (ctrl.isPowered()) {
+          return { success: true, output: ['', `[device] ${device.id} is already powered ON`, ''] }
+        }
+        await ctrl.on()
+        ctx.data.saveAllDeviceState?.()
+        return { success: true, output: ['', `[device] ${device.name} (${device.id}) powered ON`, ''] }
+      } else {
+        if (!ctrl.isPowered()) {
+          return { success: true, output: ['', `[device] ${device.id} is already powered OFF`, ''] }
+        }
+        await ctrl.off()
+        ctx.data.saveAllDeviceState?.()
+        return { success: true, output: ['', `[device] ${device.name} (${device.id}) powered OFF`, ''] }
+      }
+    }
+
     return {
       success: false,
-      error: `Unknown action: ${action}\nAvailable: TEST, REBOOT, STATUS, INFO`,
+      error: `Unknown action: ${action}\nAvailable: TEST, REBOOT, STATUS, INFO, POWER`,
     }
   },
 }
@@ -8961,7 +9097,7 @@ const exdCommand: Command = {
 
 const lsCommand: Command = {
   name: 'ls',
-  aliases: ['dir'],
+  aliases: ['dir', 'unls'],
   description: 'List directory contents',
   usage: 'ls [-l] [-a] [path]',
   execute: async (args, ctx) => {
@@ -8986,6 +9122,7 @@ const lsCommand: Command = {
 
 const cdCommand: Command = {
   name: 'cd',
+  aliases: ['uncd'],
   description: 'Change directory',
   usage: 'cd <path>',
   execute: async (args, ctx) => {
@@ -9001,6 +9138,7 @@ const cdCommand: Command = {
 
 const pwdCommand: Command = {
   name: 'pwd',
+  aliases: ['unpwd'],
   description: 'Print working directory',
   execute: async (_args, ctx) => {
     const fs = ctx.data.filesystemActions
@@ -9011,6 +9149,7 @@ const pwdCommand: Command = {
 
 const catCommand: Command = {
   name: 'cat',
+  aliases: ['uncat'],
   description: 'Display file contents',
   usage: 'cat <file>',
   execute: async (args, ctx) => {
@@ -9028,6 +9167,7 @@ const catCommand: Command = {
 
 const mkdirCommand: Command = {
   name: 'mkdir',
+  aliases: ['unmkdir'],
   description: 'Create directory',
   usage: 'mkdir [-p] <path>',
   execute: async (args, ctx) => {
@@ -9051,6 +9191,7 @@ const mkdirCommand: Command = {
 
 const touchCommand: Command = {
   name: 'touch',
+  aliases: ['untouch'],
   description: 'Create empty file',
   usage: 'touch <file>',
   execute: async (args, ctx) => {
@@ -9066,6 +9207,7 @@ const touchCommand: Command = {
 
 const rmCommand: Command = {
   name: 'rm',
+  aliases: ['unrm'],
   description: 'Remove file or directory',
   usage: 'rm [-r] <path>',
   execute: async (args, ctx) => {
@@ -9089,6 +9231,7 @@ const rmCommand: Command = {
 
 const treeCommand: Command = {
   name: 'tree',
+  aliases: ['untree'],
   description: 'Display directory tree',
   usage: 'tree [path] [depth]',
   execute: async (args, ctx) => {
@@ -9104,6 +9247,7 @@ const treeCommand: Command = {
 
 const chmodCommand: Command = {
   name: 'chmod',
+  aliases: ['unchmod'],
   description: 'Change file permissions',
   usage: 'chmod <mode> <path>',
   execute: async (args, ctx) => {
@@ -9130,6 +9274,7 @@ const chmodCommand: Command = {
 
 const idCommand: Command = {
   name: 'id',
+  aliases: ['unid'],
   description: 'Show user/group info',
   usage: 'id [user]',
   execute: async (args, ctx) => {
@@ -9141,6 +9286,7 @@ const idCommand: Command = {
 
 const suCommand: Command = {
   name: 'su',
+  aliases: ['unsu'],
   description: 'Switch user',
   usage: 'su <username>',
   execute: async (args, ctx) => {
@@ -9150,20 +9296,9 @@ const suCommand: Command = {
     if (args.length === 0) return { success: false, error: 'su: usage: su <username>' }
     const target = args[0]
 
-    // For root, no password prompt — just check wheel membership
-    if (target === 'root') {
-      const result = user.su('root')
-      if (!result.success) return { success: false, error: result.message }
-      return { success: true, output: [`[su] ${result.message}`, `root@_unLAB:~#`] }
-    }
-
-    // For other users, password is args[1] or prompt simulation
-    const password = args[1]
-    if (!password) {
-      return { success: false, error: `Password: (hint: try 'su ${target} <password>')` }
-    }
-
-    const result = user.su(target, password)
+    // su is handled by the terminal password mode for non-root targets
+    // This execute path handles: su root, su <user> when already root
+    const result = user.su(target)
     if (!result.success) return { success: false, error: result.message }
     return { success: true, output: [`[su] ${result.message}`] }
   },
@@ -9171,6 +9306,7 @@ const suCommand: Command = {
 
 const sudoCommand: Command = {
   name: 'sudo',
+  aliases: ['unsudo'],
   description: 'Run command as root',
   usage: 'sudo <command>',
   execute: async (args, ctx) => {
@@ -9203,6 +9339,7 @@ const sudoCommand: Command = {
 
 const passwdCommand: Command = {
   name: 'passwd',
+  aliases: ['unpasswd'],
   description: 'Change password (simulated)',
   usage: 'passwd [user]',
   execute: async (args, ctx) => {
@@ -9218,6 +9355,7 @@ const passwdCommand: Command = {
 
 const useraddCommand: Command = {
   name: 'useradd',
+  aliases: ['unuseradd'],
   description: 'Create new user (root only)',
   usage: 'useradd <username>',
   execute: async (args, ctx) => {
@@ -9232,6 +9370,7 @@ const useraddCommand: Command = {
 
 const groupsCommand: Command = {
   name: 'groups',
+  aliases: ['ungroups'],
   description: 'Show user groups',
   usage: 'groups [user]',
   execute: async (args, ctx) => {
@@ -9833,6 +9972,552 @@ const qbridgeCommand: Command = {
   },
 }
 
+const cpCommand: Command = {
+  name: 'cp',
+  aliases: ['uncp', 'copy'],
+  description: 'Copy files and directories',
+  usage: 'cp [-r] <source> <destination>',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+
+    let recursive = false
+    const paths: string[] = []
+
+    for (const arg of args) {
+      if (arg === '-r' || arg === '-R' || arg === '-rf') recursive = true
+      else paths.push(arg)
+    }
+
+    if (paths.length < 2) return { success: false, error: 'cp: missing destination operand' }
+    const err = fs.cp(paths[0], paths[1], recursive)
+    if (err) return { success: false, error: err }
+    return { success: true }
+  },
+}
+
+const mvCommand: Command = {
+  name: 'mv',
+  aliases: ['unmv', 'move'],
+  description: 'Move/rename files',
+  usage: 'mv <source> <destination>',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    if (args.length < 2) return { success: false, error: 'mv: missing destination operand' }
+    const err = fs.mv(args[0], args[1])
+    if (err) return { success: false, error: err }
+    return { success: true }
+  },
+}
+
+const lnCommand: Command = {
+  name: 'ln',
+  aliases: ['unln', 'link'],
+  description: 'Create symbolic links',
+  usage: 'ln -s <target> <link_name>',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+
+    let symbolic = false
+    const paths: string[] = []
+
+    for (const arg of args) {
+      if (arg === '-s') symbolic = true
+      else paths.push(arg)
+    }
+
+    if (paths.length < 2) return { success: false, error: 'ln: missing operand' }
+    if (!symbolic) return { success: false, error: 'ln: hard links not supported (use -s)' }
+    const err = fs.ln(paths[0], paths[1], symbolic)
+    if (err) return { success: false, error: err }
+    return { success: true }
+  },
+}
+
+const chownCommand: Command = {
+  name: 'chown',
+  aliases: ['unchown'],
+  description: 'Change file owner/group',
+  usage: 'chown <owner[:group]> <path>',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    const user = ctx.data.userActions
+    if (!user?.isRoot()) return { success: false, error: 'chown: Permission denied (must be root)' }
+    if (args.length < 2) return { success: false, error: 'chown: missing operand' }
+
+    const [ownerSpec, path] = [args[0], args[1]]
+    const parts = ownerSpec.split(':')
+    const err = fs.chown(path, parts[0], parts[1])
+    if (err) return { success: false, error: err }
+    return { success: true, output: [`chown: owner of '${path}' changed to ${ownerSpec}`] }
+  },
+}
+
+const headCommand: Command = {
+  name: 'head',
+  aliases: ['unhead'],
+  description: 'Display first lines of file',
+  usage: 'head [-n <lines>] <file>',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+
+    let lines = 10
+    let path: string | undefined
+
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-n' && args[i + 1]) { lines = parseInt(args[++i]) || 10 }
+      else path = args[i]
+    }
+
+    if (!path) return { success: false, error: 'head: missing file operand' }
+    const result = fs.head(path, lines)
+    if (result === null) return { success: false, error: `head: ${path}: No such file or directory` }
+    return { success: true, output: result.split('\n') }
+  },
+}
+
+const tailCommand: Command = {
+  name: 'tail',
+  aliases: ['untail'],
+  description: 'Display last lines of file',
+  usage: 'tail [-n <lines>] <file>',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+
+    let lines = 10
+    let path: string | undefined
+
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-n' && args[i + 1]) { lines = parseInt(args[++i]) || 10 }
+      else path = args[i]
+    }
+
+    if (!path) return { success: false, error: 'tail: missing file operand' }
+    const result = fs.tail(path, lines)
+    if (result === null) return { success: false, error: `tail: ${path}: No such file or directory` }
+    return { success: true, output: result.split('\n') }
+  },
+}
+
+const userdelCommand: Command = {
+  name: 'userdel',
+  aliases: ['unuserdel'],
+  description: 'Delete user account',
+  usage: 'userdel <username>',
+  execute: async (args, ctx) => {
+    const user = ctx.data.userActions
+    if (!user) return { success: false, error: 'User management not available' }
+    if (args.length === 0) return { success: false, error: 'userdel: missing operand' }
+    const result = user.userdel(args[0])
+    return { success: result.success, output: result.success ? [result.message] : undefined, error: result.success ? undefined : result.message }
+  },
+}
+
+const usermodCommand: Command = {
+  name: 'usermod',
+  aliases: ['unusermod'],
+  description: 'Modify user account',
+  usage: 'usermod -G <groups> <username>',
+  execute: async (args, ctx) => {
+    const user = ctx.data.userActions
+    if (!user) return { success: false, error: 'User management not available' }
+
+    let groups: string[] | undefined
+    let username: string | undefined
+
+    for (let i = 0; i < args.length; i++) {
+      if ((args[i] === '-G' || args[i] === '-g' || args[i] === '--groups') && args[i + 1]) {
+        groups = args[++i].split(',')
+      } else {
+        username = args[i]
+      }
+    }
+
+    if (!username) return { success: false, error: 'usermod: missing username' }
+    if (!groups) return { success: false, error: 'usermod: no modifications specified' }
+    const result = user.usermod(username, { groups })
+    return { success: result.success, output: result.success ? [result.message] : undefined, error: result.success ? undefined : result.message }
+  },
+}
+
+const unaptCommand: Command = {
+  name: 'unapt',
+  aliases: ['apt', 'undnf', 'dnf'],
+  description: 'Package manager',
+  usage: 'unapt <update|install|remove|search|show|list|upgrade|clean> [package]',
+  execute: async (args, ctx) => {
+    if (args.length === 0) return { success: false, error: 'unapt: missing subcommand\nUsage: unapt <update|install|remove|search|show|list|upgrade|clean> [package]' }
+
+    const sub = args[0]
+    const pkg = args[1]
+    const output: string[] = []
+
+    switch (sub) {
+      case 'update':
+        output.push('Hit:1 https://github.com/unstablelabs/_unOS.git stable InRelease')
+        output.push('Reading package lists... Done')
+        output.push('Building dependency tree... Done')
+        output.push('All packages are up to date.')
+        return { success: true, output }
+
+      case 'install':
+        if (!pkg) return { success: false, error: 'unapt install: missing package name' }
+        output.push(`Reading package lists... Done`)
+        output.push(`Building dependency tree... Done`)
+        output.push(`The following NEW packages will be installed:`)
+        output.push(`  ${pkg}`)
+        output.push(`0 upgraded, 1 newly installed, 0 to remove.`)
+        output.push(`Setting up ${pkg} (1.0.0-1) ...`)
+        output.push(`${pkg} installed successfully.`)
+        return { success: true, output }
+
+      case 'remove':
+        if (!pkg) return { success: false, error: 'unapt remove: missing package name' }
+        output.push(`Removing ${pkg} (1.0.0-1) ...`)
+        output.push(`${pkg} removed.`)
+        return { success: true, output }
+
+      case 'search':
+        if (!pkg) return { success: false, error: 'unapt search: missing search term' }
+        output.push(`Searching for '${pkg}'...`)
+        output.push(`${pkg}-core/stable 2.0.0-1 all`)
+        output.push(`  Core ${pkg} library for _unOS`)
+        output.push(`${pkg}-tools/stable 1.5.0-1 all`)
+        output.push(`  ${pkg} command-line tools`)
+        return { success: true, output }
+
+      case 'show':
+        if (!pkg) return { success: false, error: 'unapt show: missing package name' }
+        output.push(`Package: ${pkg}`)
+        output.push(`Version: 1.0.0-1`)
+        output.push(`Priority: optional`)
+        output.push(`Section: science`)
+        output.push(`Maintainer: Unstable Laboratories <dev@unstablelabs.io>`)
+        output.push(`Architecture: all`)
+        output.push(`Description: ${pkg} package for _unOS Quantum`)
+        return { success: true, output }
+
+      case 'list':
+        output.push('Listing installed packages...')
+        output.push('unos-core/stable,now 2.0.0-1 all [installed]')
+        output.push('unos-kernel/stable,now 2.0.0-1 all [installed]')
+        output.push('unos-devices/stable,now 2.0.0-1 all [installed]')
+        output.push('unos-network/stable,now 1.0.0-1 all [installed]')
+        output.push('unos-quantum/stable,now 1.5.0-1 all [installed]')
+        output.push('unos-crypto/stable,now 1.2.0-1 all [installed]')
+        output.push('unos-terminal/stable,now 2.0.0-1 all [installed]')
+        output.push('libcrystal/stable,now 3.1.0-1 all [installed]')
+        output.push('solana-cli/stable,now 1.18.0-1 all [installed]')
+        output.push('unchain-tools/stable,now 1.0.0-1 all [installed]')
+        return { success: true, output }
+
+      case 'upgrade':
+        output.push('Reading package lists... Done')
+        output.push('Building dependency tree... Done')
+        output.push('Calculating upgrade... Done')
+        output.push('0 upgraded, 0 newly installed, 0 to remove.')
+        return { success: true, output }
+
+      case 'clean':
+        output.push('Cleaning package cache...')
+        output.push('Cache cleaned. Freed 0 B.')
+        return { success: true, output }
+
+      default:
+        return { success: false, error: `unapt: unknown subcommand '${sub}'` }
+    }
+  },
+}
+
+const unpodCommand: Command = {
+  name: 'unpod',
+  aliases: ['pod'],
+  description: 'Container runtime',
+  usage: 'unpod <run|ps|stop|rm|images|pull|logs|exec|inspect> [args]',
+  execute: async (args, ctx) => {
+    if (args.length === 0) return { success: false, error: 'unpod: missing subcommand\nUsage: unpod <run|ps|stop|rm|images|pull|logs|exec|inspect>' }
+
+    const sub = args[0]
+    const output: string[] = []
+
+    switch (sub) {
+      case 'ps':
+        output.push('CONTAINER ID   IMAGE                    STATUS    PORTS     NAMES')
+        output.push('unpod-abc123   unos/quantum-sim:latest  Running   8080/tcp  quantum-sim')
+        output.push('unpod-def456   unos/chain-node:2.0      Running   9090/tcp  chain-node')
+        return { success: true, output }
+
+      case 'run': {
+        const name = args[1] || 'container'
+        const id = `unpod-${Date.now().toString(36).slice(-6)}`
+        output.push(`Creating container '${name}'...`)
+        output.push(`Container ${id} started.`)
+        return { success: true, output }
+      }
+
+      case 'stop': {
+        const target = args[1]
+        if (!target) return { success: false, error: 'unpod stop: missing container name/id' }
+        output.push(`Stopping container ${target}...`)
+        output.push(`Container ${target} stopped.`)
+        return { success: true, output }
+      }
+
+      case 'rm': {
+        const target = args[1]
+        if (!target) return { success: false, error: 'unpod rm: missing container name/id' }
+        output.push(`Removing container ${target}...`)
+        output.push(`Container ${target} removed.`)
+        return { success: true, output }
+      }
+
+      case 'images':
+        output.push('REPOSITORY               TAG       SIZE')
+        output.push('unos/quantum-sim         latest    256 MB')
+        output.push('unos/chain-node          2.0       128 MB')
+        output.push('unos/crystal-worker      1.0       64 MB')
+        return { success: true, output }
+
+      case 'pull': {
+        const image = args[1] || 'unos/base:latest'
+        output.push(`Pulling ${image}...`)
+        output.push(`latest: Pulling from ${image}`)
+        output.push(`Digest: sha256:${Date.now().toString(16)}`)
+        output.push(`Status: Downloaded newer image for ${image}`)
+        return { success: true, output }
+      }
+
+      case 'logs': {
+        const target = args[1]
+        if (!target) return { success: false, error: 'unpod logs: missing container name/id' }
+        output.push(`[${new Date().toISOString()}] Container ${target} started`)
+        output.push(`[${new Date().toISOString()}] Service initialized`)
+        output.push(`[${new Date().toISOString()}] Listening on port 8080`)
+        return { success: true, output }
+      }
+
+      case 'exec': {
+        const target = args[1]
+        if (!target) return { success: false, error: 'unpod exec: missing container name/id' }
+        output.push(`Executing in container ${target}...`)
+        output.push(`(interactive shell not available in simulation)`)
+        return { success: true, output }
+      }
+
+      case 'inspect': {
+        const target = args[1]
+        if (!target) return { success: false, error: 'unpod inspect: missing container name/id' }
+        output.push(`{`)
+        output.push(`  "Id": "${target}",`)
+        output.push(`  "State": "running",`)
+        output.push(`  "Image": "unos/quantum-sim:latest",`)
+        output.push(`  "Created": "${new Date().toISOString()}"`)
+        output.push(`}`)
+        return { success: true, output }
+      }
+
+      default:
+        return { success: false, error: `unpod: unknown subcommand '${sub}'` }
+    }
+  },
+}
+
+const unnetCommand: Command = {
+  name: 'unnet',
+  aliases: ['net', 'ifconfig'],
+  description: 'Network management',
+  usage: 'unnet <show|up|down|addr|gateway|dns|ping|trace|scan> [args]',
+  execute: async (args, ctx) => {
+    if (args.length === 0) return { success: false, error: 'unnet: missing subcommand\nUsage: unnet <show|up|down|addr|gateway|dns|ping|trace|scan>' }
+
+    const sub = args[0]
+    const output: string[] = []
+
+    switch (sub) {
+      case 'show':
+        output.push('Interface    Status    Address            Type')
+        output.push('─────────────────────────────────────────────────────')
+        output.push('unlo         UP        127.0.0.1/8        loopback')
+        output.push('uneth0       UP        10.0.1.100/24      ethernet')
+        output.push('unbr0        UP        192.168.1.1/24     bridge')
+        output.push('unq0         UP        fd00::1/128        quantum')
+        return { success: true, output }
+
+      case 'up': {
+        const iface = args[1]
+        if (!iface) return { success: false, error: 'unnet up: missing interface' }
+        output.push(`Bringing up interface ${iface}...`)
+        output.push(`${iface}: link is UP`)
+        return { success: true, output }
+      }
+
+      case 'down': {
+        const iface = args[1]
+        if (!iface) return { success: false, error: 'unnet down: missing interface' }
+        output.push(`Bringing down interface ${iface}...`)
+        output.push(`${iface}: link is DOWN`)
+        return { success: true, output }
+      }
+
+      case 'addr':
+        output.push('1: unlo: <LOOPBACK,UP> mtu 65536')
+        output.push('    inet 127.0.0.1/8 scope host unlo')
+        output.push('2: uneth0: <BROADCAST,MULTICAST,UP> mtu 1500')
+        output.push('    inet 10.0.1.100/24 brd 10.0.1.255 scope global uneth0')
+        output.push('3: unbr0: <BROADCAST,MULTICAST,UP> mtu 1500')
+        output.push('    inet 192.168.1.1/24 scope global unbr0')
+        output.push('4: unq0: <QUANTUM,UP> mtu 9000')
+        output.push('    inet6 fd00::1/128 scope global unq0')
+        return { success: true, output }
+
+      case 'gateway':
+        output.push('default via 10.0.1.1 dev uneth0 proto static')
+        output.push('10.0.1.0/24 dev uneth0 proto kernel scope link')
+        output.push('192.168.1.0/24 dev unbr0 proto kernel scope link')
+        return { success: true, output }
+
+      case 'dns':
+        output.push('nameserver 10.0.1.1')
+        output.push('nameserver 1.1.1.1')
+        output.push('search unstablelabs.local')
+        return { success: true, output }
+
+      case 'ping': {
+        const target = args[1] || '10.0.1.1'
+        output.push(`PING ${target}: 56 data bytes`)
+        for (let i = 0; i < 4; i++) {
+          const ms = (Math.random() * 5 + 1).toFixed(1)
+          output.push(`64 bytes from ${target}: icmp_seq=${i} ttl=64 time=${ms} ms`)
+        }
+        output.push(`--- ${target} ping statistics ---`)
+        output.push(`4 packets transmitted, 4 received, 0% packet loss`)
+        return { success: true, output }
+      }
+
+      case 'trace': {
+        const target = args[1] || '10.0.1.1'
+        output.push(`traceroute to ${target}, 30 hops max`)
+        output.push(` 1  10.0.1.1  1.2 ms  0.8 ms  1.1 ms`)
+        output.push(` 2  192.168.0.1  5.4 ms  4.9 ms  5.1 ms`)
+        output.push(` 3  ${target}  8.3 ms  7.9 ms  8.1 ms`)
+        return { success: true, output }
+      }
+
+      case 'scan':
+        output.push('Scanning local network 10.0.1.0/24...')
+        output.push('')
+        output.push('HOST             MAC                STATUS')
+        output.push('10.0.1.1         UN:OS:GW:00:01     gateway')
+        output.push('10.0.1.100       UN:OS:AA:BB:CC     this host')
+        output.push('10.0.1.101       UN:OS:DD:EE:FF     peer')
+        output.push('')
+        output.push('3 hosts found.')
+        return { success: true, output }
+
+      case 'fw':
+        output.push('Chain INPUT (policy ACCEPT)')
+        output.push('target     prot   source       destination')
+        output.push('ACCEPT     all    0.0.0.0/0    0.0.0.0/0    state ESTABLISHED')
+        output.push('ACCEPT     tcp    0.0.0.0/0    0.0.0.0/0    tcp dpt:22')
+        output.push('')
+        output.push('Chain OUTPUT (policy ACCEPT)')
+        output.push('Chain FORWARD (policy DROP)')
+        return { success: true, output }
+
+      default:
+        return { success: false, error: `unnet: unknown subcommand '${sub}'` }
+    }
+  },
+}
+
+const exitCommand: Command = {
+  name: 'exit',
+  aliases: ['logout', 'quit'],
+  description: 'Exit current session',
+  execute: async (_args, ctx) => {
+    const user = ctx.data.userActions
+    if (user && !user.isRoot() && user.whoami() !== 'operator') {
+      const result = user.su('operator')
+      return { success: true, output: [`Returning to user: operator`, result.message] }
+    }
+    return { success: true, output: ['Session active. Use su to switch users.'] }
+  },
+}
+
+const ungitCommand: Command = {
+  name: 'ungit',
+  aliases: ['git'],
+  description: 'Version control (simulated)',
+  usage: 'ungit <status|add|commit|push|pull|log|sync|backup|restore>',
+  execute: async (args, _ctx) => {
+    if (args.length === 0) return { success: false, error: 'ungit: missing subcommand' }
+
+    const sub = args[0]
+    const output: string[] = []
+
+    switch (sub) {
+      case 'status':
+        output.push('On branch main')
+        output.push('Your branch is up to date with \'origin/main\'.')
+        output.push('')
+        output.push('nothing to commit, working tree clean')
+        return { success: true, output }
+
+      case 'log':
+        output.push('commit abc1234 (HEAD -> main, origin/main)')
+        output.push('Author: operator <operator@unstablelabs.io>')
+        output.push(`Date:   ${new Date().toUTCString()}`)
+        output.push('')
+        output.push('    System state checkpoint')
+        return { success: true, output }
+
+      case 'add':
+        output.push(`Added ${args[1] || '.'} to staging area.`)
+        return { success: true, output }
+
+      case 'commit':
+        output.push(`[main ${Date.now().toString(36).slice(-7)}] ${args.slice(1).join(' ') || 'System commit'}`)
+        output.push(' 1 file changed')
+        return { success: true, output }
+
+      case 'push':
+        output.push('Enumerating objects: 3, done.')
+        output.push('Writing objects: 100% (3/3), done.')
+        output.push('To origin/main')
+        output.push('   abc1234..def5678  main -> main')
+        return { success: true, output }
+
+      case 'pull':
+        output.push('Already up to date.')
+        return { success: true, output }
+
+      case 'sync':
+      case 'update':
+        output.push('Syncing with remote...')
+        output.push('Already up to date.')
+        return { success: true, output }
+
+      case 'backup':
+        output.push(`Creating backup... snapshot-${Date.now().toString(36)}`)
+        output.push('Backup complete.')
+        return { success: true, output }
+
+      case 'restore':
+        output.push('Restoring from latest backup...')
+        output.push('Restore complete.')
+        return { success: true, output }
+
+      default:
+        return { success: false, error: `ungit: unknown subcommand '${sub}'` }
+    }
+  },
+}
+
 // Command registry
 export const commands: Command[] = [
   helpCommand,
@@ -9890,6 +10575,19 @@ export const commands: Command[] = [
   poollinkCommand,
   meshcastCommand,
   qbridgeCommand,
+  cpCommand,
+  mvCommand,
+  lnCommand,
+  chownCommand,
+  headCommand,
+  tailCommand,
+  userdelCommand,
+  usermodCommand,
+  unaptCommand,
+  unpodCommand,
+  unnetCommand,
+  exitCommand,
+  ungitCommand,
 ]
 
 // Find command by name or alias

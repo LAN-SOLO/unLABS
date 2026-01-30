@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useRef } from 'react'
 import { VirtualFS, UserManager } from '@/lib/unos'
+import { commands } from '@/lib/terminal/commands'
 import { loadPanelState } from '@/lib/panel/panelState'
 import type { FilesystemActions, UserActions } from '@/lib/terminal/types'
 import { useTerminal } from '@/hooks/useTerminal'
@@ -65,7 +66,13 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
 
   const syncFsHomeUser = useCallback(() => {
     if (fsRef.current && userMgrRef.current) {
-      fsRef.current.setHomeUser(userMgrRef.current.currentUsername)
+      const username = userMgrRef.current.currentUsername
+      const home = userMgrRef.current.currentUser.home
+      fsRef.current.setHomeUser(username)
+      // Ensure home dir exists
+      fsRef.current.mkdir(home, true)
+      // cd to new user's home
+      fsRef.current.cd(home)
     }
   }, [])
 
@@ -96,6 +103,13 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       return { permissions: node.permissions, owner: node.owner, group: node.group, size: node.size, modified: node.modified, type: node.type }
     },
     chmod: (path, mode) => fsRef.current!.chmod(path, mode),
+    chown: (path, owner, group) => fsRef.current!.chown(path, owner, group),
+    cp: (src, dest, recursive) => fsRef.current!.cp(src, dest, recursive),
+    mv: (src, dest) => fsRef.current!.mv(src, dest),
+    ln: (target, linkName, symbolic) => fsRef.current!.ln(target, linkName, symbolic),
+    head: (path, lines) => fsRef.current!.head(path, lines),
+    tail: (path, lines) => fsRef.current!.tail(path, lines),
+    write: (path, content) => fsRef.current!.write(path, content),
     pwd: () => fsRef.current!.pwd(),
     resolve: (path) => fsRef.current!.resolve(path) !== null,
     formatPermissions: (path) => {
@@ -124,6 +138,8 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     isRoot: () => userMgrRef.current!.isRoot(),
     passwd: (user, newPass) => userMgrRef.current!.passwd(user, newPass),
     useradd: (name, opts) => userMgrRef.current!.useradd(name, opts),
+    userdel: (name) => userMgrRef.current!.userdel(name),
+    usermod: (name, opts) => userMgrRef.current!.usermod(name, opts),
     groups: (user) => userMgrRef.current!.groups(user),
     getCurrentUser: () => {
       const u = userMgrRef.current!.currentUser
@@ -823,7 +839,7 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [themes !== undefined, themeIndex !== undefined, setThemeIndex !== undefined])
 
-  const { lines, isTyping, processCommand, navigateHistory, prompt } = useTerminal({
+  const { lines, isTyping, processCommand, navigateHistory, prompt, passwordMode } = useTerminal({
     userId,
     username,
     balance,
@@ -847,14 +863,71 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     themeActions,
   })
 
+  const handleAutocomplete = useCallback((input: string): string[] => {
+    const parts = input.split(/\s+/)
+
+    if (parts.length <= 1) {
+      // Completing a command name
+      const partial = (parts[0] || '').toLowerCase()
+      if (!partial) return []
+
+      const matches: string[] = []
+      for (const cmd of commands) {
+        if (cmd.name.startsWith(partial)) matches.push(cmd.name + ' ')
+        if (cmd.aliases) {
+          for (const alias of cmd.aliases) {
+            if (alias.startsWith(partial) && alias !== cmd.name) matches.push(alias + ' ')
+          }
+        }
+      }
+      return [...new Set(matches)].sort().slice(0, 12)
+    }
+
+    // Completing a file/directory path argument
+    const cmd = parts[0]
+    const partial = parts[parts.length - 1] || ''
+    const prefix = parts.slice(0, -1).join(' ') + ' '
+
+    // Get directory to list and the partial filename
+    let dirPath: string
+    let filePrefix: string
+
+    const lastSlash = partial.lastIndexOf('/')
+    if (lastSlash >= 0) {
+      dirPath = partial.slice(0, lastSlash) || '/'
+      filePrefix = partial.slice(lastSlash + 1)
+    } else {
+      dirPath = '.'
+      filePrefix = partial
+    }
+
+    try {
+      const entries = fsRef.current?.ls(dirPath, { all: false }) ?? []
+      const matches: string[] = []
+      for (const entry of entries) {
+        // Strip trailing / from dirs for comparison
+        const clean = entry.replace(/\/$/, '')
+        if (clean.toLowerCase().startsWith(filePrefix.toLowerCase())) {
+          const pathBase = lastSlash >= 0 ? partial.slice(0, lastSlash + 1) : ''
+          matches.push(prefix + pathBase + entry)
+        }
+      }
+      return matches.slice(0, 12)
+    } catch {
+      return []
+    }
+  }, [])
+
   return (
     <div className="flex flex-col h-full">
       <TerminalOutput lines={lines} isTyping={isTyping} />
       <TerminalInput
         onSubmit={processCommand}
         onNavigateHistory={navigateHistory}
+        onAutocomplete={handleAutocomplete}
         disabled={isTyping}
-        prompt={prompt}
+        prompt={passwordMode ? 'Password:' : prompt}
+        passwordMode={passwordMode}
       />
     </div>
   )

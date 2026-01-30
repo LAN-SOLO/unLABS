@@ -144,6 +144,21 @@ export class UserManager {
     return { success: true, message: `useradd: user '${name}' created (uid=${uid})` }
   }
 
+  userdel(name: string): { success: boolean; message: string } {
+    if (this._currentUser !== 'root') {
+      return { success: false, message: 'userdel: Permission denied (must be root)' }
+    }
+    if (!this.users.has(name)) {
+      return { success: false, message: `userdel: user '${name}' does not exist` }
+    }
+    if (name === 'root' || name === 'operator' || name === 'adm') {
+      return { success: false, message: `userdel: cannot remove system user '${name}'` }
+    }
+    this.users.delete(name)
+    this.passwords.delete(name)
+    return { success: true, message: `userdel: user '${name}' removed` }
+  }
+
   usermod(name: string, opts: { groups?: string[] }): { success: boolean; message: string } {
     if (this._currentUser !== 'root') {
       return { success: false, message: 'usermod: Permission denied' }

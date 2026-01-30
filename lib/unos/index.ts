@@ -7,6 +7,8 @@ import { DeviceManager } from './devices'
 import { PackageManager } from './packages'
 import { NetworkManager } from './network'
 import { InitSystem } from './init'
+import { ContainerRuntime } from './containers'
+import { UnShell } from './shell'
 import { UNOS_VERSION, UNOS_CODENAME } from './constants'
 import type { BootResult, UnOSState } from './types'
 
@@ -20,6 +22,8 @@ export class UnOS {
   packages: PackageManager
   network: NetworkManager
   init: InitSystem
+  containers: ContainerRuntime
+  shell: UnShell
 
   private _booted = false
   private _bootTime = 0
@@ -56,6 +60,8 @@ export class UnOS {
     }
 
     this.init = new InitSystem()
+    this.containers = new ContainerRuntime()
+    this.shell = new UnShell()
 
     // Sync fs home user with user manager
     this.fs.setHomeUser(this.users.currentUsername)
@@ -152,6 +158,8 @@ export { DeviceManager } from './devices'
 export { PackageManager } from './packages'
 export { NetworkManager } from './network'
 export { InitSystem } from './init'
+export { ContainerRuntime } from './containers'
+export { UnShell } from './shell'
 export { UNOS_PATHS, PATH_ALIASES, UNOS_VERSION, UNOS_CODENAME, DEVICE_IDS, DEVICE_CATEGORIES } from './constants'
 export type { DeviceCategory } from './constants'
 export type * from './types'

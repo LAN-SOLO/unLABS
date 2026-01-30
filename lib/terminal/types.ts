@@ -586,6 +586,13 @@ export interface FilesystemActions {
   tree: (path?: string, depth?: number) => string[]
   stat: (path: string) => { permissions: number; owner: string; group: string; size: number; modified: number; type: string } | null
   chmod: (path: string, mode: number) => string | null
+  chown: (path: string, owner: string, group?: string) => string | null
+  cp: (src: string, dest: string, recursive?: boolean) => string | null
+  mv: (src: string, dest: string) => string | null
+  ln: (target: string, linkName: string, symbolic?: boolean) => string | null
+  head: (path: string, lines?: number) => string | null
+  tail: (path: string, lines?: number) => string | null
+  write: (path: string, content: string) => string | null
   pwd: () => string
   resolve: (path: string) => boolean
   formatPermissions: (path: string) => string | null
@@ -601,6 +608,8 @@ export interface UserActions {
   isRoot: () => boolean
   passwd: (user: string, newPass: string) => { success: boolean; message: string }
   useradd: (name: string, opts?: { uid?: number; groups?: string[]; home?: string }) => { success: boolean; message: string }
+  userdel: (name: string) => { success: boolean; message: string }
+  usermod: (name: string, opts: { groups?: string[] }) => { success: boolean; message: string }
   groups: (user?: string) => string
   getCurrentUser: () => { uid: number; username: string; groups: string[]; home: string; isRoot: boolean }
   verifyPassword: (username: string, password: string) => boolean
