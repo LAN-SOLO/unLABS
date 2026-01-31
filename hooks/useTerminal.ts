@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import type { TerminalLine, TerminalState, CommandContext, DataFetchers, CDCDeviceActions, UECDeviceActions, BATDeviceActions, HMSDeviceActions, ECRDeviceActions, IPLDeviceActions, MFRDeviceActions, AICDeviceActions, VNTDeviceActions, SCADeviceActions, EXDDeviceActions, QSMDeviceActions, EMCDeviceActions, QUADeviceActions, PWBDeviceActions, BTKDeviceActions, RMGDeviceActions, MSCDeviceActions, ScrewButtonDeviceActions, FilesystemActions, UserActions, ThemeActions } from '@/lib/terminal/types'
+import type { TerminalLine, TerminalState, CommandContext, DataFetchers, CDCDeviceActions, UECDeviceActions, BATDeviceActions, HMSDeviceActions, ECRDeviceActions, IPLDeviceActions, MFRDeviceActions, AICDeviceActions, VNTDeviceActions, SCADeviceActions, EXDDeviceActions, QSMDeviceActions, EMCDeviceActions, QUADeviceActions, PWBDeviceActions, BTKDeviceActions, RMGDeviceActions, MSCDeviceActions, NETDeviceActions, TMPDeviceActions, DIMDeviceActions, CPUDeviceActions, CLKDeviceActions, MEMDeviceActions, ANDDeviceActions, QCPDeviceActions, TLPDeviceActions, LCTDeviceActions, P3DDeviceActions, ScrewButtonDeviceActions, FilesystemActions, UserActions, ThemeActions } from '@/lib/terminal/types'
 import { executeCommand, getWelcomeMessage } from '@/lib/terminal/commands'
 import { savePanelState } from '@/lib/panel/panelState'
 import type { PanelSaveData } from '@/lib/panel/panelState'
@@ -42,13 +42,24 @@ interface UseTerminalProps {
   btkDeviceActions?: BTKDeviceActions
   rmgDeviceActions?: RMGDeviceActions
   mscDeviceActions?: MSCDeviceActions
+  netDeviceActions?: NETDeviceActions
+  tmpDeviceActions?: TMPDeviceActions
+  dimDeviceActions?: DIMDeviceActions
+  cpuDeviceActions?: CPUDeviceActions
+  clkDeviceActions?: CLKDeviceActions
+  memDeviceActions?: MEMDeviceActions
+  andDeviceActions?: ANDDeviceActions
+  qcpDeviceActions?: QCPDeviceActions
+  tlpDeviceActions?: TLPDeviceActions
+  lctDeviceActions?: LCTDeviceActions
+  p3dDeviceActions?: P3DDeviceActions
   screwButtonDeviceActions?: ScrewButtonDeviceActions
   filesystemActions?: FilesystemActions
   userActions?: UserActions
   themeActions?: ThemeActions
 }
 
-export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, rmgDeviceActions, mscDeviceActions, screwButtonDeviceActions, filesystemActions, userActions, themeActions }: UseTerminalProps) {
+export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, rmgDeviceActions, mscDeviceActions, netDeviceActions, tmpDeviceActions, dimDeviceActions, cpuDeviceActions, clkDeviceActions, memDeviceActions, andDeviceActions, qcpDeviceActions, tlpDeviceActions, lctDeviceActions, p3dDeviceActions, screwButtonDeviceActions, filesystemActions, userActions, themeActions }: UseTerminalProps) {
   const router = useRouter()
   const [state, setState] = useState<TerminalState>(() => {
     let savedHistory: string[] = []
@@ -133,6 +144,10 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
   // Prompt refresh trigger — incremented after commands that change user/cwd
   const [promptTick, setPromptTick] = useState(0)
 
+  // App mode — when set, an interactive app takes over the terminal UI
+  const [appMode, setAppMode] = useState<string | null>(null)
+  const [appModeData, setAppModeData] = useState<Record<string, string> | null>(null)
+
   // Save all device state to localStorage
   const saveAllDeviceState = useCallback(() => {
     const cdcState = cdcDeviceActions?.getState()
@@ -153,6 +168,11 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
     const btkState = btkDeviceActions?.getState()
     const rmgState = rmgDeviceActions?.getState()
     const mscState = mscDeviceActions?.getState()
+    const netState = netDeviceActions?.getState()
+    const tmpState = tmpDeviceActions?.getState()
+    const dimState = dimDeviceActions?.getState()
+    const cpuState = cpuDeviceActions?.getState()
+    const clkState = clkDeviceActions?.getState()
     const screwStates = screwButtonDeviceActions?.getAllStates()
 
     const data: PanelSaveData = {
@@ -161,12 +181,13 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
       filesystem: filesystemActions?.toJSON(),
       users: userActions?.toJSON(),
       devices: {
-        cdc: { isPowered: cdcState?.isPowered ?? true },
-        uec: { isPowered: uecState?.isPowered ?? true },
+        cdc: { isPowered: cdcState?.isPowered ?? true, isExpanded: cdcState?.isExpanded ?? true },
+        uec: { isPowered: uecState?.isPowered ?? true, isExpanded: uecState?.isExpanded ?? true },
         bat: {
           isPowered: batState?.isPowered ?? true,
           currentCharge: batState?.currentCharge ?? 5000,
           autoRegen: batState?.autoRegen ?? true,
+          isExpanded: batState?.isExpanded ?? true,
         },
         hms: {
           isPowered: hmsState?.isPowered ?? true,
@@ -174,40 +195,117 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
           tempoValue: hmsState?.tempoValue ?? 40,
           freqValue: hmsState?.freqValue ?? 37,
           waveformType: hmsState?.waveformType ?? 'sine',
+          isExpanded: hmsState?.isExpanded ?? true,
         },
         ecr: {
           isPowered: ecrState?.isPowered ?? true,
           pulseValue: ecrState?.pulseValue ?? 40,
           bloomValue: ecrState?.bloomValue ?? 60,
           isRecording: ecrState?.isRecording ?? false,
+          isExpanded: ecrState?.isExpanded ?? true,
         },
-        ipl: { isPowered: iplState?.isPowered ?? true },
-        mfr: { isPowered: mfrState?.isPowered ?? true },
+        ipl: { isPowered: iplState?.isPowered ?? true, isExpanded: iplState?.isExpanded ?? true },
+        mfr: { isPowered: mfrState?.isPowered ?? true, isExpanded: mfrState?.isExpanded ?? true },
         aic: {
           isPowered: aicState?.isPowered ?? true,
           isLearning: aicState?.isLearning ?? true,
+          isExpanded: aicState?.isExpanded ?? true,
         },
         vnt: {
           isPowered: vntState?.isPowered ?? true,
           cpuFanSpeed: vntState?.cpuFan?.speed ?? 65,
           gpuFanSpeed: vntState?.gpuFan?.speed ?? 65,
           fanMode: vntState?.cpuFan?.mode ?? 'AUTO',
+          isExpanded: vntState?.isExpanded ?? true,
         },
-        sca: { isPowered: scaState?.isPowered ?? true },
-        exd: { isPowered: exdState?.isPowered ?? true, isDeployed: exdState?.isDeployed ?? true },
-        qsm: { isPowered: qsmState?.isPowered ?? true },
-        emc: { isPowered: emcState?.isPowered ?? true },
+        sca: { isPowered: scaState?.isPowered ?? true, isExpanded: scaState?.isExpanded ?? true },
+        exd: { isPowered: exdState?.isPowered ?? true, isDeployed: exdState?.isDeployed ?? true, isExpanded: exdState?.isExpanded ?? true },
+        qsm: { isPowered: qsmState?.isPowered ?? true, isExpanded: qsmState?.isExpanded ?? true },
+        emc: { isPowered: emcState?.isPowered ?? true, isExpanded: emcState?.isExpanded ?? true },
         qua: {
           isPowered: quaState?.isPowered ?? true,
           mode: quaState?.mode ?? 'ANOMALY',
           sensitivity: quaState?.sensitivity ?? 65,
           depth: quaState?.depth ?? 50,
           frequency: quaState?.frequency ?? 40,
+          isExpanded: quaState?.isExpanded ?? true,
         },
-        pwb: { isPowered: pwbState?.isPowered ?? true },
-        btk: { isPowered: btkState?.isPowered ?? true },
-        rmg: { isPowered: rmgState?.isPowered ?? true, strength: rmgState?.strength ?? 45 },
-        msc: { isPowered: mscState?.isPowered ?? true },
+        pwb: { isPowered: pwbState?.isPowered ?? true, isExpanded: pwbState?.isExpanded ?? true },
+        btk: { isPowered: btkState?.isPowered ?? true, isExpanded: btkState?.isExpanded ?? true },
+        rmg: { isPowered: rmgState?.isPowered ?? true, strength: rmgState?.strength ?? 45, isExpanded: rmgState?.isExpanded ?? true },
+        msc: { isPowered: mscState?.isPowered ?? true, isExpanded: mscState?.isExpanded ?? true },
+        net: {
+          isPowered: netState?.isPowered ?? true,
+          bandwidth: netState?.bandwidth ?? 2.4,
+          latencyMs: netState?.latencyMs ?? 12,
+          isExpanded: netState?.isExpanded ?? true,
+        },
+        tmp: {
+          isPowered: tmpState?.isPowered ?? true,
+          temperature: tmpState?.temperature ?? 28.4,
+          isExpanded: tmpState?.isExpanded ?? true,
+        },
+        dim: {
+          isPowered: dimState?.isPowered ?? true,
+          dimension: dimState?.dimension ?? 3.14,
+          stability: dimState?.stability ?? 98,
+          isExpanded: dimState?.isExpanded ?? true,
+        },
+        cpu: {
+          isPowered: cpuState?.isPowered ?? true,
+          cores: cpuState?.cores ?? 8,
+          utilization: cpuState?.utilization ?? 67,
+          frequency: cpuState?.frequency ?? 4.2,
+          isExpanded: cpuState?.isExpanded ?? true,
+        },
+        clk: {
+          isPowered: clkState?.isPowered ?? true,
+          displayMode: clkState?.displayMode ?? 'local',
+          isExpanded: clkState?.isExpanded ?? true,
+        },
+        mem: {
+          isPowered: memDeviceActions?.getState().isPowered ?? true,
+          totalMemory: memDeviceActions?.getState().totalMemory ?? 16,
+          usedMemory: memDeviceActions?.getState().usedMemory ?? 11.5,
+          displayMode: memDeviceActions?.getState().displayMode ?? 'usage',
+          isExpanded: memDeviceActions?.getState().isExpanded ?? true,
+        },
+        and: {
+          isPowered: andDeviceActions?.getState().isPowered ?? true,
+          signalStrength: andDeviceActions?.getState().signalStrength ?? 67,
+          anomaliesFound: andDeviceActions?.getState().anomaliesFound ?? 3,
+          displayMode: andDeviceActions?.getState().displayMode ?? 'waveform',
+          isExpanded: andDeviceActions?.getState().isExpanded ?? true,
+        },
+        qcp: {
+          isPowered: qcpDeviceActions?.getState().isPowered ?? true,
+          anomalyDirection: qcpDeviceActions?.getState().anomalyDirection ?? 127,
+          anomalyDistance: qcpDeviceActions?.getState().anomalyDistance ?? 42,
+          displayMode: qcpDeviceActions?.getState().displayMode ?? 'compass',
+          isExpanded: qcpDeviceActions?.getState().isExpanded ?? true,
+        },
+        tlp: {
+          isPowered: tlpDeviceActions?.getState().isPowered ?? true,
+          chargeLevel: tlpDeviceActions?.getState().chargeLevel ?? 65,
+          lastDestination: tlpDeviceActions?.getState().lastDestination ?? 'LAB-Ω',
+          displayMode: tlpDeviceActions?.getState().displayMode ?? 'standard',
+          isExpanded: tlpDeviceActions?.getState().isExpanded ?? true,
+        },
+        lct: {
+          isPowered: lctDeviceActions?.getState().isPowered ?? true,
+          laserPower: lctDeviceActions?.getState().laserPower ?? 450,
+          precision: lctDeviceActions?.getState().precision ?? 0.01,
+          displayMode: lctDeviceActions?.getState().displayMode ?? 'cutting',
+          isExpanded: lctDeviceActions?.getState().isExpanded ?? true,
+        },
+        p3d: {
+          isPowered: p3dDeviceActions?.getState().isPowered ?? true,
+          progress: p3dDeviceActions?.getState().progress ?? 67,
+          layerCount: p3dDeviceActions?.getState().layerCount ?? 234,
+          bedTemp: p3dDeviceActions?.getState().bedTemp ?? 60,
+          displayMode: p3dDeviceActions?.getState().displayMode ?? 'plastic',
+          isExpanded: p3dDeviceActions?.getState().isExpanded ?? true,
+        },
         screwButtons: screwStates ? Object.fromEntries(
           Object.entries(screwStates).map(([k, v]) => [k, { unlocked: v.unlocked, active: v.active, totalActiveTime: v.totalActiveTime }])
         ) : undefined,
@@ -215,7 +313,7 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
     }
 
     savePanelState(data)
-  }, [cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, rmgDeviceActions, mscDeviceActions, screwButtonDeviceActions])
+  }, [cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, rmgDeviceActions, mscDeviceActions, netDeviceActions, tmpDeviceActions, dimDeviceActions, cpuDeviceActions, clkDeviceActions, memDeviceActions, andDeviceActions, qcpDeviceActions, tlpDeviceActions, lctDeviceActions, p3dDeviceActions, screwButtonDeviceActions])
 
   // Data fetchers for commands - memoized for stability
   const dataFetchers: DataFetchers = useMemo(() => ({
@@ -249,11 +347,22 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
     btkDevice: btkDeviceActions,
     rmgDevice: rmgDeviceActions,
     mscDevice: mscDeviceActions,
+    netDevice: netDeviceActions,
+    tmpDevice: tmpDeviceActions,
+    dimDevice: dimDeviceActions,
+    cpuDevice: cpuDeviceActions,
+    clkDevice: clkDeviceActions,
+    memDevice: memDeviceActions,
+    andDevice: andDeviceActions,
+    qcpDevice: qcpDeviceActions,
+    tlpDevice: tlpDeviceActions,
+    lctDevice: lctDeviceActions,
+    p3dDevice: p3dDeviceActions,
     screwButtons: screwButtonDeviceActions,
     filesystemActions,
     userActions,
     themeActions,
-  }), [cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, rmgDeviceActions, mscDeviceActions, screwButtonDeviceActions, saveAllDeviceState, filesystemActions, userActions, themeActions])
+  }), [cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, rmgDeviceActions, mscDeviceActions, netDeviceActions, tmpDeviceActions, dimDeviceActions, cpuDeviceActions, clkDeviceActions, andDeviceActions, qcpDeviceActions, tlpDeviceActions, lctDeviceActions, p3dDeviceActions, screwButtonDeviceActions, saveAllDeviceState, filesystemActions, userActions, themeActions])
 
   // Initialize with welcome message
   useEffect(() => {
@@ -364,6 +473,12 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
         }, 1500) // Delay to let user see the output
       }
 
+      // Handle app mode launch (e.g. Midnight Commander)
+      if (result.appMode) {
+        setAppMode(result.appMode)
+        setAppModeData(result.appModeData ?? null)
+      }
+
       // Refresh prompt after any command (user/cwd may have changed)
       setPromptTick(t => t + 1)
     },
@@ -400,6 +515,11 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userActions, filesystemActions, username, promptTick])
 
+  const exitAppMode = useCallback(() => {
+    setAppMode(null)
+    setAppModeData(null)
+  }, [])
+
   return {
     lines: state.lines,
     history: state.history,
@@ -410,5 +530,8 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
     addOutput,
     prompt,
     passwordMode,
+    appMode,
+    appModeData,
+    exitAppMode,
   }
 }

@@ -44,6 +44,9 @@ interface MSCManagerContextType extends MSCState {
   powerOff: () => Promise<void>
   runTest: () => Promise<void>
   reboot: () => Promise<void>
+  isExpanded: boolean
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
   firmware: typeof MSC_FIRMWARE
   powerSpecs: typeof MSC_POWER_SPECS
 }
@@ -52,7 +55,7 @@ const MSCManagerContext = createContext<MSCManagerContextType | null>(null)
 
 interface MSCManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean }
+  initialState?: { isPowered: boolean; isExpanded?: boolean }
 }
 
 export function MSCManagerProvider({ children, initialState }: MSCManagerProviderProps) {
@@ -67,6 +70,12 @@ export function MSCManagerProvider({ children, initialState }: MSCManagerProvide
   const [currentDraw, setCurrentDraw] = useState(MSC_POWER_SPECS.idle)
   const [scanLine, setScanLine] = useState(0)
   const [detectedMaterials, setDetectedMaterials] = useState(0)
+  const startExpanded = initialState?.isExpanded ?? startPowered
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
+
+  const toggleExpanded = useCallback(() => {
+    setIsExpanded(prev => !prev)
+  }, [])
 
   const runBootSequence = useCallback(async () => {
     setDeviceState('booting')
@@ -119,6 +128,7 @@ export function MSCManagerProvider({ children, initialState }: MSCManagerProvide
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
@@ -126,6 +136,7 @@ export function MSCManagerProvider({ children, initialState }: MSCManagerProvide
     if (deviceState !== 'online') return
     setIsPowered(false)
     await runShutdownSequence()
+    setIsExpanded(false)
   }, [deviceState, runShutdownSequence])
 
   const runTest = useCallback(async () => {
@@ -206,6 +217,9 @@ export function MSCManagerProvider({ children, initialState }: MSCManagerProvide
     currentDraw,
     scanLine,
     detectedMaterials,
+    isExpanded,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     powerOn,
     powerOff,
     runTest,

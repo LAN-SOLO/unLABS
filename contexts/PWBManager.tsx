@@ -47,6 +47,10 @@ interface PWBManagerContextType extends PWBState {
   runTest: () => Promise<void>
   reboot: () => Promise<void>
   selectSlot: (slot: number) => void
+  // Fold state
+  isExpanded: boolean
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
   // Read-only info
   firmware: typeof PWB_FIRMWARE
   powerSpecs: typeof PWB_POWER_SPECS
@@ -56,11 +60,14 @@ const PWBManagerContext = createContext<PWBManagerContextType | null>(null)
 
 interface PWBManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean }
+  initialState?: { isPowered: boolean; isExpanded?: boolean }
 }
 
 export function PWBManagerProvider({ children, initialState }: PWBManagerProviderProps) {
   const startPowered = initialState?.isPowered ?? true
+  const startExpanded = initialState?.isExpanded ?? startPowered
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
+  const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev) }, [])
   const [deviceState, setDeviceState] = useState<PWBDeviceState>(startPowered ? 'booting' : 'standby')
   const [bootPhase, setBootPhase] = useState<PWBBootPhase>(startPowered ? 'post' : null)
   const [testPhase, setTestPhase] = useState<PWBTestPhase>(null)
@@ -133,6 +140,7 @@ export function PWBManagerProvider({ children, initialState }: PWBManagerProvide
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
@@ -140,6 +148,7 @@ export function PWBManagerProvider({ children, initialState }: PWBManagerProvide
   const powerOff = useCallback(async () => {
     if (deviceState !== 'online') return
     setIsPowered(false)
+    setIsExpanded(false)
     await runShutdownSequence()
   }, [deviceState, runShutdownSequence])
 
@@ -235,6 +244,9 @@ export function PWBManagerProvider({ children, initialState }: PWBManagerProvide
     runTest,
     reboot,
     selectSlot,
+    isExpanded,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     firmware: PWB_FIRMWARE,
     powerSpecs: PWB_POWER_SPECS,
   }

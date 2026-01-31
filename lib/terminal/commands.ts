@@ -240,6 +240,11 @@ const helpCommand: Command = {
       '|  ungit     - simulated version control                      |',
       '|             ungit status/add/commit/push/pull/log           |',
       '+------------------------------------------------------------+',
+      '|                    file manager                              |',
+      '+------------------------------------------------------------+',
+      '|  unmc       - midnight commander file manager (interactive)   |',
+      '|  unmcedit   - edit file in unMC editor                       |',
+      '+------------------------------------------------------------+',
       '|                       other                                |',
       '+------------------------------------------------------------+',
       '|  history   - view command history                          |',
@@ -401,6 +406,50 @@ const helpCommand: Command = {
       '|  btk        - basic toolkit (BTK-001)                    |',
       '|  msc        - material scanner (MSC-001)                  |',
       '|  rmg        - resource magnet (RMG-001)                  |',
+      '|  mem        - memory monitor (MEM-001)                    |',
+      '|             mem status         - show device status       |',
+      '|             mem firmware       - view firmware info       |',
+      '|             mem test           - run diagnostics          |',
+      '|             mem config         - view configuration       |',
+      '|             mem mode           - cycle display mode       |',
+      '|             mem reboot         - reboot device            |',
+      '|  and        - anomaly detector (AND-001)                   |',
+      '|             and status         - show device status       |',
+      '|             and firmware       - view firmware info       |',
+      '|             and test           - run diagnostics          |',
+      '|             and config         - view configuration       |',
+      '|             and mode           - cycle display mode       |',
+      '|             and signal         - set signal strength      |',
+      '|             and reboot         - reboot device            |',
+      '|  qcp        - quantum compass (QCP-001)                    |',
+      '|             qcp status         - show device status       |',
+      '|             qcp firmware       - view firmware info       |',
+      '|             qcp test           - run diagnostics          |',
+      '|             qcp config         - view configuration       |',
+      '|             qcp mode           - cycle display mode       |',
+      '|             qcp bearing        - set anomaly direction    |',
+      '|             qcp distance       - set anomaly distance     |',
+      '|             qcp reboot         - reboot device            |',
+      '|  tlp        - teleport pad (TLP-001)                      |',
+      '|             tlp status         - show device status       |',
+      '|             tlp on/off         - power control            |',
+      '|             tlp firmware       - view firmware info       |',
+      '|             tlp test           - run diagnostics          |',
+      '|             tlp config         - view/set configuration   |',
+      '|             tlp mode           - set transport mode       |',
+      '|             tlp charge         - show charge level        |',
+      '|             tlp dest           - show destination         |',
+      '|             tlp reboot         - reboot device            |',
+      '|  lct        - precision laser (LCT-001)                    |',
+      '|             lct status         - show device status       |',
+      '|             lct on/off         - power control            |',
+      '|             lct firmware       - view firmware info       |',
+      '|             lct test           - run diagnostics          |',
+      '|             lct config         - view power specs         |',
+      '|             lct mode           - set laser mode           |',
+      '|             lct power          - set laser power          |',
+      '|             lct precision      - set precision            |',
+      '|             lct reboot         - reboot device            |',
       '|             btk status         - show device status       |',
       '|             btk firmware       - view firmware info       |',
       '|             btk test           - run diagnostics          |',
@@ -1352,45 +1401,45 @@ const deviceCommand: Command = {
           '│                    DEVICE REGISTRY                          │',
           '└─────────────────────────────────────────────────────────────┘',
           '',
-          '  ID        DEVICE                  VERSION   STATUS    ',
-          '  ────────  ──────────────────────  ────────  ──────────',
-          '  CDC-001   Crystal Data Cache      v1.4.2    ONLINE    ',
-          '  UEC-001   Unstable Energy Core    v2.0.1    ONLINE    ',
-          '  BAT-001   Battery Pack            v1.8.0    ONLINE    ',
-          '  HMS-001   Handmade Synthesizer    v3.2.1    ONLINE    ',
-          '  ECR-001   Echo Recorder           v1.1.0    ONLINE    ',
-          '  INT-001   Interpolator            v2.5.3    ONLINE    ',
-          '  MFR-001   Microfusion Reactor     v2.3.0    ONLINE    ',
-          '  AIC-001   AI Assistant Core       v2.4.0    ONLINE    ',
-          '  SCA-001   Supercomputer Array     v5.2.0    ONLINE    ',
-          '  EXD-001   Explorer Drone          v3.1.2    ONLINE    ',
-          '  RMG-001   Resource Magnet         v1.2.0    ONLINE    ',
-          '  ATK-001   Abstractum Tank         v2.1.0    ONLINE    ',
-          '  EMC-001   Exotic Matter Contain.  v4.0.1    ONLINE    ',
-          '  VNT-001   Ventilation System      v1.0.0    ONLINE    ',
-          '  SPK-001   Narrow Speaker          v1.0.0    ONLINE    ',
-          '  OSC-001   Oscilloscope Array      v4.6.0    ONLINE    ',
-          `  QAN-001   Quantum Analyzer        v3.7.2    ${ctx.data.quaDevice?.getState().isPowered ? 'ONLINE' : 'STANDBY'}   `,
-          '  QSM-001   Quantum State Monitor   v1.2.0    ONLINE    ',
-          '  NET-001   Network Monitor         v2.1.0    ONLINE    ',
-          '  TMP-001   Temperature Monitor     v1.0.0    ONLINE    ',
-          '  DIM-001   Dimension Monitor       v1.0.0    ONLINE    ',
-          '  CPU-001   CPU Monitor             v3.2.1    ONLINE    ',
-          '  CLK-001   Lab Clock               v2.4.0    ONLINE    ',
-          '  MEM-001   Memory Monitor          v3.1.0    ONLINE    ',
-          '  AND-001   Anomaly Detector        v2.3.0    ONLINE    ',
-          '  QCP-001   Quantum Compass         v1.5.0    ONLINE    ',
-          '  TLP-001   Teleport Pad            v2.2.0    ONLINE    ',
-          '  LCT-001   Precision Laser         v2.1.0    ONLINE    ',
-          '  P3D-001   3D Fabricator           v3.2.1    ONLINE    ',
-          '  DGN-001   Diagnostics Console     v2.0.4    ONLINE    ',
-          '  THM-001   Thermal Manager         v1.0.0    ONLINE    ',
-          '  BTK-001   Basic Toolkit           v1.2.0    ONLINE    ',
-          '  MSC-001   Material Scanner        v1.3.0    ONLINE    ',
-          '  PWB-001   Portable Workbench      v1.1.0    ONLINE    ',
-          '  PWR-001   Power Management Sys.   v1.0.0    ONLINE    ',
-          '  VLT-001   Volt Meter Display      v1.0.0    ONLINE    ',
-          '  PWD-001   Power Display Panel     v1.0.0    ONLINE    ',
+          '  ID        DEVICE                  VERSION   TIER  STATUS    ',
+          '  ────────  ──────────────────────  ────────  ────  ──────────',
+          '  P3D-001   3D Fabricator           v3.2.1    T2    ONLINE    ',
+          '  ATK-001   Abstractum Tank         v2.1.0    T1    ONLINE    ',
+          '  AIC-001   AI Assistant Core       v2.4.0    T3    ONLINE    ',
+          '  AND-001   Anomaly Detector        v2.3.0    T2    ONLINE    ',
+          '  BAT-001   Battery Pack            v1.8.0    T1    ONLINE    ',
+          '  BTK-001   Basic Toolkit           v1.2.0    T1    ONLINE    ',
+          '  CPU-001   CPU Monitor             v3.2.1    T1    ONLINE    ',
+          '  CDC-001   Crystal Data Cache      v1.4.2    T1    ONLINE    ',
+          '  DGN-001   Diagnostics Console     v2.0.4    T2    ONLINE    ',
+          '  DIM-001   Dimension Monitor       v1.0.0    T2    ONLINE    ',
+          '  ECR-001   Echo Recorder           v1.1.0    T1    ONLINE    ',
+          '  EMC-001   Exotic Matter Contain.  v4.0.1    T3    ONLINE    ',
+          '  EXD-001   Explorer Drone          v3.1.2    T2    ONLINE    ',
+          '  HMS-001   Handmade Synthesizer    v3.2.1    T2    ONLINE    ',
+          '  INT-001   Interpolator            v2.5.3    T2    ONLINE    ',
+          '  CLK-001   Lab Clock               v2.4.0    T1    ONLINE    ',
+          '  MSC-001   Material Scanner        v1.3.0    T1    ONLINE    ',
+          '  MEM-001   Memory Monitor          v3.1.0    T1    ONLINE    ',
+          '  MFR-001   Microfusion Reactor     v2.3.0    T3    ONLINE    ',
+          '  SPK-001   Narrow Speaker          v1.0.0    T1    ONLINE    ',
+          '  NET-001   Network Monitor         v2.1.0    T1    ONLINE    ',
+          '  OSC-001   Oscilloscope Array      v4.6.0    T2    ONLINE    ',
+          '  PWB-001   Portable Workbench      v1.1.0    T1    ONLINE    ',
+          '  PWD-001   Power Display Panel     v1.0.0    T1    ONLINE    ',
+          '  PWR-001   Power Management Sys.   v1.0.0    T1    ONLINE    ',
+          '  LCT-001   Precision Laser         v2.1.0    T2    ONLINE    ',
+          `  QAN-001   Quantum Analyzer        v3.7.2    T3    ${ctx.data.quaDevice?.getState().isPowered ? 'ONLINE' : 'STANDBY'}   `,
+          '  QCP-001   Quantum Compass         v1.5.0    T2    ONLINE    ',
+          '  QSM-001   Quantum State Monitor   v1.2.0    T3    ONLINE    ',
+          '  RMG-001   Resource Magnet         v1.2.0    T1    ONLINE    ',
+          '  SCA-001   Supercomputer Array     v5.2.0    T3    ONLINE    ',
+          '  TLP-001   Teleport Pad            v2.2.0    T3    ONLINE    ',
+          '  TMP-001   Temperature Monitor     v1.0.0    T1    ONLINE    ',
+          '  THM-001   Thermal Manager         v1.0.0    T1    ONLINE    ',
+          '  UEC-001   Unstable Energy Core    v2.0.1    T2    ONLINE    ',
+          '  VNT-001   Ventilation System      v1.0.0    T1    ONLINE    ',
+          '  VLT-001   Volt Meter Display      v1.0.0    T1    ONLINE    ',
           '',
           '  usage: device <name> [test|reset|status|info]',
           '  example: device cache test',
@@ -1421,6 +1470,17 @@ const deviceCommand: Command = {
         'BTK-001': 'Basic Toolkit',
         'RMG-001': 'Resource Magnet',
         'MSC-001': 'Material Scanner',
+        'NET-001': 'Network Monitor',
+        'TMP-001': 'Temperature Monitor',
+        'DIM-001': 'Dimension Monitor',
+        'CPU-001': 'CPU Monitor',
+        'CLK-001': 'Lab Clock',
+        'MEM-001': 'Memory Monitor',
+        'AND-001': 'Anomaly Detector',
+        'QCP-001': 'Quantum Compass',
+        'TLP-001': 'Teleport Pad',
+        'LCT-001': 'Precision Laser',
+        'P3D-001': '3D Fabricator',
       }
 
       const devicePowerCtrl: Record<string, { on: () => Promise<void>; off: () => Promise<void>; isPowered: () => boolean } | undefined> = {
@@ -1442,6 +1502,17 @@ const deviceCommand: Command = {
         'BTK-001': ctx.data.btkDevice ? { on: () => ctx.data.btkDevice!.powerOn(), off: () => ctx.data.btkDevice!.powerOff(), isPowered: () => ctx.data.btkDevice!.getState().isPowered } : undefined,
         'RMG-001': ctx.data.rmgDevice ? { on: () => ctx.data.rmgDevice!.powerOn(), off: () => ctx.data.rmgDevice!.powerOff(), isPowered: () => ctx.data.rmgDevice!.getState().isPowered } : undefined,
         'MSC-001': ctx.data.mscDevice ? { on: () => ctx.data.mscDevice!.powerOn(), off: () => ctx.data.mscDevice!.powerOff(), isPowered: () => ctx.data.mscDevice!.getState().isPowered } : undefined,
+        'NET-001': ctx.data.netDevice ? { on: () => ctx.data.netDevice!.powerOn(), off: () => ctx.data.netDevice!.powerOff(), isPowered: () => ctx.data.netDevice!.getState().isPowered } : undefined,
+        'TMP-001': ctx.data.tmpDevice ? { on: () => ctx.data.tmpDevice!.powerOn(), off: () => ctx.data.tmpDevice!.powerOff(), isPowered: () => ctx.data.tmpDevice!.getState().isPowered } : undefined,
+        'DIM-001': ctx.data.dimDevice ? { on: () => ctx.data.dimDevice!.powerOn(), off: () => ctx.data.dimDevice!.powerOff(), isPowered: () => ctx.data.dimDevice!.getState().isPowered } : undefined,
+        'CPU-001': ctx.data.cpuDevice ? { on: () => ctx.data.cpuDevice!.powerOn(), off: () => ctx.data.cpuDevice!.powerOff(), isPowered: () => ctx.data.cpuDevice!.getState().isPowered } : undefined,
+        'CLK-001': ctx.data.clkDevice ? { on: () => ctx.data.clkDevice!.powerOn(), off: () => ctx.data.clkDevice!.powerOff(), isPowered: () => ctx.data.clkDevice!.getState().isPowered } : undefined,
+        'MEM-001': ctx.data.memDevice ? { on: () => ctx.data.memDevice!.powerOn(), off: () => ctx.data.memDevice!.powerOff(), isPowered: () => ctx.data.memDevice!.getState().isPowered } : undefined,
+        'AND-001': ctx.data.andDevice ? { on: () => ctx.data.andDevice!.powerOn(), off: () => ctx.data.andDevice!.powerOff(), isPowered: () => ctx.data.andDevice!.getState().isPowered } : undefined,
+        'QCP-001': ctx.data.qcpDevice ? { on: () => ctx.data.qcpDevice!.powerOn(), off: () => ctx.data.qcpDevice!.powerOff(), isPowered: () => ctx.data.qcpDevice!.getState().isPowered } : undefined,
+        'TLP-001': ctx.data.tlpDevice ? { on: () => ctx.data.tlpDevice!.powerOn(), off: () => ctx.data.tlpDevice!.powerOff(), isPowered: () => ctx.data.tlpDevice!.getState().isPowered } : undefined,
+        'LCT-001': ctx.data.lctDevice ? { on: () => ctx.data.lctDevice!.powerOn(), off: () => ctx.data.lctDevice!.powerOff(), isPowered: () => ctx.data.lctDevice!.getState().isPowered } : undefined,
+        'P3D-001': ctx.data.p3dDevice ? { on: () => ctx.data.p3dDevice!.powerOn(), off: () => ctx.data.p3dDevice!.powerOff(), isPowered: () => ctx.data.p3dDevice!.getState().isPowered } : undefined,
       }
 
       const dName = idToName[powerId]
@@ -1662,133 +1733,133 @@ const deviceCommand: Command = {
         name: 'Network Monitor',
         id: 'NET-001',
         version: '2.1.0',
-        desc: 'Monitors network throughput and connectivity.\nReal-time bandwidth visualization with latency tracking.',
+        desc: 'Monitors network throughput and connectivity.\nReal-time bandwidth visualization with latency tracking.\n\nUse NET command for management: net status | net firmware | net test',
         compatible: ['SCA-001', 'AIC-001', 'QSM-001', 'DGN-001'],
       },
       'net': {
         name: 'Network Monitor',
         id: 'NET-001',
         version: '2.1.0',
-        desc: 'Monitors network throughput and connectivity.\nReal-time bandwidth visualization with latency tracking.',
+        desc: 'Monitors network throughput and connectivity.\nReal-time bandwidth visualization with latency tracking.\n\nUse NET command for management: net status | net firmware | net test',
         compatible: ['SCA-001', 'AIC-001', 'QSM-001', 'DGN-001'],
       },
       'temp': {
         name: 'Temperature Monitor',
         id: 'TMP-001',
         version: '1.0.0',
-        desc: 'Thermal monitoring system for lab equipment.\nTracks CPU/GPU and ambient temperatures with alerts.',
+        desc: 'Thermal monitoring system for lab equipment.\nTracks CPU/GPU and ambient temperatures with alerts.\n\nUse TMP command for management: tmp status | tmp firmware | tmp test',
         compatible: ['VNT-001', 'MFR-001', 'SCA-001', 'DGN-001'],
       },
       'thermal': {
         name: 'Temperature Monitor',
         id: 'TMP-001',
         version: '1.0.0',
-        desc: 'Thermal monitoring system for lab equipment.\nTracks CPU/GPU and ambient temperatures with alerts.',
+        desc: 'Thermal monitoring system for lab equipment.\nTracks CPU/GPU and ambient temperatures with alerts.\n\nUse TMP command for management: tmp status | tmp firmware | tmp test',
         compatible: ['VNT-001', 'MFR-001', 'SCA-001', 'DGN-001'],
       },
       'dim': {
         name: 'Dimension Monitor',
         id: 'DIM-001',
         version: '1.0.0',
-        desc: 'Monitors dimensional stability and rift activity.\nTracks D-space coordinates and Halo Plane proximity.',
+        desc: 'Monitors dimensional stability and rift activity.\nTracks D-space coordinates and Halo Plane proximity.\nUse DIM command for device management.',
         compatible: ['QSM-001', 'EMC-001', 'QAN-001'],
       },
       'dimension': {
         name: 'Dimension Monitor',
         id: 'DIM-001',
         version: '1.0.0',
-        desc: 'Monitors dimensional stability and rift activity.\nTracks D-space coordinates and Halo Plane proximity.',
+        desc: 'Monitors dimensional stability and rift activity.\nTracks D-space coordinates and Halo Plane proximity.\nUse DIM command for device management.',
         compatible: ['QSM-001', 'EMC-001', 'QAN-001'],
       },
       'cpu': {
         name: 'CPU Monitor',
         id: 'CPU-001',
         version: '3.2.1',
-        desc: 'Multi-core processor utilization monitor.\nTracks core loads, frequency scaling, and thermal limits.',
+        desc: 'Multi-core processor utilization monitor.\nTracks core loads, frequency scaling, and thermal limits.\nUse CPU command for device management.',
         compatible: ['TMP-001', 'VNT-001', 'SCA-001', 'MFR-001'],
       },
       'processor': {
         name: 'CPU Monitor',
         id: 'CPU-001',
         version: '3.2.1',
-        desc: 'Multi-core processor utilization monitor.\nTracks core loads, frequency scaling, and thermal limits.',
+        desc: 'Multi-core processor utilization monitor.\nTracks core loads, frequency scaling, and thermal limits.\nUse CPU command for device management.',
         compatible: ['TMP-001', 'VNT-001', 'SCA-001', 'MFR-001'],
       },
       'clock': {
         name: 'Lab Clock',
         id: 'CLK-001',
         version: '2.4.0',
-        desc: 'Multi-mode time display system with 6 modes.\nLOCAL, UTC, DATE, UPTIME, COUNTDOWN, STOPWATCH.',
+        desc: 'Multi-mode time display system with 6 modes.\nLOCAL, UTC, DATE, UPTIME, COUNTDOWN, STOPWATCH.\nUse CLK command for device management.',
         compatible: ['DGN-001', 'SCA-001', 'ALL'],
       },
       'time': {
         name: 'Lab Clock',
         id: 'CLK-001',
         version: '2.4.0',
-        desc: 'Multi-mode time display system with 6 modes.\nLOCAL, UTC, DATE, UPTIME, COUNTDOWN, STOPWATCH.',
+        desc: 'Multi-mode time display system with 6 modes.\nLOCAL, UTC, DATE, UPTIME, COUNTDOWN, STOPWATCH.\nUse CLK command for device management.',
         compatible: ['DGN-001', 'SCA-001', 'ALL'],
       },
       'mem': {
         name: 'Memory Monitor',
         id: 'MEM-001',
         version: '3.1.0',
-        desc: 'Multi-mode RAM/memory display with 6 modes.\nUSAGE, HEAP, CACHE, SWAP, PROCESSES, ALLOCATION.',
+        desc: 'Multi-mode RAM/memory display with 6 modes.\nUSAGE, HEAP, CACHE, SWAP, PROCESSES, ALLOCATION.\nUse MEM command for device management.',
         compatible: ['CPU-001', 'SCA-001', 'DGN-001'],
       },
       'memory': {
         name: 'Memory Monitor',
         id: 'MEM-001',
         version: '3.1.0',
-        desc: 'Multi-mode RAM/memory display with 6 modes.\nUSAGE, HEAP, CACHE, SWAP, PROCESSES, ALLOCATION.',
+        desc: 'Multi-mode RAM/memory display with 6 modes.\nUSAGE, HEAP, CACHE, SWAP, PROCESSES, ALLOCATION.\nUse MEM command for device management.',
         compatible: ['CPU-001', 'SCA-001', 'DGN-001'],
       },
       'ram': {
         name: 'Memory Monitor',
         id: 'MEM-001',
         version: '3.1.0',
-        desc: 'Multi-mode RAM/memory display with 6 modes.\nUSAGE, HEAP, CACHE, SWAP, PROCESSES, ALLOCATION.',
+        desc: 'Multi-mode RAM/memory display with 6 modes.\nUSAGE, HEAP, CACHE, SWAP, PROCESSES, ALLOCATION.\nUse MEM command for device management.',
         compatible: ['CPU-001', 'SCA-001', 'DGN-001'],
       },
       'anomaly': {
         name: 'Anomaly Detector',
         id: 'AND-001',
         version: '2.3.0',
-        desc: 'Halo Plane anomaly scanner and signal analyzer.\nDetects dimensional rifts and quantum anomalies.',
+        desc: 'Halo Plane anomaly scanner and signal analyzer.\nDetects dimensional rifts and quantum anomalies.\nUse AND command for device management.',
         compatible: ['QSM-001', 'DIM-001', 'EMC-001', 'QAN-001'],
       },
       'detector': {
         name: 'Anomaly Detector',
         id: 'AND-001',
         version: '2.3.0',
-        desc: 'Halo Plane anomaly scanner and signal analyzer.\nDetects dimensional rifts and quantum anomalies.',
+        desc: 'Halo Plane anomaly scanner and signal analyzer.\nDetects dimensional rifts and quantum anomalies.\nUse AND command for device management.',
         compatible: ['QSM-001', 'DIM-001', 'EMC-001', 'QAN-001'],
       },
       'compass': {
         name: 'Quantum Compass',
         id: 'QCP-001',
         version: '1.5.0',
-        desc: 'Quantum-entangled anomaly direction finder.\nTracks anomaly direction and distance in real-time.',
+        desc: 'Quantum-entangled anomaly direction finder.\nTracks anomaly direction and distance in real-time.\nUse QCP command for device management.',
         compatible: ['AND-001', 'DIM-001', 'QSM-001', 'EMC-001'],
       },
       'qcompass': {
         name: 'Quantum Compass',
         id: 'QCP-001',
         version: '1.5.0',
-        desc: 'Quantum-entangled anomaly direction finder.\nTracks anomaly direction and distance in real-time.',
+        desc: 'Quantum-entangled anomaly direction finder.\nTracks anomaly direction and distance in real-time.\nUse QCP command for device management.',
         compatible: ['AND-001', 'DIM-001', 'QSM-001', 'EMC-001'],
       },
       'teleport': {
         name: 'Teleport Pad',
         id: 'TLP-001',
         version: '2.2.0',
-        desc: 'Quantum transport pad for inter-lab teleportation.\nRequires energy charge and stable quantum lock.',
+        desc: 'Quantum transport pad for inter-lab teleportation.\nRequires energy charge and stable quantum lock.\nUse TLP command for device management.',
         compatible: ['UEC-001', 'MFR-001', 'DIM-001', 'QSM-001'],
       },
       'pad': {
         name: 'Teleport Pad',
         id: 'TLP-001',
         version: '2.2.0',
-        desc: 'Quantum transport pad for inter-lab teleportation.\nRequires energy charge and stable quantum lock.',
+        desc: 'Quantum transport pad for inter-lab teleportation.\nRequires energy charge and stable quantum lock.\nUse TLP command for device management.',
         compatible: ['UEC-001', 'MFR-001', 'DIM-001', 'QSM-001'],
       },
       'diag': {
@@ -1809,35 +1880,35 @@ const deviceCommand: Command = {
         name: 'Precision Laser',
         id: 'LCT-001',
         version: '2.1.0',
-        desc: 'Tier 2 high-precision laser tool for cutting and shaping materials.\nEnables crafting of advanced components and fine-tolerance work.',
+        desc: 'Tier 2 high-precision laser tool for cutting and shaping materials.\nEnables crafting of advanced components and fine-tolerance work.\nUse LCT command for device management.',
         compatible: ['UEC-001', 'MFR-001', 'INT-001', 'CDC-001'],
       },
       'cutter': {
         name: 'Precision Laser',
         id: 'LCT-001',
         version: '2.1.0',
-        desc: 'Tier 2 high-precision laser tool for cutting and shaping materials.\nEnables crafting of advanced components and fine-tolerance work.',
+        desc: 'Tier 2 high-precision laser tool for cutting and shaping materials.\nEnables crafting of advanced components and fine-tolerance work.\nUse LCT command for device management.',
         compatible: ['UEC-001', 'MFR-001', 'INT-001', 'CDC-001'],
       },
       'printer': {
         name: '3D Fabricator',
         id: 'P3D-001',
         version: '3.2.1',
-        desc: 'Tier 2 fabricator that prints complex parts in plastic, metal or crystal.\nSpeeds up component production and prototyping of new devices.',
+        desc: 'Tier 2 fabricator that prints complex parts in plastic, metal or crystal.\nSpeeds up component production and prototyping of new devices.\nUse P3D command for device management.',
         compatible: ['LCT-001', 'CDC-001', 'AIC-001', 'HMS-001'],
       },
       '3d': {
         name: '3D Fabricator',
         id: 'P3D-001',
         version: '3.2.1',
-        desc: 'Tier 2 fabricator that prints complex parts in plastic, metal or crystal.\nSpeeds up component production and prototyping of new devices.',
+        desc: 'Tier 2 fabricator that prints complex parts in plastic, metal or crystal.\nSpeeds up component production and prototyping of new devices.\nUse P3D command for device management.',
         compatible: ['LCT-001', 'CDC-001', 'AIC-001', 'HMS-001'],
       },
       'fabricator': {
         name: '3D Fabricator',
         id: 'P3D-001',
         version: '3.2.1',
-        desc: 'Tier 2 fabricator that prints complex parts in plastic, metal or crystal.\nSpeeds up component production and prototyping of new devices.',
+        desc: 'Tier 2 fabricator that prints complex parts in plastic, metal or crystal.\nSpeeds up component production and prototyping of new devices.\nUse P3D command for device management.',
         compatible: ['LCT-001', 'CDC-001', 'AIC-001', 'HMS-001'],
       },
       'thmgr': {
@@ -2118,6 +2189,17 @@ const deviceCommand: Command = {
         'BTK-001': ctx.data.btkDevice ? { on: () => ctx.data.btkDevice!.powerOn(), off: () => ctx.data.btkDevice!.powerOff(), isPowered: () => ctx.data.btkDevice!.getState().isPowered } : undefined,
         'RMG-001': ctx.data.rmgDevice ? { on: () => ctx.data.rmgDevice!.powerOn(), off: () => ctx.data.rmgDevice!.powerOff(), isPowered: () => ctx.data.rmgDevice!.getState().isPowered } : undefined,
         'MSC-001': ctx.data.mscDevice ? { on: () => ctx.data.mscDevice!.powerOn(), off: () => ctx.data.mscDevice!.powerOff(), isPowered: () => ctx.data.mscDevice!.getState().isPowered } : undefined,
+        'NET-001': ctx.data.netDevice ? { on: () => ctx.data.netDevice!.powerOn(), off: () => ctx.data.netDevice!.powerOff(), isPowered: () => ctx.data.netDevice!.getState().isPowered } : undefined,
+        'TMP-001': ctx.data.tmpDevice ? { on: () => ctx.data.tmpDevice!.powerOn(), off: () => ctx.data.tmpDevice!.powerOff(), isPowered: () => ctx.data.tmpDevice!.getState().isPowered } : undefined,
+        'DIM-001': ctx.data.dimDevice ? { on: () => ctx.data.dimDevice!.powerOn(), off: () => ctx.data.dimDevice!.powerOff(), isPowered: () => ctx.data.dimDevice!.getState().isPowered } : undefined,
+        'CPU-001': ctx.data.cpuDevice ? { on: () => ctx.data.cpuDevice!.powerOn(), off: () => ctx.data.cpuDevice!.powerOff(), isPowered: () => ctx.data.cpuDevice!.getState().isPowered } : undefined,
+        'CLK-001': ctx.data.clkDevice ? { on: () => ctx.data.clkDevice!.powerOn(), off: () => ctx.data.clkDevice!.powerOff(), isPowered: () => ctx.data.clkDevice!.getState().isPowered } : undefined,
+        'MEM-001': ctx.data.memDevice ? { on: () => ctx.data.memDevice!.powerOn(), off: () => ctx.data.memDevice!.powerOff(), isPowered: () => ctx.data.memDevice!.getState().isPowered } : undefined,
+        'AND-001': ctx.data.andDevice ? { on: () => ctx.data.andDevice!.powerOn(), off: () => ctx.data.andDevice!.powerOff(), isPowered: () => ctx.data.andDevice!.getState().isPowered } : undefined,
+        'QCP-001': ctx.data.qcpDevice ? { on: () => ctx.data.qcpDevice!.powerOn(), off: () => ctx.data.qcpDevice!.powerOff(), isPowered: () => ctx.data.qcpDevice!.getState().isPowered } : undefined,
+        'TLP-001': ctx.data.tlpDevice ? { on: () => ctx.data.tlpDevice!.powerOn(), off: () => ctx.data.tlpDevice!.powerOff(), isPowered: () => ctx.data.tlpDevice!.getState().isPowered } : undefined,
+        'LCT-001': ctx.data.lctDevice ? { on: () => ctx.data.lctDevice!.powerOn(), off: () => ctx.data.lctDevice!.powerOff(), isPowered: () => ctx.data.lctDevice!.getState().isPowered } : undefined,
+        'P3D-001': ctx.data.p3dDevice ? { on: () => ctx.data.p3dDevice!.powerOn(), off: () => ctx.data.p3dDevice!.powerOff(), isPowered: () => ctx.data.p3dDevice!.getState().isPowered } : undefined,
       }
 
       const ctrl = devicePowerMap[device.id]
@@ -2177,11 +2259,11 @@ const powerCommand: Command = {
     const powerConsumers = [
       // Heavy Consumers
       { id: 'SCA-001', name: 'Supercomputer Array', draw: ctx.data.scaDevice?.getState().currentDraw ?? 45, priority: 3, status: ctx.data.scaDevice?.getState().isPowered ? 'on' : 'standby', category: 'heavy' },
-      { id: 'TLP-001', name: 'Teleport Pad', draw: 3, priority: 4, status: 'standby', category: 'heavy' },
+      { id: 'TLP-001', name: 'Teleport Pad', draw: ctx.data.tlpDevice?.getState().currentDraw ?? 3, priority: 4, status: ctx.data.tlpDevice?.getState().isPowered ? 'on' : 'standby', category: 'heavy' },
       { id: 'QAN-001', name: 'Quantum Analyzer', draw: ctx.data.quaDevice?.getState().currentDraw ?? 10, priority: 2, status: ctx.data.quaDevice?.getState().isPowered ? 'on' : 'standby', category: 'heavy' },
       { id: 'EMC-001', name: 'Exotic Matter Contain.', draw: ctx.data.emcDevice?.getState().currentDraw ?? 18, priority: 1, status: ctx.data.emcDevice?.getState().isPowered ? 'on' : 'standby', category: 'heavy' },
-      { id: 'P3D-001', name: '3D Fabricator', draw: 2, priority: 3, status: 'standby', category: 'heavy' },
-      { id: 'LCT-001', name: 'Precision Laser', draw: 2, priority: 3, status: 'standby', category: 'heavy' },
+      { id: 'P3D-001', name: '3D Fabricator', draw: ctx.data.p3dDevice?.getState().currentDraw ?? 2, priority: 3, status: ctx.data.p3dDevice?.getState().isPowered ? 'on' : 'standby', category: 'heavy' },
+      { id: 'LCT-001', name: 'Precision Laser', draw: ctx.data.lctDevice?.getState().currentDraw ?? 2, priority: 3, status: ctx.data.lctDevice?.getState().isPowered ? 'on' : 'standby', category: 'heavy' },
       { id: 'EXD-001', name: 'Explorer Drone', draw: ctx.data.exdDevice?.getState().currentDraw ?? 1, priority: 3, status: ctx.data.exdDevice?.getState().isPowered ? 'on' : 'standby', category: 'heavy' },
       { id: 'AIC-001', name: 'AI Assistant Core', draw: 12, priority: 1, status: 'on', category: 'heavy' },
       // Medium Consumers
@@ -2189,28 +2271,28 @@ const powerCommand: Command = {
       { id: 'INT-001', name: 'Interpolator', draw: 6, priority: 2, status: 'on', category: 'medium' },
       { id: 'OSC-001', name: 'Oscilloscope Array', draw: 5, priority: 2, status: 'on', category: 'medium' },
       { id: 'CDC-001', name: 'Crystal Data Cache', draw: 5, priority: 1, status: 'on', category: 'medium' },
-      { id: 'AND-001', name: 'Anomaly Detector', draw: 4, priority: 2, status: 'on', category: 'medium' },
+      { id: 'AND-001', name: 'Anomaly Detector', draw: ctx.data.andDevice?.getState().currentDraw ?? 4, priority: 2, status: ctx.data.andDevice?.getState().isPowered ? 'on' : 'standby', category: 'medium' },
       { id: 'RMG-001', name: 'Resource Magnet', draw: 3, priority: 3, status: 'on', category: 'medium' },
       { id: 'HMS-001', name: 'Handmade Synthesizer', draw: 3, priority: 2, status: 'on', category: 'medium' },
       { id: 'ECR-001', name: 'Echo Recorder', draw: 2, priority: 2, status: 'on', category: 'medium' },
       // Light Consumers
       { id: 'VNT-001', name: 'Ventilation System', draw: 2, priority: 1, status: 'on', category: 'light' },
       { id: 'THM-001', name: 'Thermal Manager', draw: 1.5, priority: 1, status: 'on', category: 'light' },
-      { id: 'DIM-001', name: 'Dimension Monitor', draw: 1.5, priority: 2, status: 'on', category: 'light' },
+      { id: 'DIM-001', name: 'Dimension Monitor', draw: ctx.data.dimDevice?.getState().currentDraw ?? 1.5, priority: 2, status: ctx.data.dimDevice?.getState().isPowered ? 'on' : 'standby', category: 'light' },
       { id: 'MSC-001', name: 'Material Scanner', draw: 1, priority: 2, status: 'on', category: 'light' },
-      { id: 'NET-001', name: 'Network Monitor', draw: 1.5, priority: 2, status: 'on', category: 'light' },
+      { id: 'NET-001', name: 'Network Monitor', draw: ctx.data.netDevice?.getState().currentDraw ?? 1.5, priority: 2, status: ctx.data.netDevice?.getState().isPowered ? 'on' : 'standby', category: 'light' },
       { id: 'DGN-001', name: 'Diagnostics Console', draw: 1, priority: 1, status: 'on', category: 'light' },
       { id: 'SPK-001', name: 'Narrow Speaker', draw: 0.5, priority: 3, status: 'on', category: 'light' },
-      { id: 'QCP-001', name: 'Quantum Compass', draw: 0.8, priority: 3, status: 'on', category: 'light' },
+      { id: 'QCP-001', name: 'Quantum Compass', draw: ctx.data.qcpDevice?.getState().currentDraw ?? 0.8, priority: 3, status: ctx.data.qcpDevice?.getState().isPowered ? 'on' : 'standby', category: 'light' },
       { id: 'PWR-001', name: 'Power Management Sys.', draw: 2.5, priority: 1, status: 'on', category: 'light' },
       { id: 'BTK-001', name: 'Basic Toolkit', draw: 0.3, priority: 2, status: 'on', category: 'light' },
       { id: 'PWB-001', name: 'Portable Workbench', draw: 2.5, priority: 2, status: 'on', category: 'light' },
-      { id: 'CPU-001', name: 'CPU Monitor', draw: 0.8, priority: 1, status: 'on', category: 'light' },
-      { id: 'MEM-001', name: 'Memory Monitor', draw: 0.6, priority: 1, status: 'on', category: 'light' },
-      { id: 'TMP-001', name: 'Temperature Monitor', draw: 0.8, priority: 1, status: 'on', category: 'light' },
+      { id: 'CPU-001', name: 'CPU Monitor', draw: ctx.data.cpuDevice?.getState().currentDraw ?? 0.8, priority: 1, status: ctx.data.cpuDevice?.getState().isPowered ? 'on' : 'standby', category: 'light' },
+      { id: 'MEM-001', name: 'Memory Monitor', draw: ctx.data.memDevice?.getState().currentDraw ?? 0.6, priority: 1, status: ctx.data.memDevice?.getState().isPowered ? 'on' : 'standby', category: 'light' },
+      { id: 'TMP-001', name: 'Temperature Monitor', draw: ctx.data.tmpDevice?.getState().currentDraw ?? 0.8, priority: 1, status: ctx.data.tmpDevice?.getState().isPowered ? 'on' : 'standby', category: 'light' },
       { id: 'ATK-001', name: 'Abstractum Tank', draw: 0.3, priority: 1, status: 'on', category: 'light' },
       { id: 'PWD-001', name: 'Power Display Panel', draw: 1, priority: 1, status: 'on', category: 'light' },
-      { id: 'CLK-001', name: 'Lab Clock', draw: 0.5, priority: 1, status: 'on', category: 'light' },
+      { id: 'CLK-001', name: 'Lab Clock', draw: ctx.data.clkDevice?.getState().currentDraw ?? 0.5, priority: 1, status: ctx.data.clkDevice?.getState().isPowered ? 'on' : 'standby', category: 'light' },
       { id: 'VLT-001', name: 'Volt Meter Display', draw: 0.8, priority: 1, status: 'on', category: 'light' },
     ]
 
@@ -2804,10 +2886,52 @@ const cdcCommand: Command = {
           '    cdc firmware patch  - Apply security patches',
           '    cdc test         - Run hardware diagnostics',
           '    cdc reset        - Reboot device',
+          '    cdc fold         - Fold device to compact view',
+          '    cdc unfold       - Unfold device to full view',
+          '    cdc toggle       - Toggle fold state',
           '    cdc info         - Show full device documentation',
           '',
           '  POWER INTEGRATION:',
           `    Full:    ${powerSpecs.full} E/s  |  Idle: ${powerSpecs.idle} E/s  |  Standby: ${powerSpecs.standby} E/s`,
+          '',
+        ],
+      }
+    }
+
+    // FOLD command
+    if (action === 'fold') {
+      cdcDevice?.setExpanded(false)
+      return {
+        success: true,
+        output: [
+          '',
+          '  CDC-001 >> Device folded to compact view.',
+          '',
+        ],
+      }
+    }
+
+    // UNFOLD command
+    if (action === 'unfold') {
+      cdcDevice?.setExpanded(true)
+      return {
+        success: true,
+        output: [
+          '',
+          '  CDC-001 >> Device unfolded to full view.',
+          '',
+        ],
+      }
+    }
+
+    // TOGGLE command
+    if (action === 'toggle') {
+      cdcDevice?.toggleExpanded()
+      return {
+        success: true,
+        output: [
+          '',
+          '  CDC-001 >> Device fold state toggled.',
           '',
         ],
       }
@@ -3277,6 +3401,9 @@ const uecCommand: Command = {
           '    uec firmware patch  - Apply security patches',
           '    uec test         - Run hardware diagnostics',
           '    uec reset        - Reboot device',
+          '    uec fold         - Fold device to compact view',
+          '    uec unfold       - Unfold device to full view',
+          '    uec toggle       - Toggle fold state',
           '    uec info         - Show full device documentation',
           '',
           '  POWER OUTPUT:',
@@ -3669,6 +3796,9 @@ const uecCommand: Command = {
           '    uec firmware patch  - Apply security patches',
           '    uec test            - Run diagnostics',
           '    uec reset           - Reboot core',
+          '    uec fold            - Fold to compact view',
+          '    uec unfold          - Unfold to full view',
+          '    uec toggle          - Toggle fold state',
           '',
           '  LOCATION IN unOS:',
           '    /sys/devices/uec-001/',
@@ -3677,6 +3807,27 @@ const uecCommand: Command = {
           '',
         ],
       }
+    }
+
+    // FOLD command
+    if (action === 'fold') {
+      if (!uecDevice) return { success: false, error: '[UEC-001] Device not connected' }
+      uecDevice.setExpanded(false)
+      return { success: true, output: ['', '[UEC-001] Device folded to compact view', ''] }
+    }
+
+    // UNFOLD command
+    if (action === 'unfold') {
+      if (!uecDevice) return { success: false, error: '[UEC-001] Device not connected' }
+      uecDevice.setExpanded(true)
+      return { success: true, output: ['', '[UEC-001] Device unfolded to full view', ''] }
+    }
+
+    // TOGGLE command
+    if (action === 'toggle') {
+      if (!uecDevice) return { success: false, error: '[UEC-001] Device not connected' }
+      uecDevice.toggleExpanded()
+      return { success: true, output: ['', '[UEC-001] Device fold state toggled', ''] }
     }
 
     return {
@@ -3748,6 +3899,9 @@ const batCommand: Command = {
           '    bat test         - Run battery diagnostics',
           '    bat reset        - Reboot device',
           '    bat regen [on|off] - Toggle auto-regeneration',
+          '    bat fold         - Fold device to compact view',
+          '    bat unfold       - Unfold device to full view',
+          '    bat toggle       - Toggle fold state',
           '    bat info         - Show full device documentation',
           '',
           '  STORAGE CAPACITY:',
@@ -4177,6 +4331,9 @@ const batCommand: Command = {
           '    bat regen [on|off]  - Toggle auto-regeneration',
           '    bat test            - Run diagnostics',
           '    bat reset           - Reboot pack',
+          '    bat fold            - Fold to compact view',
+          '    bat unfold          - Unfold to full view',
+          '    bat toggle          - Toggle fold state',
           '',
           '  LOCATION IN unOS:',
           '    /sys/devices/bat-001/',
@@ -4187,6 +4344,27 @@ const batCommand: Command = {
           '',
         ],
       }
+    }
+
+    // FOLD command
+    if (action === 'fold') {
+      if (!batDevice) return { success: false, error: '[BAT-001] Device not connected' }
+      batDevice.setExpanded(false)
+      return { success: true, output: ['', '[BAT-001] Device folded to compact view', ''] }
+    }
+
+    // UNFOLD command
+    if (action === 'unfold') {
+      if (!batDevice) return { success: false, error: '[BAT-001] Device not connected' }
+      batDevice.setExpanded(true)
+      return { success: true, output: ['', '[BAT-001] Device unfolded to full view', ''] }
+    }
+
+    // TOGGLE command
+    if (action === 'toggle') {
+      if (!batDevice) return { success: false, error: '[BAT-001] Device not connected' }
+      batDevice.toggleExpanded()
+      return { success: true, output: ['', '[BAT-001] Device fold state toggled', ''] }
     }
 
     return {
@@ -4264,6 +4442,9 @@ const hmsCommand: Command = {
           '    hms reset        - Reboot device',
           '    hms wave [type]  - Set waveform (sine|square|saw|triangle)',
           '    hms knob [p|t|f] [value] - Set knob value (0-100)',
+          '    hms fold         - Fold device to compact view',
+          '    hms unfold       - Unfold device to full view',
+          '    hms toggle       - Toggle fold state',
           '    hms info         - Show full device documentation',
           '',
           '  POWER INTEGRATION:',
@@ -4791,6 +4972,9 @@ const hmsCommand: Command = {
           '    hms knob [k] [val]  - Adjust knob values',
           '    hms test            - Run diagnostics',
           '    hms reset           - Reboot synth',
+          '    hms fold            - Fold to compact view',
+          '    hms unfold          - Unfold to full view',
+          '    hms toggle          - Toggle fold state',
           '',
           '  LOCATION IN unOS:',
           '    /sys/devices/hms-001/',
@@ -4801,6 +4985,27 @@ const hmsCommand: Command = {
           '',
         ],
       }
+    }
+
+    // FOLD command
+    if (action === 'fold') {
+      if (!hmsDevice) return { success: false, error: '[HMS-001] Device not connected' }
+      hmsDevice.setExpanded(false)
+      return { success: true, output: ['', '[HMS-001] Device folded to compact view', ''] }
+    }
+
+    // UNFOLD command
+    if (action === 'unfold') {
+      if (!hmsDevice) return { success: false, error: '[HMS-001] Device not connected' }
+      hmsDevice.setExpanded(true)
+      return { success: true, output: ['', '[HMS-001] Device unfolded to full view', ''] }
+    }
+
+    // TOGGLE command
+    if (action === 'toggle') {
+      if (!hmsDevice) return { success: false, error: '[HMS-001] Device not connected' }
+      hmsDevice.toggleExpanded()
+      return { success: true, output: ['', '[HMS-001] Device fold state toggled', ''] }
     }
 
     return {
@@ -4815,7 +5020,7 @@ const ecrCommand: Command = {
   name: 'ecr',
   aliases: ['echo-recorder', 'ecr001'],
   description: 'Echo Recorder management (ECR-001)',
-  usage: 'ecr [status|power|firmware|test|reset|record|knob|info]',
+  usage: 'ecr [status|power|firmware|test|reset|record|knob|fold|unfold|toggle|info]',
   execute: async (args, ctx) => {
     const ecrDevice = ctx.data.ecrDevice
     const action = args[0]?.toLowerCase()
@@ -4876,6 +5081,9 @@ const ecrCommand: Command = {
           '    ecr record [on|off] Toggle recording mode',
           '    ecr knob [k] [val]  Adjust knob values (p=pulse, b=bloom)',
           '    ecr info            Full documentation',
+          '    ecr fold            Fold device to compact view',
+          '    ecr unfold          Unfold device to full view',
+          '    ecr toggle          Toggle fold state',
           '',
           '  EXAMPLES:',
           '    ecr power on        Boot the recorder',
@@ -5374,6 +5582,37 @@ const ecrCommand: Command = {
       }
     }
 
+    // FOLD command
+    if (action === 'fold') {
+      if (!ecrDevice) return { success: false, error: '[ECR-001] Device not connected' }
+      ecrDevice.setExpanded(false)
+      return {
+        success: true,
+        output: ['', '  ECR-001 folded.', ''],
+      }
+    }
+
+    // UNFOLD command
+    if (action === 'unfold') {
+      if (!ecrDevice) return { success: false, error: '[ECR-001] Device not connected' }
+      ecrDevice.setExpanded(true)
+      return {
+        success: true,
+        output: ['', '  ECR-001 unfolded.', ''],
+      }
+    }
+
+    // TOGGLE fold command
+    if (action === 'toggle') {
+      if (!ecrDevice) return { success: false, error: '[ECR-001] Device not connected' }
+      ecrDevice.toggleExpanded()
+      const st = ecrDevice.getState()
+      return {
+        success: true,
+        output: ['', `  ECR-001 ${st.isExpanded ? 'unfolded' : 'folded'}.`, ''],
+      }
+    }
+
     // INFO command
     if (action === 'info' || action === 'docs' || action === 'documentation') {
       return {
@@ -5436,6 +5675,9 @@ const ecrCommand: Command = {
           '    ecr knob [k] [val]   - Adjust knob values',
           '    ecr test             - Run diagnostics',
           '    ecr reset            - Reboot recorder',
+          '    ecr fold             - Fold device to compact view',
+          '    ecr unfold           - Unfold device to full view',
+          '    ecr toggle           - Toggle fold state',
           '',
           '  LOCATION IN unOS:',
           '    /sys/devices/ecr-001/',
@@ -5460,7 +5702,7 @@ const iplCommand: Command = {
   name: 'ipl',
   aliases: ['interpolator', 'int001'],
   description: 'Interpolator management (INT-001)',
-  usage: 'ipl [status|power|firmware|test|reset|info]',
+  usage: 'ipl [status|power|firmware|test|reset|fold|unfold|toggle|info]',
   execute: async (args, ctx) => {
     const iplDevice = ctx.data.iplDevice
     const action = args[0]?.toLowerCase()
@@ -5517,6 +5759,9 @@ const iplCommand: Command = {
           '    ipl test            Run diagnostics',
           '    ipl reset           Reboot device',
           '    ipl info            Full documentation',
+          '    ipl fold            Fold device to compact view',
+          '    ipl unfold          Unfold device to full view',
+          '    ipl toggle          Toggle fold state',
           '',
           '  EXAMPLES:',
           '    ipl power on        Boot the interpolator',
@@ -5819,6 +6064,37 @@ const iplCommand: Command = {
       }
     }
 
+    // FOLD command
+    if (action === 'fold') {
+      if (!iplDevice) return { success: false, error: '[INT-001] Device not connected' }
+      iplDevice.setExpanded(false)
+      return {
+        success: true,
+        output: ['', '  INT-001 folded.', ''],
+      }
+    }
+
+    // UNFOLD command
+    if (action === 'unfold') {
+      if (!iplDevice) return { success: false, error: '[INT-001] Device not connected' }
+      iplDevice.setExpanded(true)
+      return {
+        success: true,
+        output: ['', '  INT-001 unfolded.', ''],
+      }
+    }
+
+    // TOGGLE fold command
+    if (action === 'toggle') {
+      if (!iplDevice) return { success: false, error: '[INT-001] Device not connected' }
+      iplDevice.toggleExpanded()
+      const st = iplDevice.getState()
+      return {
+        success: true,
+        output: ['', `  INT-001 ${st.isExpanded ? 'unfolded' : 'folded'}.`, ''],
+      }
+    }
+
     // INFO command
     if (action === 'info' || action === 'docs' || action === 'documentation') {
       return {
@@ -5877,6 +6153,9 @@ const iplCommand: Command = {
           '    ipl firmware        - View firmware info',
           '    ipl test            - Run diagnostics',
           '    ipl reset           - Reboot device',
+          '    ipl fold            - Fold device to compact view',
+          '    ipl unfold          - Unfold device to full view',
+          '    ipl toggle          - Toggle fold state',
           '',
           '  LOCATION IN unOS:',
           '    /sys/devices/int-001/',
@@ -5901,7 +6180,7 @@ const mfrCommand: Command = {
   name: 'mfr',
   aliases: ['reactor', 'microfusion', 'mfr001'],
   description: 'Microfusion Reactor management (MFR-001)',
-  usage: 'mfr [status|power|firmware|test|reset|info]',
+  usage: 'mfr [status|power|firmware|test|reset|fold|unfold|toggle|info]',
   execute: async (args, ctx) => {
     const mfrDevice = ctx.data.mfrDevice
     const action = args[0]?.toLowerCase()
@@ -5958,6 +6237,9 @@ const mfrCommand: Command = {
           '    mfr test            Run diagnostics',
           '    mfr reset           Reboot reactor',
           '    mfr info            Full documentation',
+          '    mfr fold            Fold device to compact view',
+          '    mfr unfold          Unfold device to full view',
+          '    mfr toggle          Toggle fold state',
           '',
           '  EXAMPLES:',
           '    mfr power on        Ignite plasma core',
@@ -6265,6 +6547,37 @@ const mfrCommand: Command = {
       }
     }
 
+    // FOLD command
+    if (action === 'fold') {
+      if (!mfrDevice) return { success: false, error: '[MFR-001] Device not connected' }
+      mfrDevice.setExpanded(false)
+      return {
+        success: true,
+        output: ['', '  MFR-001 folded.', ''],
+      }
+    }
+
+    // UNFOLD command
+    if (action === 'unfold') {
+      if (!mfrDevice) return { success: false, error: '[MFR-001] Device not connected' }
+      mfrDevice.setExpanded(true)
+      return {
+        success: true,
+        output: ['', '  MFR-001 unfolded.', ''],
+      }
+    }
+
+    // TOGGLE fold command
+    if (action === 'toggle') {
+      if (!mfrDevice) return { success: false, error: '[MFR-001] Device not connected' }
+      mfrDevice.toggleExpanded()
+      const st = mfrDevice.getState()
+      return {
+        success: true,
+        output: ['', `  MFR-001 ${st.isExpanded ? 'unfolded' : 'folded'}.`, ''],
+      }
+    }
+
     // INFO command
     if (action === 'info' || action === 'docs' || action === 'documentation') {
       return {
@@ -6320,6 +6633,9 @@ const mfrCommand: Command = {
           '    mfr firmware        - View firmware info',
           '    mfr test            - Run diagnostics',
           '    mfr reset           - Reboot reactor',
+          '    mfr fold            - Fold device to compact view',
+          '    mfr unfold          - Unfold device to full view',
+          '    mfr toggle          - Toggle fold state',
           '',
           '  LOCATION IN unOS:',
           '    /sys/devices/mfr-001/',
@@ -6344,7 +6660,7 @@ const aicCommand: Command = {
   name: 'aic',
   aliases: ['ai', 'assistant', 'aic001'],
   description: 'AI Assistant Core management (AIC-001)',
-  usage: 'aic [status|power|firmware|test|reset|learn|info]',
+  usage: 'aic [status|power|firmware|test|reset|learn|fold|unfold|toggle|info]',
   execute: async (args, ctx) => {
     const aicDevice = ctx.data.aicDevice
     const action = args[0]?.toLowerCase()
@@ -6404,6 +6720,9 @@ const aicCommand: Command = {
           '    aic reset           Reboot neural core',
           '    aic learn [on|off]  Toggle learning mode',
           '    aic info            Full documentation',
+          '    aic fold            Fold device to compact view',
+          '    aic unfold          Unfold device to full view',
+          '    aic toggle          Toggle fold state',
           '',
           '  EXAMPLES:',
           '    aic power on        Boot the AI core',
@@ -6775,6 +7094,37 @@ const aicCommand: Command = {
       }
     }
 
+    // FOLD command
+    if (action === 'fold') {
+      if (!aicDevice) return { success: false, error: '[AIC-001] Device not connected' }
+      aicDevice.setExpanded(false)
+      return {
+        success: true,
+        output: ['', '  AIC-001 folded.', ''],
+      }
+    }
+
+    // UNFOLD command
+    if (action === 'unfold') {
+      if (!aicDevice) return { success: false, error: '[AIC-001] Device not connected' }
+      aicDevice.setExpanded(true)
+      return {
+        success: true,
+        output: ['', '  AIC-001 unfolded.', ''],
+      }
+    }
+
+    // TOGGLE fold command
+    if (action === 'toggle') {
+      if (!aicDevice) return { success: false, error: '[AIC-001] Device not connected' }
+      aicDevice.toggleExpanded()
+      const st = aicDevice.getState()
+      return {
+        success: true,
+        output: ['', `  AIC-001 ${st.isExpanded ? 'unfolded' : 'folded'}.`, ''],
+      }
+    }
+
     // INFO command
     if (action === 'info' || action === 'help' || action === 'doc') {
       return {
@@ -6829,6 +7179,9 @@ const aicCommand: Command = {
           '    aic test            - Run neural diagnostics',
           '    aic reset           - Reboot neural core',
           '    aic learn [on|off]  - Toggle learning mode',
+          '    aic fold            - Fold device to compact view',
+          '    aic unfold          - Unfold device to full view',
+          '    aic toggle          - Toggle fold state',
           '',
           '  LOCATION IN unOS:',
           '    /sys/devices/aic-001/',
@@ -6855,7 +7208,7 @@ const emcCommand: Command = {
   name: 'emc',
   aliases: ['exotic', 'emc001', 'containment'],
   description: 'Exotic Matter Containment management (EMC-001)',
-  usage: 'emc [status|power|firmware|test|reset|info]',
+  usage: 'emc [status|power|firmware|test|reset|fold|unfold|toggle|info]',
   execute: async (args, ctx) => {
     const emcDevice = ctx.data.emcDevice
 
@@ -6907,6 +7260,9 @@ const emcCommand: Command = {
           '    emc firmware update     Check for firmware updates',
           '    emc test                Run containment diagnostics',
           '    emc reset               Reboot containment system',
+          '    emc fold                Fold device to compact view',
+          '    emc unfold              Unfold to full view',
+          '    emc toggle              Toggle fold state',
           '    emc info                Full documentation',
           '',
           '  Examples:',
@@ -7031,6 +7387,27 @@ const emcCommand: Command = {
       }
     }
 
+    if (action === 'fold') {
+      emcDevice?.setExpanded(false)
+      return { success: true, output: ['', '  EMC-001 folded to compact view.', ''] }
+    }
+
+    if (action === 'unfold' || action === 'expand') {
+      if (state.deviceState === 'standby') {
+        return { success: false, error: 'EMC-001 is in standby. Use: emc power on' }
+      }
+      emcDevice?.setExpanded(true)
+      return { success: true, output: ['', '  EMC-001 unfolded to full view.', ''] }
+    }
+
+    if (action === 'toggle') {
+      if (state.deviceState === 'standby') {
+        return { success: false, error: 'EMC-001 is in standby. Use: emc power on' }
+      }
+      emcDevice?.toggleExpanded()
+      return { success: true, output: ['', '  EMC-001 fold state toggled.', ''] }
+    }
+
     if (action === 'info') {
       return {
         success: true,
@@ -7065,6 +7442,9 @@ const emcCommand: Command = {
           '    emc firmware     View firmware',
           '    emc test         Run diagnostics',
           '    emc reset        Reboot system',
+          '    emc fold         Fold to compact view',
+          '    emc unfold       Unfold to full view',
+          '    emc toggle       Toggle fold state',
           '    emc info         This documentation',
           '',
           '  TROUBLESHOOTING',
@@ -7081,7 +7461,7 @@ const emcCommand: Command = {
 
     return {
       success: false,
-      error: `unknown emc subcommand: ${action}\nusage: emc [status|power|firmware|test|reset|info]`,
+      error: `unknown emc subcommand: ${action}\nusage: emc [status|power|firmware|test|reset|fold|unfold|toggle|info]`,
     }
   },
 }
@@ -7092,7 +7472,7 @@ const quaCommand: Command = {
   name: 'qua',
   aliases: ['analyzer', 'qua001', 'quantum-analyzer'],
   description: 'Quantum Analyzer management (QUA-001)',
-  usage: 'qua [status|power|firmware|test|reset|mode|sensitivity|depth|frequency|info]',
+  usage: 'qua [status|power|firmware|test|reset|mode|sensitivity|depth|frequency|fold|unfold|toggle|info]',
   execute: async (args, ctx) => {
     const quaDevice = ctx.data.quaDevice
 
@@ -7148,6 +7528,9 @@ const quaCommand: Command = {
           '    qua sensitivity <0-100> Set sensitivity knob',
           '    qua depth <0-100>       Set depth knob',
           '    qua frequency <0-100>   Set frequency knob',
+          '    qua fold                Fold device to compact view',
+          '    qua unfold              Unfold to full view',
+          '    qua toggle              Toggle fold state',
           '    qua info                Full documentation',
           '',
           '  Modes: ANOMALY, RESOURCE, DECRYPT, DIAGNOSE, SIMULATE, SCAN',
@@ -7344,6 +7727,27 @@ const quaCommand: Command = {
       }
     }
 
+    if (action === 'fold') {
+      quaDevice?.setExpanded(false)
+      return { success: true, output: ['', '  QUA-001 folded to compact view.', ''] }
+    }
+
+    if (action === 'unfold' || action === 'expand') {
+      if (state.deviceState === 'standby') {
+        return { success: false, error: 'QUA-001 is in standby. Use: qua power on' }
+      }
+      quaDevice?.setExpanded(true)
+      return { success: true, output: ['', '  QUA-001 unfolded to full view.', ''] }
+    }
+
+    if (action === 'toggle') {
+      if (state.deviceState === 'standby') {
+        return { success: false, error: 'QUA-001 is in standby. Use: qua power on' }
+      }
+      quaDevice?.toggleExpanded()
+      return { success: true, output: ['', '  QUA-001 fold state toggled.', ''] }
+    }
+
     if (action === 'info') {
       return {
         success: true,
@@ -7387,7 +7791,7 @@ const quaCommand: Command = {
 
     return {
       success: false,
-      error: `unknown qua subcommand: ${action}\nusage: qua [status|power|firmware|test|reset|mode|sensitivity|depth|frequency|info]`,
+      error: `unknown qua subcommand: ${action}\nusage: qua [status|power|firmware|test|reset|mode|sensitivity|depth|frequency|fold|unfold|toggle|info]`,
     }
   },
 }
@@ -7398,7 +7802,7 @@ const qsmCommand: Command = {
   name: 'qsm',
   aliases: ['quantum', 'qsm001', 'qubit'],
   description: 'Quantum State Monitor management (QSM-001)',
-  usage: 'qsm [status|power|firmware|test|reset|info]',
+  usage: 'qsm [status|power|firmware|test|reset|fold|unfold|toggle|info]',
   execute: async (args, ctx) => {
     const qsmDevice = ctx.data.qsmDevice
     const action = args[0]?.toLowerCase()
@@ -7446,6 +7850,9 @@ const qsmCommand: Command = {
           '    qsm firmware update     Check for firmware updates',
           '    qsm test                Run quantum diagnostics',
           '    qsm reset               Reboot quantum monitor',
+          '    qsm fold                Fold device to compact view',
+          '    qsm unfold              Unfold to full view',
+          '    qsm toggle              Toggle fold state',
           '    qsm info                Full documentation',
           '',
           '  EXAMPLES:',
@@ -7604,6 +8011,27 @@ const qsmCommand: Command = {
       }
     }
 
+    if (action === 'fold') {
+      qsmDevice?.setExpanded(false)
+      return { success: true, output: ['', '  QSM-001 folded to compact view.', ''] }
+    }
+
+    if (action === 'unfold' || action === 'expand') {
+      if (state.deviceState === 'standby') {
+        return { success: false, error: 'QSM-001 is in standby. Use: qsm power on' }
+      }
+      qsmDevice?.setExpanded(true)
+      return { success: true, output: ['', '  QSM-001 unfolded to full view.', ''] }
+    }
+
+    if (action === 'toggle') {
+      if (state.deviceState === 'standby') {
+        return { success: false, error: 'QSM-001 is in standby. Use: qsm power on' }
+      }
+      qsmDevice?.toggleExpanded()
+      return { success: true, output: ['', '  QSM-001 fold state toggled.', ''] }
+    }
+
     if (action === 'info' || action === 'help') {
       return {
         success: true,
@@ -7656,7 +8084,7 @@ const qsmCommand: Command = {
 
     return {
       success: false,
-      error: `unknown qsm subcommand: ${action}\nusage: qsm [status|power|firmware|test|reset|info]`,
+      error: `unknown qsm subcommand: ${action}\nusage: qsm [status|power|firmware|test|reset|fold|unfold|toggle|info]`,
     }
   },
 }
@@ -7665,7 +8093,7 @@ const vntCommand: Command = {
   name: 'vnt',
   aliases: ['vent', 'ventilation', 'fan', 'vnt001', 'cooling'],
   description: 'Ventilation System management (VNT-001)',
-  usage: 'vnt [status|power|firmware|test|reset|fan|info]',
+  usage: 'vnt [status|power|firmware|test|reset|fan|fold|unfold|toggle|info]',
   execute: async (args, ctx) => {
     const vntDevice = ctx.data.vntDevice
     const action = args[0]?.toLowerCase()
@@ -7726,6 +8154,9 @@ const vntCommand: Command = {
           '    vnt fan <cpu|gpu> <cmd> Control individual fan',
           '    vnt mode <mode>        Set all fans mode',
           '    vnt emergency          Emergency purge (max airflow)',
+          '    vnt fold               Fold device panel',
+          '    vnt unfold             Unfold device panel',
+          '    vnt toggle             Toggle fold state',
           '    vnt info               Full documentation',
           '',
           '  FAN COMMANDS:',
@@ -8174,6 +8605,21 @@ const vntCommand: Command = {
       }
     }
 
+    // FOLD commands
+    if (action === 'fold') {
+      vntDevice?.setExpanded(false)
+      return { success: true, output: ['', '  VNT-001 panel folded.', ''] }
+    }
+    if (action === 'unfold' || action === 'expand') {
+      vntDevice?.setExpanded(true)
+      return { success: true, output: ['', '  VNT-001 panel unfolded.', ''] }
+    }
+    if (action === 'toggle') {
+      const current = vntDevice?.getState().isExpanded ?? true
+      vntDevice?.setExpanded(!current)
+      return { success: true, output: ['', `  VNT-001 panel ${current ? 'folded' : 'unfolded'}.`, ''] }
+    }
+
     // INFO command
     if (action === 'info' || action === 'help' || action === 'doc') {
       return {
@@ -8224,6 +8670,9 @@ const vntCommand: Command = {
           '    vnt test                - Run fan diagnostics',
           '    vnt reset               - Reboot controller',
           '    vnt fan <cpu|gpu> <cmd> - Control individual fan',
+          '    vnt fold                - Fold device panel',
+          '    vnt unfold              - Unfold device panel',
+          '    vnt toggle              - Toggle fold state',
           '',
           '  LOCATION IN unOS:',
           '    /sys/devices/vnt-001/',
@@ -8313,7 +8762,7 @@ const scaCommand: Command = {
   name: 'sca',
   aliases: ['super', 'supercomputer', 'sca001', 'cluster'],
   description: 'Supercomputer Array management (SCA-001)',
-  usage: 'sca [status|power|firmware|test|reset|info]',
+  usage: 'sca [status|power|firmware|test|reset|fold|unfold|toggle|info]',
   execute: async (args, ctx) => {
     const scaDevice = ctx.data.scaDevice
     const action = args[0]?.toLowerCase()
@@ -8368,6 +8817,9 @@ const scaCommand: Command = {
           '    sca firmware        View firmware info',
           '    sca test            Run cluster diagnostics',
           '    sca reset           Reboot cluster',
+          '    sca fold            Fold device panel',
+          '    sca unfold          Unfold device panel',
+          '    sca toggle          Toggle fold state',
           '    sca info            Full documentation',
           '',
           '  EXAMPLES:',
@@ -8710,6 +9162,21 @@ const scaCommand: Command = {
       }
     }
 
+    // FOLD commands
+    if (action === 'fold') {
+      scaDevice?.setExpanded(false)
+      return { success: true, output: ['', '  SCA-001 panel folded.', ''] }
+    }
+    if (action === 'unfold' || action === 'expand') {
+      scaDevice?.setExpanded(true)
+      return { success: true, output: ['', '  SCA-001 panel unfolded.', ''] }
+    }
+    if (action === 'toggle') {
+      const current = scaDevice?.getState().isExpanded ?? true
+      scaDevice?.setExpanded(!current)
+      return { success: true, output: ['', `  SCA-001 panel ${current ? 'folded' : 'unfolded'}.`, ''] }
+    }
+
     // INFO command
     if (action === 'info' || action === 'help' || action === 'doc') {
       return {
@@ -8762,6 +9229,9 @@ const scaCommand: Command = {
           '    sca firmware            - View firmware info',
           '    sca test                - Run cluster diagnostics',
           '    sca reset               - Reboot cluster',
+          '    sca fold                - Fold device panel',
+          '    sca unfold              - Unfold device panel',
+          '    sca toggle              - Toggle fold state',
           '',
           '  LOCATION IN unOS:',
           '    /sys/devices/sca-001/',
@@ -8788,7 +9258,7 @@ const exdCommand: Command = {
   name: 'exd',
   aliases: ['drone', 'explorer', 'exd001'],
   description: 'Explorer Drone management (EXD-001)',
-  usage: 'exd [status|power|firmware|test|reset|deploy|recall|info]',
+  usage: 'exd [status|power|firmware|test|reset|deploy|recall|fold|unfold|toggle|info]',
   execute: async (args, ctx) => {
     const exdDevice = ctx.data.exdDevice
     const action = args[0]?.toLowerCase()
@@ -8844,6 +9314,9 @@ const exdCommand: Command = {
           '    exd reset            Reboot drone systems',
           '    exd deploy           Deploy drone to field',
           '    exd recall           Recall drone to dock',
+          '    exd fold             Fold device panel',
+          '    exd unfold           Unfold device panel',
+          '    exd toggle           Toggle fold state',
           '    exd info             Full documentation',
           '',
           '  EXAMPLES:',
@@ -9106,6 +9579,21 @@ const exdCommand: Command = {
           '',
         ],
       }
+    }
+
+    // FOLD commands
+    if (action === 'fold') {
+      exdDevice?.setExpanded(false)
+      return { success: true, output: ['', '  EXD-001 panel folded.', ''] }
+    }
+    if (action === 'unfold' || action === 'expand') {
+      exdDevice?.setExpanded(true)
+      return { success: true, output: ['', '  EXD-001 panel unfolded.', ''] }
+    }
+    if (action === 'toggle') {
+      const current = exdDevice?.getState().isExpanded ?? true
+      exdDevice?.setExpanded(!current)
+      return { success: true, output: ['', `  EXD-001 panel ${current ? 'folded' : 'unfolded'}.`, ''] }
     }
 
     // INFO command
@@ -10619,6 +11107,9 @@ const btkCommand: Command = {
         '  btk config     View configuration',
         '  btk tools      Tool status',
         '  btk reboot     Reboot device',
+        '  btk fold       Fold to compact view',
+        '  btk unfold     Unfold to full view',
+        '  btk toggle     Toggle fold state',
         '',
       ]}
     }
@@ -10713,7 +11204,20 @@ const btkCommand: Command = {
       return { success: true, output: ['[btk] Reboot complete'] }
     }
 
-    return { success: false, output: [`[btk] Unknown subcommand: ${sub}`, 'Usage: btk <status|firmware|test|config|tools|reboot>'] }
+    if (sub === 'fold') {
+      device.setExpanded(false)
+      return { success: true, output: ['', '[BTK-001] Device folded to compact view', ''] }
+    }
+    if (sub === 'unfold') {
+      device.setExpanded(true)
+      return { success: true, output: ['', '[BTK-001] Device unfolded to full view', ''] }
+    }
+    if (sub === 'toggle') {
+      device.toggleExpanded()
+      return { success: true, output: ['', '[BTK-001] Device view toggled', ''] }
+    }
+
+    return { success: false, output: [`[btk] Unknown subcommand: ${sub}`, 'Usage: btk <status|firmware|test|config|tools|reboot|fold|unfold|toggle>'] }
   }
 }
 
@@ -10722,7 +11226,7 @@ const pwbCommand: Command = {
   name: 'pwb',
   aliases: ['workbench', 'bench'],
   description: 'Portable Workbench management',
-  usage: 'pwb <status|firmware|test|config|slots|reboot>',
+  usage: 'pwb <status|firmware|test|config|slots|reboot|fold|unfold|toggle>',
   execute: async (args, ctx) => {
     const device = ctx.data.pwbDevice
     if (!device) {
@@ -10730,6 +11234,19 @@ const pwbCommand: Command = {
     }
 
     const sub = args[0]?.toLowerCase()
+
+    if (sub === 'fold') {
+      device.setExpanded(false)
+      return { success: true, output: ['[pwb] Device folded'] }
+    }
+    if (sub === 'unfold') {
+      device.setExpanded(true)
+      return { success: true, output: ['[pwb] Device unfolded'] }
+    }
+    if (sub === 'toggle') {
+      device.toggleExpanded()
+      return { success: true, output: ['[pwb] Fold state toggled'] }
+    }
 
     if (!sub || sub === 'help') {
       return { success: true, output: [
@@ -10742,6 +11259,9 @@ const pwbCommand: Command = {
         '  pwb config     View configuration',
         '  pwb slots      Slot status',
         '  pwb reboot     Reboot device',
+        '  pwb fold       Fold to compact view',
+        '  pwb unfold     Unfold to full view',
+        '  pwb toggle     Toggle fold state',
         '',
       ]}
     }
@@ -10840,7 +11360,7 @@ const pwbCommand: Command = {
       return { success: true, output: ['[pwb] Reboot complete'] }
     }
 
-    return { success: false, output: [`[pwb] Unknown subcommand: ${sub}`, 'Usage: pwb <status|firmware|test|config|slots|reboot>'] }
+    return { success: false, output: [`[pwb] Unknown subcommand: ${sub}`, 'Usage: pwb <status|firmware|test|config|slots|reboot|fold|unfold|toggle>'] }
   }
 }
 
@@ -10860,7 +11380,9 @@ const rmgCommand: Command = {
         '  rmg status     Device status', '  rmg firmware   Firmware info',
         '  rmg test       Run diagnostics', '  rmg config     View configuration',
         '  rmg field      Field status', '  rmg strength   Set strength (0-100)',
-        '  rmg reboot     Reboot device', '',
+        '  rmg reboot     Reboot device',
+        '  rmg fold       Fold to compact view', '  rmg unfold     Unfold to full view',
+        '  rmg toggle     Toggle fold state', '',
       ]}
     }
     const state = device.getState()
@@ -10932,7 +11454,19 @@ const rmgCommand: Command = {
       await device.reboot()
       return { success: true, output: ['[rmg] Reboot complete'] }
     }
-    return { success: false, output: [`[rmg] Unknown subcommand: ${sub}`, 'Usage: rmg <status|firmware|test|config|field|strength|reboot>'] }
+    if (sub === 'fold') {
+      device.setExpanded(false)
+      return { success: true, output: ['', '[RMG-001] Device folded to compact view', ''] }
+    }
+    if (sub === 'unfold') {
+      device.setExpanded(true)
+      return { success: true, output: ['', '[RMG-001] Device unfolded to full view', ''] }
+    }
+    if (sub === 'toggle') {
+      device.toggleExpanded()
+      return { success: true, output: ['', '[RMG-001] Device view toggled', ''] }
+    }
+    return { success: false, output: [`[rmg] Unknown subcommand: ${sub}`, 'Usage: rmg <status|firmware|test|config|field|strength|reboot|fold|unfold|toggle>'] }
   }
 }
 
@@ -10950,7 +11484,9 @@ const mscCommand: Command = {
         '', '  MSC-001 Material Scanner', '  ─────────────────────────────',
         '  msc status     Device status', '  msc firmware   Firmware info',
         '  msc test       Run diagnostics', '  msc config     View configuration',
-        '  msc reboot     Reboot device', '',
+        '  msc reboot     Reboot device',
+        '  msc fold       Fold to compact view', '  msc unfold     Unfold to full view',
+        '  msc toggle     Toggle fold state', '',
       ]}
     }
     const state = device.getState()
@@ -11006,8 +11542,1403 @@ const mscCommand: Command = {
       await device.reboot()
       return { success: true, output: ['[msc] Reboot complete'] }
     }
-    return { success: false, output: [`[msc] Unknown subcommand: ${sub}`, 'Usage: msc <status|firmware|test|config|reboot>'] }
+    if (sub === 'fold') {
+      device.setExpanded(false)
+      return { success: true, output: ['', '[MSC-001] Device folded to compact view', ''] }
+    }
+    if (sub === 'unfold') {
+      device.setExpanded(true)
+      return { success: true, output: ['', '[MSC-001] Device unfolded to full view', ''] }
+    }
+    if (sub === 'toggle') {
+      device.toggleExpanded()
+      return { success: true, output: ['', '[MSC-001] Device view toggled', ''] }
+    }
+    return { success: false, output: [`[msc] Unknown subcommand: ${sub}`, 'Usage: msc <status|firmware|test|config|reboot|fold|unfold|toggle>'] }
   }
+}
+
+// ──────────────────────────────────────────────────────
+// TMP — Temperature Monitor management
+// ──────────────────────────────────────────────────────
+
+const tmpCommand: Command = {
+  name: 'tmp',
+  aliases: ['temperature'],
+  description: 'Temperature Monitor management',
+  usage: 'tmp <status|firmware|test|config|reboot|fold|unfold|toggle>',
+  execute: async (args, ctx) => {
+    const device = ctx.data.tmpDevice
+    if (!device) return { success: false, output: ['[tmp] Device not connected'] }
+    const sub = args[0]?.toLowerCase()
+    if (sub === 'fold') {
+      device.setExpanded(false)
+      return { success: true, output: ['[tmp] Device folded'] }
+    }
+    if (sub === 'unfold') {
+      device.setExpanded(true)
+      return { success: true, output: ['[tmp] Device unfolded'] }
+    }
+    if (sub === 'toggle') {
+      device.toggleExpanded()
+      return { success: true, output: ['[tmp] Fold state toggled'] }
+    }
+    if (!sub || sub === 'help') {
+      return { success: true, output: [
+        '', '  TMP-001 Temperature Monitor', '  ─────────────────────────────',
+        '  tmp status     Device status', '  tmp firmware   Firmware info',
+        '  tmp test       Run diagnostics', '  tmp config     View configuration',
+        '  tmp reboot     Reboot device',
+        '  tmp fold       Fold to compact view', '  tmp unfold     Unfold to full view',
+        '  tmp toggle     Toggle fold state', '',
+      ]}
+    }
+    const state = device.getState()
+    if (sub === 'status') {
+      const fw = device.getFirmware()
+      return { success: true, output: [
+        '', '  ┌─ TMP-001 STATUS ────────────────┐',
+        `  │ State:    ${state.deviceState.toUpperCase().padEnd(22)}│`,
+        `  │ Power:    ${state.isPowered ? 'ON' : 'OFF'}${' '.repeat(state.isPowered ? 20 : 19)}│`,
+        `  │ Draw:     ${state.currentDraw.toFixed(1)} E/s${' '.repeat(17 - state.currentDraw.toFixed(1).length)}│`,
+        `  │ Firmware: v${fw.version}${' '.repeat(20 - fw.version.length)}│`,
+        `  │ Temp:     ${(state.temperature.toFixed(1) + '°C').padEnd(22)}│`,
+        `  │ Range:    ${(state.minTemp + '–' + state.maxTemp + '°C').padEnd(22)}│`,
+        '  └──────────────────────────────────┘', '',
+      ]}
+    }
+    if (sub === 'firmware') {
+      const sub2 = args[1]?.toLowerCase()
+      const fw = device.getFirmware()
+      if (sub2 === 'update') {
+        if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[tmp] Device must be online to update firmware'] }
+        ctx.addOutput('[tmp] Checking for firmware updates...')
+        await new Promise(r => setTimeout(r, 800))
+        ctx.addOutput('[tmp] Current version: v' + fw.version)
+        await new Promise(r => setTimeout(r, 500))
+        ctx.addOutput('[tmp] No updates available. Firmware is up to date.')
+        return { success: true }
+      }
+      return { success: true, output: [
+        '', '  TMP-001 FIRMWARE', '  ─────────────────────────────',
+        `  Version:  v${fw.version}`, `  Build:    ${fw.build}`,
+        `  Checksum: ${fw.checksum}`, `  Patch:    ${fw.securityPatch}`,
+        `  Features: ${fw.features.join(', ')}`, '',
+      ]}
+    }
+    if (sub === 'test' || sub === 'diag') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[tmp] Device must be online to run diagnostics'] }
+      ctx.addOutput('[tmp] Starting diagnostics...')
+      await device.runTest()
+      return { success: true, output: ['[tmp] Diagnostics complete — ALL PASSED'] }
+    }
+    if (sub === 'config') {
+      const ps = device.getPowerSpecs()
+      return { success: true, output: [
+        '', '  TMP-001 CONFIGURATION', '  ─────────────────────────────',
+        `  Category: ${ps.category}`, `  Priority: ${ps.priority}`,
+        `  Power Full:    ${ps.full} E/s`, `  Power Idle:    ${ps.idle} E/s`,
+        `  Power Standby: ${ps.standby} E/s`, '',
+      ]}
+    }
+    if (sub === 'reboot') {
+      if (!state.isPowered) return { success: false, output: ['[tmp] Device is not powered on'] }
+      ctx.addOutput('[tmp] Rebooting TMP-001...')
+      await device.reboot()
+      return { success: true, output: ['[tmp] Reboot complete'] }
+    }
+    return { success: false, output: [`[tmp] Unknown subcommand: ${sub}`, 'Usage: tmp <status|firmware|test|config|reboot|fold|unfold|toggle>'] }
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// CLK — Lab Clock management
+// ──────────────────────────────────────────────────────
+
+const clkCommand: Command = {
+  name: 'clk',
+  aliases: ['clock'],
+  description: 'CLK-001 Lab Clock management',
+  usage: 'clk <status|firmware|test|config|mode|reboot|fold|unfold|toggle>',
+  execute: async (args, ctx) => {
+    const device = ctx.data.clkDevice
+    if (!device) return { success: false, output: ['[clk] CLK-001 not connected'] }
+    const sub = args[0]?.toLowerCase()
+    if (sub === 'fold') { device.setExpanded(false); return { success: true, output: ['[clk] Device folded'] } }
+    if (sub === 'unfold') { device.setExpanded(true); return { success: true, output: ['[clk] Device unfolded'] } }
+    if (sub === 'toggle') { device.toggleExpanded(); return { success: true, output: ['[clk] Fold state toggled'] } }
+    if (!sub || sub === 'help') {
+      return { success: true, output: [
+        '', '  CLK-001 Lab Clock', '  ─────────────────────────────',
+        '  clk status     Device status', '  clk firmware   Firmware info',
+        '  clk test       Run diagnostics', '  clk config     View configuration',
+        '  clk mode       Cycle display mode', '  clk reboot     Reboot device',
+        '  clk fold       Fold to compact view', '  clk unfold     Unfold to full view',
+        '  clk toggle     Toggle fold state', '',
+      ]}
+    }
+    const state = device.getState()
+    if (sub === 'status') {
+      const fw = device.getFirmware()
+      const modeLabel = state.displayMode.toUpperCase()
+      return { success: true, output: [
+        '', '  ┌─ CLK-001 STATUS ────────────────┐',
+        `  │ State:       ${state.deviceState.toUpperCase().padEnd(19)}│`,
+        `  │ Power:       ${(state.isPowered ? 'ON' : 'OFF').padEnd(19)}│`,
+        `  │ Draw:        ${(state.currentDraw.toFixed(2) + ' E/s').padEnd(19)}│`,
+        `  │ Firmware:    v${fw.version.padEnd(17)}│`,
+        `  │ Mode:        ${modeLabel.padEnd(19)}│`,
+        `  │ Uptime:      ${(state.uptime + 's').padEnd(19)}│`,
+        `  │ RTC Sync:    ${'OK'.padEnd(19)}│`,
+        '  └──────────────────────────────────┘', '',
+      ]}
+    }
+    if (sub === 'firmware') {
+      const sub2 = args[1]?.toLowerCase()
+      const fw = device.getFirmware()
+      if (sub2 === 'update') {
+        if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[clk] Device must be online to update firmware'] }
+        ctx.addOutput('[clk] Checking for firmware updates...')
+        await new Promise(r => setTimeout(r, 800))
+        ctx.addOutput('[clk] Current version: v' + fw.version)
+        await new Promise(r => setTimeout(r, 500))
+        ctx.addOutput('[clk] No updates available. Firmware is up to date.')
+        return { success: true }
+      }
+      return { success: true, output: [
+        '', '  CLK-001 FIRMWARE', '  ─────────────────────────────',
+        `  Version:  v${fw.version}`, `  Build:    ${fw.build}`,
+        `  Checksum: ${fw.checksum}`, `  Patch:    ${fw.securityPatch}`,
+        `  Features: ${fw.features.join(', ')}`, '',
+      ]}
+    }
+    if (sub === 'test' || sub === 'diag') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[clk] Device must be online to run diagnostics'] }
+      ctx.addOutput('[clk] Starting diagnostics...')
+      await device.runTest()
+      return { success: true, output: ['[clk] Diagnostics complete — ALL PASSED'] }
+    }
+    if (sub === 'config') {
+      const ps = device.getPowerSpecs()
+      return { success: true, output: [
+        '', '  CLK-001 CONFIGURATION', '  ─────────────────────────────',
+        `  Category: ${ps.category}`, `  Priority: ${ps.priority}`,
+        `  Power Full:    ${ps.full} E/s`, `  Power Idle:    ${ps.idle} E/s`,
+        `  Power Standby: ${ps.standby} E/s`,
+        `  Crystal:       32.768 kHz`,
+        `  NTP Server:    time.unos.local`,
+        `  Drift Comp:    Auto`,
+        `  Modes:         LOCAL, UTC, DATE, UPTIME, COUNTDOWN, STOPWATCH`, '',
+      ]}
+    }
+    if (sub === 'mode') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[clk] Device must be online to change mode'] }
+      const modeName = args[1]?.toLowerCase()
+      const validModes = ['local', 'utc', 'date', 'uptime', 'countdown', 'stopwatch']
+      if (modeName && validModes.includes(modeName)) {
+        device.setMode(modeName as any)
+        return { success: true, output: [`[clk] Mode set to ${modeName.toUpperCase()}`] }
+      }
+      device.cycleMode()
+      return { success: true, output: [`[clk] Mode cycled`] }
+    }
+    if (sub === 'reboot') {
+      if (!state.isPowered) return { success: false, output: ['[clk] Device is not powered on'] }
+      ctx.addOutput('[clk] Rebooting CLK-001...')
+      await device.reboot()
+      return { success: true, output: ['[clk] Reboot complete'] }
+    }
+    return { success: false, output: [`[clk] Unknown subcommand: ${sub}`, 'Usage: clk <status|firmware|test|config|mode|reboot|fold|unfold|toggle>'] }
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// CPU — CPU Monitor management
+// ──────────────────────────────────────────────────────
+
+const cpuCommand: Command = {
+  name: 'cpu',
+  aliases: ['processor'],
+  description: 'CPU-001 CPU Monitor management',
+  usage: 'cpu <status|firmware|test|config|reboot|fold|unfold|toggle>',
+  execute: async (args, ctx) => {
+    const device = ctx.data.cpuDevice
+    if (!device) return { success: false, output: ['[cpu] CPU-001 not connected'] }
+    const sub = args[0]?.toLowerCase()
+    if (sub === 'fold') { device.setExpanded(false); return { success: true, output: ['[cpu] Device folded'] } }
+    if (sub === 'unfold') { device.setExpanded(true); return { success: true, output: ['[cpu] Device unfolded'] } }
+    if (sub === 'toggle') { device.toggleExpanded(); return { success: true, output: ['[cpu] Fold state toggled'] } }
+    if (!sub || sub === 'help') {
+      return { success: true, output: [
+        '', '  CPU-001 CPU Monitor', '  ─────────────────────────────',
+        '  cpu status     Device status', '  cpu firmware   Firmware info',
+        '  cpu test       Run diagnostics', '  cpu config     View configuration',
+        '  cpu reboot     Reboot device',
+        '  cpu fold       Fold to compact view', '  cpu unfold     Unfold to full view',
+        '  cpu toggle     Toggle fold state', '',
+      ]}
+    }
+    const state = device.getState()
+    if (sub === 'status') {
+      const fw = device.getFirmware()
+      const avgLoad = state.coreLoads.length > 0 ? Math.round(state.coreLoads.reduce((a: number, b: number) => a + b, 0) / state.coreLoads.length) : 0
+      const tempColor = state.temperature > 80 ? '\x1b[31m' : state.temperature > 65 ? '\x1b[33m' : '\x1b[32m'
+      const loadColor = avgLoad > 80 ? '\x1b[31m' : avgLoad > 50 ? '\x1b[33m' : '\x1b[32m'
+      const reset = '\x1b[0m'
+      return { success: true, output: [
+        '', '  ┌─ CPU-001 STATUS ────────────────┐',
+        `  │ State:       ${state.deviceState.toUpperCase().padEnd(19)}│`,
+        `  │ Power:       ${(state.isPowered ? 'ON' : 'OFF').padEnd(19)}│`,
+        `  │ Draw:        ${(state.currentDraw.toFixed(1) + ' E/s').padEnd(19)}│`,
+        `  │ Firmware:    v${fw.version.padEnd(17)}│`,
+        `  │ Cores:       ${String(state.cores).padEnd(19)}│`,
+        `  │ Frequency:   ${(state.frequency.toFixed(1) + ' GHz').padEnd(19)}│`,
+        `  │ Avg Load:    ${loadColor}${(avgLoad + '%').padEnd(19)}${reset}│`,
+        `  │ Temperature: ${tempColor}${(state.temperature.toFixed(0) + '°C').padEnd(19)}${reset}│`,
+        '  └──────────────────────────────────┘', '',
+      ]}
+    }
+    if (sub === 'firmware') {
+      const sub2 = args[1]?.toLowerCase()
+      const fw = device.getFirmware()
+      if (sub2 === 'update') {
+        if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[cpu] Device must be online to update firmware'] }
+        ctx.addOutput('[cpu] Checking for firmware updates...')
+        await new Promise(r => setTimeout(r, 800))
+        ctx.addOutput('[cpu] Current version: v' + fw.version)
+        await new Promise(r => setTimeout(r, 500))
+        ctx.addOutput('[cpu] No updates available. Firmware is up to date.')
+        return { success: true }
+      }
+      return { success: true, output: [
+        '', '  CPU-001 FIRMWARE', '  ─────────────────────────────',
+        `  Version:  v${fw.version}`, `  Build:    ${fw.build}`,
+        `  Checksum: ${fw.checksum}`, `  Patch:    ${fw.securityPatch}`,
+        `  Features: ${fw.features.join(', ')}`, '',
+      ]}
+    }
+    if (sub === 'test' || sub === 'diag') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[cpu] Device must be online to run diagnostics'] }
+      ctx.addOutput('[cpu] Starting diagnostics...')
+      await device.runTest()
+      return { success: true, output: ['[cpu] Diagnostics complete — ALL PASSED'] }
+    }
+    if (sub === 'config') {
+      const ps = device.getPowerSpecs()
+      return { success: true, output: [
+        '', '  CPU-001 CONFIGURATION', '  ─────────────────────────────',
+        `  Category: ${ps.category}`, `  Priority: ${ps.priority}`,
+        `  Power Full:    ${ps.full} E/s`, `  Power Idle:    ${ps.idle} E/s`,
+        `  Power Standby: ${ps.standby} E/s`,
+        `  Cores:         ${state.cores}`,
+        `  Base Freq:     ${state.frequency.toFixed(1)} GHz`,
+        `  Thermal Limit: 95°C`,
+        `  Cache L1:      64 KB/core`,
+        `  Cache L2:      512 KB/core`, '',
+      ]}
+    }
+    if (sub === 'reboot') {
+      if (!state.isPowered) return { success: false, output: ['[cpu] Device is not powered on'] }
+      ctx.addOutput('[cpu] Rebooting CPU-001...')
+      await device.reboot()
+      return { success: true, output: ['[cpu] Reboot complete'] }
+    }
+    return { success: false, output: [`[cpu] Unknown subcommand: ${sub}`, 'Usage: cpu <status|firmware|test|config|reboot|fold|unfold|toggle>'] }
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// MEM — Memory Monitor management
+// ──────────────────────────────────────────────────────
+
+const memCommand: Command = {
+  name: 'mem',
+  aliases: ['memory', 'ram'],
+  description: 'Memory Monitor device management',
+  usage: 'mem [status|firmware|test|config|mode|reboot|fold|unfold|toggle]',
+  execute: async (args, ctx) => {
+    const device = ctx.data.memDevice
+    if (!device) return { success: false, output: ['[mem] MEM-001 not connected'] }
+    const sub = args[0]?.toLowerCase()
+    if (sub === 'fold') { device.setExpanded(false); return { success: true, output: ['[mem] Device folded'] } }
+    if (sub === 'unfold') { device.setExpanded(true); return { success: true, output: ['[mem] Device unfolded'] } }
+    if (sub === 'toggle') { device.toggleExpanded(); return { success: true, output: ['[mem] Fold state toggled'] } }
+    if (!sub || sub === 'help') {
+      return { success: true, output: [
+        '', '  MEM-001 Memory Monitor', '  ─────────────────────────────',
+        '  mem status     Device status', '  mem firmware   Firmware info',
+        '  mem test       Run diagnostics', '  mem config     View configuration',
+        '  mem mode       Cycle display mode', '  mem reboot     Reboot device',
+        '  mem fold       Fold to compact view', '  mem unfold     Unfold to full view',
+        '  mem toggle     Toggle fold state', '',
+      ]}
+    }
+    const state = device.getState()
+    if (sub === 'status') {
+      const fw = device.getFirmware()
+      const modeLabel = state.displayMode.toUpperCase()
+      const usedPct = state.totalMemory > 0 ? Math.round((state.usedMemory / state.totalMemory) * 100) : 0
+      const usedColor = usedPct > 80 ? '\x1b[31m' : usedPct > 50 ? '\x1b[33m' : '\x1b[32m'
+      const reset = '\x1b[0m'
+      return { success: true, output: [
+        '', '  ┌─ MEM-001 STATUS ────────────────┐',
+        `  │ State:       ${state.deviceState.toUpperCase().padEnd(19)}│`,
+        `  │ Power:       ${(state.isPowered ? 'ON' : 'OFF').padEnd(19)}│`,
+        `  │ Draw:        ${(state.currentDraw.toFixed(2) + ' E/s').padEnd(19)}│`,
+        `  │ Firmware:    v${fw.version.padEnd(17)}│`,
+        `  │ Mode:        ${modeLabel.padEnd(19)}│`,
+        `  │ Total Mem:   ${(state.totalMemory + ' MB').padEnd(19)}│`,
+        `  │ Used Mem:    ${usedColor}${(state.usedMemory + ' MB (' + usedPct + '%)').padEnd(19)}${reset}│`,
+        '  └──────────────────────────────────┘', '',
+      ]}
+    }
+    if (sub === 'firmware') {
+      const sub2 = args[1]?.toLowerCase()
+      const fw = device.getFirmware()
+      if (sub2 === 'update') {
+        if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[mem] Device must be online to update firmware'] }
+        ctx.addOutput('[mem] Checking for firmware updates...')
+        await new Promise(r => setTimeout(r, 800))
+        ctx.addOutput('[mem] Current version: v' + fw.version)
+        await new Promise(r => setTimeout(r, 500))
+        ctx.addOutput('[mem] No updates available. Firmware is up to date.')
+        return { success: true }
+      }
+      return { success: true, output: [
+        '', '  MEM-001 FIRMWARE', '  ─────────────────────────────',
+        `  Version:  v${fw.version}`, `  Build:    ${fw.build}`,
+        `  Checksum: ${fw.checksum}`, `  Patch:    ${fw.securityPatch}`,
+        `  Features: ${fw.features.join(', ')}`, '',
+      ]}
+    }
+    if (sub === 'test' || sub === 'diag') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[mem] Device must be online to run diagnostics'] }
+      ctx.addOutput('[mem] Starting diagnostics...')
+      await device.runTest()
+      return { success: true, output: ['[mem] Diagnostics complete — ALL PASSED'] }
+    }
+    if (sub === 'config') {
+      const ps = device.getPowerSpecs()
+      return { success: true, output: [
+        '', '  MEM-001 CONFIGURATION', '  ─────────────────────────────',
+        `  Category: ${ps.category}`, `  Priority: ${ps.priority}`,
+        `  Power Full:    ${ps.full} E/s`, `  Power Idle:    ${ps.idle} E/s`,
+        `  Power Standby: ${ps.standby} E/s`,
+        `  Total Memory:  ${state.totalMemory} MB`,
+        `  Used Memory:   ${state.usedMemory} MB`,
+        `  Display Mode:  ${state.displayMode.toUpperCase()}`,
+        `  Current Draw:  ${state.currentDraw.toFixed(2)} E/s`,
+        `  Modes:         USAGE, HEAP, CACHE, SWAP, PROCESSES, ALLOCATION`, '',
+      ]}
+    }
+    if (sub === 'mode') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[mem] Device must be online to change mode'] }
+      const modeName = args[1]?.toLowerCase()
+      const validModes = ['usage', 'heap', 'cache', 'swap', 'processes', 'allocation']
+      if (modeName && validModes.includes(modeName)) {
+        device.setMode(modeName as any)
+        return { success: true, output: [`[mem] Mode set to ${modeName.toUpperCase()}`] }
+      }
+      device.cycleMode()
+      return { success: true, output: [`[mem] Mode cycled`] }
+    }
+    if (sub === 'reboot') {
+      if (!state.isPowered) return { success: false, output: ['[mem] Device is not powered on'] }
+      ctx.addOutput('[mem] Rebooting MEM-001...')
+      await device.reboot()
+      return { success: true, output: ['[mem] Reboot complete'] }
+    }
+    return { success: false, output: [`[mem] Unknown subcommand: ${sub}`, 'Usage: mem [status|firmware|test|config|mode|reboot|fold|unfold|toggle]'] }
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// AND — Anomaly Detector management
+// ──────────────────────────────────────────────────────
+
+const andCommand: Command = {
+  name: 'and',
+  aliases: ['anomaly', 'detector'],
+  description: 'AND-001 Anomaly Detector management',
+  usage: 'and [status|firmware|test|config|mode|signal|reboot|fold|unfold|toggle]',
+  execute: async (args, ctx) => {
+    const device = ctx.data.andDevice
+    if (!device) return { success: false, output: ['[and] AND-001 not connected'] }
+    const sub = args[0]?.toLowerCase()
+    if (sub === 'fold') { device.setExpanded(false); return { success: true, output: ['[and] Device folded'] } }
+    if (sub === 'unfold') { device.setExpanded(true); return { success: true, output: ['[and] Device unfolded'] } }
+    if (sub === 'toggle') { device.toggleExpanded(); return { success: true, output: ['[and] Fold state toggled'] } }
+    if (!sub || sub === 'help') {
+      return { success: true, output: [
+        '', '  AND-001 Anomaly Detector', '  ─────────────────────────────',
+        '  and status     Device status', '  and firmware   Firmware info',
+        '  and test       Run diagnostics', '  and config     View configuration',
+        '  and mode       Cycle display mode', '  and signal     Set signal strength',
+        '  and reboot     Reboot device',
+        '  and fold       Fold to compact view', '  and unfold     Unfold to full view',
+        '  and toggle     Toggle fold state', '',
+      ]}
+    }
+    const state = device.getState()
+    if (sub === 'status') {
+      const fw = device.getFirmware()
+      const modeLabel = state.displayMode.toUpperCase()
+      const signalPct = state.signalStrength ?? 0
+      const signalColor = signalPct > 60 ? '\x1b[32m' : signalPct > 30 ? '\x1b[33m' : '\x1b[31m'
+      const anomalyCount = state.anomaliesFound ?? 0
+      const anomalyColor = anomalyCount > 0 ? '\x1b[31m' : '\x1b[32m'
+      const reset = '\x1b[0m'
+      return { success: true, output: [
+        '', '  ┌─ AND-001 STATUS ────────────────┐',
+        `  │ State:       ${state.deviceState.toUpperCase().padEnd(19)}│`,
+        `  │ Power:       ${(state.isPowered ? 'ON' : 'OFF').padEnd(19)}│`,
+        `  │ Draw:        ${(state.currentDraw.toFixed(2) + ' E/s').padEnd(19)}│`,
+        `  │ Firmware:    v${fw.version.padEnd(17)}│`,
+        `  │ Mode:        ${modeLabel.padEnd(19)}│`,
+        `  │ Signal:      ${signalColor}${(signalPct + '%').padEnd(19)}${reset}│`,
+        `  │ Anomalies:   ${anomalyColor}${String(anomalyCount).padEnd(19)}${reset}│`,
+        '  └──────────────────────────────────┘', '',
+      ]}
+    }
+    if (sub === 'firmware') {
+      const sub2 = args[1]?.toLowerCase()
+      const fw = device.getFirmware()
+      if (sub2 === 'update') {
+        if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[and] Device must be online to update firmware'] }
+        ctx.addOutput('[and] Checking for firmware updates...')
+        await new Promise(r => setTimeout(r, 800))
+        ctx.addOutput('[and] Current version: v' + fw.version)
+        await new Promise(r => setTimeout(r, 500))
+        ctx.addOutput('[and] No updates available. Firmware is up to date.')
+        return { success: true }
+      }
+      return { success: true, output: [
+        '', '  AND-001 FIRMWARE', '  ─────────────────────────────',
+        `  Version:  v${fw.version}`, `  Build:    ${fw.build}`,
+        `  Checksum: ${fw.checksum}`, `  Patch:    ${fw.securityPatch}`,
+        `  Features: ${fw.features.join(', ')}`, '',
+      ]}
+    }
+    if (sub === 'test' || sub === 'diag') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[and] Device must be online to run diagnostics'] }
+      ctx.addOutput('[and] Starting diagnostics...')
+      await device.runTest()
+      return { success: true, output: ['[and] Diagnostics complete — ALL PASSED'] }
+    }
+    if (sub === 'config') {
+      const ps = device.getPowerSpecs()
+      return { success: true, output: [
+        '', '  AND-001 CONFIGURATION', '  ─────────────────────────────',
+        `  Category: ${ps.category}`, `  Priority: ${ps.priority}`,
+        `  Power Full:    ${ps.full} E/s`, `  Power Idle:    ${ps.idle} E/s`,
+        `  Power Standby: ${ps.standby} E/s`,
+        `  Signal Strength: ${state.signalStrength ?? 0}%`,
+        `  Anomalies Found: ${state.anomaliesFound ?? 0}`,
+        `  Display Mode:  ${state.displayMode.toUpperCase()}`,
+        `  Current Draw:  ${state.currentDraw.toFixed(2)} E/s`,
+        `  Modes:         WAVEFORM, SPECTRUM, HEATMAP, TIMELINE, FREQUENCY, RADAR`, '',
+      ]}
+    }
+    if (sub === 'mode') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[and] Device must be online to change mode'] }
+      const modeName = args[1]?.toLowerCase()
+      const validModes = ['waveform', 'spectrum', 'heatmap', 'timeline', 'frequency', 'radar']
+      if (modeName && validModes.includes(modeName)) {
+        device.setMode(modeName as any)
+        return { success: true, output: [`[and] Mode set to ${modeName.toUpperCase()}`] }
+      }
+      device.cycleMode()
+      return { success: true, output: [`[and] Mode cycled`] }
+    }
+    if (sub === 'signal') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[and] Device must be online to set signal strength'] }
+      const val = parseInt(args[1], 10)
+      if (isNaN(val) || val < 0 || val > 100) return { success: false, output: ['[and] Signal strength must be 0-100'] }
+      device.setSignalStrength(val)
+      return { success: true, output: [`[and] Signal strength set to ${val}%`] }
+    }
+    if (sub === 'reboot') {
+      if (!state.isPowered) return { success: false, output: ['[and] Device is not powered on'] }
+      ctx.addOutput('[and] Rebooting AND-001...')
+      await device.reboot()
+      return { success: true, output: ['[and] Reboot complete'] }
+    }
+    return { success: false, output: [`[and] Unknown subcommand: ${sub}`, 'Usage: and [status|firmware|test|config|mode|signal|reboot|fold|unfold|toggle]'] }
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// QCP — Quantum Compass management
+// ──────────────────────────────────────────────────────
+
+const qcpCommand: Command = {
+  name: 'qcp',
+  aliases: ['compass', 'qcompass'],
+  description: 'QCP-001 Quantum Compass management',
+  usage: 'qcp [status|firmware|test|config|mode|bearing|distance|reboot|fold|unfold|toggle]',
+  execute: async (args, ctx) => {
+    const device = ctx.data.qcpDevice
+    if (!device) return { success: false, output: ['[qcp] QCP-001 not connected'] }
+    const sub = args[0]?.toLowerCase()
+    if (sub === 'fold') { device.setExpanded(false); return { success: true, output: ['[qcp] Device folded'] } }
+    if (sub === 'unfold') { device.setExpanded(true); return { success: true, output: ['[qcp] Device unfolded'] } }
+    if (sub === 'toggle') { device.toggleExpanded(); return { success: true, output: ['[qcp] Fold state toggled'] } }
+    if (!sub || sub === 'help') {
+      return { success: true, output: [
+        '', '  QCP-001 Quantum Compass', '  ─────────────────────────────',
+        '  qcp status     Device status', '  qcp firmware   Firmware info',
+        '  qcp test       Run diagnostics', '  qcp config     View configuration',
+        '  qcp mode       Cycle display mode', '  qcp bearing    Set anomaly direction',
+        '  qcp distance   Set anomaly distance', '  qcp reboot     Reboot device',
+        '  qcp fold       Fold to compact view', '  qcp unfold     Unfold to full view',
+        '  qcp toggle     Toggle fold state', '',
+      ]}
+    }
+    const state = device.getState()
+    if (sub === 'status') {
+      const fw = device.getFirmware()
+      const modeLabel = state.displayMode.toUpperCase()
+      const direction = state.anomalyDirection ?? 0
+      const distance = state.anomalyDistance ?? 0
+      const distColor = distance < 50 ? '\x1b[32m' : distance < 100 ? '\x1b[33m' : '\x1b[31m'
+      const anomalyStatus = distance > 0 ? 'DETECTED' : 'NONE'
+      const anomalyColor = distance > 0 ? '\x1b[31m' : '\x1b[32m'
+      const reset = '\x1b[0m'
+      return { success: true, output: [
+        '', '  ┌─ QCP-001 STATUS ────────────────┐',
+        `  │ State:       ${state.deviceState.toUpperCase().padEnd(19)}│`,
+        `  │ Power:       ${(state.isPowered ? 'ON' : 'OFF').padEnd(19)}│`,
+        `  │ Draw:        ${(state.currentDraw.toFixed(2) + ' E/s').padEnd(19)}│`,
+        `  │ Firmware:    v${fw.version.padEnd(17)}│`,
+        `  │ Mode:        ${modeLabel.padEnd(19)}│`,
+        `  │ Direction:   ${(direction + '°').padEnd(19)}│`,
+        `  │ Distance:    ${distColor}${(distance + 'm').padEnd(19)}${reset}│`,
+        `  │ Anomaly:     ${anomalyColor}${anomalyStatus.padEnd(19)}${reset}│`,
+        '  └──────────────────────────────────┘', '',
+      ]}
+    }
+    if (sub === 'firmware') {
+      const sub2 = args[1]?.toLowerCase()
+      const fw = device.getFirmware()
+      if (sub2 === 'update') {
+        if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[qcp] Device must be online to update firmware'] }
+        ctx.addOutput('[qcp] Checking for firmware updates...')
+        await new Promise(r => setTimeout(r, 800))
+        ctx.addOutput('[qcp] Current version: v' + fw.version)
+        await new Promise(r => setTimeout(r, 500))
+        ctx.addOutput('[qcp] No updates available. Firmware is up to date.')
+        return { success: true }
+      }
+      return { success: true, output: [
+        '', '  QCP-001 FIRMWARE', '  ─────────────────────────────',
+        `  Version:  v${fw.version}`, `  Build:    ${fw.build}`,
+        `  Checksum: ${fw.checksum}`, `  Patch:    ${fw.securityPatch}`,
+        `  Features: ${fw.features.join(', ')}`, '',
+      ]}
+    }
+    if (sub === 'test' || sub === 'diag') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[qcp] Device must be online to run diagnostics'] }
+      ctx.addOutput('[qcp] Starting diagnostics...')
+      await device.runTest()
+      return { success: true, output: ['[qcp] Diagnostics complete — ALL PASSED'] }
+    }
+    if (sub === 'config') {
+      const ps = device.getPowerSpecs()
+      return { success: true, output: [
+        '', '  QCP-001 CONFIGURATION', '  ─────────────────────────────',
+        `  Category: ${ps.category}`, `  Priority: ${ps.priority}`,
+        `  Power Full:    ${ps.full} E/s`, `  Power Idle:    ${ps.idle} E/s`,
+        `  Power Standby: ${ps.standby} E/s`,
+        `  Direction:     ${state.anomalyDirection ?? 0}°`,
+        `  Distance:      ${state.anomalyDistance ?? 0}m`,
+        `  Display Mode:  ${state.displayMode.toUpperCase()}`,
+        `  Current Draw:  ${state.currentDraw.toFixed(2)} E/s`,
+        `  Modes:         COMPASS, RADAR, HEATMAP, TRAJECTORY, TRIANGULATE, HISTORY`, '',
+      ]}
+    }
+    if (sub === 'mode') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[qcp] Device must be online to change mode'] }
+      const modeName = args[1]?.toLowerCase()
+      const validModes = ['compass', 'radar', 'heatmap', 'trajectory', 'triangulate', 'history']
+      if (modeName && validModes.includes(modeName)) {
+        device.setMode(modeName as any)
+        return { success: true, output: [`[qcp] Mode set to ${modeName.toUpperCase()}`] }
+      }
+      device.cycleMode()
+      return { success: true, output: [`[qcp] Mode cycled`] }
+    }
+    if (sub === 'bearing') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[qcp] Device must be online to set bearing'] }
+      const val = parseInt(args[1], 10)
+      if (isNaN(val) || val < 0 || val > 360) return { success: false, output: ['[qcp] Bearing must be 0-360 degrees'] }
+      device.setAnomalyDirection(val)
+      return { success: true, output: [`[qcp] Anomaly bearing set to ${val}°`] }
+    }
+    if (sub === 'distance') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[qcp] Device must be online to set distance'] }
+      const val = parseFloat(args[1])
+      if (isNaN(val) || val < 0) return { success: false, output: ['[qcp] Distance must be a positive number (meters)'] }
+      device.setAnomalyDistance(val)
+      return { success: true, output: [`[qcp] Anomaly distance set to ${val}m`] }
+    }
+    if (sub === 'reboot') {
+      if (!state.isPowered) return { success: false, output: ['[qcp] Device is not powered on'] }
+      ctx.addOutput('[qcp] Rebooting QCP-001...')
+      await device.reboot()
+      return { success: true, output: ['[qcp] Reboot complete'] }
+    }
+    return { success: false, output: [`[qcp] Unknown subcommand: ${sub}`, 'Usage: qcp [status|firmware|test|config|mode|bearing|distance|reboot|fold|unfold|toggle]'] }
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// DIM — Dimension Monitor management
+// ──────────────────────────────────────────────────────
+
+const dimCommand: Command = {
+  name: 'dim',
+  aliases: ['dimension'],
+  description: 'DIM-001 Dimension Monitor management',
+  usage: 'dim <status|firmware|test|config|reboot|fold|unfold|toggle>',
+  execute: async (args, ctx) => {
+    const device = ctx.data.dimDevice
+    if (!device) return { success: false, output: ['[dim] DIM-001 not connected'] }
+    const sub = args[0]?.toLowerCase()
+    if (sub === 'fold') { device.setExpanded(false); return { success: true, output: ['[dim] Device folded'] } }
+    if (sub === 'unfold') { device.setExpanded(true); return { success: true, output: ['[dim] Device unfolded'] } }
+    if (sub === 'toggle') { device.toggleExpanded(); return { success: true, output: ['[dim] Fold state toggled'] } }
+    if (!sub || sub === 'help') {
+      return { success: true, output: [
+        '', '  DIM-001 Dimension Monitor', '  ─────────────────────────────',
+        '  dim status     Device status', '  dim firmware   Firmware info',
+        '  dim test       Run diagnostics', '  dim config     View configuration',
+        '  dim reboot     Reboot device',
+        '  dim fold       Fold to compact view', '  dim unfold     Unfold to full view',
+        '  dim toggle     Toggle fold state', '',
+      ]}
+    }
+    const state = device.getState()
+    if (sub === 'status') {
+      const fw = device.getFirmware()
+      const dimValue = state.dimension + (state.fluctuation ?? 0)
+      const stabilityPct = state.stability ?? 0
+      const riftPct = state.riftActivity ?? 0
+      const haloProximity = Math.max(0, 100 - stabilityPct + riftPct * 100)
+      const entanglement = stabilityPct > 90 ? 'STRONG' : stabilityPct > 70 ? 'MODERATE' : 'WEAK'
+      const stabilityColor = stabilityPct > 90 ? '\x1b[32m' : stabilityPct > 70 ? '\x1b[33m' : '\x1b[31m'
+      const reset = '\x1b[0m'
+      return { success: true, output: [
+        '', '  ┌─ DIM-001 STATUS ────────────────┐',
+        `  │ State:       ${state.deviceState.toUpperCase().padEnd(19)}│`,
+        `  │ Power:       ${(state.isPowered ? 'ON' : 'OFF').padEnd(19)}│`,
+        `  │ Draw:        ${(state.currentDraw.toFixed(1) + ' E/s').padEnd(19)}│`,
+        `  │ Firmware:    v${fw.version.padEnd(17)}│`,
+        `  │ Dimension:   ${dimValue.toFixed(2).padEnd(19)}│`,
+        `  │ Stability:   ${stabilityColor}${(stabilityPct.toFixed(1) + '%').padEnd(19)}${reset}│`,
+        `  │ Rift Act.:   ${(riftPct.toFixed(1) + '%').padEnd(19)}│`,
+        `  │ Halo Prox.:  ${haloProximity.toFixed(1).padEnd(19)}│`,
+        `  │ Entangle.:   ${entanglement.padEnd(19)}│`,
+        '  └──────────────────────────────────┘', '',
+      ]}
+    }
+    if (sub === 'firmware') {
+      const sub2 = args[1]?.toLowerCase()
+      const fw = device.getFirmware()
+      if (sub2 === 'update') {
+        if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[dim] Device must be online to update firmware'] }
+        ctx.addOutput('[dim] Checking for firmware updates...')
+        await new Promise(r => setTimeout(r, 800))
+        ctx.addOutput('[dim] Current version: v' + fw.version)
+        await new Promise(r => setTimeout(r, 500))
+        ctx.addOutput('[dim] No updates available. Firmware is up to date.')
+        return { success: true }
+      }
+      return { success: true, output: [
+        '', '  DIM-001 FIRMWARE', '  ─────────────────────────────',
+        `  Version:  v${fw.version}`, `  Build:    ${fw.build}`,
+        `  Checksum: ${fw.checksum}`, `  Patch:    ${fw.securityPatch}`,
+        `  Features: ${fw.features.join(', ')}`, '',
+      ]}
+    }
+    if (sub === 'test' || sub === 'diag') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[dim] Device must be online to run diagnostics'] }
+      ctx.addOutput('[dim] Starting diagnostics...')
+      await device.runTest()
+      return { success: true, output: ['[dim] Diagnostics complete — ALL PASSED'] }
+    }
+    if (sub === 'config') {
+      const ps = device.getPowerSpecs()
+      return { success: true, output: [
+        '', '  DIM-001 CONFIGURATION', '  ─────────────────────────────',
+        `  Category: ${ps.category}`, `  Priority: ${ps.priority}`,
+        `  Power Full:    ${ps.full} E/s`, `  Power Idle:    ${ps.idle} E/s`,
+        `  Power Standby: ${ps.standby} E/s`,
+        `  Dim Lock Target:     D-3.7`,
+        `  Stability Threshold: 85%`,
+        `  Rift Sensitivity:    HIGH`,
+        `  Halo Alert Distance: 25.0`,
+        `  Scan Interval:       500ms`, '',
+      ]}
+    }
+    if (sub === 'reboot') {
+      if (!state.isPowered) return { success: false, output: ['[dim] Device is not powered on'] }
+      ctx.addOutput('[dim] Rebooting DIM-001...')
+      await device.reboot()
+      return { success: true, output: ['[dim] Reboot complete'] }
+    }
+    return { success: false, output: [`[dim] Unknown subcommand: ${sub}`, 'Usage: dim <status|firmware|test|config|reboot|fold|unfold|toggle>'] }
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// NET — Network Monitor management
+// ──────────────────────────────────────────────────────
+
+const netCommand: Command = {
+  name: 'net',
+  aliases: ['network', 'netmon'],
+  description: 'Network Monitor management',
+  usage: 'net <status|firmware|test|config|reboot|fold|unfold|toggle>',
+  execute: async (args, ctx) => {
+    const device = ctx.data.netDevice
+    if (!device) return { success: false, output: ['[net] Device not connected'] }
+    const sub = args[0]?.toLowerCase()
+    if (sub === 'fold') {
+      device.setExpanded(false)
+      return { success: true, output: ['[net] Device folded'] }
+    }
+    if (sub === 'unfold') {
+      device.setExpanded(true)
+      return { success: true, output: ['[net] Device unfolded'] }
+    }
+    if (sub === 'toggle') {
+      device.toggleExpanded()
+      return { success: true, output: ['[net] Fold state toggled'] }
+    }
+    if (!sub || sub === 'help') {
+      return { success: true, output: [
+        '', '  NET-001 Network Monitor', '  ─────────────────────────────',
+        '  net status     Device status', '  net firmware   Firmware info',
+        '  net test       Run diagnostics', '  net config     View configuration',
+        '  net reboot     Reboot device',
+        '  net fold       Fold to compact view', '  net unfold     Unfold to full view',
+        '  net toggle     Toggle fold state', '',
+      ]}
+    }
+    const state = device.getState()
+    if (sub === 'status') {
+      const fw = device.getFirmware()
+      return { success: true, output: [
+        '', '  ┌─ NET-001 STATUS ────────────────┐',
+        `  │ State:    ${state.deviceState.toUpperCase().padEnd(22)}│`,
+        `  │ Power:    ${state.isPowered ? 'ON' : 'OFF'}${' '.repeat(state.isPowered ? 20 : 19)}│`,
+        `  │ Draw:     ${state.currentDraw.toFixed(1)} E/s${' '.repeat(17 - state.currentDraw.toFixed(1).length)}│`,
+        `  │ Firmware: v${fw.version}${' '.repeat(20 - fw.version.length)}│`,
+        `  │ Bandwidth:${(state.bandwidth.toFixed(1) + ' Gbps').padEnd(22)}│`,
+        `  │ Latency:  ${(state.latencyMs + 'ms').padEnd(22)}│`,
+        `  │ Connected:${(state.isConnected ? 'YES' : 'NO').padEnd(22)}│`,
+        '  └──────────────────────────────────┘', '',
+      ]}
+    }
+    if (sub === 'firmware') {
+      const sub2 = args[1]?.toLowerCase()
+      const fw = device.getFirmware()
+      if (sub2 === 'update') {
+        if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[net] Device must be online to update firmware'] }
+        ctx.addOutput('[net] Checking for firmware updates...')
+        await new Promise(r => setTimeout(r, 800))
+        ctx.addOutput('[net] Current version: v' + fw.version)
+        await new Promise(r => setTimeout(r, 500))
+        ctx.addOutput('[net] No updates available. Firmware is up to date.')
+        return { success: true }
+      }
+      return { success: true, output: [
+        '', '  NET-001 FIRMWARE', '  ─────────────────────────────',
+        `  Version:  v${fw.version}`, `  Build:    ${fw.build}`,
+        `  Checksum: ${fw.checksum}`, `  Patch:    ${fw.securityPatch}`,
+        `  Features: ${fw.features.join(', ')}`, '',
+      ]}
+    }
+    if (sub === 'test' || sub === 'diag') {
+      if (!state.isPowered || state.deviceState !== 'online') return { success: false, output: ['[net] Device must be online to run diagnostics'] }
+      ctx.addOutput('[net] Starting diagnostics...')
+      await device.runTest()
+      return { success: true, output: ['[net] Diagnostics complete — ALL PASSED'] }
+    }
+    if (sub === 'config') {
+      const ps = device.getPowerSpecs()
+      return { success: true, output: [
+        '', '  NET-001 CONFIGURATION', '  ─────────────────────────────',
+        `  Category: ${ps.category}`, `  Priority: ${ps.priority}`,
+        `  Power Full:    ${ps.full} E/s`, `  Power Idle:    ${ps.idle} E/s`,
+        `  Power Standby: ${ps.standby} E/s`, '',
+      ]}
+    }
+    if (sub === 'reboot') {
+      if (!state.isPowered) return { success: false, output: ['[net] Device is not powered on'] }
+      ctx.addOutput('[net] Rebooting NET-001...')
+      await device.reboot()
+      return { success: true, output: ['[net] Reboot complete'] }
+    }
+    return { success: false, output: [`[net] Unknown subcommand: ${sub}`, 'Usage: net <status|firmware|test|config|reboot|fold|unfold|toggle>'] }
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// unMC — Midnight Commander for _unOS (interactive)
+// ──────────────────────────────────────────────────────
+const unmcCommand: Command = {
+  name: 'unmc',
+  aliases: ['mc'],
+  description: 'Midnight Commander — interactive dual-pane file manager',
+  usage: 'unmc',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: '[unmc] Filesystem not available' }
+
+    if (args[0]?.toLowerCase() === 'info' || args[0]?.toLowerCase() === 'about') {
+      return { success: true, output: [
+        '',
+        '  ┌─────────────────────────────────────────────┐',
+        '  │           unMC — _unOS File Manager          │',
+        '  │         Midnight Commander for _unOS          │',
+        '  ├─────────────────────────────────────────────┤',
+        '  │  Version:  2.0.0 (interactive)               │',
+        '  │  Based on: GNU Midnight Commander            │',
+        '  │  License:  _unOS Internal Use Only            │',
+        '  │  Author:   _unLABS Dev Team                   │',
+        '  │                                               │',
+        '  │  github.com/MidnightCommander/mc              │',
+        '  └─────────────────────────────────────────────┘',
+        '',
+      ]}
+    }
+
+    if (args[0]?.toLowerCase() === 'help' || args[0]?.toLowerCase() === 'h') {
+      return { success: true, output: [
+        '',
+        '  unMC — Interactive Midnight Commander for _unOS',
+        '  ───────────────────────────────────────────────',
+        '  unmc           Launch interactive file manager',
+        '  unmc info      About unMC',
+        '',
+        '  Keyboard (inside MC):',
+        '  ↑/↓       Navigate files',
+        '  Tab       Switch panes',
+        '  Enter     Open directory / view file',
+        '  Backspace Go to parent directory',
+        '  F3        View file',
+        '  F5        Copy to other pane',
+        '  F6        Move/rename',
+        '  F7        Create directory',
+        '  F8        Delete',
+        '  Esc/F10   Quit MC',
+        '',
+      ]}
+    }
+
+    // Launch interactive MC
+    return { success: true, output: ['[unmc] Launching interactive mode...'], appMode: 'mc' }
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// unmcedit — standalone editor command
+// ──────────────────────────────────────────────────────
+const unmceditCommand: Command = {
+  name: 'unmcedit',
+  aliases: ['mcedit'],
+  description: 'Edit a file in the unMC editor',
+  usage: 'unmcedit <file>',
+  execute: async (args, ctx) => {
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: '[unmcedit] Filesystem not available' }
+
+    const target = args[0]
+    if (!target) return { success: false, error: 'Usage: unmcedit <file>' }
+
+    // Resolve path
+    const cwd = fs.getCwd()
+    let resolved: string
+    if (target.startsWith('/')) resolved = target
+    else if (target.startsWith('~')) resolved = target
+    else resolved = cwd === '/' ? `/${target}` : `${cwd}/${target}`
+
+    // Check if it exists — if not, create it
+    const info = fs.stat(resolved)
+    if (info && info.type === 'dir') return { success: false, error: `[unmcedit] "${resolved}" is a directory` }
+    if (!info) {
+      // Create new file
+      const err = fs.touch(resolved)
+      if (err) return { success: false, error: `[unmcedit] ${err}` }
+    }
+
+    return { success: true, output: [`[unmcedit] Opening ${resolved}...`], appMode: 'mcedit', appModeData: { editFile: resolved } }
+  }
+}
+
+const tlpCommand: Command = {
+  name: 'tlp',
+  aliases: ['teleport'],
+  description: 'Manage TLP-001 Teleport Pad',
+  usage: 'tlp <subcommand>',
+  execute: async (args, ctx) => {
+    const sub = args[0]?.toLowerCase()
+    const device = ctx.data.tlpDevice
+    if (sub === 'fold') { device?.setExpanded(false); return { success: true, output: ['[TLP-001] Device folded'] } }
+    if (sub === 'unfold') { device?.setExpanded(true); return { success: true, output: ['[TLP-001] Device unfolded'] } }
+    if (sub === 'toggle') { device?.toggleExpanded(); return { success: true, output: ['[TLP-001] Fold state toggled'] } }
+
+    if (!sub || sub === 'status') {
+      // Show full status with firmware, power, state
+      const state = device?.getState()
+      const fw = device?.getFirmware()
+      const power = device?.getPowerSpecs()
+      return {
+        success: true,
+        output: [
+          '┌─────────────────────────────────────────┐',
+          '│         TLP-001 TELEPORT PAD             │',
+          '│            WARP Industries                │',
+          '├─────────────────────────────────────────┤',
+          `│ Status:      ${(state?.deviceState ?? 'unknown').toUpperCase().padEnd(26)}│`,
+          `│ Message:     ${(state?.statusMessage ?? '-').padEnd(26)}│`,
+          `│ Powered:     ${(state?.isPowered ? 'YES' : 'NO').padEnd(26)}│`,
+          `│ Draw:        ${((state?.currentDraw ?? 0).toFixed(1) + ' W').padEnd(26)}│`,
+          `│ Charge:      ${((state?.chargeLevel ?? 0) + '%').padEnd(26)}│`,
+          `│ Destination: ${(state?.lastDestination ?? '-').padEnd(26)}│`,
+          `│ Mode:        ${(state?.displayMode ?? '-').toUpperCase().padEnd(26)}│`,
+          '├─────────────────────────────────────────┤',
+          `│ Firmware:    ${('v' + (fw?.version ?? '?')).padEnd(26)}│`,
+          `│ Build:       ${(fw?.build ?? '?').padEnd(26)}│`,
+          `│ Checksum:    ${(fw?.checksum ?? '?').padEnd(26)}│`,
+          `│ Patch:       ${(fw?.securityPatch ?? '?').padEnd(26)}│`,
+          '├─────────────────────────────────────────┤',
+          `│ Power Full:  ${((power?.full ?? 0) + ' W').padEnd(26)}│`,
+          `│ Power Idle:  ${((power?.idle ?? 0) + ' W').padEnd(26)}│`,
+          `│ Standby:     ${((power?.standby ?? 0) + ' W').padEnd(26)}│`,
+          `│ Category:    ${(power?.category ?? '?').padEnd(26)}│`,
+          `│ Priority:    ${String(power?.priority ?? '?').padEnd(26)}│`,
+          '└─────────────────────────────────────────┘',
+        ],
+      }
+    }
+
+    if (sub === 'on') {
+      await device?.powerOn()
+      return { success: true, output: ['[TLP-001] Powering on...'] }
+    }
+    if (sub === 'off') {
+      await device?.powerOff()
+      return { success: true, output: ['[TLP-001] Powering off...'] }
+    }
+    if (sub === 'test') {
+      await device?.runTest()
+      return { success: true, output: ['[TLP-001] Running diagnostics...'] }
+    }
+    if (sub === 'reboot') {
+      await device?.reboot()
+      return { success: true, output: ['[TLP-001] Rebooting...'] }
+    }
+    if (sub === 'firmware' || sub === 'fw') {
+      const fw = device?.getFirmware()
+      return {
+        success: true,
+        output: [
+          `TLP-001 Firmware v${fw?.version ?? '?'}`,
+          `Build:    ${fw?.build ?? '?'}`,
+          `Checksum: ${fw?.checksum ?? '?'}`,
+          `Patch:    ${fw?.securityPatch ?? '?'}`,
+          `Features: ${fw?.features?.join(', ') ?? 'none'}`,
+        ],
+      }
+    }
+    if (sub === 'config' || sub === 'cfg') {
+      const param = args[1]?.toLowerCase()
+      const value = args[2]
+      if (!param) {
+        const state = device?.getState()
+        return {
+          success: true,
+          output: [
+            'TLP-001 Configuration:',
+            `  charge:      ${state?.chargeLevel ?? 65}%`,
+            `  destination: ${state?.lastDestination ?? 'LAB-Ω'}`,
+            `  mode:        ${state?.displayMode ?? 'standard'}`,
+            '',
+            'Usage: tlp config <param> <value>',
+            '  charge <0-100>         Set charge level',
+            '  dest <name>            Set destination',
+            '  mode <mode>            Set transport mode',
+          ],
+        }
+      }
+      if (param === 'charge' && value) {
+        const v = parseInt(value)
+        if (isNaN(v) || v < 0 || v > 100) return { success: false, error: 'charge must be 0-100' }
+        device?.setChargeLevel(v)
+        return { success: true, output: [`[TLP-001] Charge set to ${v}%`] }
+      }
+      if ((param === 'dest' || param === 'destination') && value) {
+        device?.setLastDestination(args.slice(2).join(' '))
+        return { success: true, output: [`[TLP-001] Destination set to ${args.slice(2).join(' ')}`] }
+      }
+      if (param === 'mode' && value) {
+        const modes = ['standard', 'precision', 'express', 'stealth', 'cargo', 'emergency']
+        if (!modes.includes(value.toLowerCase())) return { success: false, error: `invalid mode. valid: ${modes.join(', ')}` }
+        device?.setMode(value.toLowerCase() as 'standard' | 'precision' | 'express' | 'stealth' | 'cargo' | 'emergency')
+        return { success: true, output: [`[TLP-001] Mode set to ${value.toUpperCase()}`] }
+      }
+      return { success: false, error: 'unknown config parameter' }
+    }
+    if (sub === 'mode') {
+      const mode = args[1]?.toLowerCase()
+      if (!mode) {
+        return { success: true, output: ['modes: standard, precision, express, stealth, cargo, emergency'] }
+      }
+      const modes = ['standard', 'precision', 'express', 'stealth', 'cargo', 'emergency']
+      if (!modes.includes(mode)) return { success: false, error: `invalid mode. valid: ${modes.join(', ')}` }
+      device?.setMode(mode as 'standard' | 'precision' | 'express' | 'stealth' | 'cargo' | 'emergency')
+      return { success: true, output: [`[TLP-001] Transport mode: ${mode.toUpperCase()}`] }
+    }
+    if (sub === 'charge') {
+      const state = device?.getState()
+      return { success: true, output: [`[TLP-001] Charge: ${state?.chargeLevel ?? 0}%`] }
+    }
+    if (sub === 'dest' || sub === 'destination') {
+      const state = device?.getState()
+      return { success: true, output: [`[TLP-001] Destination: ${state?.lastDestination ?? 'unknown'}`] }
+    }
+    if (sub === 'help') {
+      return {
+        success: true,
+        output: [
+          'TLP-001 Teleport Pad — WARP Industries',
+          '',
+          'Usage: tlp <subcommand>',
+          '',
+          '  status       Show device status',
+          '  on/off       Power control',
+          '  test         Run diagnostics',
+          '  reboot       Restart device',
+          '  firmware     Show firmware info',
+          '  config       View/set configuration',
+          '  mode <m>     Set transport mode',
+          '  charge       Show charge level',
+          '  dest         Show destination',
+          '  fold         Fold to compact view',
+          '  unfold       Unfold to full view',
+          '  toggle       Toggle fold state',
+          '  help         Show this help',
+        ],
+      }
+    }
+
+    return { success: false, error: `unknown subcommand: ${sub}. try: tlp help` }
+  },
+}
+
+const lctCommand: Command = {
+  name: 'lct',
+  aliases: ['laser-ctrl'],
+  description: 'LCT-001 Precision Laser management',
+  usage: 'lct <subcommand>',
+  execute: async (args, ctx) => {
+    const sub = args[0]?.toLowerCase()
+    const device = ctx.data.lctDevice
+    if (sub === 'fold') { device?.setExpanded(false); return { success: true, output: ['[LCT-001] Device folded'] } }
+    if (sub === 'unfold') { device?.setExpanded(true); return { success: true, output: ['[LCT-001] Device unfolded'] } }
+    if (sub === 'toggle') { device?.toggleExpanded(); return { success: true, output: ['[LCT-001] Fold state toggled'] } }
+
+    if (!sub || sub === 'status') {
+      const state = device?.getState()
+      return {
+        success: true,
+        output: [
+          '┌─────────────────────────────────────────┐',
+          '│         LCT-001 PRECISION LASER          │',
+          '├─────────────────────────────────────────┤',
+          `│ Status:      ${(state?.deviceState ?? 'unknown').toUpperCase().padEnd(26)}│`,
+          `│ Message:     ${(state?.statusMessage ?? '-').padEnd(26)}│`,
+          `│ Powered:     ${(state?.isPowered ? 'YES' : 'NO').padEnd(26)}│`,
+          `│ Draw:        ${((state?.currentDraw ?? 0).toFixed(1) + ' W').padEnd(26)}│`,
+          `│ Laser Power: ${((state?.laserPower ?? 0) + ' W').padEnd(26)}│`,
+          `│ Precision:   ${(String(state?.precision ?? 0)).padEnd(26)}│`,
+          `│ Mode:        ${(state?.displayMode ?? '-').toUpperCase().padEnd(26)}│`,
+          `│ Test Result: ${(state?.testResult ?? '-').padEnd(26)}│`,
+          '└─────────────────────────────────────────┘',
+        ],
+      }
+    }
+
+    if (sub === 'on') {
+      await device?.powerOn()
+      return { success: true, output: ['[LCT-001] Powering on...'] }
+    }
+    if (sub === 'off') {
+      await device?.powerOff()
+      return { success: true, output: ['[LCT-001] Powering off...'] }
+    }
+    if (sub === 'test') {
+      await device?.runTest()
+      return { success: true, output: ['[LCT-001] Running diagnostics...'] }
+    }
+    if (sub === 'reboot') {
+      await device?.reboot()
+      return { success: true, output: ['[LCT-001] Rebooting...'] }
+    }
+    if (sub === 'firmware' || sub === 'fw') {
+      const fw = device?.getFirmware()
+      return {
+        success: true,
+        output: [
+          `LCT-001 Firmware v${fw?.version ?? '?'}`,
+          `Build:    ${fw?.build ?? '?'}`,
+          `Checksum: ${fw?.checksum ?? '?'}`,
+          `Features: ${fw?.features?.join(', ') ?? 'none'}`,
+          `Patch:    ${fw?.securityPatch ?? '?'}`,
+        ],
+      }
+    }
+    if (sub === 'config' || sub === 'cfg') {
+      const power = device?.getPowerSpecs()
+      return {
+        success: true,
+        output: [
+          'LCT-001 Power Configuration:',
+          `  Full:      ${power?.full ?? '?'} W`,
+          `  Idle:      ${power?.idle ?? '?'} W`,
+          `  Standby:   ${power?.standby ?? '?'} W`,
+          `  Category:  ${power?.category ?? '?'}`,
+          `  Priority:  ${power?.priority ?? '?'}`,
+        ],
+      }
+    }
+    if (sub === 'mode') {
+      const value = args[1]?.toLowerCase()
+      const modes = ['cutting', 'engraving', 'welding', 'marking', 'drilling', 'scanning']
+      if (!value) {
+        await device?.cycleMode()
+        const state = device?.getState()
+        return { success: true, output: [`[LCT-001] Mode cycled to: ${(state?.displayMode ?? 'cutting').toUpperCase()}`] }
+      }
+      if (!modes.includes(value)) return { success: false, error: `invalid mode. valid: ${modes.join(', ')}` }
+      device?.setMode(value as 'cutting' | 'engraving' | 'welding' | 'marking' | 'drilling' | 'scanning')
+      return { success: true, output: [`[LCT-001] Mode set to ${value.toUpperCase()}`] }
+    }
+    if (sub === 'power') {
+      const value = args[1]
+      if (!value) {
+        const state = device?.getState()
+        return { success: true, output: [`[LCT-001] Laser power: ${state?.laserPower ?? 0} W`] }
+      }
+      const v = parseInt(value)
+      if (isNaN(v) || v < 0 || v > 450) return { success: false, error: 'laser power must be 0-450' }
+      device?.setLaserPower(v)
+      return { success: true, output: [`[LCT-001] Laser power set to ${v} W`] }
+    }
+    if (sub === 'precision') {
+      const value = args[1]
+      if (!value) {
+        const state = device?.getState()
+        return { success: true, output: [`[LCT-001] Precision: ${state?.precision ?? 0}`] }
+      }
+      const v = parseFloat(value)
+      if (isNaN(v) || v < 0.001 || v > 1.0) return { success: false, error: 'precision must be 0.001-1.0' }
+      device?.setPrecision(v)
+      return { success: true, output: [`[LCT-001] Precision set to ${v}`] }
+    }
+    if (sub === 'help') {
+      return {
+        success: true,
+        output: [
+          'LCT-001 Precision Laser',
+          '',
+          'Usage: lct <subcommand>',
+          '',
+          '  status       Show device status',
+          '  on/off       Power control',
+          '  test         Run diagnostics',
+          '  reboot       Restart device',
+          '  firmware     Show firmware info',
+          '  config       View power specs',
+          '  mode [name]  Cycle or set laser mode',
+          '  power [val]  Get/set laser power (0-450)',
+          '  precision [v] Get/set precision (0.001-1.0)',
+          '  fold         Fold to compact view',
+          '  unfold       Unfold to full view',
+          '  toggle       Toggle fold state',
+          '  help         Show this help',
+        ],
+      }
+    }
+
+    return { success: false, error: `unknown subcommand: ${sub}. try: lct help` }
+  },
+}
+
+const p3dCommand: Command = {
+  name: 'p3d',
+  aliases: ['printer-ctrl', 'fab'],
+  description: 'P3D-001 3D Fabricator management',
+  usage: 'p3d <subcommand>',
+  execute: async (args, ctx) => {
+    const sub = args[0]?.toLowerCase()
+    const device = ctx.data.p3dDevice
+
+    if (!sub || sub === 'status') {
+      const state = device?.getState()
+      return {
+        success: true,
+        output: [
+          '┌─────────────────────────────────────────┐',
+          '│         P3D-001 3D FABRICATOR            │',
+          '├─────────────────────────────────────────┤',
+          `│ Status:      ${(state?.deviceState ?? 'unknown').toUpperCase().padEnd(26)}│`,
+          `│ Message:     ${(state?.statusMessage ?? '-').padEnd(26)}│`,
+          `│ Powered:     ${(state?.isPowered ? 'YES' : 'NO').padEnd(26)}│`,
+          `│ Draw:        ${((state?.currentDraw ?? 0).toFixed(1) + ' W').padEnd(26)}│`,
+          `│ Progress:    ${((state?.progress ?? 0) + '%').padEnd(26)}│`,
+          `│ Layer Count: ${(String(state?.layerCount ?? 0)).padEnd(26)}│`,
+          `│ Bed Temp:    ${((state?.bedTemp ?? 0) + '°C').padEnd(26)}│`,
+          `│ Mode:        ${(state?.displayMode ?? '-').toUpperCase().padEnd(26)}│`,
+          `│ Test Result: ${(state?.testResult ?? '-').padEnd(26)}│`,
+          '└─────────────────────────────────────────┘',
+        ],
+      }
+    }
+
+    if (sub === 'on') {
+      await device?.powerOn()
+      return { success: true, output: ['[P3D-001] Powering on...'] }
+    }
+    if (sub === 'off') {
+      await device?.powerOff()
+      return { success: true, output: ['[P3D-001] Powering off...'] }
+    }
+    if (sub === 'test') {
+      await device?.runTest()
+      return { success: true, output: ['[P3D-001] Running diagnostics...'] }
+    }
+    if (sub === 'reboot') {
+      await device?.reboot()
+      return { success: true, output: ['[P3D-001] Rebooting...'] }
+    }
+    if (sub === 'firmware' || sub === 'fw') {
+      const fw = device?.getFirmware()
+      return {
+        success: true,
+        output: [
+          `P3D-001 Firmware v${fw?.version ?? '?'}`,
+          `Build:    ${fw?.build ?? '?'}`,
+          `Checksum: ${fw?.checksum ?? '?'}`,
+          `Features: ${fw?.features?.join(', ') ?? 'none'}`,
+          `Patch:    ${fw?.securityPatch ?? '?'}`,
+        ],
+      }
+    }
+    if (sub === 'config' || sub === 'cfg') {
+      const power = device?.getPowerSpecs()
+      return {
+        success: true,
+        output: [
+          'P3D-001 Power Configuration:',
+          `  Full:      ${power?.full ?? '?'} W`,
+          `  Idle:      ${power?.idle ?? '?'} W`,
+          `  Standby:   ${power?.standby ?? '?'} W`,
+          `  Category:  ${power?.category ?? '?'}`,
+          `  Priority:  ${power?.priority ?? '?'}`,
+        ],
+      }
+    }
+    if (sub === 'mode') {
+      const value = args[1]?.toLowerCase()
+      const modes = ['plastic', 'metal', 'crystal', 'composite', 'nano', 'prototype']
+      if (!value) {
+        await device?.cycleMode()
+        const state = device?.getState()
+        return { success: true, output: [`[P3D-001] Mode cycled to: ${(state?.displayMode ?? 'plastic').toUpperCase()}`] }
+      }
+      if (!modes.includes(value)) return { success: false, error: `invalid mode. valid: ${modes.join(', ')}` }
+      device?.setMode(value as 'plastic' | 'metal' | 'crystal' | 'composite' | 'nano' | 'prototype')
+      return { success: true, output: [`[P3D-001] Mode set to ${value.toUpperCase()}`] }
+    }
+    if (sub === 'progress') {
+      const value = args[1]
+      if (!value) {
+        const state = device?.getState()
+        return { success: true, output: [`[P3D-001] Print progress: ${state?.progress ?? 0}%`] }
+      }
+      const v = parseInt(value)
+      if (isNaN(v) || v < 0 || v > 100) return { success: false, error: 'progress must be 0-100' }
+      device?.setProgress(v)
+      return { success: true, output: [`[P3D-001] Print progress set to ${v}%`] }
+    }
+    if (sub === 'layer') {
+      const value = args[1]
+      if (!value) {
+        const state = device?.getState()
+        return { success: true, output: [`[P3D-001] Layer count: ${state?.layerCount ?? 0}`] }
+      }
+      const v = parseInt(value)
+      if (isNaN(v) || v < 0) return { success: false, error: 'layer count must be >= 0' }
+      device?.setLayerCount(v)
+      return { success: true, output: [`[P3D-001] Layer count set to ${v}`] }
+    }
+    if (sub === 'bedtemp') {
+      const value = args[1]
+      if (!value) {
+        const state = device?.getState()
+        return { success: true, output: [`[P3D-001] Bed temperature: ${state?.bedTemp ?? 0}°C`] }
+      }
+      const v = parseInt(value)
+      if (isNaN(v) || v < 0 || v > 120) return { success: false, error: 'bed temperature must be 0-120' }
+      device?.setBedTemp(v)
+      return { success: true, output: [`[P3D-001] Bed temperature set to ${v}°C`] }
+    }
+    if (sub === 'fold') {
+      if (!device) return { success: false, error: '[P3D-001] Device not connected' }
+      device.setExpanded(false)
+      return { success: true, output: ['', '[P3D-001] Device folded to compact view', ''] }
+    }
+    if (sub === 'unfold') {
+      if (!device) return { success: false, error: '[P3D-001] Device not connected' }
+      device.setExpanded(true)
+      return { success: true, output: ['', '[P3D-001] Device unfolded to full view', ''] }
+    }
+    if (sub === 'toggle') {
+      if (!device) return { success: false, error: '[P3D-001] Device not connected' }
+      device.toggleExpanded()
+      return { success: true, output: ['', '[P3D-001] Device view toggled', ''] }
+    }
+    if (sub === 'help') {
+      return {
+        success: true,
+        output: [
+          'P3D-001 3D Fabricator',
+          '',
+          'Usage: p3d <subcommand>',
+          '',
+          '  status         Show device status',
+          '  on/off         Power control',
+          '  test           Run diagnostics',
+          '  reboot         Restart device',
+          '  firmware       Show firmware info',
+          '  config         View power specs',
+          '  mode [name]    Cycle or set print mode',
+          '  progress [val] Get/set print progress (0-100)',
+          '  layer [val]    Get/set layer count',
+          '  bedtemp [val]  Get/set bed temperature (0-120)',
+          '  fold           Fold to compact view',
+          '  unfold         Unfold to full view',
+          '  toggle         Toggle fold state',
+          '  help           Show this help',
+        ],
+      }
+    }
+
+    return { success: false, error: `unknown subcommand: ${sub}. try: p3d help` }
+  },
 }
 
 // Command registry
@@ -11066,6 +12997,17 @@ export const commands: Command[] = [
   pwbCommand,
   rmgCommand,
   mscCommand,
+  dimCommand,
+  clkCommand,
+  cpuCommand,
+  memCommand,
+  andCommand,
+  qcpCommand,
+  netCommand,
+  tmpCommand,
+  tlpCommand,
+  lctCommand,
+  p3dCommand,
   themeCommand,
   screwstatCommand,
   nodesyncCommand,
@@ -11085,6 +13027,8 @@ export const commands: Command[] = [
   unnetCommand,
   exitCommand,
   ungitCommand,
+  unmcCommand,
+  unmceditCommand,
 ]
 
 // Find command by name or alias

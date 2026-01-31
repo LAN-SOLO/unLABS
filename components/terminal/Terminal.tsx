@@ -8,6 +8,7 @@ import type { FilesystemActions, UserActions } from '@/lib/terminal/types'
 import { useTerminal } from '@/hooks/useTerminal'
 import { TerminalOutput } from './TerminalOutput'
 import { TerminalInput } from './TerminalInput'
+import { MidnightCommander } from './MidnightCommander'
 import { useCDCManagerOptional } from '@/contexts/CDCManager'
 import { useUECManagerOptional } from '@/contexts/UECManager'
 import { useBATManagerOptional } from '@/contexts/BATManager'
@@ -26,8 +27,19 @@ import { usePWBManagerOptional } from '@/contexts/PWBManager'
 import { useBTKManagerOptional } from '@/contexts/BTKManager'
 import { useRMGManagerOptional } from '@/contexts/RMGManager'
 import { useMSCManagerOptional } from '@/contexts/MSCManager'
+import { useNETManagerOptional } from '@/contexts/NETManager'
+import { useTMPManagerOptional } from '@/contexts/TMPManager'
+import { useDIMManagerOptional } from '@/contexts/DIMManager'
+import { useCPUManagerOptional } from '@/contexts/CPUManager'
+import { useCLKManagerOptional } from '@/contexts/CLKManager'
+import { useMEMManagerOptional } from '@/contexts/MEMManager'
+import { useANDManagerOptional } from '@/contexts/ANDManager'
+import { useQCPManagerOptional } from '@/contexts/QCPManager'
+import { useTLPManagerOptional } from '@/contexts/TLPManager'
+import { useLCTManagerOptional } from '@/contexts/LCTManager'
+import { useP3DManagerOptional } from '@/contexts/P3DManager'
 import { useScrewButtonManagerOptional } from '@/contexts/ScrewButtonManager'
-import type { CDCDeviceActions, UECDeviceActions, BATDeviceActions, HMSDeviceActions, ECRDeviceActions, IPLDeviceActions, MFRDeviceActions, AICDeviceActions, VNTDeviceActions, SCADeviceActions, EXDDeviceActions, QSMDeviceActions, EMCDeviceActions, QUADeviceActions, PWBDeviceActions, BTKDeviceActions, RMGDeviceActions, MSCDeviceActions, ScrewButtonDeviceActions, ThemeActions } from '@/lib/terminal/types'
+import type { CDCDeviceActions, UECDeviceActions, BATDeviceActions, HMSDeviceActions, ECRDeviceActions, IPLDeviceActions, MFRDeviceActions, AICDeviceActions, VNTDeviceActions, SCADeviceActions, EXDDeviceActions, QSMDeviceActions, EMCDeviceActions, QUADeviceActions, PWBDeviceActions, BTKDeviceActions, RMGDeviceActions, MSCDeviceActions, NETDeviceActions, TMPDeviceActions, DIMDeviceActions, CPUDeviceActions, CLKDeviceActions, MEMDeviceActions, ANDDeviceActions, QCPDeviceActions, TLPDeviceActions, LCTDeviceActions, P3DDeviceActions, ScrewButtonDeviceActions, ThemeActions } from '@/lib/terminal/types'
 
 interface TerminalProps {
   userId: string
@@ -57,6 +69,17 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   const btkManager = useBTKManagerOptional()
   const rmgManager = useRMGManagerOptional()
   const mscManager = useMSCManagerOptional()
+  const netManager = useNETManagerOptional()
+  const tmpManager = useTMPManagerOptional()
+  const dimManager = useDIMManagerOptional()
+  const cpuManager = useCPUManagerOptional()
+  const clkManager = useCLKManagerOptional()
+  const memManager = useMEMManagerOptional()
+  const andManager = useANDManagerOptional()
+  const qcpManager = useQCPManagerOptional()
+  const tlpManager = useTLPManagerOptional()
+  const lctManager = useLCTManagerOptional()
+  const p3dManager = useP3DManagerOptional()
   const screwButtonManager = useScrewButtonManagerOptional()
 
   // Initialize VirtualFS and UserManager (persisted via refs, restored from localStorage)
@@ -212,6 +235,39 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   const mscManagerRef = useRef(mscManager)
   mscManagerRef.current = mscManager
 
+  const netManagerRef = useRef(netManager)
+  netManagerRef.current = netManager
+
+  const tmpManagerRef = useRef(tmpManager)
+  tmpManagerRef.current = tmpManager
+
+  const dimManagerRef = useRef(dimManager)
+  dimManagerRef.current = dimManager
+
+  const cpuManagerRef = useRef(cpuManager)
+  cpuManagerRef.current = cpuManager
+
+  const clkManagerRef = useRef(clkManager)
+  clkManagerRef.current = clkManager
+
+  const memManagerRef = useRef(memManager)
+  memManagerRef.current = memManager
+
+  const andManagerRef = useRef(andManager)
+  andManagerRef.current = andManager
+
+  const qcpManagerRef = useRef(qcpManager)
+  qcpManagerRef.current = qcpManager
+
+  const tlpManagerRef = useRef(tlpManager)
+  tlpManagerRef.current = tlpManager
+
+  const lctManagerRef = useRef(lctManager)
+  lctManagerRef.current = lctManager
+
+  const p3dManagerRef = useRef(p3dManager)
+  p3dManagerRef.current = p3dManager
+
   const screwButtonManagerRef = useRef(screwButtonManager)
   screwButtonManagerRef.current = screwButtonManager
 
@@ -242,12 +298,15 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       powerOff: () => cdcManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => cdcManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => cdcManagerRef.current?.reboot() ?? Promise.resolve(),
+      setExpanded: (expanded: boolean) => cdcManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => cdcManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = cdcManagerRef.current
         return {
           deviceState: m?.deviceState ?? 'standby',
           statusMessage: m?.statusMessage ?? '',
           isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
           crystalCount: m?.crystalCount ?? 0,
           sliceCount: m?.sliceCount ?? 0,
           totalPower: m?.totalPower ?? 0,
@@ -280,12 +339,15 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       powerOff: () => uecManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => uecManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => uecManagerRef.current?.reboot() ?? Promise.resolve(),
+      setExpanded: (expanded: boolean) => uecManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => uecManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = uecManagerRef.current
         return {
           deviceState: m?.deviceState ?? 'standby',
           statusMessage: m?.statusMessage ?? '',
           isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
           volatilityTier: m?.volatilityTier ?? 1,
           tps: m?.tps ?? 0,
           energyOutput: m?.energyOutput ?? 0,
@@ -320,12 +382,15 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       runTest: () => batManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => batManagerRef.current?.reboot() ?? Promise.resolve(),
       setAutoRegen: (enabled: boolean) => batManagerRef.current?.setAutoRegen(enabled),
+      setExpanded: (expanded: boolean) => batManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => batManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = batManagerRef.current
         return {
           deviceState: m?.deviceState ?? 'standby',
           statusMessage: m?.statusMessage ?? '',
           isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
           currentCharge: m?.currentCharge ?? 0,
           chargePercent: m?.chargePercent ?? 0,
           isCharging: m?.isCharging ?? false,
@@ -365,12 +430,15 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       reboot: () => hmsManagerRef.current?.reboot() ?? Promise.resolve(),
       setKnobValue: (knob: 'pulse' | 'tempo' | 'freq', value: number) => hmsManagerRef.current?.setKnobValue(knob, value),
       setWaveform: (type: 'sine' | 'square' | 'saw' | 'triangle') => hmsManagerRef.current?.setWaveform(type),
+      setExpanded: (expanded: boolean) => hmsManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => hmsManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = hmsManagerRef.current
         return {
           deviceState: m?.deviceState ?? 'standby',
           statusMessage: m?.statusMessage ?? '',
           isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
           pulseValue: m?.pulseValue ?? 0,
           tempoValue: m?.tempoValue ?? 0,
           freqValue: m?.freqValue ?? 0,
@@ -408,6 +476,8 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       reboot: () => ecrManagerRef.current?.reboot() ?? Promise.resolve(),
       setKnobValue: (knob: 'pulse' | 'bloom', value: number) => ecrManagerRef.current?.setKnobValue(knob, value),
       setRecording: (recording: boolean) => ecrManagerRef.current?.setRecording(recording),
+      setExpanded: (expanded: boolean) => ecrManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => ecrManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = ecrManagerRef.current
         return {
@@ -420,6 +490,7 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           isRecording: m?.isRecording ?? false,
           signalStrength: m?.signalStrength ?? 0,
           currentTier: m?.currentTier ?? 1,
+          isExpanded: m?.isExpanded ?? false,
         }
       },
       getFirmware: () => ecrManagerRef.current?.firmware ?? {
@@ -449,6 +520,8 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       powerOff: () => iplManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => iplManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => iplManagerRef.current?.reboot() ?? Promise.resolve(),
+      setExpanded: (expanded: boolean) => iplManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => iplManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = iplManagerRef.current
         return {
@@ -460,6 +533,7 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           inputStreams: m?.inputStreams ?? 8,
           predictionHorizon: m?.predictionHorizon ?? 60,
           currentTier: m?.currentTier ?? 1,
+          isExpanded: m?.isExpanded ?? false,
         }
       },
       getFirmware: () => iplManagerRef.current?.firmware ?? {
@@ -489,6 +563,8 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       powerOff: () => mfrManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => mfrManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => mfrManagerRef.current?.reboot() ?? Promise.resolve(),
+      setExpanded: (expanded: boolean) => mfrManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => mfrManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = mfrManagerRef.current
         return {
@@ -500,6 +576,7 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           plasmaTemp: m?.plasmaTemp ?? 0,
           efficiency: m?.efficiency ?? 92,
           ringSpeed: m?.ringSpeed ?? 0,
+          isExpanded: m?.isExpanded ?? false,
         }
       },
       getFirmware: () => mfrManagerRef.current?.firmware ?? {
@@ -531,6 +608,8 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       runTest: () => aicManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => aicManagerRef.current?.reboot() ?? Promise.resolve(),
       setLearningMode: (enabled: boolean) => aicManagerRef.current?.setLearningMode(enabled),
+      setExpanded: (expanded: boolean) => aicManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => aicManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = aicManagerRef.current
         return {
@@ -543,6 +622,7 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           nodeActivity: m?.nodeActivity ?? [0, 0, 0, 0, 0],
           anomalyCount: m?.anomalyCount ?? 0,
           uptime: m?.uptime ?? 0,
+          isExpanded: m?.isExpanded ?? false,
         }
       },
       getFirmware: () => aicManagerRef.current?.firmware ?? {
@@ -576,12 +656,15 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setFanMode: (fanId: 'cpu' | 'gpu', mode: 'AUTO' | 'LOW' | 'MED' | 'HIGH') => vntManagerRef.current?.setFanMode(fanId, mode),
       toggleFan: (fanId: 'cpu' | 'gpu', on: boolean) => vntManagerRef.current?.toggleFan(fanId, on),
       emergencyPurge: () => vntManagerRef.current?.emergencyPurge() ?? Promise.resolve(),
+      setExpanded: (expanded: boolean) => vntManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => vntManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = vntManagerRef.current
         return {
           deviceState: m?.deviceState ?? 'standby',
           statusMessage: m?.statusMessage ?? '',
           isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
           cpuFan: m?.cpuFan ?? { speed: 0, rpm: 0, mode: 'AUTO', isOn: false },
           gpuFan: m?.gpuFan ?? { speed: 0, rpm: 0, mode: 'AUTO', isOn: false },
           cpuTemp: m?.cpuTemp ?? 0,
@@ -619,12 +702,15 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       powerOff: () => scaManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => scaManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => scaManagerRef.current?.reboot() ?? Promise.resolve(),
+      setExpanded: (expanded: boolean) => scaManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => scaManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = scaManagerRef.current
         return {
           deviceState: m?.deviceState ?? 'standby',
           statusMessage: m?.statusMessage ?? '',
           isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
           flops: m?.flops ?? 0,
           utilization: m?.utilization ?? 0,
           activeNodes: m?.activeNodes ?? 0,
@@ -665,12 +751,15 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       reboot: () => exdManagerRef.current?.reboot() ?? Promise.resolve(),
       deploy: () => exdManagerRef.current?.deploy(),
       recall: () => exdManagerRef.current?.recall(),
+      setExpanded: (expanded: boolean) => exdManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => exdManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = exdManagerRef.current
         return {
           deviceState: m?.deviceState ?? 'standby',
           statusMessage: m?.statusMessage ?? '',
           isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
           range: m?.range ?? 0,
           battery: m?.battery ?? 0,
           altitude: m?.altitude ?? 0,
@@ -710,12 +799,15 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       powerOff: () => qsmManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => qsmManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => qsmManagerRef.current?.reboot() ?? Promise.resolve(),
+      setExpanded: (v: boolean) => qsmManagerRef.current?.setExpanded(v),
+      toggleExpanded: () => qsmManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = qsmManagerRef.current
         return {
           deviceState: m?.deviceState ?? 'standby',
           statusMessage: m?.statusMessage ?? '',
           isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
           coherence: m?.coherence ?? 0,
           qubits: m?.qubits ?? 0,
           isEntangled: m?.isEntangled ?? false,
@@ -751,12 +843,15 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       powerOff: () => emcManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => emcManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => emcManagerRef.current?.reboot() ?? Promise.resolve(),
+      setExpanded: (v: boolean) => emcManagerRef.current?.setExpanded(v),
+      toggleExpanded: () => emcManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = emcManagerRef.current
         return {
           deviceState: m?.deviceState ?? 'standby',
           statusMessage: m?.statusMessage ?? '',
           isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
           units: m?.units ?? 0,
           stability: m?.stability ?? 0,
           fieldStrength: m?.fieldStrength ?? 0,
@@ -796,12 +891,15 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setSensitivity: (value: number) => quaManagerRef.current?.setSensitivity(value),
       setDepth: (value: number) => quaManagerRef.current?.setDepth(value),
       setFrequency: (value: number) => quaManagerRef.current?.setFrequency(value),
+      setExpanded: (v: boolean) => quaManagerRef.current?.setExpanded(v),
+      toggleExpanded: () => quaManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = quaManagerRef.current
         return {
           deviceState: m?.deviceState ?? 'standby',
           statusMessage: m?.statusMessage ?? '',
           isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
           mode: m?.mode ?? 'ANOMALY',
           sensitivity: m?.sensitivity ?? 65,
           depth: m?.depth ?? 50,
@@ -837,12 +935,15 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       powerOff: () => pwbManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => pwbManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => pwbManagerRef.current?.reboot() ?? Promise.resolve(),
+      setExpanded: (expanded: boolean) => pwbManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => pwbManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = pwbManagerRef.current
         return {
           deviceState: m?.deviceState ?? 'standby',
           statusMessage: m?.statusMessage ?? '',
           isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
           currentDraw: m?.currentDraw ?? 0,
           activeSlot: m?.activeSlot ?? null,
           queuedItems: m?.queuedItems ?? 0,
@@ -874,6 +975,8 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       powerOff: () => btkManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => btkManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => btkManagerRef.current?.reboot() ?? Promise.resolve(),
+      setExpanded: (expanded: boolean) => btkManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => btkManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = btkManagerRef.current
         return {
@@ -882,6 +985,7 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           isPowered: m?.isPowered ?? false,
           currentDraw: m?.currentDraw ?? 0,
           selectedTool: m?.selectedTool ?? null,
+          isExpanded: m?.isExpanded ?? true,
         }
       },
       getFirmware: () => btkManagerRef.current?.firmware ?? {
@@ -910,6 +1014,8 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       runTest: () => rmgManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => rmgManagerRef.current?.reboot() ?? Promise.resolve(),
       setStrength: (value: number) => rmgManagerRef.current?.setStrength(value),
+      setExpanded: (expanded: boolean) => rmgManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => rmgManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = rmgManagerRef.current
         return {
@@ -919,6 +1025,7 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           currentDraw: m?.currentDraw ?? 0,
           strength: m?.strength ?? 45,
           fieldActive: m?.fieldActive ?? false,
+          isExpanded: m?.isExpanded ?? true,
         }
       },
       getFirmware: () => rmgManagerRef.current?.firmware ?? {
@@ -946,6 +1053,8 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       powerOff: () => mscManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => mscManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => mscManagerRef.current?.reboot() ?? Promise.resolve(),
+      setExpanded: (expanded: boolean) => mscManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => mscManagerRef.current?.toggleExpanded(),
       getState: () => {
         const m = mscManagerRef.current
         return {
@@ -955,6 +1064,7 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           currentDraw: m?.currentDraw ?? 0,
           scanLine: m?.scanLine ?? 0,
           detectedMaterials: m?.detectedMaterials ?? 0,
+          isExpanded: m?.isExpanded ?? true,
         }
       },
       getFirmware: () => mscManagerRef.current?.firmware ?? {
@@ -974,6 +1084,503 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mscManager !== undefined])
+
+  const netDeviceActions: NETDeviceActions | undefined = useMemo(() => {
+    if (!netManager) return undefined
+    return {
+      powerOn: () => netManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => netManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => netManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => netManagerRef.current?.reboot() ?? Promise.resolve(),
+      setBandwidth: (value: number) => netManagerRef.current?.setBandwidth(value),
+      setLatency: (value: number) => netManagerRef.current?.setLatency(value),
+      setExpanded: (expanded: boolean) => netManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => netManagerRef.current?.toggleExpanded(),
+      getState: () => {
+        const m = netManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
+          currentDraw: m?.currentDraw ?? 0,
+          bandwidth: m?.bandwidth ?? 2.4,
+          latencyMs: m?.latencyMs ?? 12,
+          isConnected: m?.isConnected ?? false,
+          packetLoss: m?.packetLoss ?? 0,
+        }
+      },
+      getFirmware: () => netManagerRef.current?.firmware ?? {
+        version: '2.1.0',
+        build: '2026.01.28',
+        checksum: 'N7E4T2M1',
+        features: ['nic-detect', 'dhcp-client', 'throughput-monitor', 'latency-track', 'packet-inspect'],
+        securityPatch: '2026.01.20',
+      },
+      getPowerSpecs: () => netManagerRef.current?.powerSpecs ?? {
+        full: 1.5,
+        idle: 0.8,
+        standby: 0.1,
+        category: 'light',
+        priority: 2,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [netManager !== undefined])
+
+  const tmpDeviceActions: TMPDeviceActions | undefined = useMemo(() => {
+    if (!tmpManager) return undefined
+    return {
+      powerOn: () => tmpManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => tmpManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => tmpManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => tmpManagerRef.current?.reboot() ?? Promise.resolve(),
+      setTemperature: (value: number) => tmpManagerRef.current?.setTemperature(value),
+      setExpanded: (expanded: boolean) => tmpManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => tmpManagerRef.current?.toggleExpanded(),
+      getState: () => {
+        const m = tmpManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
+          currentDraw: m?.currentDraw ?? 0,
+          temperature: m?.temperature ?? 28.4,
+          maxTemp: m?.maxTemp ?? 85,
+          minTemp: m?.minTemp ?? 15,
+          fluctuation: m?.fluctuation ?? 0,
+        }
+      },
+      getFirmware: () => tmpManagerRef.current?.firmware ?? {
+        version: '1.0.0',
+        build: '2025.11.15',
+        checksum: 'T3M1P4K2',
+        features: ['thermal-probe', 'multi-sensor', 'threshold-alert', 'cooling-monitor', 'auto-calibrate'],
+        securityPatch: '2025.11.10',
+      },
+      getPowerSpecs: () => tmpManagerRef.current?.powerSpecs ?? {
+        full: 1.2,
+        idle: 0.8,
+        standby: 0.1,
+        category: 'light',
+        priority: 1,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tmpManager !== undefined])
+
+  const dimDeviceActions: DIMDeviceActions | undefined = useMemo(() => {
+    if (!dimManager) return undefined
+    return {
+      powerOn: () => dimManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => dimManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => dimManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => dimManagerRef.current?.reboot() ?? Promise.resolve(),
+      setDimension: (value: number) => dimManagerRef.current?.setDimension(value),
+      setExpanded: (expanded: boolean) => dimManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => dimManagerRef.current?.toggleExpanded(),
+      getState: () => {
+        const m = dimManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
+          currentDraw: m?.currentDraw ?? 0,
+          dimension: m?.dimension ?? 3.14,
+          stability: m?.stability ?? 98,
+          riftActivity: m?.riftActivity ?? 0.02,
+          fluctuation: m?.fluctuation ?? 0,
+          testResult: m?.testResult ?? null,
+        }
+      },
+      getFirmware: () => dimManagerRef.current?.firmware ?? {
+        version: '1.0.0',
+        build: '2025.12.01',
+        checksum: 'D1M3N501',
+        features: ['d-space-probe', 'rift-scan', 'stability-lock', 'halo-monitor', 'auto-calibrate'],
+        securityPatch: '2025.11.28',
+      },
+      getPowerSpecs: () => dimManagerRef.current?.powerSpecs ?? {
+        full: 1.5,
+        idle: 0.8,
+        standby: 0.1,
+        category: 'light',
+        priority: 2,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dimManager !== undefined])
+
+  const cpuDeviceActions: CPUDeviceActions | undefined = useMemo(() => {
+    if (!cpuManager) return undefined
+    return {
+      powerOn: () => cpuManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => cpuManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => cpuManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => cpuManagerRef.current?.reboot() ?? Promise.resolve(),
+      setCores: (value: number) => cpuManagerRef.current?.setCores(value),
+      setUtilization: (value: number) => cpuManagerRef.current?.setUtilization(value),
+      setFrequency: (value: number) => cpuManagerRef.current?.setFrequency(value),
+      setExpanded: (expanded: boolean) => cpuManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => cpuManagerRef.current?.toggleExpanded(),
+      getState: () => {
+        const m = cpuManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
+          currentDraw: m?.currentDraw ?? 0,
+          cores: m?.cores ?? 8,
+          utilization: m?.utilization ?? 67,
+          frequency: m?.frequency ?? 4.2,
+          coreLoads: m?.coreLoads ?? [],
+          temperature: m?.temperature ?? 62,
+          testResult: m?.testResult ?? null,
+        }
+      },
+      getFirmware: () => cpuManagerRef.current?.firmware ?? {
+        version: '3.2.1',
+        build: '2025.08.15',
+        checksum: 'CPU3M0N1',
+        features: ['multi-core-monitor', 'freq-scaling', 'thermal-link', 'cache-analysis', 'stress-test'],
+        securityPatch: '2025.08.01',
+      },
+      getPowerSpecs: () => cpuManagerRef.current?.powerSpecs ?? {
+        full: 0.8,
+        idle: 0.5,
+        standby: 0.05,
+        category: 'light',
+        priority: 1,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cpuManager !== undefined])
+
+  const clkDeviceActions: CLKDeviceActions | undefined = useMemo(() => {
+    if (!clkManager) return undefined
+    return {
+      powerOn: () => clkManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => clkManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => clkManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => clkManagerRef.current?.reboot() ?? Promise.resolve(),
+      cycleMode: () => clkManagerRef.current?.cycleMode(),
+      setMode: (mode: 'local' | 'utc' | 'date' | 'uptime' | 'countdown' | 'stopwatch') => clkManagerRef.current?.setMode(mode),
+      toggleStopwatch: () => clkManagerRef.current?.toggleStopwatch(),
+      resetStopwatch: () => clkManagerRef.current?.resetStopwatch(),
+      toggleCountdown: () => clkManagerRef.current?.toggleCountdown(),
+      resetCountdown: () => clkManagerRef.current?.resetCountdown(),
+      setExpanded: (expanded: boolean) => clkManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => clkManagerRef.current?.toggleExpanded(),
+      getState: () => {
+        const m = clkManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
+          currentDraw: m?.currentDraw ?? 0,
+          displayMode: m?.displayMode ?? 'local',
+          currentTime: m?.currentTime ?? new Date(),
+          uptime: m?.uptime ?? 0,
+          stopwatchTime: m?.stopwatchTime ?? 0,
+          stopwatchRunning: m?.stopwatchRunning ?? false,
+          countdownTime: m?.countdownTime ?? 3600,
+          countdownRunning: m?.countdownRunning ?? false,
+          testResult: m?.testResult ?? null,
+        }
+      },
+      getFirmware: () => clkManagerRef.current?.firmware ?? {
+        version: '2.4.0',
+        build: '2025.06.20',
+        checksum: 'CLK7M3R0',
+        features: ['rtc-sync', 'ntp-query', 'drift-comp', 'multi-mode', 'stopwatch', 'countdown'],
+        securityPatch: '2025.06.15',
+      },
+      getPowerSpecs: () => clkManagerRef.current?.powerSpecs ?? {
+        full: 0.5,
+        idle: 0.3,
+        standby: 0.02,
+        category: 'light',
+        priority: 1,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clkManager !== undefined])
+
+  const memDeviceActions: MEMDeviceActions | undefined = useMemo(() => {
+    if (!memManager) return undefined
+    return {
+      powerOn: () => memManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => memManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => memManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => memManagerRef.current?.reboot() ?? Promise.resolve(),
+      cycleMode: () => memManagerRef.current?.cycleMode(),
+      setMode: (mode: 'usage' | 'heap' | 'cache' | 'swap' | 'processes' | 'allocation') => memManagerRef.current?.setMode(mode),
+      setTotalMemory: (value: number) => memManagerRef.current?.setTotalMemory(value),
+      setUsedMemory: (value: number) => memManagerRef.current?.setUsedMemory(value),
+      setExpanded: (expanded: boolean) => memManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => memManagerRef.current?.toggleExpanded(),
+      getState: () => {
+        const m = memManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
+          currentDraw: m?.currentDraw ?? 0,
+          totalMemory: m?.totalMemory ?? 16,
+          usedMemory: m?.usedMemory ?? 11.5,
+          displayMode: m?.displayMode ?? 'usage',
+          testResult: m?.testResult ?? null,
+        }
+      },
+      getFirmware: () => memManagerRef.current?.firmware ?? {
+        version: '3.1.0',
+        build: '2025.10.20',
+        checksum: 'M3M0RY01',
+        features: ['dimm-detect', 'spd-read', 'timing-config', 'bandwidth-test', 'multi-mode'],
+        securityPatch: '2025.10.15',
+      },
+      getPowerSpecs: () => memManagerRef.current?.powerSpecs ?? {
+        full: 0.6,
+        idle: 0.4,
+        standby: 0.05,
+        category: 'light',
+        priority: 1,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memManager !== undefined])
+
+  const andDeviceActions: ANDDeviceActions | undefined = useMemo(() => {
+    if (!andManager) return undefined
+    return {
+      powerOn: () => andManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => andManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => andManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => andManagerRef.current?.reboot() ?? Promise.resolve(),
+      cycleMode: () => andManagerRef.current?.cycleMode(),
+      setMode: (mode: 'waveform' | 'spectrum' | 'heatmap' | 'timeline' | 'frequency' | 'radar') => andManagerRef.current?.setMode(mode),
+      setSignalStrength: (value: number) => andManagerRef.current?.setSignalStrength(value),
+      setAnomaliesFound: (value: number) => andManagerRef.current?.setAnomaliesFound(value),
+      setExpanded: (expanded: boolean) => andManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => andManagerRef.current?.toggleExpanded(),
+      getState: () => {
+        const m = andManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
+          currentDraw: m?.currentDraw ?? 0,
+          signalStrength: m?.signalStrength ?? 67,
+          anomaliesFound: m?.anomaliesFound ?? 3,
+          displayMode: m?.displayMode ?? 'waveform',
+          testResult: m?.testResult ?? null,
+        }
+      },
+      getFirmware: () => andManagerRef.current?.firmware ?? {
+        version: '2.3.0',
+        build: '2025.11.08',
+        checksum: 'AN0MALY01',
+        features: ['waveform-scan', 'anomaly-detect', 'signal-analysis', 'freq-sweep', 'multi-mode', 'halo-link'],
+        securityPatch: '2025.11.01',
+      },
+      getPowerSpecs: () => andManagerRef.current?.powerSpecs ?? {
+        full: 4,
+        idle: 2,
+        standby: 0.1,
+        category: 'medium',
+        priority: 2,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [andManager !== undefined])
+
+  const qcpDeviceActions: QCPDeviceActions | undefined = useMemo(() => {
+    if (!qcpManager) return undefined
+    return {
+      powerOn: () => qcpManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => qcpManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => qcpManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => qcpManagerRef.current?.reboot() ?? Promise.resolve(),
+      cycleMode: () => qcpManagerRef.current?.cycleMode(),
+      setMode: (mode: 'compass' | 'radar' | 'heatmap' | 'trajectory' | 'triangulate' | 'history') => qcpManagerRef.current?.setMode(mode),
+      setAnomalyDirection: (value: number) => qcpManagerRef.current?.setAnomalyDirection(value),
+      setAnomalyDistance: (value: number) => qcpManagerRef.current?.setAnomalyDistance(value),
+      setExpanded: (expanded: boolean) => qcpManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => qcpManagerRef.current?.toggleExpanded(),
+      getState: () => {
+        const m = qcpManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
+          currentDraw: m?.currentDraw ?? 0,
+          anomalyDirection: m?.anomalyDirection ?? 127,
+          anomalyDistance: m?.anomalyDistance ?? 42,
+          displayMode: m?.displayMode ?? 'compass',
+          testResult: m?.testResult ?? null,
+        }
+      },
+      getFirmware: () => qcpManagerRef.current?.firmware ?? {
+        version: '1.5.0',
+        build: '2025.09.22',
+        checksum: 'QC0MPA55',
+        features: ['gyroscope', 'magnetometer', 'quantum-link', 'anomaly-track', 'distance-calc', 'needle-stabilize'],
+        securityPatch: '2025.09.15',
+      },
+      getPowerSpecs: () => qcpManagerRef.current?.powerSpecs ?? {
+        full: 2.5,
+        idle: 0.8,
+        standby: 0.2,
+        category: 'light',
+        priority: 3,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qcpManager !== undefined])
+
+  const tlpDeviceActions: TLPDeviceActions | undefined = useMemo(() => {
+    if (!tlpManager) return undefined
+    return {
+      powerOn: () => tlpManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => tlpManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => tlpManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => tlpManagerRef.current?.reboot() ?? Promise.resolve(),
+      cycleMode: () => tlpManagerRef.current?.cycleMode(),
+      setMode: (mode: 'standard' | 'precision' | 'express' | 'stealth' | 'cargo' | 'emergency') => tlpManagerRef.current?.setMode(mode),
+      setChargeLevel: (value: number) => tlpManagerRef.current?.setChargeLevel(value),
+      setLastDestination: (value: string) => tlpManagerRef.current?.setLastDestination(value),
+      setExpanded: (expanded: boolean) => tlpManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => tlpManagerRef.current?.toggleExpanded(),
+      getState: () => {
+        const m = tlpManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
+          currentDraw: m?.currentDraw ?? 0,
+          chargeLevel: m?.chargeLevel ?? 65,
+          lastDestination: m?.lastDestination ?? 'LAB-Ω',
+          displayMode: m?.displayMode ?? 'standard',
+          testResult: m?.testResult ?? null,
+        }
+      },
+      getFirmware: () => tlpManagerRef.current?.firmware ?? {
+        version: '2.2.0',
+        build: '2025.08.10',
+        checksum: 'T3L3P0RT',
+        features: ['capacitor-charge', 'matrix-align', 'quantum-lock', 'coord-load', 'stabilize', 'portal-gen'],
+        securityPatch: '2025.08.05',
+      },
+      getPowerSpecs: () => tlpManagerRef.current?.powerSpecs ?? {
+        full: 35,
+        idle: 3,
+        standby: 0.5,
+        category: 'heavy',
+        priority: 4,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tlpManager !== undefined])
+
+  const lctDeviceActions: LCTDeviceActions | undefined = useMemo(() => {
+    if (!lctManager) return undefined
+    return {
+      powerOn: () => lctManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => lctManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => lctManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => lctManagerRef.current?.reboot() ?? Promise.resolve(),
+      cycleMode: () => lctManagerRef.current?.cycleMode(),
+      setMode: (mode: 'cutting' | 'engraving' | 'welding' | 'marking' | 'drilling' | 'scanning') => lctManagerRef.current?.setMode(mode),
+      setLaserPower: (value: number) => lctManagerRef.current?.setLaserPower(value),
+      setPrecision: (value: number) => lctManagerRef.current?.setPrecision(value),
+      setExpanded: (expanded: boolean) => lctManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => lctManagerRef.current?.toggleExpanded(),
+      getState: () => {
+        const m = lctManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
+          currentDraw: m?.currentDraw ?? 0,
+          laserPower: m?.laserPower ?? 450,
+          precision: m?.precision ?? 0.01,
+          displayMode: m?.displayMode ?? 'cutting',
+          testResult: m?.testResult ?? null,
+        }
+      },
+      getFirmware: () => lctManagerRef.current?.firmware ?? {
+        version: '2.1.0',
+        build: '2025.07.20',
+        checksum: 'L4S3RCUT',
+        features: ['diode-array', 'optics-check', 'focus-calibrate', 'power-regulate', 'thermal-protect', 'precision-cut'],
+        securityPatch: '2025.07.15',
+      },
+      getPowerSpecs: () => lctManagerRef.current?.powerSpecs ?? {
+        full: 25,
+        idle: 4,
+        standby: 0.5,
+        category: 'heavy',
+        priority: 3,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lctManager !== undefined])
+
+  const p3dDeviceActions: P3DDeviceActions | undefined = useMemo(() => {
+    if (!p3dManager) return undefined
+    return {
+      powerOn: () => p3dManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => p3dManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => p3dManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => p3dManagerRef.current?.reboot() ?? Promise.resolve(),
+      cycleMode: () => p3dManagerRef.current?.cycleMode(),
+      setMode: (mode: 'plastic' | 'metal' | 'crystal' | 'composite' | 'nano' | 'prototype') => p3dManagerRef.current?.setMode(mode),
+      setProgress: (value: number) => p3dManagerRef.current?.setProgress(value),
+      setLayerCount: (value: number) => p3dManagerRef.current?.setLayerCount(value),
+      setBedTemp: (value: number) => p3dManagerRef.current?.setBedTemp(value),
+      setExpanded: (expanded: boolean) => p3dManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => p3dManagerRef.current?.toggleExpanded(),
+      getState: () => {
+        const m = p3dManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          currentDraw: m?.currentDraw ?? 0,
+          progress: m?.progress ?? 67,
+          layerCount: m?.layerCount ?? 234,
+          bedTemp: m?.bedTemp ?? 60,
+          displayMode: m?.displayMode ?? 'plastic',
+          testResult: m?.testResult ?? null,
+          isExpanded: m?.isExpanded ?? true,
+        }
+      },
+      getFirmware: () => p3dManagerRef.current?.firmware ?? {
+        version: '3.2.1',
+        build: '2025.06.15',
+        checksum: 'F4BR1C8R',
+        features: ['bed-level', 'nozzle-calibrate', 'extrusion-ctrl', 'layer-track', 'thermal-manage', 'multi-material'],
+        securityPatch: '2025.06.10',
+      },
+      getPowerSpecs: () => p3dManagerRef.current?.powerSpecs ?? {
+        full: 18,
+        idle: 3,
+        standby: 0.5,
+        category: 'heavy',
+        priority: 3,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p3dManager !== undefined])
 
   // Build theme actions from props - use refs for stable reference
   const themeIndexRef = useRef(themeIndex)
@@ -1004,7 +1611,7 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [themes !== undefined, themeIndex !== undefined, setThemeIndex !== undefined])
 
-  const { lines, isTyping, processCommand, navigateHistory, prompt, passwordMode } = useTerminal({
+  const { lines, isTyping, processCommand, navigateHistory, prompt, passwordMode, appMode, appModeData, exitAppMode } = useTerminal({
     userId,
     username,
     balance,
@@ -1026,6 +1633,17 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     btkDeviceActions,
     rmgDeviceActions,
     mscDeviceActions,
+    netDeviceActions,
+    tmpDeviceActions,
+    dimDeviceActions,
+    cpuDeviceActions,
+    clkDeviceActions,
+    memDeviceActions,
+    andDeviceActions,
+    qcpDeviceActions,
+    tlpDeviceActions,
+    lctDeviceActions,
+    p3dDeviceActions,
     screwButtonDeviceActions,
     filesystemActions,
     userActions,
@@ -1086,6 +1704,14 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       return []
     }
   }, [])
+
+  if (appMode === 'mc' || appMode === 'mcedit') {
+    return (
+      <div className="flex flex-col h-full">
+        <MidnightCommander filesystemActions={filesystemActions} onExit={exitAppMode} initialEditFile={appMode === 'mcedit' ? appModeData?.editFile : undefined} />
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full">

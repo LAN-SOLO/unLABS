@@ -44,6 +44,9 @@ interface BTKManagerContextType extends BTKState {
   runTest: () => Promise<void>
   reboot: () => Promise<void>
   selectTool: (toolName: string) => void
+  isExpanded: boolean
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
   firmware: typeof BTK_FIRMWARE
   powerSpecs: typeof BTK_POWER_SPECS
 }
@@ -52,7 +55,7 @@ const BTKManagerContext = createContext<BTKManagerContextType | null>(null)
 
 interface BTKManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean }
+  initialState?: { isPowered: boolean; isExpanded?: boolean }
 }
 
 export function BTKManagerProvider({ children, initialState }: BTKManagerProviderProps) {
@@ -66,6 +69,12 @@ export function BTKManagerProvider({ children, initialState }: BTKManagerProvide
   const [isPowered, setIsPowered] = useState(startPowered)
   const [currentDraw, setCurrentDraw] = useState(BTK_POWER_SPECS.idle)
   const [selectedTool, setSelectedTool] = useState<string | null>(null)
+  const startExpanded = initialState?.isExpanded ?? startPowered
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
+
+  const toggleExpanded = useCallback(() => {
+    setIsExpanded(prev => !prev)
+  }, [])
 
   const runBootSequence = useCallback(async () => {
     setDeviceState('booting')
@@ -116,6 +125,7 @@ export function BTKManagerProvider({ children, initialState }: BTKManagerProvide
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
@@ -123,6 +133,7 @@ export function BTKManagerProvider({ children, initialState }: BTKManagerProvide
     if (deviceState !== 'online') return
     setIsPowered(false)
     await runShutdownSequence()
+    setIsExpanded(false)
   }, [deviceState, runShutdownSequence])
 
   const runTest = useCallback(async () => {
@@ -207,6 +218,9 @@ export function BTKManagerProvider({ children, initialState }: BTKManagerProvide
     isPowered,
     currentDraw,
     selectedTool,
+    isExpanded,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     powerOn,
     powerOff,
     runTest,

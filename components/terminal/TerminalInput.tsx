@@ -24,6 +24,7 @@ export function TerminalInput({
   const [suggestionIndex, setSuggestionIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
   const lastSpaceTime = useRef(0)
+  const prevValue = useRef('')
 
   // Focus input on mount and when clicked anywhere
   useEffect(() => {
@@ -44,11 +45,13 @@ export function TerminalInput({
 
     if (completions.length === 1) {
       setValue(completions[0])
+      prevValue.current = completions[0]
       setSuggestions([])
     } else if (completions.length > 1) {
       setSuggestions(completions)
       setSuggestionIndex(0)
       setValue(completions[0])
+      prevValue.current = completions[0]
     }
   }
 
@@ -119,7 +122,25 @@ export function TerminalInput({
           ref={inputRef}
           type={passwordMode ? 'password' : 'text'}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            const newVal = e.target.value
+            const prev = prevValue.current
+            // Detect OS double-space → period substitution:
+            // prev ends with " " and OS replaced it with ". " (or just ".")
+            if (
+              prev.endsWith(' ') &&
+              (newVal === prev.slice(0, -1) + '. ' || newVal === prev.slice(0, -1) + '.')
+            ) {
+              // Undo the period insertion, trigger autocomplete instead
+              const trimmed = prev.trimEnd()
+              setValue(trimmed)
+              prevValue.current = trimmed
+              triggerAutocomplete(trimmed)
+              return
+            }
+            prevValue.current = newVal
+            setValue(newVal)
+          }}
           onKeyDown={handleKeyDown}
           disabled={disabled}
           className="flex-1 bg-transparent text-green-400 font-mono text-[10px] outline-none border-none caret-green-400 placeholder-green-500/30 disabled:opacity-50"

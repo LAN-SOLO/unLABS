@@ -35,6 +35,7 @@ interface UECState {
   testResult: 'pass' | 'fail' | null
   statusMessage: string
   isPowered: boolean
+  isExpanded: boolean
   volatilityTier: number
   tps: number
   energyOutput: number
@@ -48,6 +49,8 @@ interface UECManagerContextType extends UECState {
   runTest: () => Promise<void>
   reboot: () => Promise<void>
   updateVolatility: (tier: number, tps: number) => void
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
   // Read-only info
   firmware: typeof UEC_FIRMWARE
   powerSpecs: typeof UEC_POWER_SPECS
@@ -57,11 +60,12 @@ const UECManagerContext = createContext<UECManagerContextType | null>(null)
 
 interface UECManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean }
+  initialState?: { isPowered: boolean; isExpanded?: boolean }
 }
 
 export function UECManagerProvider({ children, initialState }: UECManagerProviderProps) {
   const startPowered = initialState?.isPowered ?? true
+  const startExpanded = initialState?.isExpanded ?? startPowered
   const [deviceState, setDeviceState] = useState<UECDeviceState>(startPowered ? 'booting' : 'standby')
   const [bootPhase, setBootPhase] = useState<UECBootPhase>(startPowered ? 'post' : null)
   const [testPhase, setTestPhase] = useState<UECTestPhase>(null)
@@ -69,6 +73,7 @@ export function UECManagerProvider({ children, initialState }: UECManagerProvide
   const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
   const [statusMessage, setStatusMessage] = useState(startPowered ? 'Initializing...' : 'Standby mode')
   const [isPowered, setIsPowered] = useState(startPowered)
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
   const [volatilityTier, setVolatilityTier] = useState(1)
   const [tps, setTps] = useState(1000)
   const [energyOutput, setEnergyOutput] = useState(0)
@@ -138,10 +143,16 @@ export function UECManagerProvider({ children, initialState }: UECManagerProvide
     setStatusMessage('Standby mode')
   }, [])
 
+  // Toggle expanded
+  const toggleExpanded = useCallback(() => {
+    setIsExpanded(prev => !prev)
+  }, [])
+
   // Power ON
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
@@ -150,6 +161,7 @@ export function UECManagerProvider({ children, initialState }: UECManagerProvide
     if (deviceState !== 'online') return
     setIsPowered(false)
     await runShutdownSequence()
+    setIsExpanded(false)
   }, [deviceState, runShutdownSequence])
 
   // Run test
@@ -242,6 +254,7 @@ export function UECManagerProvider({ children, initialState }: UECManagerProvide
     testResult,
     statusMessage,
     isPowered,
+    isExpanded,
     volatilityTier,
     tps,
     energyOutput,
@@ -251,6 +264,8 @@ export function UECManagerProvider({ children, initialState }: UECManagerProvide
     runTest,
     reboot,
     updateVolatility,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     firmware: UEC_FIRMWARE,
     powerSpecs: UEC_POWER_SPECS,
   }

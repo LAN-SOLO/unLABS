@@ -51,6 +51,10 @@ interface AICManagerContextType extends AICState {
   runTest: () => Promise<void>
   reboot: () => Promise<void>
   setLearningMode: (enabled: boolean) => void
+  // Fold state
+  isExpanded: boolean
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
   // Read-only info
   firmware: typeof AIC_FIRMWARE
   powerSpecs: typeof AIC_POWER_SPECS
@@ -60,7 +64,7 @@ const AICManagerContext = createContext<AICManagerContextType | null>(null)
 
 interface AICManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean; isLearning: boolean }
+  initialState?: { isPowered: boolean; isLearning: boolean; isExpanded?: boolean }
 }
 
 export function AICManagerProvider({ children, initialState }: AICManagerProviderProps) {
@@ -78,6 +82,11 @@ export function AICManagerProvider({ children, initialState }: AICManagerProvide
   const [nodeActivity, setNodeActivity] = useState([0, 0, 0, 0, 0])
   const [anomalyCount, setAnomalyCount] = useState(0)
   const [uptime, setUptime] = useState(0)
+
+  // Fold state
+  const startExpanded = initialState?.isExpanded ?? startPowered
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
+  const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev) }, [])
 
   // Simulate AI activity
   useEffect(() => {
@@ -172,6 +181,7 @@ export function AICManagerProvider({ children, initialState }: AICManagerProvide
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
@@ -180,6 +190,7 @@ export function AICManagerProvider({ children, initialState }: AICManagerProvide
     if (deviceState !== 'online') return
     setIsPowered(false)
     await runShutdownSequence()
+    setIsExpanded(false)
   }, [deviceState, runShutdownSequence])
 
   // Run test
@@ -287,6 +298,9 @@ export function AICManagerProvider({ children, initialState }: AICManagerProvide
     runTest,
     reboot,
     setLearningMode,
+    isExpanded,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     firmware: AIC_FIRMWARE,
     powerSpecs: AIC_POWER_SPECS,
   }

@@ -36,6 +36,7 @@ interface BATState {
   testResult: 'pass' | 'fail' | null
   statusMessage: string
   isPowered: boolean
+  isExpanded: boolean
   currentCharge: number      // Current E stored (0-5000)
   chargePercent: number      // 0-100%
   isCharging: boolean
@@ -53,6 +54,8 @@ interface BATManagerContextType extends BATState {
   reboot: () => Promise<void>
   setAutoRegen: (enabled: boolean) => void
   updateCharge: (amount: number) => void
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
   // Read-only info
   firmware: typeof BAT_FIRMWARE
   powerSpecs: typeof BAT_POWER_SPECS
@@ -62,11 +65,12 @@ const BATManagerContext = createContext<BATManagerContextType | null>(null)
 
 interface BATManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean; currentCharge: number; autoRegen: boolean }
+  initialState?: { isPowered: boolean; currentCharge: number; autoRegen: boolean; isExpanded?: boolean }
 }
 
 export function BATManagerProvider({ children, initialState }: BATManagerProviderProps) {
   const startPowered = initialState?.isPowered ?? true
+  const startExpanded = initialState?.isExpanded ?? startPowered
   const [deviceState, setDeviceState] = useState<BATDeviceState>(startPowered ? 'booting' : 'standby')
   const [bootPhase, setBootPhase] = useState<BATBootPhase>(startPowered ? 'init' : null)
   const [testPhase, setTestPhase] = useState<BATTestPhase>(null)
@@ -74,6 +78,7 @@ export function BATManagerProvider({ children, initialState }: BATManagerProvide
   const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
   const [statusMessage, setStatusMessage] = useState(startPowered ? 'Initializing...' : 'Standby mode')
   const [isPowered, setIsPowered] = useState(startPowered)
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
   const [currentCharge, setCurrentCharge] = useState(initialState?.currentCharge ?? 5000)
   const [chargePercent, setChargePercent] = useState(100)
   const [isCharging, setIsCharging] = useState(false)
@@ -134,10 +139,16 @@ export function BATManagerProvider({ children, initialState }: BATManagerProvide
     setStatusMessage('Standby mode')
   }, [])
 
+  // Toggle expanded
+  const toggleExpanded = useCallback(() => {
+    setIsExpanded(prev => !prev)
+  }, [])
+
   // Power ON
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
@@ -146,6 +157,7 @@ export function BATManagerProvider({ children, initialState }: BATManagerProvide
     if (deviceState !== 'online' && deviceState !== 'charging' && deviceState !== 'discharging') return
     setIsPowered(false)
     await runShutdownSequence()
+    setIsExpanded(false)
   }, [deviceState, runShutdownSequence])
 
   // Run test
@@ -237,6 +249,7 @@ export function BATManagerProvider({ children, initialState }: BATManagerProvide
     testResult,
     statusMessage,
     isPowered,
+    isExpanded,
     currentCharge,
     chargePercent,
     isCharging,
@@ -250,6 +263,8 @@ export function BATManagerProvider({ children, initialState }: BATManagerProvide
     reboot,
     setAutoRegen,
     updateCharge,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     firmware: BAT_FIRMWARE,
     powerSpecs: BAT_POWER_SPECS,
   }

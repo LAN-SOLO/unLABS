@@ -53,6 +53,10 @@ interface SCAManagerContextType extends SCAState {
   powerOff: () => Promise<void>
   runTest: () => Promise<void>
   reboot: () => Promise<void>
+  // Fold state
+  isExpanded: boolean
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
   // Read-only info
   firmware: typeof SCA_FIRMWARE
   powerSpecs: typeof SCA_POWER_SPECS
@@ -62,11 +66,14 @@ const SCAManagerContext = createContext<SCAManagerContextType | null>(null)
 
 interface SCAManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean }
+  initialState?: { isPowered: boolean; isExpanded?: boolean }
 }
 
 export function SCAManagerProvider({ children, initialState }: SCAManagerProviderProps) {
   const startPowered = initialState?.isPowered ?? true
+  const startExpanded = initialState?.isExpanded ?? startPowered
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
+  const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev) }, [])
   const [deviceState, setDeviceState] = useState<SCADeviceState>(startPowered ? 'booting' : 'standby')
   const [bootPhase, setBootPhase] = useState<SCABootPhase>(startPowered ? 'post' : null)
   const [testPhase, setTestPhase] = useState<SCATestPhase>(null)
@@ -203,6 +210,7 @@ export function SCAManagerProvider({ children, initialState }: SCAManagerProvide
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
@@ -210,6 +218,7 @@ export function SCAManagerProvider({ children, initialState }: SCAManagerProvide
   const powerOff = useCallback(async () => {
     if (deviceState !== 'online') return
     setIsPowered(false)
+    setIsExpanded(false)
     await runShutdownSequence()
   }, [deviceState, runShutdownSequence])
 
@@ -314,6 +323,9 @@ export function SCAManagerProvider({ children, initialState }: SCAManagerProvide
     powerOff,
     runTest,
     reboot,
+    isExpanded,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     firmware: SCA_FIRMWARE,
     powerSpecs: SCA_POWER_SPECS,
   }

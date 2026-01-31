@@ -45,6 +45,9 @@ interface RMGManagerContextType extends RMGState {
   runTest: () => Promise<void>
   reboot: () => Promise<void>
   setStrength: (value: number) => void
+  isExpanded: boolean
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
   firmware: typeof RMG_FIRMWARE
   powerSpecs: typeof RMG_POWER_SPECS
 }
@@ -53,7 +56,7 @@ const RMGManagerContext = createContext<RMGManagerContextType | null>(null)
 
 interface RMGManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean; strength?: number }
+  initialState?: { isPowered: boolean; strength?: number; isExpanded?: boolean }
 }
 
 export function RMGManagerProvider({ children, initialState }: RMGManagerProviderProps) {
@@ -68,6 +71,12 @@ export function RMGManagerProvider({ children, initialState }: RMGManagerProvide
   const [currentDraw, setCurrentDraw] = useState(RMG_POWER_SPECS.idle)
   const [strength, setStrengthState] = useState(initialState?.strength ?? 45)
   const [fieldActive, setFieldActive] = useState(false)
+  const startExpanded = initialState?.isExpanded ?? startPowered
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
+
+  const toggleExpanded = useCallback(() => {
+    setIsExpanded(prev => !prev)
+  }, [])
 
   const runBootSequence = useCallback(async () => {
     setDeviceState('booting')
@@ -127,6 +136,7 @@ export function RMGManagerProvider({ children, initialState }: RMGManagerProvide
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
@@ -134,6 +144,7 @@ export function RMGManagerProvider({ children, initialState }: RMGManagerProvide
     if (deviceState !== 'online') return
     setIsPowered(false)
     await runShutdownSequence()
+    setIsExpanded(false)
   }, [deviceState, runShutdownSequence])
 
   const runTest = useCallback(async () => {
@@ -218,6 +229,9 @@ export function RMGManagerProvider({ children, initialState }: RMGManagerProvide
     currentDraw,
     strength,
     fieldActive,
+    isExpanded,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     powerOn,
     powerOff,
     runTest,

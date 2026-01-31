@@ -48,6 +48,9 @@ interface EMCManagerContextType extends EMCState {
   powerOff: () => Promise<void>
   runTest: () => Promise<void>
   reboot: () => Promise<void>
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
+  isExpanded: boolean
   firmware: typeof EMC_FIRMWARE
   powerSpecs: typeof EMC_POWER_SPECS
 }
@@ -56,11 +59,15 @@ const EMCManagerContext = createContext<EMCManagerContextType | null>(null)
 
 interface EMCManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean }
+  initialState?: { isPowered: boolean; isExpanded?: boolean }
 }
 
 export function EMCManagerProvider({ children, initialState }: EMCManagerProviderProps) {
   const startPowered = initialState?.isPowered ?? true
+  const startExpanded = initialState?.isExpanded ?? startPowered
+
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
+  const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev) }, [])
 
   const [deviceState, setDeviceState] = useState<EMCDeviceState>(startPowered ? 'booting' : 'standby')
   const [bootPhase, setBootPhase] = useState<EMCBootPhase>(startPowered ? 'field' : null)
@@ -175,12 +182,14 @@ export function EMCManagerProvider({ children, initialState }: EMCManagerProvide
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
   const powerOff = useCallback(async () => {
     if (deviceState !== 'online') return
     setIsPowered(false)
+    setIsExpanded(false)
     await runShutdownSequence()
   }, [deviceState, runShutdownSequence])
 
@@ -267,6 +276,9 @@ export function EMCManagerProvider({ children, initialState }: EMCManagerProvide
     powerOff,
     runTest,
     reboot,
+    isExpanded,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     firmware: EMC_FIRMWARE,
     powerSpecs: EMC_POWER_SPECS,
   }

@@ -48,6 +48,9 @@ interface QSMManagerContextType extends QSMState {
   powerOff: () => Promise<void>
   runTest: () => Promise<void>
   reboot: () => Promise<void>
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
+  isExpanded: boolean
   firmware: typeof QSM_FIRMWARE
   powerSpecs: typeof QSM_POWER_SPECS
 }
@@ -56,11 +59,15 @@ const QSMManagerContext = createContext<QSMManagerContextType | null>(null)
 
 interface QSMManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean }
+  initialState?: { isPowered: boolean; isExpanded?: boolean }
 }
 
 export function QSMManagerProvider({ children, initialState }: QSMManagerProviderProps) {
   const startPowered = initialState?.isPowered ?? true
+  const startExpanded = initialState?.isExpanded ?? startPowered
+
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
+  const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev) }, [])
 
   const [deviceState, setDeviceState] = useState<QSMDeviceState>(startPowered ? 'booting' : 'standby')
   const [bootPhase, setBootPhase] = useState<QSMBootPhase>(startPowered ? 'cooling' : null)
@@ -176,12 +183,14 @@ export function QSMManagerProvider({ children, initialState }: QSMManagerProvide
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
   const powerOff = useCallback(async () => {
     if (deviceState !== 'online') return
     setIsPowered(false)
+    setIsExpanded(false)
     await runShutdownSequence()
   }, [deviceState, runShutdownSequence])
 
@@ -268,6 +277,9 @@ export function QSMManagerProvider({ children, initialState }: QSMManagerProvide
     powerOff,
     runTest,
     reboot,
+    isExpanded,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     firmware: QSM_FIRMWARE,
     powerSpecs: QSM_POWER_SPECS,
   }

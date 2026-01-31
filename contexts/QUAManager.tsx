@@ -55,6 +55,9 @@ interface QUAManagerContextType extends QUAState {
   setSensitivity: (value: number) => void
   setDepth: (value: number) => void
   setFrequency: (value: number) => void
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
+  isExpanded: boolean
   firmware: typeof QUA_FIRMWARE
   powerSpecs: typeof QUA_POWER_SPECS
 }
@@ -63,11 +66,15 @@ const QUAManagerContext = createContext<QUAManagerContextType | null>(null)
 
 interface QUAManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered?: boolean; mode?: string; sensitivity?: number; depth?: number; frequency?: number }
+  initialState?: { isPowered?: boolean; mode?: string; sensitivity?: number; depth?: number; frequency?: number; isExpanded?: boolean }
 }
 
 export function QUAManagerProvider({ children, initialState }: QUAManagerProviderProps) {
   const startPowered = initialState?.isPowered ?? true
+  const startExpanded = initialState?.isExpanded ?? startPowered
+
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
+  const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev) }, [])
 
   const [deviceState, setDeviceState] = useState<QUADeviceState>(startPowered ? 'booting' : 'standby')
   const [bootPhase, setBootPhase] = useState<QUABootPhase>(startPowered ? 'core' : null)
@@ -154,12 +161,14 @@ export function QUAManagerProvider({ children, initialState }: QUAManagerProvide
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
   const powerOff = useCallback(async () => {
     if (deviceState !== 'online') return
     setIsPowered(false)
+    setIsExpanded(false)
     await runShutdownSequence()
   }, [deviceState, runShutdownSequence])
 
@@ -249,6 +258,9 @@ export function QUAManagerProvider({ children, initialState }: QUAManagerProvide
     setSensitivity,
     setDepth,
     setFrequency,
+    isExpanded,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     firmware: QUA_FIRMWARE,
     powerSpecs: QUA_POWER_SPECS,
   }

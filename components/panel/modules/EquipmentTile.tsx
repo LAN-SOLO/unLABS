@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { PanelFrame } from '../PanelFrame'
 import { Knob } from '../controls/Knob'
@@ -10,6 +10,17 @@ import { usePWBManagerOptional } from '@/contexts/PWBManager'
 import { useBTKManagerOptional } from '@/contexts/BTKManager'
 import { useRMGManagerOptional } from '@/contexts/RMGManager'
 import { useMSCManagerOptional } from '@/contexts/MSCManager'
+import { useNETManagerOptional } from '@/contexts/NETManager'
+import { useTMPManagerOptional } from '@/contexts/TMPManager'
+import { useDIMManagerOptional } from '@/contexts/DIMManager'
+import { useCPUManagerOptional } from '@/contexts/CPUManager'
+import { useCLKManagerOptional } from '@/contexts/CLKManager'
+import { useMEMManagerOptional } from '@/contexts/MEMManager'
+import { useANDManagerOptional } from '@/contexts/ANDManager'
+import { useQCPManagerOptional } from '@/contexts/QCPManager'
+import { useTLPManagerOptional } from '@/contexts/TLPManager'
+import { useLCTManagerOptional } from '@/contexts/LCTManager'
+import { useP3DManagerOptional } from '@/contexts/P3DManager'
 import type { TechTreeProgress } from '@/app/(game)/terminal/actions/equipment'
 
 interface EquipmentTileProps {
@@ -337,171 +348,376 @@ export function CrystalDataCache({
 
   const isLedOn = deviceState !== 'shutdown' || shutdownPhase !== null
 
+  // Fold state from context
+  const isExpanded = cdcManager?.isExpanded ?? true
+  const handleToggleExpand = () => cdcManager?.toggleExpanded()
+
+  // Folded info toggle (local, with 5-min inactivity auto-close)
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const toggleFoldedInfo = () => {
+    const next = !showFoldedInfo
+    setShowFoldedInfo(next)
+    if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current)
+    if (next) {
+      foldedInfoTimerRef.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+    }
+  }
+
+  // Auto-close folded info when powered off
+  useEffect(() => {
+    if (!isPowered) setShowFoldedInfo(false)
+  }, [isPowered])
+
+  // Cleanup timer
+  useEffect(() => {
+    return () => { if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current) }
+  }, [])
+
+  // State label for folded display
+  const stateLabel = deviceState === 'standby' ? 'STANDBY' :
+    deviceState === 'booting' ? 'BOOTING' :
+    deviceState === 'testing' ? 'TESTING' :
+    deviceState === 'rebooting' ? 'REBOOT' :
+    deviceState === 'shutdown' ? 'SHUTDOWN' : 'ONLINE'
+
+  const isTransitioning = deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'
+
+  // Shared micro button style helper
+  const microBtnClass = (active: boolean, color: string) => cn(
+    'w-3.5 h-3 rounded-sm font-mono text-[5px] transition-all border flex items-center justify-center shrink-0',
+    active
+      ? `bg-[var(--neon-${color})]/20 text-[var(--neon-${color})] border-[var(--neon-${color})]/50`
+      : 'bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20 disabled:opacity-30'
+  )
+
   return (
-    <PanelFrame variant="default" className={cn('p-2 relative', className)}>
-      {/* Tiny power button - top right corner */}
-      <button
-        onClick={handlePowerToggle}
-        disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
-        className="absolute top-1.5 right-1.5 z-10 group"
-        title={isPowered && deviceState !== 'standby' ? 'Power Off' : 'Power On'}
+    <PanelFrame
+      variant="default"
+      className={cn('relative overflow-hidden', className)}
+      style={{ perspective: '600px' }}
+    >
+      {/* ═══ FOLDED FRONT PANEL ═══ */}
+      <div
+        style={{
+          transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 400ms cubic-bezier(0.4,0,0.2,1), opacity 350ms ease',
+          opacity: isExpanded ? 0 : 1,
+          position: isExpanded ? 'absolute' : 'relative',
+          pointerEvents: isExpanded ? 'none' : 'auto',
+          zIndex: isExpanded ? 0 : 2,
+        }}
+        className="w-full"
       >
-        <div
-          className="w-2.5 h-2.5 rounded-full border transition-all flex items-center justify-center"
-          style={{
-            background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
-            borderColor: isPowered && deviceState !== 'standby'
-              ? 'var(--neon-green)'
-              : deviceState === 'standby' ? 'var(--neon-amber)' : '#3a3a4a',
-            boxShadow: isPowered && deviceState !== 'standby'
-              ? '0 0 4px var(--neon-green), inset 0 0 2px rgba(0,255,0,0.3)'
-              : deviceState === 'standby' ? '0 0 3px var(--neon-amber)' : 'none',
-          }}
-        >
-          <div
-            className="w-1 h-1 rounded-full"
-            style={{
-              backgroundColor: isPowered && deviceState !== 'standby'
-                ? 'var(--neon-green)'
-                : deviceState === 'standby' ? 'var(--neon-amber)' : '#333',
-            }}
-          />
-        </div>
-      </button>
+        <div className="p-1.5 px-2">
+          {/* Main folded row */}
+          <div className="flex items-center gap-1.5">
+            <LED on={isLedOn} color={getLedColor()} size="sm" />
+            <span className="font-mono text-[8px] text-[var(--neon-amber)] tracking-wider font-bold">CDC-001</span>
+            <span className={cn(
+              'font-mono text-[6px] tracking-wide',
+              deviceState === 'online' ? 'text-[var(--neon-green)]' :
+              deviceState === 'standby' ? 'text-white/40' :
+              'text-[var(--neon-amber)]'
+            )}>
+              {stateLabel}
+            </span>
+            <div className="flex-1" />
 
-      {/* Header with status LED */}
-      <div className="flex items-center justify-between mb-1.5 pr-4">
-        <div className="flex items-center gap-1.5">
-          <LED
-            on={isLedOn}
-            color={getLedColor()}
-            size="sm"
-          />
-          <div>
-            <div className="font-mono text-[9px] uppercase tracking-wider text-[var(--neon-amber)]">
-              Crystal Data
+            {/* Folded action buttons — only show T/R when powered */}
+            {isPowered && deviceState !== 'standby' && (
+              <>
+                <button
+                  onClick={handleTest}
+                  disabled={deviceState !== 'online'}
+                  className={microBtnClass(deviceState === 'testing', 'cyan')}
+                  title="Test"
+                >
+                  {deviceState === 'testing' ? '·' : testResult === 'pass' ? '✓' : testResult === 'fail' ? '✗' : 'T'}
+                </button>
+                <button
+                  onClick={handleReboot}
+                  disabled={isTransitioning}
+                  className={microBtnClass(deviceState === 'rebooting' || deviceState === 'booting', 'amber')}
+                  title="Reboot"
+                >
+                  {deviceState === 'rebooting' || deviceState === 'booting' ? '·' : 'R'}
+                </button>
+              </>
+            )}
+
+            {/* Power button */}
+            <button
+              onClick={handlePowerToggle}
+              disabled={isTransitioning}
+              className="w-3.5 h-3 rounded-sm font-mono text-[5px] transition-all border flex items-center justify-center shrink-0"
+              style={{
+                background: isPowered && deviceState !== 'standby' ? 'rgba(0,255,102,0.15)' : '#0a0a0f',
+                color: isPowered && deviceState !== 'standby' ? 'var(--neon-green)' : 'rgba(255,255,255,0.4)',
+                borderColor: isPowered && deviceState !== 'standby' ? 'rgba(0,255,102,0.5)' : 'rgba(255,255,255,0.1)',
+              }}
+              title={isPowered && deviceState !== 'standby' ? 'Power Off' : 'Power On'}
+            >
+              ⏻
+            </button>
+
+            {/* Info toggle / Unfold chevron */}
+            {isPowered && deviceState !== 'standby' ? (
+              <button
+                onClick={showFoldedInfo ? () => { setShowFoldedInfo(false); handleToggleExpand() } : toggleFoldedInfo}
+                className="w-3.5 h-3 rounded-sm font-mono text-[6px] transition-all border flex items-center justify-center shrink-0 bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20"
+                title={showFoldedInfo ? 'Unfold' : 'More info'}
+              >
+                {showFoldedInfo ? '▲' : '▼'}
+              </button>
+            ) : (
+              <button
+                onClick={handleToggleExpand}
+                className="w-3.5 h-3 rounded-sm font-mono text-[6px] transition-all border flex items-center justify-center shrink-0 bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20"
+                title="Unfold"
+              >
+                ▼
+              </button>
+            )}
+          </div>
+
+          {/* Folded info expansion */}
+          <div
+            style={{
+              maxHeight: showFoldedInfo ? '48px' : '0px',
+              transition: 'max-height 300ms ease, opacity 300ms ease',
+              opacity: showFoldedInfo ? 1 : 0,
+              overflow: 'hidden',
+            }}
+          >
+            <div className="mt-1 pt-1 border-t border-white/5 grid grid-cols-3 gap-2">
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Crystals </span>
+                <span className="text-[var(--neon-green)]">{displayValues.crystals}</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Slices </span>
+                <span className="text-[var(--neon-cyan)]">{displayValues.slices}</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Power </span>
+                <span className="text-[var(--neon-amber)]">{displayValues.power}</span>
+              </div>
             </div>
-            <div className="font-mono text-[6px] text-white/30">CACHE</div>
+            <div className="mt-0.5 grid grid-cols-3 gap-2">
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Mode </span>
+                <span className="text-white/50">{deviceState === 'testing' ? 'DIAG' : 'IDLE'}</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Draw </span>
+                <span className="text-white/50">{cdcManager?.currentDraw ?? 5}</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Tier </span>
+                <span className="text-white/50">T1</span>
+              </div>
+            </div>
           </div>
-        </div>
-        <div className="font-mono text-[5px] text-white/20">CDC-001</div>
-      </div>
-
-      {/* Data display grid */}
-      <div className="grid grid-cols-3 gap-1 mb-1.5">
-        <div className="bg-black/40 p-1 rounded border border-white/5 relative overflow-hidden">
-          <div className="font-mono text-[6px] text-white/40">Crystals</div>
-          <div
-            className={cn(
-              'font-mono text-sm tabular-nums transition-all duration-300',
-              (deviceState === 'booting' && bootPhaseNum < 4) || deviceState === 'standby' ? 'opacity-50' : ''
-            )}
-            style={{
-              color: 'var(--neon-green)',
-              textShadow: displayValues.crystals !== '--' && displayValues.crystals !== '0' ? '0 0 6px var(--neon-green)' : 'none',
-            }}
-          >
-            {deviceState === 'standby' ? '0' : displayValues.crystals}
-          </div>
-          {deviceState === 'testing' && testPhase === 'cache' && (
-            <div className="absolute inset-0 bg-[var(--neon-cyan)]/10 animate-pulse" />
-          )}
-        </div>
-        <div className="bg-black/40 p-1 rounded border border-white/5 relative overflow-hidden">
-          <div className="font-mono text-[6px] text-white/40">Slices</div>
-          <div
-            className={cn(
-              'font-mono text-sm tabular-nums transition-all duration-300',
-              (deviceState === 'booting' && bootPhaseNum < 4) || deviceState === 'standby' ? 'opacity-50' : ''
-            )}
-            style={{
-              color: 'var(--neon-cyan)',
-              textShadow: displayValues.slices !== '--' && displayValues.slices !== '0' ? '0 0 6px var(--neon-cyan)' : 'none',
-            }}
-          >
-            {deviceState === 'standby' ? '0' : displayValues.slices}
-          </div>
-          {deviceState === 'testing' && testPhase === 'memory' && (
-            <div className="absolute inset-0 bg-[var(--neon-cyan)]/10 animate-pulse" />
-          )}
-        </div>
-        <div className="bg-black/40 p-1 rounded border border-white/5 relative overflow-hidden">
-          <div className="font-mono text-[6px] text-white/40">Power</div>
-          <div
-            className={cn(
-              'font-mono text-sm tabular-nums transition-all duration-300',
-              (deviceState === 'booting' && bootPhaseNum < 4) || deviceState === 'standby' ? 'opacity-50' : ''
-            )}
-            style={{
-              color: 'var(--neon-amber)',
-              textShadow: displayValues.power !== '--' && displayValues.power !== '0.0' ? '0 0 6px var(--neon-amber)' : 'none',
-            }}
-          >
-            {deviceState === 'standby' ? '0.0' : displayValues.power}
-          </div>
-          {deviceState === 'testing' && testPhase === 'power' && (
-            <div className="absolute inset-0 bg-[var(--neon-amber)]/10 animate-pulse" />
-          )}
         </div>
       </div>
 
-      {/* Status bar with micro buttons */}
-      <div className="mt-1 pt-1 border-t border-white/5 flex items-center gap-1">
-        <span className={cn(
-          'font-mono text-[5px] transition-colors flex-1 truncate',
-          deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
-          deviceState === 'rebooting' || deviceState === 'booting' || deviceState === 'shutdown' ? 'text-[var(--neon-amber)]' :
-          deviceState === 'standby' ? 'text-white/40' :
-          testResult === 'pass' ? 'text-[var(--neon-green)]' :
-          testResult === 'fail' ? 'text-[var(--neon-red)]' :
-          'text-white/30'
-        )}>
-          {statusMessage}
-        </span>
+      {/* ═══ UNFOLDED INNER PANEL ═══ */}
+      <div
+        style={{
+          transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 400ms cubic-bezier(0.4,0,0.2,1), opacity 350ms ease',
+          opacity: isExpanded ? 1 : 0,
+          position: isExpanded ? 'relative' : 'absolute',
+          pointerEvents: isExpanded ? 'auto' : 'none',
+          zIndex: isExpanded ? 2 : 0,
+        }}
+        className="w-full p-2"
+      >
+        {/* Top-right buttons: fold chevron + power */}
+        <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-1">
+          <button
+            onClick={handleToggleExpand}
+            className="group"
+            title="Fold"
+          >
+            <div
+              className="w-2.5 h-2.5 rounded-sm border transition-all flex items-center justify-center"
+              style={{
+                background: '#0a0a0f',
+                borderColor: 'rgba(255,255,255,0.15)',
+              }}
+            >
+              <span className="font-mono text-[5px] text-white/40 group-hover:text-white/70 transition-colors">▲</span>
+            </div>
+          </button>
+          <button
+            onClick={handlePowerToggle}
+            disabled={isTransitioning}
+            className="group"
+            title={isPowered && deviceState !== 'standby' ? 'Power Off' : 'Power On'}
+          >
+            <div
+              className="w-2.5 h-2.5 rounded-full border transition-all flex items-center justify-center"
+              style={{
+                background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                borderColor: isPowered && deviceState !== 'standby'
+                  ? 'var(--neon-green)'
+                  : deviceState === 'standby' ? 'var(--neon-amber)' : '#3a3a4a',
+                boxShadow: isPowered && deviceState !== 'standby'
+                  ? '0 0 4px var(--neon-green), inset 0 0 2px rgba(0,255,0,0.3)'
+                  : deviceState === 'standby' ? '0 0 3px var(--neon-amber)' : 'none',
+              }}
+            >
+              <div
+                className="w-1 h-1 rounded-full"
+                style={{
+                  backgroundColor: isPowered && deviceState !== 'standby'
+                    ? 'var(--neon-green)'
+                    : deviceState === 'standby' ? 'var(--neon-amber)' : '#333',
+                }}
+              />
+            </div>
+          </button>
+        </div>
 
-        {/* Micro square buttons */}
-        <button
-          onClick={handleTest}
-          disabled={deviceState !== 'online'}
-          className={cn(
-            'w-3.5 h-3 rounded-sm font-mono text-[5px] transition-all border flex items-center justify-center',
-            deviceState === 'testing'
-              ? 'bg-[var(--neon-cyan)]/20 text-[var(--neon-cyan)] border-[var(--neon-cyan)]/50'
-              : testResult === 'pass'
-              ? 'bg-[var(--neon-green)]/20 text-[var(--neon-green)] border-[var(--neon-green)]/50'
-              : testResult === 'fail'
-              ? 'bg-[var(--neon-red)]/20 text-[var(--neon-red)] border-[var(--neon-red)]/50'
-              : 'bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20 disabled:opacity-30'
-          )}
-          title="Test"
-        >
-          {deviceState === 'testing' ? '·' : testResult === 'pass' ? '✓' : testResult === 'fail' ? '✗' : 'T'}
-        </button>
-        <button
-          onClick={handleReboot}
-          disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
-          className={cn(
-            'w-3.5 h-3 rounded-sm font-mono text-[5px] transition-all border flex items-center justify-center',
-            deviceState === 'rebooting' || deviceState === 'booting'
-              ? 'bg-[var(--neon-amber)]/20 text-[var(--neon-amber)] border-[var(--neon-amber)]/50'
-              : 'bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20 disabled:opacity-30'
-          )}
-          title="Reboot"
-        >
-          {deviceState === 'rebooting' || deviceState === 'booting' ? '·' : 'R'}
-        </button>
+        {/* Header with status LED */}
+        <div className="flex items-center justify-between mb-1.5 pr-12">
+          <div className="flex items-center gap-1.5">
+            <LED
+              on={isLedOn}
+              color={getLedColor()}
+              size="sm"
+            />
+            <div>
+              <div className="font-mono text-[9px] uppercase tracking-wider text-[var(--neon-amber)]">
+                Crystal Data
+              </div>
+              <div className="font-mono text-[6px] text-white/30">CACHE</div>
+            </div>
+          </div>
+          <div className="font-mono text-[5px] text-white/20">CDC-001</div>
+        </div>
 
-        {/* Status indicators */}
-        <div className="flex gap-0.5 ml-0.5">
-          <div className={cn('w-1 h-1 rounded-full transition-colors',
-            deviceState === 'online' && crystalCount > 0 ? 'bg-[var(--neon-green)]' : 'bg-white/20'
-          )} />
-          <div className={cn('w-1 h-1 rounded-full transition-colors',
-            deviceState === 'online' && sliceCount > 0 ? 'bg-[var(--neon-cyan)]' : 'bg-white/20'
-          )} />
-          <div className={cn('w-1 h-1 rounded-full transition-colors',
-            deviceState === 'online' && totalPower > 0 ? 'bg-[var(--neon-amber)]' : 'bg-white/20'
-          )} />
+        {/* Data display grid */}
+        <div className="grid grid-cols-3 gap-1 mb-1.5">
+          <div className="bg-black/40 p-1 rounded border border-white/5 relative overflow-hidden">
+            <div className="font-mono text-[6px] text-white/40">Crystals</div>
+            <div
+              className={cn(
+                'font-mono text-sm tabular-nums transition-all duration-300',
+                (deviceState === 'booting' && bootPhaseNum < 4) || deviceState === 'standby' ? 'opacity-50' : ''
+              )}
+              style={{
+                color: 'var(--neon-green)',
+                textShadow: displayValues.crystals !== '--' && displayValues.crystals !== '0' ? '0 0 6px var(--neon-green)' : 'none',
+              }}
+            >
+              {deviceState === 'standby' ? '0' : displayValues.crystals}
+            </div>
+            {deviceState === 'testing' && testPhase === 'cache' && (
+              <div className="absolute inset-0 bg-[var(--neon-cyan)]/10 animate-pulse" />
+            )}
+          </div>
+          <div className="bg-black/40 p-1 rounded border border-white/5 relative overflow-hidden">
+            <div className="font-mono text-[6px] text-white/40">Slices</div>
+            <div
+              className={cn(
+                'font-mono text-sm tabular-nums transition-all duration-300',
+                (deviceState === 'booting' && bootPhaseNum < 4) || deviceState === 'standby' ? 'opacity-50' : ''
+              )}
+              style={{
+                color: 'var(--neon-cyan)',
+                textShadow: displayValues.slices !== '--' && displayValues.slices !== '0' ? '0 0 6px var(--neon-cyan)' : 'none',
+              }}
+            >
+              {deviceState === 'standby' ? '0' : displayValues.slices}
+            </div>
+            {deviceState === 'testing' && testPhase === 'memory' && (
+              <div className="absolute inset-0 bg-[var(--neon-cyan)]/10 animate-pulse" />
+            )}
+          </div>
+          <div className="bg-black/40 p-1 rounded border border-white/5 relative overflow-hidden">
+            <div className="font-mono text-[6px] text-white/40">Power</div>
+            <div
+              className={cn(
+                'font-mono text-sm tabular-nums transition-all duration-300',
+                (deviceState === 'booting' && bootPhaseNum < 4) || deviceState === 'standby' ? 'opacity-50' : ''
+              )}
+              style={{
+                color: 'var(--neon-amber)',
+                textShadow: displayValues.power !== '--' && displayValues.power !== '0.0' ? '0 0 6px var(--neon-amber)' : 'none',
+              }}
+            >
+              {deviceState === 'standby' ? '0.0' : displayValues.power}
+            </div>
+            {deviceState === 'testing' && testPhase === 'power' && (
+              <div className="absolute inset-0 bg-[var(--neon-amber)]/10 animate-pulse" />
+            )}
+          </div>
+        </div>
+
+        {/* Status bar with micro buttons */}
+        <div className="mt-1 pt-1 border-t border-white/5 flex items-center gap-1">
+          <span className={cn(
+            'font-mono text-[5px] transition-colors flex-1 truncate',
+            deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
+            deviceState === 'rebooting' || deviceState === 'booting' || deviceState === 'shutdown' ? 'text-[var(--neon-amber)]' :
+            deviceState === 'standby' ? 'text-white/40' :
+            testResult === 'pass' ? 'text-[var(--neon-green)]' :
+            testResult === 'fail' ? 'text-[var(--neon-red)]' :
+            'text-white/30'
+          )}>
+            {statusMessage}
+          </span>
+
+          {/* Micro square buttons */}
+          <button
+            onClick={handleTest}
+            disabled={deviceState !== 'online'}
+            className={cn(
+              'w-3.5 h-3 rounded-sm font-mono text-[5px] transition-all border flex items-center justify-center',
+              deviceState === 'testing'
+                ? 'bg-[var(--neon-cyan)]/20 text-[var(--neon-cyan)] border-[var(--neon-cyan)]/50'
+                : testResult === 'pass'
+                ? 'bg-[var(--neon-green)]/20 text-[var(--neon-green)] border-[var(--neon-green)]/50'
+                : testResult === 'fail'
+                ? 'bg-[var(--neon-red)]/20 text-[var(--neon-red)] border-[var(--neon-red)]/50'
+                : 'bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20 disabled:opacity-30'
+            )}
+            title="Test"
+          >
+            {deviceState === 'testing' ? '·' : testResult === 'pass' ? '✓' : testResult === 'fail' ? '✗' : 'T'}
+          </button>
+          <button
+            onClick={handleReboot}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
+            className={cn(
+              'w-3.5 h-3 rounded-sm font-mono text-[5px] transition-all border flex items-center justify-center',
+              deviceState === 'rebooting' || deviceState === 'booting'
+                ? 'bg-[var(--neon-amber)]/20 text-[var(--neon-amber)] border-[var(--neon-amber)]/50'
+                : 'bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20 disabled:opacity-30'
+            )}
+            title="Reboot"
+          >
+            {deviceState === 'rebooting' || deviceState === 'booting' ? '·' : 'R'}
+          </button>
+
+          {/* Status indicators */}
+          <div className="flex gap-0.5 ml-0.5">
+            <div className={cn('w-1 h-1 rounded-full transition-colors',
+              deviceState === 'online' && crystalCount > 0 ? 'bg-[var(--neon-green)]' : 'bg-white/20'
+            )} />
+            <div className={cn('w-1 h-1 rounded-full transition-colors',
+              deviceState === 'online' && sliceCount > 0 ? 'bg-[var(--neon-cyan)]' : 'bg-white/20'
+            )} />
+            <div className={cn('w-1 h-1 rounded-full transition-colors',
+              deviceState === 'online' && totalPower > 0 ? 'bg-[var(--neon-amber)]' : 'bg-white/20'
+            )} />
+          </div>
         </div>
       </div>
     </PanelFrame>
@@ -764,183 +980,386 @@ export function EnergyCore({
 
   const isLedOn = deviceState !== 'shutdown' || shutdownPhase !== null
 
+  // Fold state from context
+  const isExpanded = uecManager?.isExpanded ?? true
+  const handleToggleExpand = () => uecManager?.toggleExpanded()
+
+  // Folded info toggle (local, with 5-min inactivity auto-close)
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const toggleFoldedInfo = () => {
+    const next = !showFoldedInfo
+    setShowFoldedInfo(next)
+    if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current)
+    if (next) {
+      foldedInfoTimerRef.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+    }
+  }
+
+  // Auto-close folded info when powered off
+  useEffect(() => {
+    if (!isPowered) setShowFoldedInfo(false)
+  }, [isPowered])
+
+  // Cleanup timer
+  useEffect(() => {
+    return () => { if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current) }
+  }, [])
+
+  // State label for folded display
+  const stateLabel = deviceState === 'standby' ? 'STANDBY' :
+    deviceState === 'booting' ? 'BOOTING' :
+    deviceState === 'testing' ? 'TESTING' :
+    deviceState === 'rebooting' ? 'REBOOT' :
+    deviceState === 'shutdown' ? 'SHUTDOWN' : 'ONLINE'
+
+  const isTransitioning = deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'
+
+  // Shared micro button style helper
+  const microBtnClass = (active: boolean, color: string) => cn(
+    'w-3.5 h-3 rounded-sm font-mono text-[5px] transition-all border flex items-center justify-center shrink-0',
+    active
+      ? `bg-[var(--neon-${color})]/20 text-[var(--neon-${color})] border-[var(--neon-${color})]/50`
+      : 'bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20 disabled:opacity-30'
+  )
+
   return (
-    <PanelFrame variant="default" className={cn('p-2 relative', className)}>
-      {/* Creative power button - hexagonal energy switch style */}
-      <button
-        onClick={handlePowerToggle}
-        disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
-        className="absolute top-1 right-1 z-10 group"
-        title={isPowered && deviceState !== 'standby' ? 'Power Off' : 'Power On'}
+    <PanelFrame
+      variant="default"
+      className={cn('relative overflow-hidden', className)}
+      style={{ perspective: '600px' }}
+    >
+      {/* ═══ FOLDED FRONT PANEL ═══ */}
+      <div
+        style={{
+          transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 400ms cubic-bezier(0.4,0,0.2,1), opacity 350ms ease',
+          opacity: isExpanded ? 0 : 1,
+          position: isExpanded ? 'absolute' : 'relative',
+          pointerEvents: isExpanded ? 'none' : 'auto',
+          zIndex: isExpanded ? 0 : 2,
+        }}
+        className="w-full"
       >
-        <div
-          className="w-3 h-3 relative flex items-center justify-center transition-all"
-          style={{
-            clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
-            background: isPowered && deviceState !== 'standby'
-              ? 'linear-gradient(180deg, var(--neon-amber) 0%, var(--neon-orange) 100%)'
-              : deviceState === 'standby' ? 'linear-gradient(180deg, #4a3a0a 0%, #2a2a2a 100%)' : '#1a1a1a',
-            boxShadow: isPowered && deviceState !== 'standby'
-              ? '0 0 6px var(--neon-amber), inset 0 0 3px rgba(255,200,0,0.5)'
-              : 'none',
-          }}
-        >
-          {/* Inner glow effect */}
-          <div
-            className="w-1.5 h-1.5 rounded-full"
-            style={{
-              background: isPowered && deviceState !== 'standby'
-                ? 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,200,0,0.3) 100%)'
-                : deviceState === 'standby' ? 'radial-gradient(circle, rgba(255,180,0,0.3) 0%, transparent 100%)' : '#333',
-            }}
-          />
-        </div>
-        {/* Pulse effect when on */}
-        {isPowered && deviceState === 'online' && (
-          <div
-            className="absolute inset-0 animate-ping"
-            style={{
-              clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
-              background: 'var(--neon-amber)',
-              opacity: 0.3,
-            }}
-          />
-        )}
-      </button>
+        <div className="p-1.5 px-2">
+          {/* Main folded row */}
+          <div className="flex items-center gap-1.5">
+            <LED on={isLedOn} color={getLedColor()} size="sm" />
+            <span className="font-mono text-[8px] text-[var(--neon-amber)] tracking-wider font-bold">UEC-001</span>
+            <span className={cn(
+              'font-mono text-[6px] tracking-wide',
+              deviceState === 'online' ? 'text-[var(--neon-green)]' :
+              deviceState === 'standby' ? 'text-white/40' :
+              'text-[var(--neon-amber)]'
+            )}>
+              {stateLabel}
+            </span>
+            <div className="flex-1" />
 
-      {/* Header with status LED */}
-      <div className="flex items-center justify-between mb-1.5 pr-4">
-        <div className="flex items-center gap-1.5">
-          <LED
-            on={isLedOn}
-            color={getLedColor()}
-            size="sm"
-          />
-          <div>
-            <div className="font-mono text-[9px] uppercase tracking-wider text-[var(--neon-amber)]">
-              Energy Core
-            </div>
-            <div className="font-mono text-[6px] text-white/30">UNSTABLE</div>
-          </div>
-        </div>
-        <div className="font-mono text-[5px] text-white/20">UEC-001</div>
-      </div>
-
-      {/* Main display - Tier and Energy bar */}
-      <div className="flex items-center gap-2 mb-1.5">
-        {/* Tier display */}
-        <div className={cn(
-          'bg-black/40 px-2 py-1 rounded border border-white/5 relative overflow-hidden',
-          deviceState === 'testing' && testPhase === 'output' && 'ring-1 ring-[var(--neon-amber)]/50'
-        )}>
-          <div
-            className={cn(
-              'font-mono text-lg font-bold tabular-nums transition-all duration-300',
-              (deviceState === 'booting' && bootPhaseNum < 3) || deviceState === 'standby' ? 'opacity-50' : ''
+            {/* Folded action buttons — only show T/R when powered */}
+            {isPowered && deviceState !== 'standby' && (
+              <>
+                <button
+                  onClick={handleTest}
+                  disabled={deviceState !== 'online'}
+                  className={microBtnClass(deviceState === 'testing', 'cyan')}
+                  title="Test"
+                >
+                  {deviceState === 'testing' ? '·' : testResult === 'pass' ? '✓' : testResult === 'fail' ? '✗' : 'T'}
+                </button>
+                <button
+                  onClick={handleReboot}
+                  disabled={isTransitioning}
+                  className={microBtnClass(deviceState === 'rebooting' || deviceState === 'booting', 'amber')}
+                  title="Reboot"
+                >
+                  {deviceState === 'rebooting' || deviceState === 'booting' ? '·' : 'R'}
+                </button>
+              </>
             )}
+
+            {/* Power button */}
+            <button
+              onClick={handlePowerToggle}
+              disabled={isTransitioning}
+              className="w-3.5 h-3 rounded-sm font-mono text-[5px] transition-all border flex items-center justify-center shrink-0"
+              style={{
+                background: isPowered && deviceState !== 'standby' ? 'rgba(255,184,0,0.15)' : '#0a0a0f',
+                color: isPowered && deviceState !== 'standby' ? 'var(--neon-amber)' : 'rgba(255,255,255,0.4)',
+                borderColor: isPowered && deviceState !== 'standby' ? 'rgba(255,184,0,0.5)' : 'rgba(255,255,255,0.1)',
+              }}
+              title={isPowered && deviceState !== 'standby' ? 'Power Off' : 'Power On'}
+            >
+              ⏻
+            </button>
+
+            {/* Info toggle / Unfold chevron */}
+            {isPowered && deviceState !== 'standby' ? (
+              <button
+                onClick={showFoldedInfo ? () => { setShowFoldedInfo(false); handleToggleExpand() } : toggleFoldedInfo}
+                className="w-3.5 h-3 rounded-sm font-mono text-[6px] transition-all border flex items-center justify-center shrink-0 bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20"
+                title={showFoldedInfo ? 'Unfold' : 'More info'}
+              >
+                {showFoldedInfo ? '▲' : '▼'}
+              </button>
+            ) : (
+              <button
+                onClick={handleToggleExpand}
+                className="w-3.5 h-3 rounded-sm font-mono text-[6px] transition-all border flex items-center justify-center shrink-0 bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20"
+                title="Unfold"
+              >
+                ▼
+              </button>
+            )}
+          </div>
+
+          {/* Folded info expansion */}
+          <div
             style={{
-              color: volatilityTier >= 4 ? 'var(--neon-red)' : 'var(--neon-amber)',
-              textShadow: displayValues.tier !== '--' ? `0 0 8px ${volatilityTier >= 4 ? 'var(--neon-red)' : 'var(--neon-amber)'}` : 'none',
+              maxHeight: showFoldedInfo ? '48px' : '0px',
+              transition: 'max-height 300ms ease, opacity 300ms ease',
+              opacity: showFoldedInfo ? 1 : 0,
+              overflow: 'hidden',
             }}
           >
-            {displayValues.tier}
+            <div className="mt-1 pt-1 border-t border-white/5 grid grid-cols-3 gap-2">
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Tier </span>
+                <span className="text-[var(--neon-amber)]">{displayValues.tier}</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">TPS </span>
+                <span className="text-[var(--neon-cyan)]">{displayValues.tps}</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Output </span>
+                <span className="text-[var(--neon-green)]">{uecManager?.energyOutput ?? 0}</span>
+              </div>
+            </div>
+            <div className="mt-0.5 grid grid-cols-3 gap-2">
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Draw </span>
+                <span className="text-white/50">{UEC_POWER_SPECS.selfConsume}</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Field </span>
+                <span className="text-white/50">{uecManager?.fieldStability ?? 0}%</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Level </span>
+                <span className="text-white/50">{displayValues.level}%</span>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Energy bar and TPS */}
-        <div className="flex-1">
-          <div className={cn(
-            'h-3 bg-black/40 rounded overflow-hidden border border-white/5 relative',
-            deviceState === 'testing' && testPhase === 'stability' && 'ring-1 ring-[var(--neon-cyan)]/50'
-          )}>
+      {/* ═══ UNFOLDED INNER PANEL ═══ */}
+      <div
+        style={{
+          transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 400ms cubic-bezier(0.4,0,0.2,1), opacity 350ms ease',
+          opacity: isExpanded ? 1 : 0,
+          position: isExpanded ? 'relative' : 'absolute',
+          pointerEvents: isExpanded ? 'auto' : 'none',
+          zIndex: isExpanded ? 2 : 0,
+        }}
+        className="w-full p-2"
+      >
+        {/* Top-right buttons: fold chevron + hexagonal power */}
+        <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-1">
+          <button
+            onClick={handleToggleExpand}
+            className="group"
+            title="Fold"
+          >
             <div
-              className="h-full transition-all duration-500"
+              className="w-2.5 h-2.5 rounded-sm border transition-all flex items-center justify-center"
               style={{
-                width: `${displayValues.level}%`,
-                background: `linear-gradient(90deg, var(--neon-amber), ${
-                  volatilityTier >= 4 ? 'var(--neon-red)' : 'var(--neon-orange)'
-                })`,
-                boxShadow: displayValues.level > 0 ? 'inset 0 0 8px rgba(255,184,0,0.3)' : 'none',
+                background: '#0a0a0f',
+                borderColor: 'rgba(255,255,255,0.15)',
               }}
-            />
-            {/* Energy pulse effect when online */}
-            {deviceState === 'online' && displayValues.level > 0 && (
+            >
+              <span className="font-mono text-[5px] text-white/40 group-hover:text-white/70 transition-colors">▲</span>
+            </div>
+          </button>
+          <button
+            onClick={handlePowerToggle}
+            disabled={isTransitioning}
+            className="group"
+            title={isPowered && deviceState !== 'standby' ? 'Power Off' : 'Power On'}
+          >
+            <div
+              className="w-3 h-3 relative flex items-center justify-center transition-all"
+              style={{
+                clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+                background: isPowered && deviceState !== 'standby'
+                  ? 'linear-gradient(180deg, var(--neon-amber) 0%, var(--neon-orange) 100%)'
+                  : deviceState === 'standby' ? 'linear-gradient(180deg, #4a3a0a 0%, #2a2a2a 100%)' : '#1a1a1a',
+                boxShadow: isPowered && deviceState !== 'standby'
+                  ? '0 0 6px var(--neon-amber), inset 0 0 3px rgba(255,200,0,0.5)'
+                  : 'none',
+              }}
+            >
               <div
-                className="absolute inset-0 opacity-30"
+                className="w-1.5 h-1.5 rounded-full"
                 style={{
-                  background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
-                  animation: 'energy-pulse 2s ease-in-out infinite',
+                  background: isPowered && deviceState !== 'standby'
+                    ? 'radial-gradient(circle, rgba(255,255,255,0.8) 0%, rgba(255,200,0,0.3) 100%)'
+                    : deviceState === 'standby' ? 'radial-gradient(circle, rgba(255,180,0,0.3) 0%, transparent 100%)' : '#333',
+                }}
+              />
+            </div>
+            {isPowered && deviceState === 'online' && (
+              <div
+                className="absolute inset-0 animate-ping"
+                style={{
+                  clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+                  background: 'var(--neon-amber)',
+                  opacity: 0.3,
                 }}
               />
             )}
+          </button>
+        </div>
+
+        {/* Header with status LED */}
+        <div className="flex items-center justify-between mb-1.5 pr-12">
+          <div className="flex items-center gap-1.5">
+            <LED
+              on={isLedOn}
+              color={getLedColor()}
+              size="sm"
+            />
+            <div>
+              <div className="font-mono text-[9px] uppercase tracking-wider text-[var(--neon-amber)]">
+                Energy Core
+              </div>
+              <div className="font-mono text-[6px] text-white/30">UNSTABLE</div>
+            </div>
           </div>
+          <div className="font-mono text-[5px] text-white/20">UEC-001</div>
+        </div>
+
+        {/* Main display - Tier and Energy bar */}
+        <div className="flex items-center gap-2 mb-1.5">
+          {/* Tier display */}
           <div className={cn(
-            'flex justify-between mt-0.5',
-            deviceState === 'testing' && testPhase === 'sync' && 'text-[var(--neon-cyan)]'
+            'bg-black/40 px-2 py-1 rounded border border-white/5 relative overflow-hidden',
+            deviceState === 'testing' && testPhase === 'output' && 'ring-1 ring-[var(--neon-amber)]/50'
           )}>
-            <span className="font-mono text-[6px] text-white/30">LEVEL</span>
-            <span className="font-mono text-[7px] text-white/50">TPS: {displayValues.tps}</span>
+            <div
+              className={cn(
+                'font-mono text-lg font-bold tabular-nums transition-all duration-300',
+                (deviceState === 'booting' && bootPhaseNum < 3) || deviceState === 'standby' ? 'opacity-50' : ''
+              )}
+              style={{
+                color: volatilityTier >= 4 ? 'var(--neon-red)' : 'var(--neon-amber)',
+                textShadow: displayValues.tier !== '--' ? `0 0 8px ${volatilityTier >= 4 ? 'var(--neon-red)' : 'var(--neon-amber)'}` : 'none',
+              }}
+            >
+              {displayValues.tier}
+            </div>
+          </div>
+
+          {/* Energy bar and TPS */}
+          <div className="flex-1">
+            <div className={cn(
+              'h-3 bg-black/40 rounded overflow-hidden border border-white/5 relative',
+              deviceState === 'testing' && testPhase === 'stability' && 'ring-1 ring-[var(--neon-cyan)]/50'
+            )}>
+              <div
+                className="h-full transition-all duration-500"
+                style={{
+                  width: `${displayValues.level}%`,
+                  background: `linear-gradient(90deg, var(--neon-amber), ${
+                    volatilityTier >= 4 ? 'var(--neon-red)' : 'var(--neon-orange)'
+                  })`,
+                  boxShadow: displayValues.level > 0 ? 'inset 0 0 8px rgba(255,184,0,0.3)' : 'none',
+                }}
+              />
+              {/* Energy pulse effect when online */}
+              {deviceState === 'online' && displayValues.level > 0 && (
+                <div
+                  className="absolute inset-0 opacity-30"
+                  style={{
+                    background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
+                    animation: 'energy-pulse 2s ease-in-out infinite',
+                  }}
+                />
+              )}
+            </div>
+            <div className={cn(
+              'flex justify-between mt-0.5',
+              deviceState === 'testing' && testPhase === 'sync' && 'text-[var(--neon-cyan)]'
+            )}>
+              <span className="font-mono text-[6px] text-white/30">LEVEL</span>
+              <span className="font-mono text-[7px] text-white/50">TPS: {displayValues.tps}</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Status bar with micro buttons */}
-      <div className="mt-1 pt-1 border-t border-white/5 flex items-center gap-1">
-        <span className={cn(
-          'font-mono text-[5px] transition-colors flex-1 truncate',
-          deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
-          deviceState === 'rebooting' || deviceState === 'booting' || deviceState === 'shutdown' ? 'text-[var(--neon-amber)]' :
-          deviceState === 'standby' ? 'text-white/40' :
-          testResult === 'pass' ? 'text-[var(--neon-green)]' :
-          testResult === 'fail' ? 'text-[var(--neon-red)]' :
-          'text-white/30'
-        )}>
-          {statusMessage}
-        </span>
+        {/* Status bar with micro buttons */}
+        <div className="mt-1 pt-1 border-t border-white/5 flex items-center gap-1">
+          <span className={cn(
+            'font-mono text-[5px] transition-colors flex-1 truncate',
+            deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
+            deviceState === 'rebooting' || deviceState === 'booting' || deviceState === 'shutdown' ? 'text-[var(--neon-amber)]' :
+            deviceState === 'standby' ? 'text-white/40' :
+            testResult === 'pass' ? 'text-[var(--neon-green)]' :
+            testResult === 'fail' ? 'text-[var(--neon-red)]' :
+            'text-white/30'
+          )}>
+            {statusMessage}
+          </span>
 
-        {/* Micro buttons */}
-        <button
-          onClick={handleTest}
-          disabled={deviceState !== 'online'}
-          className={cn(
-            'w-4 h-3 rounded-sm font-mono text-[5px] transition-all border flex items-center justify-center',
-            deviceState === 'testing'
-              ? 'bg-[var(--neon-cyan)]/20 text-[var(--neon-cyan)] border-[var(--neon-cyan)]/50 animate-pulse'
-              : testResult === 'pass'
-              ? 'bg-[var(--neon-green)]/20 text-[var(--neon-green)] border-[var(--neon-green)]/50'
-              : testResult === 'fail'
-              ? 'bg-[var(--neon-red)]/20 text-[var(--neon-red)] border-[var(--neon-red)]/50'
-              : 'bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20 disabled:opacity-30'
-          )}
-          title="Test"
-        >
-          {deviceState === 'testing' ? '·' : testResult === 'pass' ? '✓' : testResult === 'fail' ? '✗' : 'T'}
-        </button>
-        <button
-          onClick={handleReboot}
-          disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
-          className={cn(
-            'w-4 h-3 rounded-sm font-mono text-[5px] transition-all border flex items-center justify-center',
-            deviceState === 'rebooting' || deviceState === 'booting'
-              ? 'bg-[var(--neon-amber)]/20 text-[var(--neon-amber)] border-[var(--neon-amber)]/50 animate-pulse'
-              : 'bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20 disabled:opacity-30'
-          )}
-          title="Reboot"
-        >
-          {deviceState === 'rebooting' || deviceState === 'booting' ? '·' : 'R'}
-        </button>
+          {/* Micro buttons */}
+          <button
+            onClick={handleTest}
+            disabled={deviceState !== 'online'}
+            className={cn(
+              'w-3.5 h-3 rounded-sm font-mono text-[5px] transition-all border flex items-center justify-center',
+              deviceState === 'testing'
+                ? 'bg-[var(--neon-cyan)]/20 text-[var(--neon-cyan)] border-[var(--neon-cyan)]/50'
+                : testResult === 'pass'
+                ? 'bg-[var(--neon-green)]/20 text-[var(--neon-green)] border-[var(--neon-green)]/50'
+                : testResult === 'fail'
+                ? 'bg-[var(--neon-red)]/20 text-[var(--neon-red)] border-[var(--neon-red)]/50'
+                : 'bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20 disabled:opacity-30'
+            )}
+            title="Test"
+          >
+            {deviceState === 'testing' ? '·' : testResult === 'pass' ? '✓' : testResult === 'fail' ? '✗' : 'T'}
+          </button>
+          <button
+            onClick={handleReboot}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
+            className={cn(
+              'w-3.5 h-3 rounded-sm font-mono text-[5px] transition-all border flex items-center justify-center',
+              deviceState === 'rebooting' || deviceState === 'booting'
+                ? 'bg-[var(--neon-amber)]/20 text-[var(--neon-amber)] border-[var(--neon-amber)]/50'
+                : 'bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20 disabled:opacity-30'
+            )}
+            title="Reboot"
+          >
+            {deviceState === 'rebooting' || deviceState === 'booting' ? '·' : 'R'}
+          </button>
 
-        {/* Status indicators */}
-        <div className="flex gap-0.5 ml-0.5">
-          <div className={cn('w-1 h-1 rounded-full transition-colors',
-            deviceState === 'online' && volatilityTier >= 1 ? 'bg-[var(--neon-amber)]' : 'bg-white/20'
-          )} />
-          <div className={cn('w-1 h-1 rounded-full transition-colors',
-            deviceState === 'online' && volatilityTier >= 3 ? 'bg-[var(--neon-orange)]' : 'bg-white/20'
-          )} />
-          <div className={cn('w-1 h-1 rounded-full transition-colors',
-            deviceState === 'online' && volatilityTier >= 5 ? 'bg-[var(--neon-red)]' : 'bg-white/20'
-          )} />
+          {/* Status indicators */}
+          <div className="flex gap-0.5 ml-0.5">
+            <div className={cn('w-1 h-1 rounded-full transition-colors',
+              deviceState === 'online' && volatilityTier >= 1 ? 'bg-[var(--neon-amber)]' : 'bg-white/20'
+            )} />
+            <div className={cn('w-1 h-1 rounded-full transition-colors',
+              deviceState === 'online' && volatilityTier >= 3 ? 'bg-[var(--neon-orange)]' : 'bg-white/20'
+            )} />
+            <div className={cn('w-1 h-1 rounded-full transition-colors',
+              deviceState === 'online' && volatilityTier >= 5 ? 'bg-[var(--neon-red)]' : 'bg-white/20'
+            )} />
+          </div>
         </div>
       </div>
 
@@ -1218,191 +1637,394 @@ export function BatteryPack({
 
   const isLedOn = deviceState !== 'standby' && deviceState !== 'shutdown' && !(deviceState === 'rebooting' && bootPhase === 0)
 
+  // Fold state from context
+  const isExpanded = batManager?.isExpanded ?? true
+  const handleToggleExpand = () => batManager?.toggleExpanded()
+
+  // Folded info toggle (local, with 5-min inactivity auto-close)
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const toggleFoldedInfo = () => {
+    const next = !showFoldedInfo
+    setShowFoldedInfo(next)
+    if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current)
+    if (next) {
+      foldedInfoTimerRef.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+    }
+  }
+
+  // Auto-close folded info when powered off
+  useEffect(() => {
+    if (!isPowered) setShowFoldedInfo(false)
+  }, [isPowered])
+
+  // Cleanup timer
+  useEffect(() => {
+    return () => { if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current) }
+  }, [])
+
+  // State label for folded display
+  const stateLabel = deviceState === 'standby' ? 'STANDBY' :
+    deviceState === 'booting' ? 'BOOTING' :
+    deviceState === 'testing' ? 'TESTING' :
+    deviceState === 'rebooting' ? 'REBOOT' :
+    deviceState === 'shutdown' ? 'SHUTDOWN' : 'ONLINE'
+
+  const isTransitioning = deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'
+
+  // Military-style dashed micro button helper
+  const milBtnClass = (active: boolean, color: string) => cn(
+    'w-3.5 h-3 font-mono text-[5px] transition-all border border-dashed flex items-center justify-center shrink-0',
+    active
+      ? `bg-[var(--neon-${color})]/10 text-[var(--neon-${color})] border-[var(--neon-${color})]`
+      : 'bg-[#0a0a0f] text-[var(--neon-lime,#bfff00)]/60 border-[var(--neon-lime,#bfff00)]/30 hover:border-[var(--neon-lime,#bfff00)]/60 disabled:opacity-30'
+  )
+
   return (
-    <PanelFrame variant="military" className={cn('p-2 relative', className)}>
-      {/* Creative power button - tiny battery cell style */}
-      <button
-        onClick={handlePowerToggle}
-        disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
-        className="absolute top-1 right-1 z-10 group"
-        title={isPowered && deviceState !== 'standby' ? 'Power Off' : 'Power On'}
+    <PanelFrame
+      variant="military"
+      className={cn('relative overflow-hidden', className)}
+      style={{ perspective: '600px' }}
+    >
+      {/* ═══ FOLDED FRONT PANEL ═══ */}
+      <div
+        style={{
+          transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 0 : 1,
+          position: isExpanded ? 'absolute' : 'relative',
+          pointerEvents: isExpanded ? 'none' : 'auto',
+          zIndex: isExpanded ? 0 : 2,
+        }}
+        className="w-full"
       >
-        <div
-          className="w-2.5 h-4 relative flex flex-col items-center justify-center gap-[1px] rounded-sm transition-all border"
-          style={{
-            background: isPowered && deviceState !== 'standby'
-              ? 'linear-gradient(180deg, #1a3a1a 0%, #0a1f0a 100%)'
-              : deviceState === 'standby' ? 'linear-gradient(180deg, #2a2a1a 0%, #1a1a0a 100%)' : '#0a0a0a',
-            borderColor: isPowered && deviceState !== 'standby'
-              ? 'var(--neon-lime, #bfff00)'
-              : deviceState === 'standby' ? '#4a4a2a' : '#2a2a2a',
-            boxShadow: isPowered && deviceState !== 'standby'
-              ? '0 0 4px rgba(191, 255, 0, 0.4), inset 0 0 3px rgba(191, 255, 0, 0.2)'
-              : 'none',
-          }}
-        >
-          {/* Battery terminal nub */}
-          <div
-            className="absolute -top-[2px] w-1 h-[2px] rounded-t-sm"
-            style={{
-              background: isPowered && deviceState !== 'standby' ? 'var(--neon-lime, #bfff00)' : '#3a3a3a',
-            }}
-          />
-          {/* Cell segments */}
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="w-1.5 h-[3px] rounded-[1px] transition-all"
-              style={{
-                background: isPowered && deviceState !== 'standby'
-                  ? i === 0 ? 'var(--neon-lime, #bfff00)' : i === 1 ? 'var(--neon-green)' : 'var(--neon-green)'
-                  : '#2a2a2a',
-                boxShadow: isPowered && deviceState !== 'standby' && i < 2
-                  ? '0 0 3px var(--neon-lime, #bfff00)'
-                  : 'none',
-                opacity: isPowered && deviceState !== 'standby' ? 1 - (i * 0.2) : 0.3,
-              }}
-            />
-          ))}
-        </div>
-      </button>
+        <div className="p-1.5 px-2">
+          {/* Main folded row */}
+          <div className="flex items-center gap-1.5">
+            <LED on={isLedOn} color={getLedColor()} size="sm" />
+            <span className="font-mono text-[8px] text-[var(--neon-lime,#bfff00)] tracking-wider font-bold">BAT-001</span>
+            <span className={cn(
+              'font-mono text-[6px] tracking-wide',
+              deviceState === 'online' ? 'text-[var(--neon-green)]' :
+              deviceState === 'standby' ? 'text-white/40' :
+              'text-[var(--neon-amber)]'
+            )}>
+              {stateLabel}
+            </span>
+            <div className="flex-1" />
 
-      {/* Header with status LED */}
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1.5">
-          <LED
-            on={isLedOn}
-            color={getLedColor()}
-            size="sm"
-          />
-          <div>
-            <div className="font-mono text-[8px] uppercase tracking-wider text-[var(--neon-lime,#bfff00)]">
-              01_Portable Battery Pack
-            </div>
-            <div className="font-mono text-[5px] text-white/30">
-              {deviceState === 'standby' ? 'STANDBY MODE' : 'AUTOMATIC REGENERATION'}
-            </div>
-          </div>
-        </div>
-        <div className="font-mono text-[5px] text-white/20 mr-4">BAT-001</div>
-      </div>
-
-      {/* Main display - Battery segments and value */}
-      <div className="flex items-center justify-between mb-1.5">
-        {/* Battery segments */}
-        <div className={cn(
-          'flex flex-col gap-0.5 relative',
-          deviceState === 'testing' && testPhase === 'cells' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded p-0.5'
-        )}>
-          {segments.map((level, i) => {
-            const isActive = deviceState === 'online'
-              ? i >= (5 - displayValues.segments)
-              : i >= (5 - displayValues.segments) && bootPhase >= 3
-
-            return (
-              <div
-                key={i}
-                className={cn(
-                  'w-8 h-1.5 rounded-sm transition-all duration-300',
-                  isActive ? 'bg-[var(--neon-green)]' : 'bg-white/10',
-                  deviceState === 'testing' && testPhase === 'capacity' && isActive && 'animate-pulse'
-                )}
-                style={{
-                  boxShadow: isActive ? '0 0 4px var(--neon-green)' : 'none',
-                }}
-              />
-            )
-          })}
-        </div>
-
-        {/* Value display */}
-        <div className={cn(
-          'text-right',
-          deviceState === 'testing' && testPhase === 'voltage' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded px-1'
-        )}>
-          <div
-            className={cn(
-              'font-mono text-lg tabular-nums transition-all duration-300',
-              deviceState === 'booting' && bootPhase < 4 && 'opacity-50'
+            {/* Folded action buttons — only show T/R when powered */}
+            {isPowered && deviceState !== 'standby' && (
+              <>
+                <button
+                  onClick={handleTest}
+                  disabled={deviceState !== 'online'}
+                  className={milBtnClass(deviceState === 'testing', 'cyan')}
+                  title="Test"
+                >
+                  {deviceState === 'testing' ? '·' : testResult === 'pass' ? '●' : testResult === 'fail' ? '✕' : '◇'}
+                </button>
+                <button
+                  onClick={handleReboot}
+                  disabled={isTransitioning}
+                  className={milBtnClass(deviceState === 'rebooting' || deviceState === 'booting', 'amber')}
+                  title="Cycle"
+                >
+                  {deviceState === 'rebooting' || deviceState === 'booting' ? '·' : '↻'}
+                </button>
+              </>
             )}
+
+            {/* Power button */}
+            <button
+              onClick={handlePowerToggle}
+              disabled={isTransitioning}
+              className="w-3.5 h-3 font-mono text-[5px] transition-all border border-dashed flex items-center justify-center shrink-0"
+              style={{
+                background: isPowered && deviceState !== 'standby' ? 'rgba(191,255,0,0.1)' : '#0a0a0f',
+                color: isPowered && deviceState !== 'standby' ? 'var(--neon-lime, #bfff00)' : 'rgba(255,255,255,0.4)',
+                borderColor: isPowered && deviceState !== 'standby' ? 'rgba(191,255,0,0.5)' : 'rgba(255,255,255,0.1)',
+              }}
+              title={isPowered && deviceState !== 'standby' ? 'Power Off' : 'Power On'}
+            >
+              ⏻
+            </button>
+
+            {/* Info toggle / Unfold chevron */}
+            {isPowered && deviceState !== 'standby' ? (
+              <button
+                onClick={showFoldedInfo ? () => { setShowFoldedInfo(false); handleToggleExpand() } : toggleFoldedInfo}
+                className="w-3.5 h-3 font-mono text-[6px] transition-all border border-dashed flex items-center justify-center shrink-0 bg-[#0a0a0f] text-[var(--neon-lime,#bfff00)]/60 border-[var(--neon-lime,#bfff00)]/30 hover:border-[var(--neon-lime,#bfff00)]/60"
+                title={showFoldedInfo ? 'Unfold' : 'More info'}
+              >
+                {showFoldedInfo ? '▲' : '▼'}
+              </button>
+            ) : (
+              <button
+                onClick={handleToggleExpand}
+                className="w-3.5 h-3 font-mono text-[6px] transition-all border border-dashed flex items-center justify-center shrink-0 bg-[#0a0a0f] text-[var(--neon-lime,#bfff00)]/60 border-[var(--neon-lime,#bfff00)]/30 hover:border-[var(--neon-lime,#bfff00)]/60"
+                title="Unfold"
+              >
+                ▼
+              </button>
+            )}
+          </div>
+
+          {/* Folded info expansion */}
+          <div
             style={{
-              color: 'var(--neon-green)',
-              textShadow: displayValues.available !== '--' && displayValues.available !== '0' ? '0 0 8px var(--neon-green)' : 'none',
+              maxHeight: showFoldedInfo ? '48px' : '0px',
+              transition: 'max-height 400ms ease, opacity 400ms ease',
+              opacity: showFoldedInfo ? 1 : 0,
+              overflow: 'hidden',
             }}
           >
-            {displayValues.available}
-          </div>
-          <div className="font-mono text-[8px] text-white/40">_unSC</div>
-          {displayValues.staked && (
-            <div
-              className={cn(
-                'font-mono text-[8px] transition-opacity',
-                deviceState === 'booting' && bootPhase < 5 ? 'opacity-0' : 'opacity-100'
-              )}
-              style={{ color: 'var(--neon-cyan)' }}
-            >
-              {displayValues.staked} staked
+            <div className="mt-1 pt-1 border-t border-white/5 grid grid-cols-3 gap-2">
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Avail </span>
+                <span className="text-[var(--neon-green)]">{displayValues.available}</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Staked </span>
+                <span className="text-[var(--neon-cyan)]">{displayValues.staked || '0'}</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Charge </span>
+                <span className="text-[var(--neon-lime,#bfff00)]">{batManager?.chargePercent ?? chargePercent}%</span>
+              </div>
             </div>
-          )}
+            <div className="mt-0.5 grid grid-cols-3 gap-2">
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Cells </span>
+                <span className="text-white/50">{batManager?.cellHealth?.length ?? 4}</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Temp </span>
+                <span className="text-white/50">{batManager?.temperature ?? 28}C</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Regen </span>
+                <span className="text-white/50">{batManager?.autoRegen ? 'ON' : 'OFF'}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Status bar with micro buttons */}
-      <div className="mt-1 pt-1 border-t border-white/5 flex items-center gap-1">
-        <span className={cn(
-          'font-mono text-[5px] transition-colors flex-1 truncate',
-          deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
-          deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
-          testResult === 'pass' ? 'text-[var(--neon-green)]' :
-          testResult === 'fail' ? 'text-[var(--neon-red)]' :
-          'text-white/30'
-        )}>
-          {statusMessage}
-        </span>
+      {/* ═══ UNFOLDED INNER PANEL ═══ */}
+      <div
+        style={{
+          transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 1 : 0,
+          position: isExpanded ? 'relative' : 'absolute',
+          pointerEvents: isExpanded ? 'auto' : 'none',
+          zIndex: isExpanded ? 2 : 0,
+        }}
+        className="w-full p-2"
+      >
+        {/* Top-right buttons: fold chevron + battery cell power */}
+        <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-1">
+          <button
+            onClick={handleToggleExpand}
+            className="group"
+            title="Fold"
+          >
+            <div
+              className="w-2.5 h-2.5 rounded-sm border border-dashed transition-all flex items-center justify-center"
+              style={{
+                background: '#0a0a0f',
+                borderColor: 'rgba(191,255,0,0.2)',
+              }}
+            >
+              <span className="font-mono text-[5px] text-[var(--neon-lime,#bfff00)]/40 group-hover:text-[var(--neon-lime,#bfff00)]/70 transition-colors">▲</span>
+            </div>
+          </button>
+          <button
+            onClick={handlePowerToggle}
+            disabled={isTransitioning}
+            className="group"
+            title={isPowered && deviceState !== 'standby' ? 'Power Off' : 'Power On'}
+          >
+            <div
+              className="w-2.5 h-4 relative flex flex-col items-center justify-center gap-[1px] rounded-sm transition-all border"
+              style={{
+                background: isPowered && deviceState !== 'standby'
+                  ? 'linear-gradient(180deg, #1a3a1a 0%, #0a1f0a 100%)'
+                  : deviceState === 'standby' ? 'linear-gradient(180deg, #2a2a1a 0%, #1a1a0a 100%)' : '#0a0a0a',
+                borderColor: isPowered && deviceState !== 'standby'
+                  ? 'var(--neon-lime, #bfff00)'
+                  : deviceState === 'standby' ? '#4a4a2a' : '#2a2a2a',
+                boxShadow: isPowered && deviceState !== 'standby'
+                  ? '0 0 4px rgba(191, 255, 0, 0.4), inset 0 0 3px rgba(191, 255, 0, 0.2)'
+                  : 'none',
+              }}
+            >
+              <div
+                className="absolute -top-[2px] w-1 h-[2px] rounded-t-sm"
+                style={{
+                  background: isPowered && deviceState !== 'standby' ? 'var(--neon-lime, #bfff00)' : '#3a3a3a',
+                }}
+              />
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="w-1.5 h-[3px] rounded-[1px] transition-all"
+                  style={{
+                    background: isPowered && deviceState !== 'standby'
+                      ? i === 0 ? 'var(--neon-lime, #bfff00)' : 'var(--neon-green)'
+                      : '#2a2a2a',
+                    boxShadow: isPowered && deviceState !== 'standby' && i < 2
+                      ? '0 0 3px var(--neon-lime, #bfff00)'
+                      : 'none',
+                    opacity: isPowered && deviceState !== 'standby' ? 1 - (i * 0.2) : 0.3,
+                  }}
+                />
+              ))}
+            </div>
+          </button>
+        </div>
 
-        {/* Micro military-style buttons */}
-        <button
-          onClick={handleTest}
-          disabled={deviceState !== 'online'}
-          className={cn(
-            'w-4 h-3 font-mono text-[5px] transition-all border border-dashed flex items-center justify-center',
-            deviceState === 'testing'
-              ? 'bg-[var(--neon-cyan)]/10 text-[var(--neon-cyan)] border-[var(--neon-cyan)]'
-              : testResult === 'pass'
-              ? 'bg-[var(--neon-green)]/10 text-[var(--neon-green)] border-[var(--neon-green)]'
-              : testResult === 'fail'
-              ? 'bg-[var(--neon-red)]/10 text-[var(--neon-red)] border-[var(--neon-red)]'
-              : 'bg-[#0a0a0f] text-[var(--neon-lime,#bfff00)]/60 border-[var(--neon-lime,#bfff00)]/30 hover:border-[var(--neon-lime,#bfff00)]/60 disabled:opacity-30'
-          )}
-          title="Test"
-        >
-          {deviceState === 'testing' ? '·' : testResult === 'pass' ? '●' : testResult === 'fail' ? '✕' : '◇'}
-        </button>
-        <button
-          onClick={handleReboot}
-          disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
-          className={cn(
-            'w-4 h-3 font-mono text-[5px] transition-all border border-dashed flex items-center justify-center',
-            deviceState === 'rebooting' || deviceState === 'booting'
-              ? 'bg-[var(--neon-amber)]/10 text-[var(--neon-amber)] border-[var(--neon-amber)]'
-              : 'bg-[#0a0a0f] text-[var(--neon-lime,#bfff00)]/60 border-[var(--neon-lime,#bfff00)]/30 hover:border-[var(--neon-lime,#bfff00)]/60 disabled:opacity-30'
-          )}
-          title="Cycle"
-        >
-          {deviceState === 'rebooting' || deviceState === 'booting' ? '·' : '↻'}
-        </button>
+        {/* Header with status LED */}
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-1.5">
+            <LED
+              on={isLedOn}
+              color={getLedColor()}
+              size="sm"
+            />
+            <div>
+              <div className="font-mono text-[8px] uppercase tracking-wider text-[var(--neon-lime,#bfff00)]">
+                01_Portable Battery Pack
+              </div>
+              <div className="font-mono text-[5px] text-white/30">
+                {deviceState === 'standby' ? 'STANDBY MODE' : 'AUTOMATIC REGENERATION'}
+              </div>
+            </div>
+          </div>
+          <div className="font-mono text-[5px] text-white/20 mr-8">BAT-001</div>
+        </div>
 
-        {/* Status indicators */}
-        <div className="flex gap-0.5 ml-0.5">
-          <div className={cn('w-1 h-1 rounded-full transition-colors',
-            deviceState === 'online' && available > 0 ? 'bg-[var(--neon-green)]' : 'bg-white/20'
-          )} />
-          <div className={cn('w-1 h-1 rounded-full transition-colors',
-            deviceState === 'online' && staked > 0 ? 'bg-[var(--neon-cyan)]' : 'bg-white/20'
-          )} />
-          <div className={cn('w-1 h-1 rounded-full transition-colors',
-            deviceState === 'online' && locked > 0 ? 'bg-[var(--neon-amber)]' : 'bg-white/20'
-          )} />
+        {/* Main display - Battery segments and value */}
+        <div className="flex items-center justify-between mb-1.5">
+          {/* Battery segments */}
+          <div className={cn(
+            'flex flex-col gap-0.5 relative',
+            deviceState === 'testing' && testPhase === 'cells' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded p-0.5'
+          )}>
+            {segments.map((level, i) => {
+              const isActive = deviceState === 'online'
+                ? i >= (5 - displayValues.segments)
+                : i >= (5 - displayValues.segments) && bootPhase >= 3
+
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    'w-8 h-1.5 rounded-sm transition-all duration-300',
+                    isActive ? 'bg-[var(--neon-green)]' : 'bg-white/10',
+                    deviceState === 'testing' && testPhase === 'capacity' && isActive && 'animate-pulse'
+                  )}
+                  style={{
+                    boxShadow: isActive ? '0 0 4px var(--neon-green)' : 'none',
+                  }}
+                />
+              )
+            })}
+          </div>
+
+          {/* Value display */}
+          <div className={cn(
+            'text-right',
+            deviceState === 'testing' && testPhase === 'voltage' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded px-1'
+          )}>
+            <div
+              className={cn(
+                'font-mono text-lg tabular-nums transition-all duration-300',
+                deviceState === 'booting' && bootPhase < 4 && 'opacity-50'
+              )}
+              style={{
+                color: 'var(--neon-green)',
+                textShadow: displayValues.available !== '--' && displayValues.available !== '0' ? '0 0 8px var(--neon-green)' : 'none',
+              }}
+            >
+              {displayValues.available}
+            </div>
+            <div className="font-mono text-[8px] text-white/40">_unSC</div>
+            {displayValues.staked && (
+              <div
+                className={cn(
+                  'font-mono text-[8px] transition-opacity',
+                  deviceState === 'booting' && bootPhase < 5 ? 'opacity-0' : 'opacity-100'
+                )}
+                style={{ color: 'var(--neon-cyan)' }}
+              >
+                {displayValues.staked} staked
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Status bar with micro buttons */}
+        <div className="mt-1 pt-1 border-t border-white/5 flex items-center gap-1">
+          <span className={cn(
+            'font-mono text-[5px] transition-colors flex-1 truncate',
+            deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
+            deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+            testResult === 'pass' ? 'text-[var(--neon-green)]' :
+            testResult === 'fail' ? 'text-[var(--neon-red)]' :
+            'text-white/30'
+          )}>
+            {statusMessage}
+          </span>
+
+          {/* Micro military-style buttons */}
+          <button
+            onClick={handleTest}
+            disabled={deviceState !== 'online'}
+            className={cn(
+              'w-3.5 h-3 font-mono text-[5px] transition-all border border-dashed flex items-center justify-center',
+              deviceState === 'testing'
+                ? 'bg-[var(--neon-cyan)]/10 text-[var(--neon-cyan)] border-[var(--neon-cyan)]'
+                : testResult === 'pass'
+                ? 'bg-[var(--neon-green)]/10 text-[var(--neon-green)] border-[var(--neon-green)]'
+                : testResult === 'fail'
+                ? 'bg-[var(--neon-red)]/10 text-[var(--neon-red)] border-[var(--neon-red)]'
+                : 'bg-[#0a0a0f] text-[var(--neon-lime,#bfff00)]/60 border-[var(--neon-lime,#bfff00)]/30 hover:border-[var(--neon-lime,#bfff00)]/60 disabled:opacity-30'
+            )}
+            title="Test"
+          >
+            {deviceState === 'testing' ? '·' : testResult === 'pass' ? '●' : testResult === 'fail' ? '✕' : '◇'}
+          </button>
+          <button
+            onClick={handleReboot}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
+            className={cn(
+              'w-3.5 h-3 font-mono text-[5px] transition-all border border-dashed flex items-center justify-center',
+              deviceState === 'rebooting' || deviceState === 'booting'
+                ? 'bg-[var(--neon-amber)]/10 text-[var(--neon-amber)] border-[var(--neon-amber)]'
+                : 'bg-[#0a0a0f] text-[var(--neon-lime,#bfff00)]/60 border-[var(--neon-lime,#bfff00)]/30 hover:border-[var(--neon-lime,#bfff00)]/60 disabled:opacity-30'
+            )}
+            title="Cycle"
+          >
+            {deviceState === 'rebooting' || deviceState === 'booting' ? '·' : '↻'}
+          </button>
+
+          {/* Status indicators */}
+          <div className="flex gap-0.5 ml-0.5">
+            <div className={cn('w-1 h-1 rounded-full transition-colors',
+              deviceState === 'online' && available > 0 ? 'bg-[var(--neon-green)]' : 'bg-white/20'
+            )} />
+            <div className={cn('w-1 h-1 rounded-full transition-colors',
+              deviceState === 'online' && staked > 0 ? 'bg-[var(--neon-cyan)]' : 'bg-white/20'
+            )} />
+            <div className={cn('w-1 h-1 rounded-full transition-colors',
+              deviceState === 'online' && locked > 0 ? 'bg-[var(--neon-amber)]' : 'bg-white/20'
+            )} />
+          </div>
         </div>
       </div>
     </PanelFrame>
@@ -1752,25 +2374,52 @@ export function HandmadeSynthesizer({
 
   const isLedOn = deviceState !== 'standby' && deviceState !== 'shutdown' && !(deviceState === 'rebooting' && bootPhaseNum === 0)
 
-  // Waveform power button - creative sine wave shape
-  const WaveformPowerButton = () => {
-    const isOn = deviceState === 'online' || deviceState === 'testing'
-    const isTransitioning = deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting'
-    const canToggle = !isTransitioning && deviceState !== 'testing'
+  // Fold state from context
+  const isExpanded = hmsManager?.isExpanded ?? true
+  const handleToggleExpand = () => hmsManager?.toggleExpanded()
 
-    // Get waveform path based on current type
+  // Folded info toggle (local, with 5-min inactivity auto-close)
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const toggleFoldedInfo = () => {
+    const next = !showFoldedInfo
+    setShowFoldedInfo(next)
+    if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current)
+    if (next) {
+      foldedInfoTimerRef.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+    }
+  }
+
+  useEffect(() => {
+    if (!isPowered) setShowFoldedInfo(false)
+  }, [isPowered])
+
+  useEffect(() => {
+    return () => { if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current) }
+  }, [])
+
+  const stateLabel = deviceState === 'standby' ? 'STANDBY' :
+    deviceState === 'booting' ? 'BOOTING' :
+    deviceState === 'testing' ? 'TESTING' :
+    deviceState === 'rebooting' ? 'REBOOT' :
+    deviceState === 'shutdown' ? 'SHUTDOWN' : 'ONLINE'
+
+  const isTransitioning = deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'
+
+  // Waveform power button - creative sine wave shape
+  const WaveformPowerButton = ({ small }: { small?: boolean }) => {
+    const isOn = deviceState === 'online' || deviceState === 'testing'
+    const isTransBtn = deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting'
+    const canToggle = !isTransBtn && deviceState !== 'testing'
+
     const getWaveformPath = () => {
       switch (waveformType) {
-        case 'sine':
-          return 'M2,8 Q5,2 8,8 Q11,14 14,8 Q17,2 20,8'
-        case 'square':
-          return 'M2,10 L2,4 L8,4 L8,12 L14,12 L14,4 L20,4 L20,10'
-        case 'saw':
-          return 'M2,12 L8,4 L8,12 L14,4 L14,12 L20,4'
-        case 'triangle':
-          return 'M2,8 L6,3 L10,13 L14,3 L18,13 L20,8'
-        default:
-          return 'M2,8 Q5,2 8,8 Q11,14 14,8 Q17,2 20,8'
+        case 'sine': return 'M2,8 Q5,2 8,8 Q11,14 14,8 Q17,2 20,8'
+        case 'square': return 'M2,10 L2,4 L8,4 L8,12 L14,12 L14,4 L20,4 L20,10'
+        case 'saw': return 'M2,12 L8,4 L8,12 L14,4 L14,12 L20,4'
+        case 'triangle': return 'M2,8 L6,3 L10,13 L14,3 L18,13 L20,8'
+        default: return 'M2,8 Q5,2 8,8 Q11,14 14,8 Q17,2 20,8'
       }
     }
 
@@ -1779,7 +2428,8 @@ export function HandmadeSynthesizer({
         onClick={handlePowerToggle}
         disabled={!canToggle}
         className={cn(
-          'relative w-6 h-4 rounded transition-all duration-300',
+          'relative rounded transition-all duration-300',
+          small ? 'w-5 h-3' : 'w-6 h-4',
           canToggle ? 'cursor-pointer hover:scale-110' : 'cursor-not-allowed opacity-50',
           isOn ? 'bg-[#0a1a1a]' : 'bg-[#0a0a0f]',
         )}
@@ -1791,177 +2441,304 @@ export function HandmadeSynthesizer({
       >
         <svg
           viewBox="0 0 22 16"
-          className={cn(
-            'absolute inset-0 w-full h-full transition-all',
-            isTransitioning && 'animate-pulse'
-          )}
-          style={{
-            filter: isOn ? 'drop-shadow(0 0 2px var(--neon-cyan))' : 'none',
-          }}
+          className={cn('absolute inset-0 w-full h-full transition-all', isTransBtn && 'animate-pulse')}
+          style={{ filter: isOn ? 'drop-shadow(0 0 2px var(--neon-cyan))' : 'none' }}
         >
-          <path
-            d={getWaveformPath()}
-            fill="none"
-            stroke={isOn ? 'var(--neon-cyan)' : 'rgba(255,255,255,0.3)'}
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            className={cn(isOn && 'animate-pulse')}
-          />
+          <path d={getWaveformPath()} fill="none" stroke={isOn ? 'var(--neon-cyan)' : 'rgba(255,255,255,0.3)'} strokeWidth="1.5" strokeLinecap="round" className={cn(isOn && 'animate-pulse')} />
         </svg>
-        {/* Power indicator dot */}
-        <div
-          className={cn(
-            'absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full transition-all',
-            isOn ? 'bg-[var(--neon-cyan)] shadow-[0_0_4px_var(--neon-cyan)]' : 'bg-white/20'
-          )}
-        />
+        <div className={cn('absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full transition-all', isOn ? 'bg-[var(--neon-cyan)] shadow-[0_0_4px_var(--neon-cyan)]' : 'bg-white/20')} />
       </button>
     )
   }
 
+  // Micro button helper for folded bar
+  const microBtnClass = (active: boolean, color: string) => cn(
+    'w-3.5 h-3 rounded-sm font-mono text-[5px] transition-all border flex items-center justify-center shrink-0',
+    active
+      ? `bg-[var(--neon-${color})]/20 text-[var(--neon-${color})] border-[var(--neon-${color})]/50`
+      : 'bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20 disabled:opacity-30'
+  )
+
   return (
-    <PanelFrame variant="teal" className={cn('p-2', className)}>
-      {/* Header with status LED, power button, and micro buttons */}
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1.5">
-          <LED
-            on={isLedOn}
-            color={getLedColor()}
-            size="sm"
-          />
-          <div>
-            <div className="font-mono text-[9px] uppercase tracking-wider text-[var(--neon-cyan)]">
-              Handmade Synthesizer
+    <PanelFrame
+      variant="teal"
+      className={cn('relative overflow-hidden', className)}
+      style={{ perspective: '600px' }}
+    >
+      {/* ═══ FOLDED FRONT PANEL ═══ */}
+      <div
+        style={{
+          transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 0 : 1,
+          position: isExpanded ? 'absolute' : 'relative',
+          pointerEvents: isExpanded ? 'none' : 'auto',
+          zIndex: isExpanded ? 0 : 2,
+        }}
+        className="w-full"
+      >
+        <div className="p-1.5 px-2">
+          <div className="flex items-center gap-1.5">
+            <LED on={isLedOn} color={getLedColor()} size="sm" />
+            <span className="font-mono text-[8px] text-[var(--neon-cyan)] tracking-wider font-bold">HMS-001</span>
+            <span className={cn(
+              'font-mono text-[6px] tracking-wide',
+              deviceState === 'online' ? 'text-[var(--neon-green)]' :
+              deviceState === 'standby' ? 'text-white/40' :
+              'text-[var(--neon-amber)]'
+            )}>
+              {stateLabel}
+            </span>
+            <div className="flex-1" />
+
+            {isPowered && deviceState !== 'standby' && (
+              <>
+                <button
+                  onClick={handleTest}
+                  disabled={deviceState !== 'online'}
+                  className={microBtnClass(deviceState === 'testing', 'cyan')}
+                  title="Test"
+                >
+                  {deviceState === 'testing' ? '·' : testResult === 'pass' ? '✓' : testResult === 'fail' ? '✗' : 'T'}
+                </button>
+                <button
+                  onClick={handleReboot}
+                  disabled={isTransitioning}
+                  className={microBtnClass(deviceState === 'rebooting' || deviceState === 'booting', 'amber')}
+                  title="Reboot"
+                >
+                  {deviceState === 'rebooting' || deviceState === 'booting' ? '·' : 'R'}
+                </button>
+              </>
+            )}
+
+            <WaveformPowerButton small />
+
+            {isPowered && deviceState !== 'standby' ? (
+              <button
+                onClick={showFoldedInfo ? () => { setShowFoldedInfo(false); handleToggleExpand() } : toggleFoldedInfo}
+                className="w-3.5 h-3 rounded-sm font-mono text-[6px] transition-all border flex items-center justify-center shrink-0 bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20"
+                title={showFoldedInfo ? 'Unfold' : 'More info'}
+              >
+                {showFoldedInfo ? '▲' : '▼'}
+              </button>
+            ) : (
+              <button
+                onClick={handleToggleExpand}
+                className="w-3.5 h-3 rounded-sm font-mono text-[6px] transition-all border flex items-center justify-center shrink-0 bg-[#0a0a0f] text-white/40 border-white/10 hover:text-white/60 hover:border-white/20"
+                title="Unfold"
+              >
+                ▼
+              </button>
+            )}
+          </div>
+
+          {/* Folded info expansion */}
+          <div
+            style={{
+              maxHeight: showFoldedInfo ? '48px' : '0px',
+              transition: 'max-height 400ms ease, opacity 400ms ease',
+              opacity: showFoldedInfo ? 1 : 0,
+              overflow: 'hidden',
+            }}
+          >
+            <div className="mt-1 pt-1 border-t border-white/5 grid grid-cols-3 gap-2">
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Pulse </span>
+                <span className="text-[var(--neon-cyan)]">{knobValues.pulse}</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Tempo </span>
+                <span className="text-[var(--neon-amber)]">{knobValues.tempo}</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Freq </span>
+                <span className="text-[var(--neon-green)]">{knobValues.freq}</span>
+              </div>
             </div>
-            <div className="font-mono text-[6px] text-white/40">
-              {deviceState === 'standby' ? 'Standby' : TIER_NAMES.synthesizers[tier]}
+            <div className="mt-0.5 grid grid-cols-3 gap-2">
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Wave </span>
+                <span className="text-white/50">{waveformType.slice(0, 3).toUpperCase()}</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Tier </span>
+                <span className="text-white/50">T{tier}</span>
+              </div>
+              <div className="font-mono text-[5px]">
+                <span className="text-white/30">Osc </span>
+                <span className="text-white/50">{hmsManager?.oscillatorCount ?? 4}</span>
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Control cluster: Waveform power + Test + Reset */}
-        <div className="flex gap-1.5 items-center">
-          {/* Waveform-shaped Power Button */}
-          <WaveformPowerButton />
-
-          {/* Test button */}
-          <button
-            onClick={handleTest}
-            disabled={deviceState !== 'online'}
-            className="group relative disabled:opacity-30"
-            title="Test"
-          >
-            <div className={cn(
-              'w-2.5 h-2.5 rounded-full border transition-all',
-              deviceState === 'testing'
-                ? 'bg-[var(--neon-cyan)] border-[var(--neon-cyan)] shadow-[0_0_6px_var(--neon-cyan)]'
-                : testResult === 'pass'
-                ? 'bg-[var(--neon-green)] border-[var(--neon-green)] shadow-[0_0_6px_var(--neon-green)]'
-                : testResult === 'fail'
-                ? 'bg-[var(--neon-red)] border-[var(--neon-red)] shadow-[0_0_6px_var(--neon-red)]'
-                : 'bg-[#0a0a0f] border-[var(--neon-cyan)]/30 group-hover:border-[var(--neon-cyan)]/60'
-            )} />
-            <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 font-mono text-[4px] text-white/30">T</span>
-          </button>
-
-          {/* Reset button */}
-          <button
-            onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
-            className="group relative disabled:opacity-30"
-            title="Reset"
-          >
-            <div className={cn(
-              'w-2.5 h-2.5 rounded-full border transition-all',
-              deviceState === 'rebooting' || deviceState === 'booting'
-                ? 'bg-[var(--neon-amber)] border-[var(--neon-amber)] shadow-[0_0_6px_var(--neon-amber)]'
-                : 'bg-[#0a0a0f] border-[var(--neon-amber)]/30 group-hover:border-[var(--neon-amber)]/60'
-            )} />
-            <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 font-mono text-[4px] text-white/30">R</span>
-          </button>
-
-          <div className="font-mono text-[5px] text-white/20 ml-0.5">HMS-001</div>
-        </div>
       </div>
 
-      {/* Knobs row - interactive when online, dim when standby */}
-      <div className={cn(
-        'flex items-center justify-between transition-opacity duration-300',
-        deviceState === 'standby' || deviceState === 'shutdown' ? 'opacity-30' :
-        deviceState === 'booting' && bootPhaseNum < 3 ? 'opacity-50' : 'opacity-100'
-      )}>
-        <div className={cn(
-          'transition-all',
-          deviceState === 'testing' && testPhase === 'oscillator' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded-full'
-        )}>
-          <Knob
-            value={knobValues.pulse}
-            onChange={(v) => handleKnobChange('pulse', v)}
-            size="sm"
-            label="PULSE"
-            accentColor="var(--neon-cyan)"
-            disabled={deviceState !== 'online'}
-          />
-        </div>
-        <div className={cn(
-          'transition-all',
-          deviceState === 'testing' && testPhase === 'waveform' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded-full'
-        )}>
-          <Knob
-            value={knobValues.tempo}
-            onChange={(v) => handleKnobChange('tempo', v)}
-            size="sm"
-            label="TEMPO"
-            accentColor="var(--neon-amber)"
-            disabled={deviceState !== 'online'}
-          />
-        </div>
-        <div className={cn(
-          'transition-all',
-          deviceState === 'testing' && testPhase === 'filter' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded-full'
-        )}>
-          <Knob
-            value={knobValues.freq}
-            onChange={(v) => handleKnobChange('freq', v)}
-            size="sm"
-            label="FREQ"
-            accentColor="var(--neon-green)"
-            disabled={deviceState !== 'online'}
-          />
-        </div>
-      </div>
-
-      {/* Status bar with waveform indicator */}
-      <div className="mt-1.5 pt-1 border-t border-white/5 flex items-center justify-between">
-        <div className="flex items-center gap-1">
-          {/* Mini waveform type indicator */}
-          <div className={cn(
-            'font-mono text-[5px] px-1 rounded',
-            deviceState === 'online' ? 'bg-[var(--neon-cyan)]/20 text-[var(--neon-cyan)]' : 'bg-white/5 text-white/20'
-          )}>
-            {waveformType.toUpperCase().slice(0, 3)}
-          </div>
-          <span className={cn(
-            'font-mono text-[6px] transition-colors truncate',
-            deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
-            deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
-            deviceState === 'standby' || deviceState === 'shutdown' ? 'text-white/30' :
-            testResult === 'pass' ? 'text-[var(--neon-green)]' :
-            testResult === 'fail' ? 'text-[var(--neon-red)]' :
-            tier > 0 ? 'text-[var(--neon-cyan)]' : 'text-white/30'
-          )}>
-            {statusMessage}
-          </span>
-        </div>
-        <div className="flex gap-0.5">
-          {[1, 2, 3, 4, 5].map(t => (
-            <div
-              key={t}
-              className={cn('w-1 h-1 rounded-full transition-colors',
-                deviceState !== 'standby' && deviceState !== 'shutdown' && tier >= t ? 'bg-[var(--neon-cyan)]' : 'bg-white/10'
-              )}
+      {/* ═══ UNFOLDED INNER PANEL ═══ */}
+      <div
+        style={{
+          transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 1 : 0,
+          position: isExpanded ? 'relative' : 'absolute',
+          pointerEvents: isExpanded ? 'auto' : 'none',
+          zIndex: isExpanded ? 2 : 0,
+        }}
+        className="w-full p-2"
+      >
+        {/* Header with status LED, power button, and micro buttons */}
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-1.5">
+            <LED
+              on={isLedOn}
+              color={getLedColor()}
+              size="sm"
             />
-          ))}
+            <div>
+              <div className="font-mono text-[9px] uppercase tracking-wider text-[var(--neon-cyan)]">
+                Handmade Synthesizer
+              </div>
+              <div className="font-mono text-[6px] text-white/40">
+                {deviceState === 'standby' ? 'Standby' : TIER_NAMES.synthesizers[tier]}
+              </div>
+            </div>
+          </div>
+
+          {/* Control cluster: fold + Waveform power + Test + Reset */}
+          <div className="flex gap-1.5 items-center">
+            <button
+              onClick={handleToggleExpand}
+              className="group"
+              title="Fold"
+            >
+              <div
+                className="w-2.5 h-2.5 rounded-sm border transition-all flex items-center justify-center"
+                style={{ background: '#0a0a0f', borderColor: 'rgba(255,255,255,0.15)' }}
+              >
+                <span className="font-mono text-[5px] text-white/40 group-hover:text-white/70 transition-colors">▲</span>
+              </div>
+            </button>
+
+            <WaveformPowerButton />
+
+            <button
+              onClick={handleTest}
+              disabled={deviceState !== 'online'}
+              className="group relative disabled:opacity-30"
+              title="Test"
+            >
+              <div className={cn(
+                'w-2.5 h-2.5 rounded-full border transition-all',
+                deviceState === 'testing'
+                  ? 'bg-[var(--neon-cyan)] border-[var(--neon-cyan)] shadow-[0_0_6px_var(--neon-cyan)]'
+                  : testResult === 'pass'
+                  ? 'bg-[var(--neon-green)] border-[var(--neon-green)] shadow-[0_0_6px_var(--neon-green)]'
+                  : testResult === 'fail'
+                  ? 'bg-[var(--neon-red)] border-[var(--neon-red)] shadow-[0_0_6px_var(--neon-red)]'
+                  : 'bg-[#0a0a0f] border-[var(--neon-cyan)]/30 group-hover:border-[var(--neon-cyan)]/60'
+              )} />
+              <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 font-mono text-[4px] text-white/30">T</span>
+            </button>
+
+            <button
+              onClick={handleReboot}
+              disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
+              className="group relative disabled:opacity-30"
+              title="Reset"
+            >
+              <div className={cn(
+                'w-2.5 h-2.5 rounded-full border transition-all',
+                deviceState === 'rebooting' || deviceState === 'booting'
+                  ? 'bg-[var(--neon-amber)] border-[var(--neon-amber)] shadow-[0_0_6px_var(--neon-amber)]'
+                  : 'bg-[#0a0a0f] border-[var(--neon-amber)]/30 group-hover:border-[var(--neon-amber)]/60'
+              )} />
+              <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 font-mono text-[4px] text-white/30">R</span>
+            </button>
+
+            <div className="font-mono text-[5px] text-white/20 ml-0.5">HMS-001</div>
+          </div>
+        </div>
+
+        {/* Knobs row - interactive when online, dim when standby */}
+        <div className={cn(
+          'flex items-center justify-between transition-opacity duration-300',
+          deviceState === 'standby' || deviceState === 'shutdown' ? 'opacity-30' :
+          deviceState === 'booting' && bootPhaseNum < 3 ? 'opacity-50' : 'opacity-100'
+        )}>
+          <div className={cn(
+            'transition-all',
+            deviceState === 'testing' && testPhase === 'oscillator' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded-full'
+          )}>
+            <Knob
+              value={knobValues.pulse}
+              onChange={(v) => handleKnobChange('pulse', v)}
+              size="sm"
+              label="PULSE"
+              accentColor="var(--neon-cyan)"
+              disabled={deviceState !== 'online'}
+            />
+          </div>
+          <div className={cn(
+            'transition-all',
+            deviceState === 'testing' && testPhase === 'waveform' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded-full'
+          )}>
+            <Knob
+              value={knobValues.tempo}
+              onChange={(v) => handleKnobChange('tempo', v)}
+              size="sm"
+              label="TEMPO"
+              accentColor="var(--neon-amber)"
+              disabled={deviceState !== 'online'}
+            />
+          </div>
+          <div className={cn(
+            'transition-all',
+            deviceState === 'testing' && testPhase === 'filter' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded-full'
+          )}>
+            <Knob
+              value={knobValues.freq}
+              onChange={(v) => handleKnobChange('freq', v)}
+              size="sm"
+              label="FREQ"
+              accentColor="var(--neon-green)"
+              disabled={deviceState !== 'online'}
+            />
+          </div>
+        </div>
+
+        {/* Status bar with waveform indicator */}
+        <div className="mt-1.5 pt-1 border-t border-white/5 flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <div className={cn(
+              'font-mono text-[5px] px-1 rounded',
+              deviceState === 'online' ? 'bg-[var(--neon-cyan)]/20 text-[var(--neon-cyan)]' : 'bg-white/5 text-white/20'
+            )}>
+              {waveformType.toUpperCase().slice(0, 3)}
+            </div>
+            <span className={cn(
+              'font-mono text-[6px] transition-colors truncate',
+              deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
+              deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+              deviceState === 'standby' || deviceState === 'shutdown' ? 'text-white/30' :
+              testResult === 'pass' ? 'text-[var(--neon-green)]' :
+              testResult === 'fail' ? 'text-[var(--neon-red)]' :
+              tier > 0 ? 'text-[var(--neon-cyan)]' : 'text-white/30'
+            )}>
+              {statusMessage}
+            </span>
+          </div>
+          <div className="flex gap-0.5">
+            {[1, 2, 3, 4, 5].map(t => (
+              <div
+                key={t}
+                className={cn('w-1 h-1 rounded-full transition-colors',
+                  deviceState !== 'standby' && deviceState !== 'shutdown' && tier >= t ? 'bg-[var(--neon-cyan)]' : 'bg-white/10'
+                )}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </PanelFrame>
@@ -2294,156 +3071,251 @@ export function EchoRecorder({
     )
   }
 
+  // Fold state
+  const isExpanded = ecrManager?.isExpanded ?? true
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleToggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current)
+      if (next) {
+        foldedInfoTimerRef.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      }
+      return next
+    })
+  }
+
+  useEffect(() => {
+    return () => { if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current) }
+  }, [])
+
+  // Push-style nano button helper (matching existing ECR style)
+  const nanoBtn = (onClick: () => void, disabled: boolean, title: string, ledColor?: string, isActive?: boolean) => (
+    <button onClick={onClick} disabled={disabled} className="group relative disabled:opacity-30" title={title}>
+      <div className={cn(
+        'w-3 h-3 rounded-sm border-2 transition-all flex items-center justify-center',
+        'bg-gradient-to-b from-[#2a2a3a] to-[#1a1a2a]',
+        'border-[#3a3a4a] border-b-[#0a0a0f]',
+        'active:border-t-[#0a0a0f] active:border-b-[#3a3a4a] active:from-[#1a1a2a] active:to-[#2a2a3a]',
+        'shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]',
+        isActive && 'from-[#1a1a2a] to-[#2a2a3a]'
+      )}>
+        <div className={cn(
+          'w-1 h-1 rounded-full transition-all',
+          ledColor || 'bg-white/20 group-hover:bg-white/40'
+        )} />
+      </div>
+    </button>
+  )
+
+  const testLedColor = deviceState === 'testing'
+    ? 'bg-[var(--neon-cyan)] shadow-[0_0_4px_var(--neon-cyan)]'
+    : testResult === 'pass'
+    ? 'bg-[var(--neon-green)] shadow-[0_0_4px_var(--neon-green)]'
+    : testResult === 'fail'
+    ? 'bg-[var(--neon-red)] shadow-[0_0_4px_var(--neon-red)]'
+    : undefined
+
+  const rebootLedColor = (deviceState === 'rebooting' || deviceState === 'booting')
+    ? 'bg-[var(--neon-amber)] shadow-[0_0_4px_var(--neon-amber)]'
+    : undefined
+
   return (
-    <PanelFrame variant="default" className={cn('p-2', className)}>
-      {/* Header with power button */}
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1.5">
-          <LED on={isLedOn} color={getLedColor()} size="sm" />
-          <div className="font-mono text-[9px] text-[var(--neon-amber)]">
-            ECHO RECORDER
+    <PanelFrame variant="default" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+
+      {/* ===== FOLDED FRONT PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+        width: '100%',
+        left: 0,
+        top: 0,
+      }}>
+        <div className="p-2">
+          <div className="flex items-center gap-1.5">
+            <LED on={isLedOn} color={getLedColor()} size="sm" />
+            <span className="font-mono text-[9px] text-[var(--neon-amber)] font-medium">ECR-001</span>
+            <span className={cn(
+              'font-mono text-[7px] ml-1',
+              isPowered ? 'text-[var(--neon-green)]' : 'text-white/30'
+            )}>
+              {isPowered ? (deviceState === 'online' ? 'ONLINE' : deviceState.toUpperCase()) : 'STANDBY'}
+            </span>
+            <div className="flex-1" />
+            {isPowered && (
+              <>
+                {nanoBtn(handleTest, deviceState !== 'online', 'Test', testLedColor, deviceState === 'testing')}
+                {nanoBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown', 'Reset', rebootLedColor, deviceState === 'rebooting' || deviceState === 'booting')}
+              </>
+            )}
+            <SignalPowerButton />
+            <button
+              onClick={isPowered ? handleToggleFoldedInfo : undefined}
+              className={cn(
+                'w-3 h-3 flex items-center justify-center rounded-sm transition-all',
+                'border border-[#3a3a4a] bg-gradient-to-b from-[#2a2a3a] to-[#1a1a2a]',
+                isPowered ? 'cursor-pointer hover:border-[var(--neon-amber)]/50' : 'opacity-30 cursor-default',
+              )}
+              title={showFoldedInfo ? 'Hide info' : 'Show info'}
+            >
+              <span className="text-[6px] text-white/50">{showFoldedInfo ? '▲' : '▼'}</span>
+            </button>
+          </div>
+
+          {/* Folded info expansion */}
+          <div style={{
+            maxHeight: showFoldedInfo && isPowered ? '80px' : '0px',
+            overflow: 'hidden',
+            transition: 'max-height 300ms ease',
+          }}>
+            <div className="mt-1.5 pt-1 border-t border-white/5 grid grid-cols-3 gap-x-3 gap-y-0.5">
+              {[
+                ['Pulse', `${knobValues.pulse}%`],
+                ['Bloom', `${knobValues.bloom}%`],
+                ['Signal', `${signalStrength}%`],
+                ['Ticker', `${tickerTap}`],
+                ['Tier', `T${tier}`],
+                ['Rec', isRecording ? 'ON' : 'OFF'],
+              ].map(([label, val]) => (
+                <div key={label} className="flex justify-between">
+                  <span className="font-mono text-[6px] text-white/30">{label}</span>
+                  <span className="font-mono text-[6px] text-[var(--neon-amber)]">{val}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-
-        {/* Control cluster: Signal power + Test + Reset */}
-        <div className="flex gap-1 items-center">
-          {/* Signal-shaped Power Button */}
-          <SignalPowerButton />
-
-          {/* Test button - push style with nano LED */}
-          <button
-            onClick={handleTest}
-            disabled={deviceState !== 'online'}
-            className="group relative disabled:opacity-30"
-            title="Test"
-          >
-            <div className={cn(
-              'w-3 h-3 rounded-sm border-2 transition-all flex items-center justify-center',
-              'bg-gradient-to-b from-[#2a2a3a] to-[#1a1a2a]',
-              'border-[#3a3a4a] border-b-[#0a0a0f]',
-              'active:border-t-[#0a0a0f] active:border-b-[#3a3a4a] active:from-[#1a1a2a] active:to-[#2a2a3a]',
-              'shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]',
-              deviceState === 'testing' && 'from-[#1a1a2a] to-[#2a2a3a]'
-            )}>
-              <div className={cn(
-                'w-1 h-1 rounded-full transition-all',
-                deviceState === 'testing'
-                  ? 'bg-[var(--neon-cyan)] shadow-[0_0_4px_var(--neon-cyan)]'
-                  : testResult === 'pass'
-                  ? 'bg-[var(--neon-green)] shadow-[0_0_4px_var(--neon-green)]'
-                  : testResult === 'fail'
-                  ? 'bg-[var(--neon-red)] shadow-[0_0_4px_var(--neon-red)]'
-                  : 'bg-white/20 group-hover:bg-white/40'
-              )} />
-            </div>
-          </button>
-
-          {/* Reset button */}
-          <button
-            onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
-            className="group relative disabled:opacity-30"
-            title="Reset"
-          >
-            <div className={cn(
-              'w-3 h-3 rounded-sm border-2 transition-all flex items-center justify-center',
-              'bg-gradient-to-b from-[#2a2a3a] to-[#1a1a2a]',
-              'border-[#3a3a4a] border-b-[#0a0a0f]',
-              'active:border-t-[#0a0a0f] active:border-b-[#3a3a4a] active:from-[#1a1a2a] active:to-[#2a2a3a]',
-              'shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]',
-              (deviceState === 'rebooting' || deviceState === 'booting') && 'from-[#1a1a2a] to-[#2a2a3a]'
-            )}>
-              <div className={cn(
-                'w-1 h-1 rounded-full transition-all',
-                deviceState === 'rebooting' || deviceState === 'booting'
-                  ? 'bg-[var(--neon-amber)] shadow-[0_0_4px_var(--neon-amber)]'
-                  : 'bg-white/20 group-hover:bg-white/40'
-              )} />
-            </div>
-          </button>
-        </div>
       </div>
 
-      {/* Tier name with ticker */}
-      <div className={cn(
-        'font-mono text-[7px] text-white/40 mb-1.5 transition-opacity flex items-center justify-between',
-        deviceState === 'standby' || deviceState === 'shutdown' ? 'opacity-50' :
-        deviceState === 'booting' && bootPhaseNum < 4 ? 'opacity-50' : 'opacity-100'
-      )}>
-        <span>{deviceState === 'standby' ? 'Standby' : `Ticker Tap ${tickerTap}`}</span>
-        {/* Signal strength indicator */}
-        <div className="flex gap-px">
-          {[1, 2, 3, 4].map(i => (
-            <div
-              key={i}
-              className={cn(
-                'w-0.5 transition-all',
-                deviceState === 'online' && signalStrength >= i * 25
-                  ? 'bg-[var(--neon-amber)]'
-                  : 'bg-white/10'
-              )}
-              style={{ height: `${i * 2 + 2}px` }}
-            />
-          ))}
-        </div>
-      </div>
+      {/* ===== UNFOLDED INNER PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+        width: '100%',
+        left: 0,
+        top: 0,
+      }}>
+        <div className="p-2">
+          {/* Fold chevron */}
+          <button
+            onClick={() => ecrManager?.toggleExpanded()}
+            className="absolute top-1 right-1 w-3 h-3 flex items-center justify-center rounded-sm z-10 border border-[#3a3a4a] bg-gradient-to-b from-[#2a2a3a] to-[#1a1a2a] cursor-pointer hover:border-[var(--neon-amber)]/50 transition-all"
+            title="Fold"
+          >
+            <span className="text-[6px] text-white/50">▲</span>
+          </button>
 
-      {/* Knobs row - interactive when online */}
-      <div className={cn(
-        'flex items-center gap-2 transition-opacity duration-300',
-        deviceState === 'standby' || deviceState === 'shutdown' ? 'opacity-30' :
-        deviceState === 'booting' && bootPhaseNum < 2 ? 'opacity-50' : 'opacity-100'
-      )}>
-        <div className={cn(
-          'transition-all',
-          deviceState === 'testing' && testPhase === 'antenna' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded-full'
-        )}>
-          <Knob
-            value={knobValues.pulse}
-            onChange={(v) => handleKnobChange('pulse', v)}
-            size="sm"
-            label="PULSE"
-            disabled={deviceState !== 'online'}
-          />
-        </div>
-        <div className={cn(
-          'transition-all',
-          deviceState === 'testing' && testPhase === 'output' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded-full'
-        )}>
-          <Knob
-            value={knobValues.bloom}
-            onChange={(v) => handleKnobChange('bloom', v)}
-            size="sm"
-            label="BLOOM"
-            disabled={deviceState !== 'online'}
-          />
-        </div>
+          {/* Header with power button */}
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5">
+              <LED on={isLedOn} color={getLedColor()} size="sm" />
+              <div className="font-mono text-[9px] text-[var(--neon-amber)]">
+                ECHO RECORDER
+              </div>
+            </div>
 
-        {/* Recording indicator */}
-        <div className="flex-1 flex justify-end">
+            {/* Control cluster: Signal power + Test + Reset */}
+            <div className="flex gap-1 items-center mr-4">
+              <SignalPowerButton />
+              {nanoBtn(handleTest, deviceState !== 'online', 'Test', testLedColor, deviceState === 'testing')}
+              {nanoBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown', 'Reset', rebootLedColor, deviceState === 'rebooting' || deviceState === 'booting')}
+            </div>
+          </div>
+
+          {/* Tier name with ticker */}
           <div className={cn(
-            'w-1.5 h-1.5 rounded-full transition-all',
-            deviceState === 'online' && (isRecording || tier > 0)
-              ? 'bg-[var(--neon-amber)] shadow-[0_0_6px_var(--neon-amber)] animate-pulse'
-              : 'bg-white/10'
-          )} />
-        </div>
-      </div>
+            'font-mono text-[7px] text-white/40 mb-1.5 transition-opacity flex items-center justify-between',
+            deviceState === 'standby' || deviceState === 'shutdown' ? 'opacity-50' :
+            deviceState === 'booting' && bootPhaseNum < 4 ? 'opacity-50' : 'opacity-100'
+          )}>
+            <span>{deviceState === 'standby' ? 'Standby' : `Ticker Tap ${tickerTap}`}</span>
+            {/* Signal strength indicator */}
+            <div className="flex gap-px">
+              {[1, 2, 3, 4].map(i => (
+                <div
+                  key={i}
+                  className={cn(
+                    'w-0.5 transition-all',
+                    deviceState === 'online' && signalStrength >= i * 25
+                      ? 'bg-[var(--neon-amber)]'
+                      : 'bg-white/10'
+                  )}
+                  style={{ height: `${i * 2 + 2}px` }}
+                />
+              ))}
+            </div>
+          </div>
 
-      {/* Status bar */}
-      <div className="mt-1.5 pt-1 border-t border-white/5 flex items-center justify-between">
-        <span className={cn(
-          'font-mono text-[5px] transition-colors truncate',
-          deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
-          deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
-          deviceState === 'standby' || deviceState === 'shutdown' ? 'text-white/30' :
-          testResult === 'pass' ? 'text-[var(--neon-green)]' :
-          testResult === 'fail' ? 'text-[var(--neon-red)]' :
-          'text-[var(--neon-amber)]/70'
-        )}>
-          {statusMessage}
-        </span>
-        <span className="font-mono text-[5px] text-white/20">ECR-001</span>
+          {/* Knobs row - interactive when online */}
+          <div className={cn(
+            'flex items-center gap-2 transition-opacity duration-300',
+            deviceState === 'standby' || deviceState === 'shutdown' ? 'opacity-30' :
+            deviceState === 'booting' && bootPhaseNum < 2 ? 'opacity-50' : 'opacity-100'
+          )}>
+            <div className={cn(
+              'transition-all',
+              deviceState === 'testing' && testPhase === 'antenna' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded-full'
+            )}>
+              <Knob
+                value={knobValues.pulse}
+                onChange={(v) => handleKnobChange('pulse', v)}
+                size="sm"
+                label="PULSE"
+                disabled={deviceState !== 'online'}
+              />
+            </div>
+            <div className={cn(
+              'transition-all',
+              deviceState === 'testing' && testPhase === 'output' && 'ring-1 ring-[var(--neon-cyan)]/50 rounded-full'
+            )}>
+              <Knob
+                value={knobValues.bloom}
+                onChange={(v) => handleKnobChange('bloom', v)}
+                size="sm"
+                label="BLOOM"
+                disabled={deviceState !== 'online'}
+              />
+            </div>
+
+            {/* Recording indicator */}
+            <div className="flex-1 flex justify-end">
+              <div className={cn(
+                'w-1.5 h-1.5 rounded-full transition-all',
+                deviceState === 'online' && (isRecording || tier > 0)
+                  ? 'bg-[var(--neon-amber)] shadow-[0_0_6px_var(--neon-amber)] animate-pulse'
+                  : 'bg-white/10'
+              )} />
+            </div>
+          </div>
+
+          {/* Status bar */}
+          <div className="mt-1.5 pt-1 border-t border-white/5 flex items-center justify-between">
+            <span className={cn(
+              'font-mono text-[5px] transition-colors truncate',
+              deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
+              deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+              deviceState === 'standby' || deviceState === 'shutdown' ? 'text-white/30' :
+              testResult === 'pass' ? 'text-[var(--neon-green)]' :
+              testResult === 'fail' ? 'text-[var(--neon-red)]' :
+              'text-[var(--neon-amber)]/70'
+            )}>
+              {statusMessage}
+            </span>
+            <span className="font-mono text-[5px] text-white/20">ECR-001</span>
+          </div>
+        </div>
       </div>
     </PanelFrame>
   )
@@ -2537,181 +3409,262 @@ export function Interpolator({
 
   const isLedOn = isPowered && deviceState !== 'standby' && deviceState !== 'shutdown'
 
+  // Fold state
+  const isExpanded = iplManager?.isExpanded ?? true
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const handleToggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current)
+      if (next) {
+        foldedInfoTimerRef.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      }
+      return next
+    })
+  }
+
+  useEffect(() => {
+    return () => { if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current) }
+  }, [])
+
+  // Prism power button helper (reused in both panels)
+  const PrismPowerButton = () => (
+    <button
+      onClick={handlePowerToggle}
+      disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
+      className="group relative disabled:opacity-30"
+      title={isPowered && deviceState === 'online' ? 'Power Off' : 'Power On'}
+    >
+      <svg width="10" height="10" viewBox="0 0 10 10" className="transition-all">
+        <polygon
+          points="5,1 9,9 1,9"
+          fill="none"
+          stroke={isPowered && deviceState === 'online' ? 'var(--neon-lime, #bfff00)' : '#3a3a4a'}
+          strokeWidth="0.8"
+          className="transition-all"
+        />
+        {isPowered && deviceState === 'online' && (
+          <>
+            <line x1="4" y1="4" x2="2.5" y2="8" stroke="#ff0000" strokeWidth="0.4" opacity="0.7" />
+            <line x1="5" y1="4" x2="5" y2="8" stroke="#00ff00" strokeWidth="0.4" opacity="0.7" />
+            <line x1="6" y1="4" x2="7.5" y2="8" stroke="#0066ff" strokeWidth="0.4" opacity="0.7" />
+          </>
+        )}
+        <circle cx="5" cy="6" r="0.8" fill={isPowered && deviceState === 'online' ? 'var(--neon-lime, #bfff00)' : '#2a2a3a'} className="transition-all">
+          {isPowered && deviceState === 'online' && (
+            <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" />
+          )}
+        </circle>
+      </svg>
+      {isPowered && deviceState === 'online' && (
+        <div className="absolute inset-0 rounded-full opacity-30" style={{ boxShadow: '0 0 4px var(--neon-lime, #bfff00)' }} />
+      )}
+    </button>
+  )
+
+  // Toggle switch helper (reused for test/reset)
+  const ToggleSwitch = ({ onClick, disabled, title, isActive, ledColor }: { onClick: () => void; disabled: boolean; title: string; isActive: boolean; ledColor?: string }) => (
+    <button onClick={onClick} disabled={disabled} className="group relative disabled:opacity-30" title={title}>
+      <div className={cn(
+        'w-4 h-2 rounded-full transition-all relative',
+        'bg-gradient-to-b from-[#1a1a2a] to-[#0a0a0f]',
+        'border border-[#3a3a4a]',
+        'shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]'
+      )}>
+        <div className={cn(
+          'absolute top-0 h-2 w-2 rounded-full transition-all',
+          'bg-gradient-to-b from-[#4a4a5a] to-[#2a2a3a]',
+          'border border-[#5a5a6a]',
+          'flex items-center justify-center',
+          isActive ? 'left-2' : 'left-0'
+        )}>
+          <div className={cn('w-0.5 h-0.5 rounded-full transition-all', ledColor || 'bg-white/30')} />
+        </div>
+      </div>
+    </button>
+  )
+
+  const testLedColor = deviceState === 'testing'
+    ? 'bg-[var(--neon-cyan)] shadow-[0_0_3px_var(--neon-cyan)]'
+    : testResult === 'pass'
+    ? 'bg-[var(--neon-green)] shadow-[0_0_3px_var(--neon-green)]'
+    : testResult === 'fail'
+    ? 'bg-[var(--neon-red)] shadow-[0_0_3px_var(--neon-red)]'
+    : undefined
+
+  const rebootLedColor = (deviceState === 'rebooting' || deviceState === 'booting')
+    ? 'bg-[var(--neon-amber)] shadow-[0_0_3px_var(--neon-amber)]'
+    : undefined
+
+  // Chevron button helper
+  const chevronBtn = (onClick: () => void, label: string, title: string) => (
+    <button
+      onClick={onClick}
+      className="w-3 h-3 flex items-center justify-center rounded-sm border border-[#3a3a4a] bg-gradient-to-b from-[#2a2a3a] to-[#1a1a2a] cursor-pointer hover:border-[var(--neon-lime,#bfff00)]/50 transition-all"
+      title={title}
+    >
+      <span className="text-[6px] text-white/50">{label}</span>
+    </button>
+  )
+
   return (
-    <PanelFrame variant="military" className={cn('p-2', className)}>
-      {/* Header with LED, power button, and micro toggle buttons */}
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1.5">
-          <LED on={isLedOn} color={getLedColor()} size="sm" />
-          <div className="font-mono text-[9px] text-[var(--neon-lime,#bfff00)]">
-            INTERPOLATOR
+    <PanelFrame variant="military" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+
+      {/* ===== FOLDED FRONT PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+        width: '100%',
+        left: 0,
+        top: 0,
+      }}>
+        <div className="p-2">
+          <div className="flex items-center gap-1.5">
+            <LED on={isLedOn} color={getLedColor()} size="sm" />
+            <span className="font-mono text-[9px] text-[var(--neon-lime,#bfff00)] font-medium">INT-001</span>
+            <span className={cn(
+              'font-mono text-[7px] ml-1',
+              isPowered ? 'text-[var(--neon-green)]' : 'text-white/30'
+            )}>
+              {isPowered ? (deviceState === 'online' ? 'ONLINE' : deviceState.toUpperCase()) : 'STANDBY'}
+            </span>
+            <div className="flex-1" />
+            {isPowered && (
+              <>
+                <ToggleSwitch onClick={handleTest} disabled={deviceState !== 'online'} title="Test" isActive={!!(deviceState === 'testing' || testResult)} ledColor={testLedColor} />
+                <ToggleSwitch onClick={handleReboot} disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'} title="Reset" isActive={deviceState === 'rebooting' || deviceState === 'booting'} ledColor={rebootLedColor} />
+              </>
+            )}
+            <PrismPowerButton />
+            {chevronBtn(
+              isPowered ? handleToggleFoldedInfo : () => {},
+              showFoldedInfo ? '▲' : '▼',
+              showFoldedInfo ? 'Hide info' : 'Show info'
+            )}
+          </div>
+
+          {/* Folded info expansion */}
+          <div style={{
+            maxHeight: showFoldedInfo && isPowered ? '80px' : '0px',
+            overflow: 'hidden',
+            transition: 'max-height 300ms ease',
+          }}>
+            <div className="mt-1.5 pt-1 border-t border-white/5 grid grid-cols-3 gap-x-3 gap-y-0.5">
+              {[
+                ['Spectrum', `${spectrumWidth}%`],
+                ['Accuracy', `${iplManager?.interpolationAccuracy?.toFixed(1) ?? '97.5'}%`],
+                ['Streams', `${iplManager?.inputStreams ?? 8}`],
+                ['Horizon', `${iplManager?.predictionHorizon ?? 60}s`],
+                ['Tier', `T${tier}`],
+                ['Draw', `${isPowered ? '20' : '1'} E/s`],
+              ].map(([label, val]) => (
+                <div key={label} className="flex justify-between">
+                  <span className="font-mono text-[6px] text-white/30">{label}</span>
+                  <span className="font-mono text-[6px] text-[var(--neon-lime,#bfff00)]">{val}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
+      </div>
 
-        <div className="flex gap-1 items-center">
-          {/* Prism-shaped power button - tiny triangle */}
-          <button
-            onClick={handlePowerToggle}
-            disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
-            className="group relative disabled:opacity-30"
-            title={isPowered && deviceState === 'online' ? 'Power Off' : 'Power On'}
+      {/* ===== UNFOLDED INNER PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+        width: '100%',
+        left: 0,
+        top: 0,
+      }}>
+        <div className="p-2">
+          {/* Fold chevron */}
+          <div className="absolute top-1 right-1 z-10">
+            {chevronBtn(() => iplManager?.toggleExpanded(), '▲', 'Fold')}
+          </div>
+
+          {/* Header with LED, power button, and micro toggle buttons */}
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5">
+              <LED on={isLedOn} color={getLedColor()} size="sm" />
+              <div className="font-mono text-[9px] text-[var(--neon-lime,#bfff00)]">
+                INTERPOLATOR
+              </div>
+            </div>
+
+            <div className="flex gap-1 items-center mr-4">
+              <PrismPowerButton />
+              <ToggleSwitch onClick={handleTest} disabled={deviceState !== 'online'} title="Test" isActive={!!(deviceState === 'testing' || testResult)} ledColor={testLedColor} />
+              <ToggleSwitch onClick={handleReboot} disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'} title="Reset" isActive={deviceState === 'rebooting' || deviceState === 'booting'} ledColor={rebootLedColor} />
+            </div>
+          </div>
+
+          {/* Tier name */}
+          <div className={cn(
+            'font-mono text-[7px] text-white/40 mb-1 transition-opacity',
+            deviceState === 'booting' && bootPhase ? 'opacity-50' : 'opacity-100'
+          )}>
+            {TIER_NAMES.optics[tier]}
+          </div>
+
+          {/* Spectrum bar */}
+          <div
+            className={cn(
+              'h-6 bg-black/30 rounded flex items-center justify-center overflow-hidden relative',
+              deviceState === 'testing' && testPhase === 'spectrum' && 'ring-1 ring-[var(--neon-cyan)]/50'
+            )}
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" className="transition-all">
-              {/* Prism triangle */}
-              <polygon
-                points="5,1 9,9 1,9"
-                fill="none"
-                stroke={isPowered && deviceState === 'online' ? 'var(--neon-lime, #bfff00)' : '#3a3a4a'}
-                strokeWidth="0.8"
-                className="transition-all"
+            {tier > 0 && isPowered && deviceState !== 'standby' && deviceState !== 'shutdown' ? (
+              <div
+                className="h-full transition-all duration-500"
+                style={{
+                  width: `${spectrumWidth}%`,
+                  background: `linear-gradient(90deg, ${colors.slice(0, maxColorIndex + 1).join(', ')})`,
+                  opacity: deviceState === 'booting' ? 0.5 : 1,
+                }}
               />
-              {/* Inner refraction lines when powered */}
-              {isPowered && deviceState === 'online' && (
-                <>
-                  <line x1="4" y1="4" x2="2.5" y2="8" stroke="#ff0000" strokeWidth="0.4" opacity="0.7" />
-                  <line x1="5" y1="4" x2="5" y2="8" stroke="#00ff00" strokeWidth="0.4" opacity="0.7" />
-                  <line x1="6" y1="4" x2="7.5" y2="8" stroke="#0066ff" strokeWidth="0.4" opacity="0.7" />
-                </>
-              )}
-              {/* Center dot */}
-              <circle
-                cx="5" cy="6"
-                r="0.8"
-                fill={isPowered && deviceState === 'online' ? 'var(--neon-lime, #bfff00)' : '#2a2a3a'}
-                className="transition-all"
-              >
-                {isPowered && deviceState === 'online' && (
-                  <animate attributeName="opacity" values="1;0.5;1" dur="2s" repeatCount="indefinite" />
-                )}
-              </circle>
-            </svg>
-            {/* Glow effect */}
-            {isPowered && deviceState === 'online' && (
-              <div className="absolute inset-0 rounded-full opacity-30"
-                style={{ boxShadow: '0 0 4px var(--neon-lime, #bfff00)' }}
+            ) : (
+              <span className="font-mono text-[8px] text-white/30">
+                {deviceState === 'booting' ? 'LOADING...' : !isPowered || deviceState === 'standby' ? 'STANDBY' : 'OFFLINE'}
+              </span>
+            )}
+
+            {/* Scanning line during test */}
+            {deviceState === 'testing' && testPhase === 'spectrum' && (
+              <div
+                className="absolute inset-y-0 w-0.5 bg-white/80"
+                style={{ animation: 'scan-line 1s ease-in-out infinite' }}
               />
             )}
-          </button>
+          </div>
 
-          {/* Test - toggle switch */}
-          <button
-            onClick={handleTest}
-            disabled={deviceState !== 'online'}
-            className="group relative disabled:opacity-30"
-            title="Test"
-          >
-            <div className={cn(
-              'w-4 h-2 rounded-full transition-all relative',
-              'bg-gradient-to-b from-[#1a1a2a] to-[#0a0a0f]',
-              'border border-[#3a3a4a]',
-              'shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]'
+          {/* Status bar */}
+          <div className="mt-1 pt-1 border-t border-white/5 flex items-center justify-between">
+            <span className={cn(
+              'font-mono text-[5px] transition-colors truncate flex-1',
+              deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
+              deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+              !isPowered || deviceState === 'standby' ? 'text-white/20' :
+              testResult === 'pass' ? 'text-[var(--neon-green)]' :
+              testResult === 'fail' ? 'text-[var(--neon-red)]' :
+              tier > 0 ? 'text-[var(--neon-lime,#bfff00)]' : 'text-white/30'
             )}>
-              <div className={cn(
-                'absolute top-0 h-2 w-2 rounded-full transition-all',
-                'bg-gradient-to-b from-[#4a4a5a] to-[#2a2a3a]',
-                'border border-[#5a5a6a]',
-                'flex items-center justify-center',
-                deviceState === 'testing' || testResult ? 'left-2' : 'left-0'
-              )}>
-                <div className={cn(
-                  'w-0.5 h-0.5 rounded-full transition-all',
-                  deviceState === 'testing'
-                    ? 'bg-[var(--neon-cyan)] shadow-[0_0_3px_var(--neon-cyan)]'
-                    : testResult === 'pass'
-                    ? 'bg-[var(--neon-green)] shadow-[0_0_3px_var(--neon-green)]'
-                    : testResult === 'fail'
-                    ? 'bg-[var(--neon-red)] shadow-[0_0_3px_var(--neon-red)]'
-                    : 'bg-white/30'
-                )} />
-              </div>
-            </div>
-          </button>
-
-          {/* Reset - toggle switch */}
-          <button
-            onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
-            className="group relative disabled:opacity-30"
-            title="Reset"
-          >
-            <div className={cn(
-              'w-4 h-2 rounded-full transition-all relative',
-              'bg-gradient-to-b from-[#1a1a2a] to-[#0a0a0f]',
-              'border border-[#3a3a4a]',
-              'shadow-[inset_0_1px_2px_rgba(0,0,0,0.5)]'
-            )}>
-              <div className={cn(
-                'absolute top-0 h-2 w-2 rounded-full transition-all',
-                'bg-gradient-to-b from-[#4a4a5a] to-[#2a2a3a]',
-                'border border-[#5a5a6a]',
-                'flex items-center justify-center',
-                deviceState === 'rebooting' || deviceState === 'booting' ? 'left-2' : 'left-0'
-              )}>
-                <div className={cn(
-                  'w-0.5 h-0.5 rounded-full transition-all',
-                  deviceState === 'rebooting' || deviceState === 'booting'
-                    ? 'bg-[var(--neon-amber)] shadow-[0_0_3px_var(--neon-amber)]'
-                    : 'bg-white/30'
-                )} />
-              </div>
-            </div>
-          </button>
+              {statusMessage}
+            </span>
+            <span className="font-mono text-[5px] text-white/20">INT-001</span>
+          </div>
         </div>
-      </div>
-
-      {/* Tier name */}
-      <div className={cn(
-        'font-mono text-[7px] text-white/40 mb-1 transition-opacity',
-        deviceState === 'booting' && bootPhase ? 'opacity-50' : 'opacity-100'
-      )}>
-        {TIER_NAMES.optics[tier]}
-      </div>
-
-      {/* Spectrum bar */}
-      <div
-        className={cn(
-          'h-6 bg-black/30 rounded flex items-center justify-center overflow-hidden relative',
-          deviceState === 'testing' && testPhase === 'spectrum' && 'ring-1 ring-[var(--neon-cyan)]/50'
-        )}
-      >
-        {tier > 0 && isPowered && deviceState !== 'standby' && deviceState !== 'shutdown' ? (
-          <div
-            className="h-full transition-all duration-500"
-            style={{
-              width: `${spectrumWidth}%`,
-              background: `linear-gradient(90deg, ${colors.slice(0, maxColorIndex + 1).join(', ')})`,
-              opacity: deviceState === 'booting' ? 0.5 : 1,
-            }}
-          />
-        ) : (
-          <span className="font-mono text-[8px] text-white/30">
-            {deviceState === 'booting' ? 'LOADING...' : !isPowered || deviceState === 'standby' ? 'STANDBY' : 'OFFLINE'}
-          </span>
-        )}
-
-        {/* Scanning line during test */}
-        {deviceState === 'testing' && testPhase === 'spectrum' && (
-          <div
-            className="absolute inset-y-0 w-0.5 bg-white/80"
-            style={{ animation: 'scan-line 1s ease-in-out infinite' }}
-          />
-        )}
-      </div>
-
-      {/* Status bar */}
-      <div className="mt-1 pt-1 border-t border-white/5 flex items-center justify-between">
-        <span className={cn(
-          'font-mono text-[5px] transition-colors truncate flex-1',
-          deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
-          deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
-          !isPowered || deviceState === 'standby' ? 'text-white/20' :
-          testResult === 'pass' ? 'text-[var(--neon-green)]' :
-          testResult === 'fail' ? 'text-[var(--neon-red)]' :
-          tier > 0 ? 'text-[var(--neon-lime,#bfff00)]' : 'text-white/30'
-        )}>
-          {statusMessage}
-        </span>
-        <span className="font-mono text-[5px] text-white/20">INT-001</span>
       </div>
 
       <style jsx global>{`
@@ -2745,6 +3698,7 @@ export function BasicToolkit({ className }: BasicToolkitProps) {
   const shutdownPhase = btk?.shutdownPhase ?? null
   const selectedTool = btk?.selectedTool ?? null
   const isPowered = btk?.isPowered ?? true
+  const isExpanded = btk?.isExpanded ?? true
 
   // Random logo position (memoized on mount)
   const [logoPosition] = useState(() => {
@@ -2768,6 +3722,30 @@ export function BasicToolkit({ className }: BasicToolkitProps) {
   const runTest = useCallback(() => btk?.runTest(), [btk])
   const reboot = useCallback(() => btk?.reboot(), [btk])
   const selectTool = useCallback((toolName: string) => btk?.selectTool(toolName), [btk])
+  const handlePower = useCallback(() => {
+    if (deviceState === 'online') btk?.powerOff()
+    else if (deviceState === 'standby') btk?.powerOn()
+  }, [btk, deviceState])
+  const handleFoldToggle = useCallback(() => btk?.toggleExpanded(), [btk])
+
+  // Folded info toggle
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const toggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current)
+      if (next) {
+        foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      }
+      return next
+    })
+  }
+
+  useEffect(() => {
+    return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) }
+  }, [])
 
   const getStatusColor = () => {
     switch (deviceState) {
@@ -2781,200 +3759,339 @@ export function BasicToolkit({ className }: BasicToolkitProps) {
     }
   }
 
-  return (
-    <PanelFrame variant="default" className={cn('p-2 relative overflow-hidden', className)}>
-      {/* Round nano buttons with illuminated edges - top */}
-      <div className="absolute top-1 right-1 flex gap-1 z-10">
-        {/* Power rocker */}
-        <button
-          onClick={() => {
-            if (deviceState === 'online') btk?.powerOff()
-            else if (deviceState === 'standby') btk?.powerOn()
-          }}
-          disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown'}
-          className="group relative"
-          title="Power"
-        >
-          <div
-            className="rounded-sm border transition-all"
-            style={{
-              width: '7px',
-              height: '3px',
-              background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
-              borderColor: isPowered && deviceState !== 'standby' ? 'var(--neon-green)' : deviceState === 'standby' ? 'var(--neon-red)' : '#3a3a4a',
-              boxShadow: isPowered && deviceState !== 'standby'
-                ? '0 0 3px var(--neon-green)'
-                : deviceState === 'standby' ? '0 0 3px var(--neon-red)' : 'none',
-              opacity: deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown' ? 0.3 : 1,
-            }}
-          />
-        </button>
-        {/* Test button */}
-        <button
-          onClick={runTest}
-          disabled={deviceState !== 'online'}
-          className="group relative"
-          title="Test"
-        >
-          <div
-            className="w-3 h-3 rounded-full border transition-all"
-            style={{
-              background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
-              borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a',
-              boxShadow: deviceState === 'testing'
-                ? '0 0 6px var(--neon-purple), inset 0 0 3px var(--neon-purple)'
-                : 'inset 0 1px 2px rgba(0,0,0,0.5)',
-            }}
-          />
-          {/* Illuminated edge ring */}
-          <div
-            className="absolute inset-0 rounded-full pointer-events-none"
-            style={{
-              border: '1px solid',
-              borderColor: deviceState === 'online' ? 'var(--neon-cyan)' : 'transparent',
-              opacity: deviceState === 'online' ? 0.6 : 0,
-              animation: deviceState === 'testing' ? 'pulse 0.5s ease-in-out infinite' : 'none',
-            }}
-          />
-        </button>
-        {/* Reboot button */}
-        <button
-          onClick={reboot}
-          disabled={deviceState === 'booting' || deviceState === 'rebooting'}
-          className="group relative"
-          title="Reboot"
-        >
-          <div
-            className="w-3 h-3 rounded-full border transition-all"
-            style={{
-              background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
-              borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a',
-              boxShadow: deviceState === 'rebooting'
-                ? '0 0 6px var(--neon-amber), inset 0 0 3px var(--neon-amber)'
-                : 'inset 0 1px 2px rgba(0,0,0,0.5)',
-            }}
-          />
-          {/* Illuminated edge ring */}
-          <div
-            className="absolute inset-0 rounded-full pointer-events-none"
-            style={{
-              border: '1px solid',
-              borderColor: deviceState === 'online' ? 'var(--neon-amber)' : 'transparent',
-              opacity: deviceState === 'online' ? 0.5 : 0,
-              animation: deviceState === 'rebooting' ? 'pulse 0.3s ease-in-out infinite' : 'none',
-            }}
-          />
-        </button>
-      </div>
+  const stateLabel = deviceState === 'online' ? 'ONLINE' : deviceState === 'testing' ? 'TESTING' : deviceState === 'booting' ? 'BOOTING' : deviceState === 'rebooting' ? 'REBOOT' : deviceState === 'shutdown' ? 'SHUTDOWN' : 'STANDBY'
 
-      {/* Company logo - HNDX (Handex Tools) */}
+  // Nano button helper for folded bar
+  const nanoBtn = (onClick: () => void, disabled: boolean, title: string, borderColor: string, glowColor?: string) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="group relative"
+      title={title}
+    >
       <div
-        className="absolute font-mono text-[5px] text-white/20 pointer-events-none z-0"
-        style={logoPosition}
-      >
-        HNDX
-      </div>
+        className="w-3 h-3 rounded-full border transition-all"
+        style={{
+          background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+          borderColor: glowColor ?? borderColor,
+          boxShadow: glowColor
+            ? `0 0 6px ${glowColor}, inset 0 0 3px ${glowColor}`
+            : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+          opacity: disabled ? 0.3 : 1,
+        }}
+      />
+    </button>
+  )
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-1">
+  return (
+    <PanelFrame variant="default" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+      {/* ===== FOLDED FRONT PANEL ===== */}
+      <div
+        style={{
+          transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 0 : 1,
+          position: isExpanded ? 'absolute' : 'relative',
+          pointerEvents: isExpanded ? 'none' : 'auto',
+          zIndex: isExpanded ? 0 : 2,
+        }}
+        className="w-full"
+      >
+        {/* Main folded bar */}
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
+          {/* LED */}
           <div
-            className="w-1.5 h-1.5 rounded-full"
+            className="w-1.5 h-1.5 rounded-full shrink-0"
             style={{
               backgroundColor: getStatusColor(),
               boxShadow: `0 0 4px ${getStatusColor()}`,
               animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
             }}
           />
-          <div className="font-mono text-[9px] text-[var(--neon-amber)]">
-            BASIC TOOLKIT
+          {/* Device ID */}
+          <span className="font-mono text-[8px] font-bold text-[var(--neon-amber)]">BTK-001</span>
+          {/* State */}
+          <span className={cn('font-mono text-[7px]', isPowered ? 'text-[var(--neon-amber)]/70' : 'text-white/30')}>
+            {stateLabel}
+          </span>
+          <div className="flex-1" />
+          {/* Buttons */}
+          {isPowered && (
+            <>
+              {nanoBtn(runTest, deviceState !== 'online', 'Test',
+                '#3a3a4a', deviceState === 'testing' ? 'var(--neon-purple)' : undefined)}
+              {nanoBtn(reboot, deviceState === 'booting' || deviceState === 'rebooting', 'Reboot',
+                '#3a3a4a', deviceState === 'rebooting' ? 'var(--neon-amber)' : undefined)}
+            </>
+          )}
+          {/* Power rocker */}
+          <button
+            onClick={handlePower}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown'}
+            className="group relative"
+            title="Power"
+          >
+            <div
+              className="rounded-sm border transition-all"
+              style={{
+                width: '7px',
+                height: '3px',
+                background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                borderColor: isPowered && deviceState !== 'standby' ? 'var(--neon-green)' : deviceState === 'standby' ? 'var(--neon-red)' : '#3a3a4a',
+                boxShadow: isPowered && deviceState !== 'standby'
+                  ? '0 0 3px var(--neon-green)'
+                  : deviceState === 'standby' ? '0 0 3px var(--neon-red)' : 'none',
+              }}
+            />
+          </button>
+          {/* Info toggle */}
+          {isPowered ? (
+            <button
+              onClick={toggleFoldedInfo}
+              className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center cursor-pointer hover:border-[var(--neon-amber)]/40 transition-colors"
+              style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }}
+              title={showFoldedInfo ? 'Hide info' : 'Show info'}
+            >
+              <span className="font-mono text-[6px] text-[var(--neon-amber)]/60">{showFoldedInfo ? '▲' : '▼'}</span>
+            </button>
+          ) : (
+            <div className="w-3" />
+          )}
+        </div>
+
+        {/* Folded info expansion */}
+        <div
+          style={{
+            maxHeight: showFoldedInfo && isPowered ? '40px' : '0px',
+            transition: 'max-height 400ms ease, opacity 300ms ease',
+            opacity: showFoldedInfo && isPowered ? 1 : 0,
+            overflow: 'hidden',
+          }}
+        >
+          <div className="px-2 pb-1.5 font-mono text-[7px] text-[var(--neon-amber)]/60 flex gap-3 flex-wrap">
+            {tools.map(t => (
+              <span key={t.name} className="flex items-center gap-0.5">
+                <span className="w-1 h-1 rounded-full inline-block" style={{ backgroundColor: t.active ? t.color : '#333' }} />
+                {t.name}
+              </span>
+            ))}
+            <span>Tier: T1</span>
+            <span>Draw: {btk?.currentDraw?.toFixed(1) ?? '0.0'} E/s</span>
           </div>
         </div>
-        <div className="font-mono text-[7px] text-white/30">T1</div>
       </div>
 
-      {/* Tool grid - all animations happen inside this area */}
-      <div className="relative grid grid-cols-2 gap-1">
-        {/* Boot animation inside grid area */}
-        {deviceState === 'booting' && bootPhase && (
-          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[6px] text-[var(--neon-cyan)]">
-                {bootPhase === 'post' && 'POST'}
-                {bootPhase === 'tools' && 'TOOLS'}
-                {bootPhase === 'interface' && 'I/O'}
-                {bootPhase === 'ready' && 'READY'}
-              </span>
-              <div className="flex gap-0.5">
-                {['post', 'tools', 'interface', 'ready'].map((phase, i) => (
-                  <div
-                    key={phase}
-                    className="w-1 h-1 rounded-full"
-                    style={{
-                      backgroundColor: ['post', 'tools', 'interface', 'ready'].indexOf(bootPhase) >= i
-                        ? 'var(--neon-cyan)'
-                        : '#333',
-                      boxShadow: bootPhase === phase ? '0 0 4px var(--neon-cyan)' : 'none',
-                    }}
-                  />
-                ))}
-              </div>
+      {/* ===== UNFOLDED INNER PANEL ===== */}
+      <div
+        style={{
+          transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 1 : 0,
+          position: isExpanded ? 'relative' : 'absolute',
+          pointerEvents: isExpanded ? 'auto' : 'none',
+          zIndex: isExpanded ? 2 : 0,
+        }}
+        className="w-full p-2"
+      >
+        {/* Round nano buttons with illuminated edges - top */}
+        <div className="absolute top-1 right-1 flex gap-1 z-10">
+          {/* Fold chevron */}
+          <button
+            onClick={handleFoldToggle}
+            className="group relative"
+            title="Fold"
+          >
+            <div
+              className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center transition-all hover:border-[var(--neon-amber)]/40"
+              style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }}
+            >
+              <span className="font-mono text-[6px] text-[var(--neon-amber)]/60">▴</span>
+            </div>
+          </button>
+          {/* Power rocker */}
+          <button
+            onClick={handlePower}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown'}
+            className="group relative"
+            title="Power"
+          >
+            <div
+              className="rounded-sm border transition-all"
+              style={{
+                width: '7px',
+                height: '3px',
+                background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                borderColor: isPowered && deviceState !== 'standby' ? 'var(--neon-green)' : deviceState === 'standby' ? 'var(--neon-red)' : '#3a3a4a',
+                boxShadow: isPowered && deviceState !== 'standby'
+                  ? '0 0 3px var(--neon-green)'
+                  : deviceState === 'standby' ? '0 0 3px var(--neon-red)' : 'none',
+                opacity: deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown' ? 0.3 : 1,
+              }}
+            />
+          </button>
+          {/* Test button */}
+          <button
+            onClick={runTest}
+            disabled={deviceState !== 'online'}
+            className="group relative"
+            title="Test"
+          >
+            <div
+              className="w-3 h-3 rounded-full border transition-all"
+              style={{
+                background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a',
+                boxShadow: deviceState === 'testing'
+                  ? '0 0 6px var(--neon-purple), inset 0 0 3px var(--neon-purple)'
+                  : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+              }}
+            />
+            <div
+              className="absolute inset-0 rounded-full pointer-events-none"
+              style={{
+                border: '1px solid',
+                borderColor: deviceState === 'online' ? 'var(--neon-cyan)' : 'transparent',
+                opacity: deviceState === 'online' ? 0.6 : 0,
+                animation: deviceState === 'testing' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+              }}
+            />
+          </button>
+          {/* Reboot button */}
+          <button
+            onClick={reboot}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting'}
+            className="group relative"
+            title="Reboot"
+          >
+            <div
+              className="w-3 h-3 rounded-full border transition-all"
+              style={{
+                background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a',
+                boxShadow: deviceState === 'rebooting'
+                  ? '0 0 6px var(--neon-amber), inset 0 0 3px var(--neon-amber)'
+                  : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+              }}
+            />
+            <div
+              className="absolute inset-0 rounded-full pointer-events-none"
+              style={{
+                border: '1px solid',
+                borderColor: deviceState === 'online' ? 'var(--neon-amber)' : 'transparent',
+                opacity: deviceState === 'online' ? 0.5 : 0,
+                animation: deviceState === 'rebooting' ? 'pulse 0.3s ease-in-out infinite' : 'none',
+              }}
+            />
+          </button>
+        </div>
+
+        {/* Company logo - HNDX (Handex Tools) */}
+        <div
+          className="absolute font-mono text-[5px] text-white/20 pointer-events-none z-0"
+          style={logoPosition}
+        >
+          HNDX
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1">
+            <div
+              className="w-1.5 h-1.5 rounded-full"
+              style={{
+                backgroundColor: getStatusColor(),
+                boxShadow: `0 0 4px ${getStatusColor()}`,
+                animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+              }}
+            />
+            <div className="font-mono text-[9px] text-[var(--neon-amber)]">
+              BASIC TOOLKIT
             </div>
           </div>
-        )}
+          <div className="font-mono text-[7px] text-white/30">T1</div>
+        </div>
 
-        {/* Reboot animation inside grid area */}
-        {deviceState === 'rebooting' && (
-          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
-            <span className="font-mono text-[6px] text-[var(--neon-amber)] animate-pulse">
-              REBOOTING...
-            </span>
-          </div>
-        )}
+        {/* Tool grid */}
+        <div className="relative grid grid-cols-2 gap-1">
+          {deviceState === 'booting' && bootPhase && (
+            <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[6px] text-[var(--neon-cyan)]">
+                  {bootPhase === 'post' && 'POST'}
+                  {bootPhase === 'tools' && 'TOOLS'}
+                  {bootPhase === 'interface' && 'I/O'}
+                  {bootPhase === 'ready' && 'READY'}
+                </span>
+                <div className="flex gap-0.5">
+                  {['post', 'tools', 'interface', 'ready'].map((phase, i) => (
+                    <div
+                      key={phase}
+                      className="w-1 h-1 rounded-full"
+                      style={{
+                        backgroundColor: ['post', 'tools', 'interface', 'ready'].indexOf(bootPhase) >= i
+                          ? 'var(--neon-cyan)'
+                          : '#333',
+                        boxShadow: bootPhase === phase ? '0 0 4px var(--neon-cyan)' : 'none',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
-        {/* Standby/Shutdown overlay */}
-        {(deviceState === 'standby' || deviceState === 'shutdown') && (
-          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
-            <span className="font-mono text-[6px] text-[var(--neon-red)]/60">
-              {shutdownPhase ? shutdownPhase.toUpperCase() : 'STANDBY'}
-            </span>
-          </div>
-        )}
-
-        {/* Tool buttons - LEDs animate during testing */}
-        {tools.map((tool) => {
-          const isBeingTested = deviceState === 'testing' && testPhase === tool.testPhase
-          const isSelected = selectedTool === tool.name
-          return (
-            <button
-              key={tool.name}
-              onClick={() => selectTool(tool.name)}
-              disabled={deviceState !== 'online'}
-              className={cn(
-                'flex items-center gap-1 px-1 py-0.5 rounded transition-all',
-                isSelected ? 'bg-white/10 border border-white/20' : 'bg-black/30',
-                deviceState === 'online' && 'hover:bg-white/5'
-              )}
-            >
-              <div
-                className="w-1.5 h-1.5 rounded-full transition-all"
-                style={{
-                  backgroundColor: tool.active || isBeingTested ? tool.color : '#333',
-                  boxShadow: tool.active || isBeingTested ? `0 0 4px ${tool.color}` : 'none',
-                  animation: isBeingTested ? 'pulse 0.3s ease-in-out infinite' : 'none',
-                }}
-              />
-              <span
-                className="font-mono text-[7px] transition-colors"
-                style={{
-                  color: isBeingTested ? tool.color : tool.active ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)',
-                }}
-              >
-                {tool.name}
+          {deviceState === 'rebooting' && (
+            <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
+              <span className="font-mono text-[6px] text-[var(--neon-amber)] animate-pulse">
+                REBOOTING...
               </span>
-            </button>
-          )
-        })}
+            </div>
+          )}
+
+          {(deviceState === 'standby' || deviceState === 'shutdown') && (
+            <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
+              <span className="font-mono text-[6px] text-[var(--neon-red)]/60">
+                {shutdownPhase ? shutdownPhase.toUpperCase() : 'STANDBY'}
+              </span>
+            </div>
+          )}
+
+          {tools.map((tool) => {
+            const isBeingTested = deviceState === 'testing' && testPhase === tool.testPhase
+            const isSelected = selectedTool === tool.name
+            return (
+              <button
+                key={tool.name}
+                onClick={() => selectTool(tool.name)}
+                disabled={deviceState !== 'online'}
+                className={cn(
+                  'flex items-center gap-1 px-1 py-0.5 rounded transition-all',
+                  isSelected ? 'bg-white/10 border border-white/20' : 'bg-black/30',
+                  deviceState === 'online' && 'hover:bg-white/5'
+                )}
+              >
+                <div
+                  className="w-1.5 h-1.5 rounded-full transition-all"
+                  style={{
+                    backgroundColor: tool.active || isBeingTested ? tool.color : '#333',
+                    boxShadow: tool.active || isBeingTested ? `0 0 4px ${tool.color}` : 'none',
+                    animation: isBeingTested ? 'pulse 0.3s ease-in-out infinite' : 'none',
+                  }}
+                />
+                <span
+                  className="font-mono text-[7px] transition-colors"
+                  style={{
+                    color: isBeingTested ? tool.color : tool.active ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.3)',
+                  }}
+                >
+                  {tool.name}
+                </span>
+              </button>
+            )
+          })}
+        </div>
       </div>
     </PanelFrame>
   )
@@ -3005,6 +4122,8 @@ export function MaterialScanner({
   const deviceState: ScannerState = manager?.deviceState ?? 'booting'
   const testPhase: ScannerTestPhase = manager?.testPhase ?? null
   const bootPhase: ScannerBootPhase = manager?.bootPhase ?? null
+  const isPowered = manager?.isPowered ?? true
+  const isExpanded = manager?.isExpanded ?? true
   const [scanLine, setScanLine] = useState(0)
   const [foundMaterials, setFoundMaterials] = useState<number[]>([])
 
@@ -3018,6 +4137,32 @@ export function MaterialScanner({
     return positions[Math.floor(Math.random() * positions.length)]
   })
 
+  const handlePower = useCallback(() => {
+    if (!manager) return
+    if (deviceState === 'standby') manager.powerOn()
+    else if (deviceState === 'online') manager.powerOff()
+  }, [manager, deviceState])
+  const handleFoldToggle = useCallback(() => manager?.toggleExpanded(), [manager])
+
+  // Folded info toggle
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const toggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current)
+      if (next) {
+        foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      }
+      return next
+    })
+  }
+
+  useEffect(() => {
+    return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) }
+  }, [])
+
   // Scanning animation when online
   useEffect(() => {
     if (deviceState !== 'online') return
@@ -3026,7 +4171,6 @@ export function MaterialScanner({
       setScanLine(prev => {
         const next = prev + 2
         if (next > 100) {
-          // Reset and generate new material positions
           setFoundMaterials(
             Array.from({ length: detectedMaterials }, () =>
               Math.floor(Math.random() * 80) + 10
@@ -3069,233 +4213,235 @@ export function MaterialScanner({
     }
   }
 
+  const stateLabel = deviceState === 'online' ? 'SCANNING' : deviceState === 'testing' ? 'TESTING' : deviceState === 'booting' ? 'BOOTING' : deviceState === 'rebooting' ? 'REBOOT' : deviceState === 'shutdown' ? 'SHUTDOWN' : 'STANDBY'
+
+  // Ultra-thin nano button helper
+  const thinBtn = (onClick: () => void, disabled: boolean, title: string, activeColor: string, isActive: boolean, edgePos: 'top' | 'bottom', edgeColor: string, edgeVisible: boolean) => (
+    <button onClick={onClick} disabled={disabled} className="group relative" title={title}>
+      <div className="w-4 h-1.5 rounded-sm border transition-all" style={{
+        background: 'linear-gradient(180deg, #2a2a3a 0%, #1a1a2a 100%)',
+        borderColor: isActive ? activeColor : '#3a3a4a',
+        boxShadow: isActive ? `0 0 4px ${activeColor}, inset 0 0 2px ${activeColor}` : 'inset 0 0.5px 1px rgba(0,0,0,0.5)',
+      }} />
+      <div className={cn('absolute inset-x-0 h-px', edgePos === 'top' ? 'top-0 rounded-t-sm' : 'bottom-0 rounded-b-sm')} style={{
+        background: edgeVisible ? edgeColor : 'transparent',
+        opacity: edgeVisible ? 0.7 : 0,
+        boxShadow: edgeVisible ? `0 0 3px ${edgeColor}` : 'none',
+      }} />
+    </button>
+  )
+
   return (
-    <PanelFrame variant="teal" className={cn('p-2 relative overflow-hidden', className)}>
-      {/* Standby / Shutdown overlay */}
-      {(deviceState === 'standby' || deviceState === 'shutdown') && (
-        <div className="absolute inset-0 bg-black/80 z-20 flex items-center justify-center">
-          <span className="font-mono text-[7px] text-white/30">
-            {deviceState === 'shutdown' ? 'SHUTTING DOWN...' : 'STANDBY'}
-          </span>
-        </div>
-      )}
-
-      {/* Tiny power button — 5x5px flush circular dot, bottom-left */}
-      <button
-        onClick={() => {
-          if (!manager) return
-          if (deviceState === 'standby') manager.powerOn()
-          else if (deviceState === 'online') manager.powerOff()
-        }}
-        disabled={!manager || (deviceState !== 'online' && deviceState !== 'standby')}
-        className="absolute bottom-1 left-1 z-30 group"
-        title={deviceState === 'standby' ? 'Power On' : 'Power Off'}
-      >
-        <div
-          className="w-[5px] h-[5px] rounded-full border transition-all"
-          style={{
-            background: deviceState === 'standby'
-              ? 'radial-gradient(circle, #1a1a2a 40%, #0a0a1a 100%)'
-              : 'radial-gradient(circle, #2a3a2a 40%, #1a2a1a 100%)',
-            borderColor: deviceState === 'online' ? 'var(--neon-cyan)' : '#333',
-            boxShadow: deviceState === 'online'
-              ? '0 0 3px var(--neon-cyan), inset 0 0 1px var(--neon-cyan)'
-              : 'inset 0 0.5px 1px rgba(0,0,0,0.5)',
-          }}
-        />
-      </button>
-
-      {/* Ultra thin stacked nano buttons - top right */}
-      <div className="absolute top-1 right-1 flex flex-col gap-px z-10">
-        {/* Test button - ultra thin */}
-        <button
-          onClick={() => manager?.runTest()}
-          disabled={deviceState !== 'online'}
-          className="group relative"
-          title="Test"
-        >
-          <div
-            className="w-4 h-1.5 rounded-sm border transition-all"
-            style={{
-              background: 'linear-gradient(180deg, #2a2a3a 0%, #1a1a2a 100%)',
-              borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a',
-              boxShadow: deviceState === 'testing'
-                ? '0 0 4px var(--neon-purple), inset 0 0 2px var(--neon-purple)'
-                : 'inset 0 0.5px 1px rgba(0,0,0,0.5)',
-            }}
-          />
-          {/* Illuminated edge - top */}
-          <div
-            className="absolute inset-x-0 top-0 h-px rounded-t-sm"
-            style={{
-              background: deviceState === 'online' ? 'var(--neon-cyan)' : 'transparent',
-              opacity: deviceState === 'online' ? 0.7 : 0,
-              boxShadow: deviceState === 'online' ? '0 0 3px var(--neon-cyan)' : 'none',
-            }}
-          />
-        </button>
-        {/* Reboot button - ultra thin */}
-        <button
-          onClick={() => manager?.reboot()}
-          disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'standby' || deviceState === 'shutdown'}
-          className="group relative"
-          title="Reboot"
-        >
-          <div
-            className="w-4 h-1.5 rounded-sm border transition-all"
-            style={{
-              background: 'linear-gradient(180deg, #2a2a3a 0%, #1a1a2a 100%)',
-              borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a',
-              boxShadow: deviceState === 'rebooting'
-                ? '0 0 4px var(--neon-amber), inset 0 0 2px var(--neon-amber)'
-                : 'inset 0 0.5px 1px rgba(0,0,0,0.5)',
-            }}
-          />
-          {/* Illuminated edge - bottom */}
-          <div
-            className="absolute inset-x-0 bottom-0 h-px rounded-b-sm"
-            style={{
-              background: deviceState === 'online' ? 'var(--neon-amber)' : 'transparent',
-              opacity: deviceState === 'online' ? 0.5 : 0,
-              boxShadow: deviceState === 'online' ? '0 0 3px var(--neon-amber)' : 'none',
-            }}
-          />
-        </button>
-      </div>
-
-      {/* Company logo - SCNR (Scanner Tech) */}
+    <PanelFrame variant="teal" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+      {/* ===== FOLDED FRONT PANEL ===== */}
       <div
-        className="absolute font-mono text-[4px] text-white/15 pointer-events-none z-0"
-        style={logoPosition}
+        style={{
+          transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 0 : 1,
+          position: isExpanded ? 'absolute' : 'relative',
+          pointerEvents: isExpanded ? 'none' : 'auto',
+          zIndex: isExpanded ? 0 : 2,
+        }}
+        className="w-full"
       >
-        SCNR
-      </div>
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
+          {/* LED */}
+          <div className="w-1.5 h-1.5 rounded-full shrink-0 transition-all" style={{
+            backgroundColor: getStatusColor(),
+            boxShadow: `0 0 4px ${getStatusColor()}`,
+            animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+          }} />
+          <span className="font-mono text-[8px] font-bold text-[var(--neon-cyan)]">MSC-001</span>
+          <span className={cn('font-mono text-[7px]', isPowered ? 'text-[var(--neon-cyan)]/70' : 'text-white/30')}>
+            {stateLabel}
+          </span>
+          <div className="flex-1" />
+          {isPowered && (
+            <>
+              {thinBtn(() => manager?.runTest(), deviceState !== 'online', 'Test', 'var(--neon-purple)', deviceState === 'testing', 'top', 'var(--neon-cyan)', deviceState === 'online')}
+              {thinBtn(() => manager?.reboot(), deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'standby' || deviceState === 'shutdown', 'Reboot', 'var(--neon-amber)', deviceState === 'rebooting', 'bottom', 'var(--neon-amber)', deviceState === 'online')}
+            </>
+          )}
+          {/* Power dot */}
+          <button
+            onClick={handlePower}
+            disabled={!manager || (deviceState !== 'online' && deviceState !== 'standby')}
+            className="group"
+            title={deviceState === 'standby' ? 'Power On' : 'Power Off'}
+          >
+            <div className="w-[5px] h-[5px] rounded-full border transition-all" style={{
+              background: deviceState === 'standby' ? 'radial-gradient(circle, #1a1a2a 40%, #0a0a1a 100%)' : 'radial-gradient(circle, #2a3a2a 40%, #1a2a1a 100%)',
+              borderColor: deviceState === 'online' ? 'var(--neon-cyan)' : '#333',
+              boxShadow: deviceState === 'online' ? '0 0 3px var(--neon-cyan), inset 0 0 1px var(--neon-cyan)' : 'inset 0 0.5px 1px rgba(0,0,0,0.5)',
+            }} />
+          </button>
+          {/* Info toggle */}
+          {isPowered ? (
+            <button onClick={toggleFoldedInfo} className="group relative" title={showFoldedInfo ? 'Hide info' : 'Show info'}>
+              <div className="w-4 h-1.5 rounded-sm border border-white/20 flex items-center justify-center" style={{ background: 'linear-gradient(180deg, #2a2a3a 0%, #1a1a2a 100%)' }}>
+                <span className="font-mono text-[5px] text-[var(--neon-cyan)]/60">{showFoldedInfo ? '▲' : '▼'}</span>
+              </div>
+            </button>
+          ) : <div className="w-4" />}
+        </div>
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1">
-          <div
-            className="w-1.5 h-1.5 rounded-full transition-all"
-            style={{
-              backgroundColor: getStatusColor(),
-              boxShadow: `0 0 4px ${getStatusColor()}`,
-              animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
-            }}
-          />
-          <div className="font-mono text-[9px] text-[var(--neon-cyan)]">
-            MATERIAL SCANNER
+        {/* Folded info expansion */}
+        <div style={{
+          maxHeight: showFoldedInfo && isPowered ? '40px' : '0px',
+          transition: 'max-height 400ms ease, opacity 300ms ease',
+          opacity: showFoldedInfo && isPowered ? 1 : 0,
+          overflow: 'hidden',
+        }}>
+          <div className="px-2 pb-1.5 font-mono text-[7px] text-[var(--neon-cyan)]/60 flex gap-3 flex-wrap">
+            <span>Materials: {deviceState === 'online' ? foundMaterials.length : '--'}</span>
+            <span>Tier: T1</span>
+            <span>Draw: {manager?.currentDraw?.toFixed(1) ?? '0.0'} E/s</span>
           </div>
         </div>
       </div>
 
-      {/* Scanning visualization - all animations happen inside this area */}
-      <div className="relative h-6 bg-black/40 rounded overflow-hidden mb-1">
-        {/* Boot animation inside scan area */}
-        {deviceState === 'booting' && bootPhase && (
-          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[6px] text-[var(--neon-cyan)]">
-                {bootPhase === 'post' && 'POST'}
-                {bootPhase === 'sensors' && 'SENSORS'}
-                {bootPhase === 'calibrate' && 'CALIBRATE'}
-                {bootPhase === 'ready' && 'READY'}
-              </span>
-              <div className="flex gap-0.5">
-                {(['post', 'sensors', 'calibrate', 'ready'] as const).map((phase, i) => (
-                  <div
-                    key={phase}
-                    className="w-1 h-1 rounded-full"
-                    style={{
-                      backgroundColor: (['post', 'sensors', 'calibrate', 'ready'] as const).indexOf(bootPhase!) >= i
-                        ? 'var(--neon-cyan)'
-                        : '#333',
-                      boxShadow: bootPhase === phase ? '0 0 4px var(--neon-cyan)' : 'none',
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Reboot animation inside scan area */}
-        {deviceState === 'rebooting' && (
-          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center">
-            <span className="font-mono text-[6px] text-[var(--neon-amber)] animate-pulse">
-              REBOOTING...
+      {/* ===== UNFOLDED INNER PANEL ===== */}
+      <div
+        style={{
+          transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 1 : 0,
+          position: isExpanded ? 'relative' : 'absolute',
+          pointerEvents: isExpanded ? 'auto' : 'none',
+          zIndex: isExpanded ? 2 : 0,
+        }}
+        className="w-full p-2"
+      >
+        {/* Standby / Shutdown overlay */}
+        {(deviceState === 'standby' || deviceState === 'shutdown') && (
+          <div className="absolute inset-0 bg-black/80 z-20 flex items-center justify-center">
+            <span className="font-mono text-[7px] text-white/30">
+              {deviceState === 'shutdown' ? 'SHUTTING DOWN...' : 'STANDBY'}
             </span>
           </div>
         )}
 
-        {/* Test animation inside scan area */}
-        {deviceState === 'testing' && testPhase && (
-          <div className="absolute inset-0 bg-black/80 z-10 flex items-center justify-center">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[6px] text-[var(--neon-purple)]">
-                {testPhase.toUpperCase()}
-              </span>
-              <div className="flex gap-0.5">
-                {(['emitter', 'receiver', 'calibrate', 'sweep'] as const).map((phase) => (
-                  <div
-                    key={phase}
-                    className="w-1 h-1 rounded-full"
-                    style={{
-                      backgroundColor:
-                        testPhase === phase ? 'var(--neon-purple)' :
+        {/* Power button — bottom-left */}
+        <button
+          onClick={handlePower}
+          disabled={!manager || (deviceState !== 'online' && deviceState !== 'standby')}
+          className="absolute bottom-1 left-1 z-30 group"
+          title={deviceState === 'standby' ? 'Power On' : 'Power Off'}
+        >
+          <div className="w-[5px] h-[5px] rounded-full border transition-all" style={{
+            background: deviceState === 'standby' ? 'radial-gradient(circle, #1a1a2a 40%, #0a0a1a 100%)' : 'radial-gradient(circle, #2a3a2a 40%, #1a2a1a 100%)',
+            borderColor: deviceState === 'online' ? 'var(--neon-cyan)' : '#333',
+            boxShadow: deviceState === 'online' ? '0 0 3px var(--neon-cyan), inset 0 0 1px var(--neon-cyan)' : 'inset 0 0.5px 1px rgba(0,0,0,0.5)',
+          }} />
+        </button>
+
+        {/* Stacked nano buttons - top right */}
+        <div className="absolute top-1 right-1 flex flex-col gap-px z-10">
+          {/* Fold chevron */}
+          <button onClick={handleFoldToggle} className="group relative" title="Fold">
+            <div className="w-4 h-1.5 rounded-sm border border-white/20 flex items-center justify-center" style={{ background: 'linear-gradient(180deg, #2a2a3a 0%, #1a1a2a 100%)' }}>
+              <span className="font-mono text-[5px] text-[var(--neon-cyan)]/60">▴</span>
+            </div>
+          </button>
+          {/* Test button */}
+          {thinBtn(() => manager?.runTest(), deviceState !== 'online', 'Test', 'var(--neon-purple)', deviceState === 'testing', 'top', 'var(--neon-cyan)', deviceState === 'online')}
+          {/* Reboot button */}
+          {thinBtn(() => manager?.reboot(), deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'standby' || deviceState === 'shutdown', 'Reboot', 'var(--neon-amber)', deviceState === 'rebooting', 'bottom', 'var(--neon-amber)', deviceState === 'online')}
+        </div>
+
+        {/* Company logo */}
+        <div className="absolute font-mono text-[4px] text-white/15 pointer-events-none z-0" style={logoPosition}>SCNR</div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-1">
+            <div className="w-1.5 h-1.5 rounded-full transition-all" style={{
+              backgroundColor: getStatusColor(),
+              boxShadow: `0 0 4px ${getStatusColor()}`,
+              animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+            }} />
+            <div className="font-mono text-[9px] text-[var(--neon-cyan)]">MATERIAL SCANNER</div>
+          </div>
+        </div>
+
+        {/* Scanning visualization */}
+        <div className="relative h-6 bg-black/40 rounded overflow-hidden mb-1">
+          {deviceState === 'booting' && bootPhase && (
+            <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[6px] text-[var(--neon-cyan)]">
+                  {bootPhase === 'post' && 'POST'}
+                  {bootPhase === 'sensors' && 'SENSORS'}
+                  {bootPhase === 'calibrate' && 'CALIBRATE'}
+                  {bootPhase === 'ready' && 'READY'}
+                </span>
+                <div className="flex gap-0.5">
+                  {(['post', 'sensors', 'calibrate', 'ready'] as const).map((phase, i) => (
+                    <div key={phase} className="w-1 h-1 rounded-full" style={{
+                      backgroundColor: (['post', 'sensors', 'calibrate', 'ready'] as const).indexOf(bootPhase!) >= i ? 'var(--neon-cyan)' : '#333',
+                      boxShadow: bootPhase === phase ? '0 0 4px var(--neon-cyan)' : 'none',
+                    }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {deviceState === 'rebooting' && (
+            <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center">
+              <span className="font-mono text-[6px] text-[var(--neon-amber)] animate-pulse">REBOOTING...</span>
+            </div>
+          )}
+
+          {deviceState === 'testing' && testPhase && (
+            <div className="absolute inset-0 bg-black/80 z-10 flex items-center justify-center">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-[6px] text-[var(--neon-purple)]">{testPhase.toUpperCase()}</span>
+                <div className="flex gap-0.5">
+                  {(['emitter', 'receiver', 'calibrate', 'sweep'] as const).map((phase) => (
+                    <div key={phase} className="w-1 h-1 rounded-full" style={{
+                      backgroundColor: testPhase === phase ? 'var(--neon-purple)' :
                         (['emitter', 'receiver', 'calibrate', 'sweep'] as const).indexOf(phase) <
                         (['emitter', 'receiver', 'calibrate', 'sweep'] as const).indexOf(testPhase as 'emitter' | 'receiver' | 'calibrate' | 'sweep')
                           ? 'var(--neon-green)' : '#333',
                       boxShadow: testPhase === phase ? '0 0 4px var(--neon-purple)' : 'none',
-                    }}
-                  />
-                ))}
+                    }} />
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Scan line animation */}
-        {deviceState === 'online' && (
-          <div
-            className="absolute top-0 bottom-0 w-0.5 bg-[var(--neon-cyan)]"
-            style={{
+          {deviceState === 'online' && (
+            <div className="absolute top-0 bottom-0 w-0.5 bg-[var(--neon-cyan)]" style={{
               left: `${scanLine}%`,
               boxShadow: '0 0 8px var(--neon-cyan), 0 0 16px var(--neon-cyan)',
-            }}
-          />
-        )}
+            }} />
+          )}
 
-        {/* Detection blips */}
-        {deviceState === 'online' && foundMaterials.map((pos, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 rounded-full bg-[var(--neon-green)] transition-opacity"
-            style={{
-              left: `${pos}%`,
-              top: '50%',
-              transform: 'translateY(-50%)',
-              boxShadow: '0 0 4px var(--neon-green)',
-              opacity: scanLine > pos ? 1 : 0.3,
-            }}
-          />
-        ))}
+          {deviceState === 'online' && foundMaterials.map((pos, i) => (
+            <div key={i} className="absolute w-1 h-1 rounded-full bg-[var(--neon-green)] transition-opacity" style={{
+              left: `${pos}%`, top: '50%', transform: 'translateY(-50%)',
+              boxShadow: '0 0 4px var(--neon-green)', opacity: scanLine > pos ? 1 : 0.3,
+            }} />
+          ))}
 
-        {/* Grid lines */}
-        <div
-          className="absolute inset-0 pointer-events-none opacity-20"
-          style={{
+          <div className="absolute inset-0 pointer-events-none opacity-20" style={{
             backgroundImage: 'linear-gradient(90deg, var(--neon-cyan) 1px, transparent 1px)',
             backgroundSize: '20% 100%',
-          }}
-        />
-      </div>
+          }} />
+        </div>
 
-      {/* Footer */}
-      <div className="flex justify-between font-mono text-[7px]">
-        <span className="text-white/40">MATERIALS</span>
-        <span className="text-[var(--neon-green)]">
-          {deviceState === 'online' ? `${foundMaterials.length} FOUND` : '-- --'}
-        </span>
+        {/* Footer */}
+        <div className="flex justify-between font-mono text-[7px]">
+          <span className="text-white/40">MATERIALS</span>
+          <span className="text-[var(--neon-green)]">
+            {deviceState === 'online' ? `${foundMaterials.length} FOUND` : '-- --'}
+          </span>
+        </div>
       </div>
     </PanelFrame>
   )
@@ -3330,6 +4476,7 @@ export function ResourceMagnet({
   const testResult = rmg?.testResult ?? null
   const statusMessage = rmg?.statusMessage ?? 'ACTIVE'
   const isPowered = rmg?.isPowered ?? true
+  const isExpanded = rmg?.isExpanded ?? true
   const strength = rmg?.strength ?? magnetStrength
   const fieldActive = (rmg?.fieldActive ?? true) && (deviceState === 'online' || deviceState === 'testing')
   const displayStrength = deviceState === 'online' || deviceState === 'testing' ? strength : 0
@@ -3337,6 +4484,30 @@ export function ResourceMagnet({
   const handleTest = useCallback(() => { rmg?.runTest(); onTest?.() }, [rmg, onTest])
   const handleReboot = useCallback(() => { rmg?.reboot(); onReset?.() }, [rmg, onReset])
   const handleSetStrength = useCallback((value: number) => rmg?.setStrength(value), [rmg])
+  const handlePower = useCallback(() => {
+    if (deviceState === 'online') rmg?.powerOff()
+    else if (deviceState === 'standby') rmg?.powerOn()
+  }, [rmg, deviceState])
+  const handleFoldToggle = useCallback(() => rmg?.toggleExpanded(), [rmg])
+
+  // Folded info toggle
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const toggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current)
+      if (next) {
+        foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      }
+      return next
+    })
+  }
+
+  useEffect(() => {
+    return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) }
+  }, [])
 
   const getLedColor = () => {
     if (deviceState === 'standby' || deviceState === 'shutdown' || deviceState === 'rebooting') return 'red'
@@ -3348,202 +4519,252 @@ export function ResourceMagnet({
   }
 
   const isLedOn = deviceState !== 'standby' && deviceState !== 'shutdown' && !(deviceState === 'rebooting')
+  const stateLabel = deviceState === 'online' ? 'ONLINE' : deviceState === 'testing' ? 'TESTING' : deviceState === 'booting' ? 'BOOTING' : deviceState === 'rebooting' ? 'REBOOT' : deviceState === 'shutdown' ? 'SHUTDOWN' : 'STANDBY'
+
+  // Chrome metal button helper
+  const chromeBtn = (onClick: () => void, disabled: boolean, title: string, style: 'chrome' | 'brass', dotColor: string, dotGlow?: string) => (
+    <button onClick={onClick} disabled={disabled} className="group relative disabled:opacity-30" title={title}>
+      <div className={cn('w-3 h-2 rounded-[2px] transition-all flex items-center justify-center group-active:scale-95')}
+        style={{
+          background: style === 'chrome'
+            ? 'linear-gradient(180deg, #e8e8e8 0%, #c0c0c0 15%, #a0a0a0 50%, #808080 85%, #606060 100%)'
+            : 'linear-gradient(180deg, #f0d0a0 0%, #d4a060 15%, #b08040 50%, #906020 85%, #704000 100%)',
+          boxShadow: style === 'chrome'
+            ? 'inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -1px 0 rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.4)'
+            : 'inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.4)',
+          border: style === 'chrome' ? '0.5px solid #707070' : '0.5px solid #8a6030',
+        }}
+      >
+        <div className="absolute inset-0 rounded-[2px] opacity-40" style={{
+          backgroundImage: style === 'chrome'
+            ? 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, transparent 40%, transparent 60%, rgba(255,255,255,0.2) 100%)'
+            : 'linear-gradient(135deg, rgba(255,255,255,0.6) 0%, transparent 40%, transparent 60%, rgba(255,220,150,0.3) 100%)',
+        }} />
+        <div className={cn('w-1 h-1 rounded-full transition-all z-10')} style={{
+          backgroundColor: dotColor,
+          boxShadow: dotGlow ? `0 0 3px ${dotGlow}` : 'none',
+        }} />
+      </div>
+    </button>
+  )
+
+  // Copper power toggle
+  const copperPowerBtn = (
+    <button
+      onClick={handlePower}
+      disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown'}
+      className="group relative disabled:opacity-30"
+      title="Power"
+    >
+      <div className="flex items-center justify-center group-active:scale-95"
+        style={{
+          width: '3px', height: '5px',
+          background: 'linear-gradient(180deg, #c09060 0%, #906030 50%, #604020 100%)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.3), 0 1px 1px rgba(0,0,0,0.4)',
+          border: '0.5px solid #7a5030', borderRadius: '1px',
+        }}
+      >
+        <div className="w-0.5 h-0.5 rounded-full" style={{
+          backgroundColor: isPowered && deviceState !== 'standby' ? 'var(--neon-green)' : deviceState === 'standby' ? 'var(--neon-red)' : '#5a4020',
+          boxShadow: isPowered && deviceState !== 'standby' ? '0 0 2px var(--neon-green)' : deviceState === 'standby' ? '0 0 2px var(--neon-red)' : 'none',
+        }} />
+      </div>
+    </button>
+  )
 
   return (
-    <PanelFrame variant="military" className={cn('p-2', className)}>
-      {/* Header with shiny metal buttons */}
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1">
+    <PanelFrame variant="military" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+      {/* ===== FOLDED FRONT PANEL ===== */}
+      <div
+        style={{
+          transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 0 : 1,
+          position: isExpanded ? 'absolute' : 'relative',
+          pointerEvents: isExpanded ? 'none' : 'auto',
+          zIndex: isExpanded ? 0 : 2,
+        }}
+        className="w-full"
+      >
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
           <LED on={isLedOn} color={getLedColor()} size="sm" />
-          <div className="font-mono text-[8px] text-[var(--neon-lime,#bfff00)]">
-            RESOURCE MAGNET
-          </div>
+          <span className="font-mono text-[8px] font-bold text-[var(--neon-lime,#bfff00)]">RMG-001</span>
+          <span className={cn('font-mono text-[7px]', isPowered ? 'text-[var(--neon-lime,#bfff00)]/70' : 'text-white/30')}>
+            {stateLabel}
+          </span>
+          <div className="flex-1" />
+          {isPowered && (
+            <>
+              {chromeBtn(handleTest, deviceState !== 'online', 'Test', 'chrome',
+                deviceState === 'testing' ? 'var(--neon-cyan)' : testResult === 'pass' ? 'var(--neon-green)' : '#404040',
+                deviceState === 'testing' ? 'var(--neon-cyan)' : testResult === 'pass' ? 'var(--neon-green)' : undefined)}
+              {chromeBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing', 'Reboot', 'brass',
+                deviceState === 'rebooting' || deviceState === 'booting' ? 'var(--neon-amber)' : '#5a4020',
+                deviceState === 'rebooting' || deviceState === 'booting' ? 'var(--neon-amber)' : undefined)}
+            </>
+          )}
+          {copperPowerBtn}
+          {isPowered ? (
+            <button
+              onClick={toggleFoldedInfo}
+              className="group relative"
+              title={showFoldedInfo ? 'Hide info' : 'Show info'}
+            >
+              <div className="w-3 h-2 rounded-[2px] flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(180deg, #e8e8e8 0%, #a0a0a0 50%, #606060 100%)',
+                  border: '0.5px solid #707070',
+                }}
+              >
+                <span className="font-mono text-[6px] text-[#333] relative z-10">{showFoldedInfo ? '▲' : '▼'}</span>
+              </div>
+            </button>
+          ) : <div className="w-3" />}
         </div>
 
-        {/* Shiny metal micro buttons - chrome/nickel style */}
-        <div className="flex items-center gap-0.5">
-          {/* Mini logo - TESLA coil reference */}
-          <div
-            className="font-mono text-[3px] text-white/40 px-0.5 mr-0.5"
-            style={{
-              background: 'linear-gradient(180deg, #4a4a4a 0%, #2a2a2a 100%)',
-              border: '0.5px solid #5a5a5a',
-              borderRadius: '1px',
-            }}
-          >
-            TESLA
+        {/* Folded info expansion */}
+        <div style={{
+          maxHeight: showFoldedInfo && isPowered ? '40px' : '0px',
+          transition: 'max-height 400ms ease, opacity 300ms ease',
+          opacity: showFoldedInfo && isPowered ? 1 : 0,
+          overflow: 'hidden',
+        }}>
+          <div className="px-2 pb-1.5 font-mono text-[7px] text-[var(--neon-lime,#bfff00)]/60 flex gap-3 flex-wrap">
+            <span>Strength: {displayStrength}%</span>
+            <span>Field: {fieldActive ? 'ACTIVE' : 'OFF'}</span>
+            <span>Tier: T1</span>
+            <span>Draw: {rmg?.currentDraw?.toFixed(1) ?? '0.0'} E/s</span>
           </div>
-          <button
-            onClick={handleTest}
-            disabled={deviceState !== 'online'}
-            className="group relative disabled:opacity-30"
-            title="Test"
-          >
-            <div className={cn(
-              'w-3 h-2 rounded-[2px] transition-all',
-              'flex items-center justify-center',
-              'group-active:scale-95'
-            )}
-            style={{
-              background: 'linear-gradient(180deg, #e8e8e8 0%, #c0c0c0 15%, #a0a0a0 50%, #808080 85%, #606060 100%)',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -1px 0 rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.4)',
-              border: '0.5px solid #707070',
-            }}
-            >
-              {/* Chrome reflection */}
-              <div className="absolute inset-0 rounded-[2px] opacity-40"
-                style={{
-                  backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.8) 0%, transparent 40%, transparent 60%, rgba(255,255,255,0.2) 100%)',
-                }}
-              />
-              {/* Status dot */}
-              <div className={cn(
-                'w-1 h-1 rounded-full transition-all z-10',
-                deviceState === 'testing'
-                  ? 'bg-[var(--neon-cyan)] shadow-[0_0_3px_var(--neon-cyan)]'
-                  : testResult === 'pass'
-                  ? 'bg-[var(--neon-green)] shadow-[0_0_3px_var(--neon-green)]'
-                  : 'bg-[#404040]'
-              )} />
+        </div>
+      </div>
+
+      {/* ===== UNFOLDED INNER PANEL ===== */}
+      <div
+        style={{
+          transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 1 : 0,
+          position: isExpanded ? 'relative' : 'absolute',
+          pointerEvents: isExpanded ? 'auto' : 'none',
+          zIndex: isExpanded ? 2 : 0,
+        }}
+        className="w-full p-2"
+      >
+        {/* Header with shiny metal buttons */}
+        <div className="flex items-center justify-between mb-1">
+          <div className="flex items-center gap-1">
+            <LED on={isLedOn} color={getLedColor()} size="sm" />
+            <div className="font-mono text-[8px] text-[var(--neon-lime,#bfff00)]">
+              RESOURCE MAGNET
             </div>
-          </button>
-          <button
-            onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
-            className="group relative disabled:opacity-30"
-            title="Reboot"
-          >
-            <div className={cn(
-              'w-3 h-2 rounded-[2px] transition-all',
-              'flex items-center justify-center',
-              'group-active:scale-95'
-            )}
-            style={{
-              background: 'linear-gradient(180deg, #f0d0a0 0%, #d4a060 15%, #b08040 50%, #906020 85%, #704000 100%)',
-              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.5), inset 0 -1px 0 rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.4)',
-              border: '0.5px solid #8a6030',
-            }}
-            >
-              {/* Brass reflection */}
-              <div className="absolute inset-0 rounded-[2px] opacity-40"
+          </div>
+
+          <div className="flex items-center gap-0.5">
+            {/* Fold chevron - chrome style */}
+            <button onClick={handleFoldToggle} className="group relative" title="Fold">
+              <div className="w-3 h-2 rounded-[2px] flex items-center justify-center group-active:scale-95"
                 style={{
-                  backgroundImage: 'linear-gradient(135deg, rgba(255,255,255,0.6) 0%, transparent 40%, transparent 60%, rgba(255,220,150,0.3) 100%)',
+                  background: 'linear-gradient(180deg, #e8e8e8 0%, #a0a0a0 50%, #606060 100%)',
+                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.6), inset 0 -1px 0 rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.4)',
+                  border: '0.5px solid #707070',
                 }}
-              />
-              {/* Status dot */}
-              <div className={cn(
-                'w-1 h-1 rounded-full transition-all z-10',
-                deviceState === 'rebooting' || deviceState === 'booting'
-                  ? 'bg-[var(--neon-amber)] shadow-[0_0_3px_var(--neon-amber)]'
-                  : 'bg-[#5a4020]'
-              )} />
-            </div>
-          </button>
-          {/* Power toggle - copper style */}
-          <button
-            onClick={() => {
-              if (deviceState === 'online') rmg?.powerOff()
-              else if (deviceState === 'standby') rmg?.powerOn()
-            }}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown'}
-            className="group relative disabled:opacity-30"
-            title="Power"
-          >
-            <div className="flex items-center justify-center group-active:scale-95"
+              >
+                <span className="font-mono text-[6px] text-[#333] relative z-10">▴</span>
+              </div>
+            </button>
+            <div
+              className="font-mono text-[3px] text-white/40 px-0.5 mr-0.5"
               style={{
-                width: '3px',
-                height: '5px',
-                background: 'linear-gradient(180deg, #c09060 0%, #906030 50%, #604020 100%)',
-                boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.3), 0 1px 1px rgba(0,0,0,0.4)',
-                border: '0.5px solid #7a5030',
+                background: 'linear-gradient(180deg, #4a4a4a 0%, #2a2a2a 100%)',
+                border: '0.5px solid #5a5a5a',
                 borderRadius: '1px',
               }}
             >
-              <div className="w-0.5 h-0.5 rounded-full"
-                style={{
-                  backgroundColor: isPowered && deviceState !== 'standby' ? 'var(--neon-green)' : deviceState === 'standby' ? 'var(--neon-red)' : '#5a4020',
-                  boxShadow: isPowered && deviceState !== 'standby' ? '0 0 2px var(--neon-green)' : deviceState === 'standby' ? '0 0 2px var(--neon-red)' : 'none',
-                }}
-              />
+              TESLA
             </div>
-          </button>
-          <div className="font-mono text-[5px] text-white/30">T1</div>
+            {chromeBtn(handleTest, deviceState !== 'online', 'Test', 'chrome',
+              deviceState === 'testing' ? 'var(--neon-cyan)' : testResult === 'pass' ? 'var(--neon-green)' : '#404040',
+              deviceState === 'testing' ? 'var(--neon-cyan)' : testResult === 'pass' ? 'var(--neon-green)' : undefined)}
+            {chromeBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing', 'Reboot', 'brass',
+              deviceState === 'rebooting' || deviceState === 'booting' ? 'var(--neon-amber)' : '#5a4020',
+              deviceState === 'rebooting' || deviceState === 'booting' ? 'var(--neon-amber)' : undefined)}
+            {copperPowerBtn}
+            <div className="font-mono text-[5px] text-white/30">T1</div>
+          </div>
         </div>
-      </div>
 
-      {/* Magnet field visualization */}
-      <div className={cn(
-        'relative h-8 bg-black/40 rounded flex items-center justify-center overflow-hidden',
-        deviceState === 'testing' && testPhase === 'field' && 'ring-1 ring-[var(--neon-green)]/50'
-      )}>
-        {/* Concentric rings */}
-        {[3, 2, 1].map((ring) => (
+        {/* Magnet field visualization */}
+        <div className={cn(
+          'relative h-8 bg-black/40 rounded flex items-center justify-center overflow-hidden',
+          deviceState === 'testing' && testPhase === 'field' && 'ring-1 ring-[var(--neon-green)]/50'
+        )}>
+          {[3, 2, 1].map((ring) => (
+            <div
+              key={ring}
+              className={cn(
+                'absolute rounded-full border transition-all duration-300',
+                fieldActive ? 'border-[var(--neon-green)]/30' : 'border-white/10',
+                deviceState === 'testing' && testPhase === 'flux' && 'border-[var(--neon-cyan)]/50'
+              )}
+              style={{
+                width: `${ring * 30}%`,
+                height: `${ring * 60}%`,
+                opacity: fieldActive ? 0.3 + (4 - ring) * 0.2 : 0.1,
+                animation: fieldActive ? `pulse ${1 + ring * 0.3}s ease-in-out infinite` : 'none',
+              }}
+            />
+          ))}
           <div
-            key={ring}
             className={cn(
-              'absolute rounded-full border transition-all duration-300',
-              fieldActive ? 'border-[var(--neon-green)]/30' : 'border-white/10',
-              deviceState === 'testing' && testPhase === 'flux' && 'border-[var(--neon-cyan)]/50'
+              'w-2 h-2 rounded-full transition-all duration-300',
+              deviceState === 'testing' && testPhase === 'coils' && 'ring-2 ring-[var(--neon-cyan)]/50'
             )}
             style={{
-              width: `${ring * 30}%`,
-              height: `${ring * 60}%`,
-              opacity: fieldActive ? 0.3 + (4 - ring) * 0.2 : 0.1,
-              animation: fieldActive ? `pulse ${1 + ring * 0.3}s ease-in-out infinite` : 'none',
+              backgroundColor: fieldActive ? 'var(--neon-green)' : '#333',
+              boxShadow: fieldActive ? '0 0 8px var(--neon-green)' : 'none',
             }}
           />
-        ))}
-        {/* Center core */}
-        <div
-          className={cn(
-            'w-2 h-2 rounded-full transition-all duration-300',
-            deviceState === 'testing' && testPhase === 'coils' && 'ring-2 ring-[var(--neon-cyan)]/50'
+
+          {deviceState === 'testing' && testPhase === 'calibrate' && (
+            <div className="absolute inset-0 bg-[var(--neon-green)]/10 animate-pulse" />
           )}
-          style={{
-            backgroundColor: fieldActive ? 'var(--neon-green)' : '#333',
-            boxShadow: fieldActive ? '0 0 8px var(--neon-green)' : 'none',
-          }}
-        />
 
-        {/* Test overlay */}
-        {deviceState === 'testing' && testPhase === 'calibrate' && (
-          <div className="absolute inset-0 bg-[var(--neon-green)]/10 animate-pulse" />
-        )}
+          {(deviceState === 'standby' || deviceState === 'shutdown') && (
+            <div className="absolute inset-0 bg-black/80 z-10 flex items-center justify-center rounded">
+              <span className="font-mono text-[6px] text-[var(--neon-red)]/60">
+                {shutdownPhase ? shutdownPhase.toUpperCase() : 'STANDBY'}
+              </span>
+            </div>
+          )}
+        </div>
 
-        {/* Standby/Shutdown overlay */}
-        {(deviceState === 'standby' || deviceState === 'shutdown') && (
-          <div className="absolute inset-0 bg-black/80 z-10 flex items-center justify-center rounded">
-            <span className="font-mono text-[6px] text-[var(--neon-red)]/60">
-              {shutdownPhase ? shutdownPhase.toUpperCase() : 'STANDBY'}
-            </span>
+        {/* Controls row */}
+        <div className="flex items-center justify-between mt-1">
+          <Knob
+            value={strength}
+            onChange={handleSetStrength}
+            size="sm"
+            label="STR"
+            accentColor="var(--neon-green)"
+            disabled={deviceState !== 'online'}
+          />
+          <div className="flex-1 flex flex-col items-end">
+            <div className="flex items-center gap-1">
+              <span className={cn(
+                'font-mono text-[5px] transition-colors whitespace-nowrap overflow-hidden text-ellipsis max-w-[40px]',
+                deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
+                deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+                testResult === 'pass' ? 'text-[var(--neon-green)]' :
+                'text-white/30'
+              )}>
+                {statusMessage}
+              </span>
+            </div>
+            <div className="font-mono text-[10px] text-[var(--neon-green)]">{displayStrength}%</div>
+            <div className="font-mono text-[6px] text-white/30">FIELD</div>
           </div>
-        )}
-      </div>
-
-      {/* Controls row with fixed layout */}
-      <div className="flex items-center justify-between mt-1">
-        <Knob
-          value={strength}
-          onChange={handleSetStrength}
-          size="sm"
-          label="STR"
-          accentColor="var(--neon-green)"
-          disabled={deviceState !== 'online'}
-        />
-        <div className="flex-1 flex flex-col items-end">
-          <div className="flex items-center gap-1">
-            <span className={cn(
-              'font-mono text-[5px] transition-colors whitespace-nowrap overflow-hidden text-ellipsis max-w-[40px]',
-              deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
-              deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
-              testResult === 'pass' ? 'text-[var(--neon-green)]' :
-              'text-white/30'
-            )}>
-              {statusMessage}
-            </span>
-          </div>
-          <div className="font-mono text-[10px] text-[var(--neon-green)]">{displayStrength}%</div>
-          <div className="font-mono text-[6px] text-white/30">FIELD</div>
         </div>
       </div>
     </PanelFrame>
@@ -3556,36 +4777,54 @@ export function ResourceMagnet({
 // Compatible: AND-001, DIM-001, QSM-001, EMC-001
 // unOS Commands: DEVICE COMPASS [TEST|RESET|STATUS]
 // ==================================================
-type CompassState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type CompassTestPhase = 'gyro' | 'magnetometer' | 'quantum-link' | 'calibrate' | 'verify' | 'complete' | null
-
 interface QuantumCompassProps {
-  anomalyDirection?: number // 0-360 degrees
-  anomalyDistance?: number // 0-100
   className?: string
-  onTest?: () => void
-  onReset?: () => void
 }
 
 export function QuantumCompass({
-  anomalyDirection = 45,
-  anomalyDistance = 42,
   className,
-  onTest,
-  onReset,
 }: QuantumCompassProps) {
-  const [deviceState, setDeviceState] = useState<CompassState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<CompassTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Init...')
-  const [displayDirection, setDisplayDirection] = useState(0)
-  const [displayDistance, setDisplayDistance] = useState(999)
+  const qcpManager = useQCPManagerOptional()
   const [needleWobble, setNeedleWobble] = useState(0)
 
-  // Animate needle wobble
+  // Read state from manager with fallback defaults
+  const deviceState = qcpManager?.deviceState ?? 'online'
+  const statusMessage = qcpManager?.statusMessage ?? 'ANOMALY DETECTED'
+  const displayDirection = qcpManager?.anomalyDirection ?? 127
+  const displayDistance = qcpManager?.anomalyDistance ?? 42
+  const testResult = qcpManager?.testResult ?? null
+  const isPowered = qcpManager?.isPowered ?? true
+  const isExpanded = qcpManager?.isExpanded ?? true
+
+  const handleFoldToggle = useCallback(() => qcpManager?.toggleExpanded(), [qcpManager])
+
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const toggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current)
+      if (next) { foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000) }
+      return next
+    })
+  }
+  useEffect(() => { return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) } }, [])
+
+  const getStatusColor = () => {
+    switch (deviceState) {
+      case 'online': return 'var(--neon-green)'
+      case 'booting': return 'var(--neon-cyan)'
+      case 'testing': return 'var(--neon-purple)'
+      case 'rebooting': return 'var(--neon-amber)'
+      case 'standby': case 'shutdown': return 'var(--neon-red)'
+      default: return 'var(--neon-green)'
+    }
+  }
+  const stateLabel = deviceState === 'online' ? 'ONLINE' : deviceState === 'testing' ? 'TESTING' : deviceState === 'booting' ? 'BOOTING' : deviceState === 'rebooting' ? 'REBOOT' : deviceState === 'shutdown' ? 'SHUTDOWN' : 'STANDBY'
+
+  // Animate needle wobble (pure visual, stays local)
   useEffect(() => {
-    if (deviceState === 'offline') return
+    if (deviceState === 'standby' || deviceState === 'shutdown') return
     const interval = setInterval(() => {
       const wobbleAmount = deviceState === 'testing' ? 15 : 3
       setNeedleWobble((Math.random() - 0.5) * wobbleAmount)
@@ -3593,139 +4832,128 @@ export function QuantumCompass({
     return () => clearInterval(interval)
   }, [deviceState])
 
-  // Boot sequence
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Gyro init...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Magnetometer...')
-      setBootPhase(2)
-      setDisplayDirection(180)
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Quantum link...')
-      setBootPhase(3)
-      setDisplayDirection(90)
-      setDisplayDistance(500)
-      await new Promise(r => setTimeout(r, 400))
-
-      setStatusMessage('Calibrating...')
-      setBootPhase(4)
-      setDisplayDirection(anomalyDirection)
-      setDisplayDistance(200)
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Locking target...')
-      setBootPhase(5)
-      setDisplayDistance(anomalyDistance)
-      await new Promise(r => setTimeout(r, 300))
-
-      setBootPhase(6)
-      setDeviceState('online')
-      setStatusMessage('ANOMALY DETECTED')
-    }
-    bootSequence()
-  }, [])
-
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayDirection(anomalyDirection)
-      setDisplayDistance(anomalyDistance)
-    }
-  }, [anomalyDirection, anomalyDistance, deviceState])
-
-  const handleTest = async () => {
-    if (deviceState !== 'online') return
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<CompassTestPhase>[] = ['gyro', 'magnetometer', 'quantum-link', 'calibrate', 'verify', 'complete']
-    const msgs: Record<NonNullable<CompassTestPhase>, string> = {
-      gyro: 'Testing gyro...',
-      magnetometer: 'Magnetometer...',
-      'quantum-link': 'Quantum link...',
-      calibrate: 'Calibrating...',
-      verify: 'Verifying...',
-      complete: 'Test complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(msgs[phase])
-      if (phase === 'quantum-link') {
-        // Spin the needle during quantum link test
-        for (let i = 0; i < 8; i++) {
-          setDisplayDirection(prev => (prev + 45) % 360)
-          await new Promise(r => setTimeout(r, 100))
-        }
-      } else {
-        await new Promise(r => setTimeout(r, 350))
-      }
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setDisplayDirection(anomalyDirection)
-    setStatusMessage('PASSED')
-    onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('ANOMALY DETECTED')
-    }, 2500)
+  const handleTest = () => {
+    qcpManager?.runTest()
   }
 
-  const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-    setDeviceState('rebooting')
-    setTestResult(null)
+  const handleReboot = () => {
+    qcpManager?.reboot()
+  }
 
-    setStatusMessage('Shutdown...')
-    setDisplayDirection(0)
-    setDisplayDistance(999)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Reset...')
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 350))
-
-    // Boot
-    setDeviceState('booting')
-    setStatusMessage('Gyro init...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('Quantum link...')
-    setBootPhase(3)
-    setDisplayDirection(anomalyDirection)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Locking...')
-    setBootPhase(5)
-    setDisplayDistance(anomalyDistance)
-    await new Promise(r => setTimeout(r, 250))
-
-    setBootPhase(6)
-    setDeviceState('online')
-    setStatusMessage('ANOMALY DETECTED')
-    onReset?.()
+  const handlePowerToggle = () => {
+    if (qcpManager?.isPowered) {
+      qcpManager?.powerOff()
+    } else {
+      qcpManager?.powerOn()
+    }
   }
 
   const isActive = deviceState === 'online' || deviceState === 'testing'
   const hasAnomaly = displayDistance < 100
 
   return (
-    <PanelFrame variant="default" className={cn('p-1.5', className)}>
-      {/* Header with logo */}
+    <PanelFrame variant="default" className={cn('overflow-hidden relative', className)} style={{ perspective: '600px' }}>
+      {/* Folded front panel */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+      }} className="w-full">
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
+          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{
+            backgroundColor: getStatusColor(), boxShadow: `0 0 4px ${getStatusColor()}`,
+            animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+          }} />
+          <span className="font-mono text-[8px] font-bold text-[var(--neon-amber)]">QCP-001</span>
+          <span className={cn('font-mono text-[7px]', isPowered ? 'text-[var(--neon-amber)]/70' : 'text-white/30')}>{stateLabel}</span>
+          <div className="flex-1" />
+          {isPowered && (<>
+            <button onClick={handleTest} disabled={deviceState !== 'online'} className="group relative" title="Test">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{
+                background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a',
+                boxShadow: deviceState === 'testing' ? '0 0 6px var(--neon-purple), inset 0 0 3px var(--neon-purple)' : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                opacity: deviceState !== 'online' ? 0.3 : 1,
+              }} />
+            </button>
+            <button onClick={handleReboot} disabled={deviceState === 'booting' || deviceState === 'rebooting'} className="group relative" title="Reboot">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{
+                background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a',
+                boxShadow: deviceState === 'rebooting' ? '0 0 6px var(--neon-amber), inset 0 0 3px var(--neon-amber)' : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                opacity: deviceState === 'booting' || deviceState === 'rebooting' ? 0.3 : 1,
+              }} />
+            </button>
+          </>)}
+          {/* Triangular power button */}
+          <button onClick={handlePowerToggle} className="relative" title={isPowered ? 'Power off' : 'Power on'}>
+            <div style={{
+              width: '5px', height: '5px',
+              clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+              background: isPowered ? 'var(--neon-amber)' : '#333',
+              boxShadow: isPowered ? '0 0 4px var(--neon-amber)' : 'none',
+              transition: 'all 0.2s ease',
+            }} />
+          </button>
+          {/* Info toggle */}
+          {isPowered ? (
+            <button onClick={toggleFoldedInfo} className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center cursor-pointer hover:border-[var(--neon-amber)]/40 transition-colors" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }} title={showFoldedInfo ? 'Hide info' : 'Show info'}>
+              <span className="font-mono text-[6px] text-[var(--neon-amber)]/60">{showFoldedInfo ? '\u25B2' : '\u25BC'}</span>
+            </button>
+          ) : <div className="w-3" />}
+        </div>
+        <div style={{ maxHeight: showFoldedInfo && isPowered ? '40px' : '0px', transition: 'max-height 400ms ease, opacity 300ms ease', opacity: showFoldedInfo && isPowered ? 1 : 0, overflow: 'hidden' }}>
+          <div className="px-2 pb-1.5 font-mono text-[7px] text-[var(--neon-amber)]/60 flex gap-3 flex-wrap">
+            <span>Dir: {displayDirection}&deg;</span>
+            <span>Dist: {displayDistance}m</span>
+            <span>Tier: T1</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Unfolded inner panel */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+      }} className="w-full p-1.5">
+        <button onClick={handleFoldToggle} className="absolute top-1 right-1 z-10 group" title="Fold">
+          <div className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center transition-all hover:border-[var(--neon-amber)]/40" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }}>
+            <span className="font-mono text-[6px] text-[var(--neon-amber)]/60">{'\u25B4'}</span>
+          </div>
+        </button>
+
+        {/* Header with logo */}
       <div className="flex items-center justify-between mb-1">
         <div className="font-mono text-[8px] text-[var(--neon-amber)]">
           QUANTUM COMPASS
         </div>
         <div className="flex items-center gap-1">
+          {/* Power button - triangular */}
+          <button
+            onClick={handlePowerToggle}
+            title={isPowered ? 'Power off' : 'Power on'}
+            className="relative"
+          >
+            <div
+              style={{
+                width: '5px',
+                height: '5px',
+                clipPath: 'polygon(50% 0%, 0% 100%, 100% 100%)',
+                background: isPowered ? 'var(--neon-amber)' : '#333',
+                boxShadow: isPowered ? '0 0 4px var(--neon-amber)' : 'none',
+                transition: 'all 0.2s ease',
+              }}
+            />
+          </button>
           {/* QNTM logo */}
           <div
             className="font-mono text-[3px] text-[#ffaa00] px-0.5 leading-none"
@@ -3819,6 +5047,15 @@ export function QuantumCompass({
             </span>
           </div>
         )}
+
+        {/* Standby overlay */}
+        {(deviceState === 'standby' || deviceState === 'shutdown') && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 rounded">
+            <span className="font-mono text-[7px] text-white/40">
+              STANDBY
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Status bar with shiny buttons */}
@@ -3876,6 +5113,7 @@ export function QuantumCompass({
           />
         </button>
       </div>
+      </div>
     </PanelFrame>
   )
 }
@@ -3909,8 +5147,29 @@ export function PortableWorkbench({
   const activeSlot = pwb?.activeSlot ?? null
   const isPowered = pwb?.isPowered ?? true
   const shutdownPhase = pwb?.shutdownPhase ?? null
+  const isExpanded = pwb?.isExpanded ?? true
+  const currentDraw = pwb?.currentDraw ?? 0.8
 
   const isCrafting = craftingProgress > 0 && craftingProgress < 100
+
+  // Folded info toggle
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const toggleFoldedInfo = useCallback(() => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current)
+      if (next) {
+        foldedInfoTimerRef.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      }
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    return () => { if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current) }
+  }, [])
 
   // Random button style for nano buttons (memoized on mount)
   const [buttonStyle] = useState(() => {
@@ -3946,6 +5205,18 @@ export function PortableWorkbench({
     }
   }
 
+  const getStatusLabel = () => {
+    switch (deviceState) {
+      case 'online': return 'ONLINE'
+      case 'booting': return 'BOOT'
+      case 'testing': return 'TEST'
+      case 'rebooting': return 'REBOOT'
+      case 'standby': return 'STANDBY'
+      case 'shutdown': return 'SHTDWN'
+      default: return 'ONLINE'
+    }
+  }
+
   // Button shape based on random style
   const getButtonClass = () => {
     switch (buttonStyle) {
@@ -3964,256 +5235,413 @@ export function PortableWorkbench({
   }
 
   return (
-    <PanelFrame variant="default" className={cn('p-2 relative overflow-hidden', className)}>
-      {/* Thin nano buttons - LEFT SIDE vertical strip */}
-      <div className="absolute left-1 top-1/2 -translate-y-1/2 flex flex-col gap-1.5 z-10">
-        {/* Test button */}
-        <button
-          onClick={runTest}
-          disabled={deviceState !== 'online'}
-          className="group relative"
-          title="Test"
-        >
-          <div
-            className={cn('transition-all border', getButtonClass(), getButtonSize())}
-            style={{
-              background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
-              borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a',
-              boxShadow: deviceState === 'testing'
-                ? '0 0 5px var(--neon-purple), inset 0 0 2px var(--neon-purple)'
-                : 'inset 0 1px 2px rgba(0,0,0,0.5)',
-            }}
-          />
-          {/* Illuminated edge */}
-          <div
-            className={cn('absolute inset-0 pointer-events-none', getButtonClass())}
-            style={{
-              border: '1px solid',
-              borderColor: deviceState === 'online' ? 'var(--neon-cyan)' : 'transparent',
-              opacity: deviceState === 'online' ? 0.5 : 0,
-              animation: deviceState === 'testing' ? 'pulse 0.4s ease-in-out infinite' : 'none',
-            }}
-          />
-        </button>
-        {/* Reboot button */}
-        <button
-          onClick={reboot}
-          disabled={deviceState === 'booting' || deviceState === 'rebooting'}
-          className="group relative"
-          title="Reboot"
-        >
-          <div
-            className={cn('transition-all border', getButtonClass(), getButtonSize())}
-            style={{
-              background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
-              borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a',
-              boxShadow: deviceState === 'rebooting'
-                ? '0 0 5px var(--neon-amber), inset 0 0 2px var(--neon-amber)'
-                : 'inset 0 1px 2px rgba(0,0,0,0.5)',
-            }}
-          />
-          <div
-            className={cn('absolute inset-0 pointer-events-none', getButtonClass())}
-            style={{
-              border: '1px solid',
-              borderColor: deviceState === 'online' ? 'var(--neon-amber)' : 'transparent',
-              opacity: deviceState === 'online' ? 0.4 : 0,
-              animation: deviceState === 'rebooting' ? 'pulse 0.3s ease-in-out infinite' : 'none',
-            }}
-          />
-        </button>
-        {/* Power micro-toggle */}
-        <button
-          onClick={() => {
-            if (deviceState === 'online') pwb?.powerOff()
-            else if (deviceState === 'standby') pwb?.powerOn()
-          }}
-          disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown'}
-          className="group relative flex items-center justify-center"
-          title="Power"
-          style={{ width: '6px', height: '6px' }}
-        >
-          {/* Recessed housing */}
-          <div
-            className="absolute inset-0 rounded-full"
-            style={{
-              background: 'radial-gradient(circle at 50% 50%, #0a0a0f 0%, #1a1a2a 70%)',
-              boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.8), 0 0.5px 0 rgba(255,255,255,0.05)',
-              border: '0.5px solid #2a2a3a',
-            }}
-          />
-          {/* Power indicator dot */}
-          <div
-            className="relative rounded-full"
-            style={{
-              width: '2px',
-              height: '2px',
-              backgroundColor: (deviceState === 'online' || deviceState === 'booting' || deviceState === 'testing' || deviceState === 'rebooting')
-                ? 'var(--neon-green)'
-                : 'var(--neon-red)',
-              boxShadow: (deviceState === 'online' || deviceState === 'booting' || deviceState === 'testing' || deviceState === 'rebooting')
-                ? '0 0 3px var(--neon-green)'
-                : '0 0 2px var(--neon-red)',
-              opacity: (deviceState === 'shutdown') ? 0.3 : 0.7,
-            }}
-          />
-        </button>
-      </div>
+    <PanelFrame variant="default" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+      {/* ===== FOLDED FRONT PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+        width: '100%', left: 0, top: 0,
+      }}>
+        <div className="px-2 py-1.5">
+          {/* Main folded row */}
+          <div className="flex items-center gap-1.5">
+            {/* Status LED */}
+            <div
+              className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+              style={{
+                backgroundColor: getStatusColor(),
+                boxShadow: `0 0 4px ${getStatusColor()}`,
+                animation: (deviceState === 'booting' || deviceState === 'rebooting') ? 'pulse 0.5s ease-in-out infinite' : 'none',
+              }}
+            />
+            {/* Device ID */}
+            <span className="font-mono text-[8px] text-[var(--neon-amber)] font-bold tracking-wide">PWB-001</span>
+            {/* Status label */}
+            <span className="font-mono text-[7px] text-white/50">{getStatusLabel()}</span>
+            <div className="flex-1" />
 
-      {/* Company logo - FABX (Fabrication Systems) */}
-      <div
-        className="absolute font-mono text-[5px] text-white/15 pointer-events-none z-0 tracking-wider"
-        style={logoPosition}
-      >
-        FABX
-      </div>
+            {/* Action buttons - only when powered */}
+            {isPowered && (
+              <>
+                {/* Test nano button */}
+                <button
+                  onClick={runTest}
+                  disabled={deviceState !== 'online'}
+                  className="group relative"
+                  title="Test"
+                >
+                  <div
+                    className={cn('transition-all border', getButtonClass(), getButtonSize())}
+                    style={{
+                      background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                      borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a',
+                      boxShadow: deviceState === 'testing'
+                        ? '0 0 5px var(--neon-purple), inset 0 0 2px var(--neon-purple)'
+                        : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                    }}
+                  />
+                </button>
+                {/* Reboot nano button */}
+                <button
+                  onClick={reboot}
+                  disabled={!isPowered}
+                  className="group relative"
+                  title="Reboot"
+                >
+                  <div
+                    className={cn('transition-all border', getButtonClass(), getButtonSize())}
+                    style={{
+                      background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                      borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a',
+                      boxShadow: deviceState === 'rebooting'
+                        ? '0 0 5px var(--neon-amber), inset 0 0 2px var(--neon-amber)'
+                        : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                    }}
+                  />
+                </button>
+              </>
+            )}
 
-      {/* Header with left margin for buttons */}
-      <div className="flex items-center justify-between mb-1 ml-5">
-        <div className="flex items-center gap-1">
-          <div
-            className="w-1.5 h-1.5 rounded-full"
-            style={{
-              backgroundColor: getStatusColor(),
-              boxShadow: `0 0 4px ${getStatusColor()}`,
-              animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
-            }}
-          />
-          <div className="font-mono text-[9px] text-[var(--neon-amber)]">
-            PORTABLE WORKBENCH
+            {/* Power micro-toggle */}
+            <button
+              onClick={() => {
+                if (deviceState === 'online') pwb?.powerOff()
+                else if (deviceState === 'standby') pwb?.powerOn()
+              }}
+              disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown'}
+              className="group relative flex items-center justify-center flex-shrink-0"
+              title="Power"
+              style={{ width: '6px', height: '6px' }}
+            >
+              <div
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background: 'radial-gradient(circle at 50% 50%, #0a0a0f 0%, #1a1a2a 70%)',
+                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.8), 0 0.5px 0 rgba(255,255,255,0.05)',
+                  border: '0.5px solid #2a2a3a',
+                }}
+              />
+              <div
+                className="relative rounded-full"
+                style={{
+                  width: '2px', height: '2px',
+                  backgroundColor: isPowered ? 'var(--neon-green)' : 'var(--neon-red)',
+                  boxShadow: isPowered ? '0 0 3px var(--neon-green)' : '0 0 2px var(--neon-red)',
+                  opacity: deviceState === 'shutdown' ? 0.3 : 0.7,
+                }}
+              />
+            </button>
+
+            {/* Info / Unfold toggle */}
+            {isPowered ? (
+              <button
+                onClick={toggleFoldedInfo}
+                className="font-mono text-[7px] text-white/40 hover:text-white/70 transition-colors flex-shrink-0"
+                title={showFoldedInfo ? 'Hide info' : 'Show info'}
+              >
+                {showFoldedInfo ? '▲' : '▼'}
+              </button>
+            ) : (
+              <button
+                onClick={() => pwb?.setExpanded(true)}
+                className="font-mono text-[7px] text-white/30 hover:text-white/50 transition-colors flex-shrink-0"
+                title="Unfold"
+              >
+                ▼
+              </button>
+            )}
+          </div>
+
+          {/* Folded info expansion */}
+          <div style={{
+            maxHeight: showFoldedInfo && isPowered ? '40px' : '0px',
+            overflow: 'hidden',
+            transition: 'max-height 300ms ease',
+          }}>
+            <div className="mt-1 grid grid-cols-3 gap-x-3 gap-y-0.5 font-mono text-[6px]">
+              <span className="text-white/30">Slots: <span className="text-[var(--neon-amber)]">3</span></span>
+              <span className="text-white/30">Queue: <span className="text-[var(--neon-amber)]">{queuedItems}</span></span>
+              <span className="text-white/30">Prog: <span className="text-[var(--neon-amber)]">{craftingProgress}%</span></span>
+              <span className="text-white/30">Active: <span className="text-[var(--neon-cyan)]">{activeSlot !== null ? `S${activeSlot}` : '--'}</span></span>
+              <span className="text-white/30">Draw: <span className="text-[var(--neon-amber)]">{currentDraw.toFixed(1)}</span></span>
+              <span className="text-white/30">Tier: <span className="text-white/50">T1</span></span>
+            </div>
           </div>
         </div>
-        <div className="font-mono text-[7px] text-white/30">T1</div>
       </div>
 
-      {/* Crafting slots area - all animations happen inside */}
-      <div className="relative flex gap-1 mb-1 ml-5">
-        {/* Boot animation inside slots area */}
-        {deviceState === 'booting' && bootPhase && (
-          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[6px] text-[var(--neon-cyan)]">
-                {bootPhase === 'post' && 'POST'}
-                {bootPhase === 'firmware' && 'FIRMWARE'}
-                {bootPhase === 'calibration' && 'CALIBRATE'}
-                {bootPhase === 'tools' && 'TOOLS'}
-                {bootPhase === 'ready' && 'READY'}
-              </span>
-              <div className="flex gap-0.5">
-                {['post', 'firmware', 'calibration', 'tools', 'ready'].map((phase, i) => (
-                  <div
-                    key={phase}
-                    className="w-1 h-1 rounded-full"
-                    style={{
-                      backgroundColor: ['post', 'firmware', 'calibration', 'tools', 'ready'].indexOf(bootPhase) >= i
-                        ? 'var(--neon-cyan)'
-                        : '#333',
-                      boxShadow: bootPhase === phase ? '0 0 4px var(--neon-cyan)' : 'none',
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+      {/* ===== UNFOLDED INNER PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+        width: '100%', left: 0, top: 0,
+      }}>
+        {/* Fold chevron */}
+        <button
+          onClick={() => pwb?.setExpanded(false)}
+          className="absolute top-0.5 right-1 z-20 font-mono text-[7px] text-white/30 hover:text-white/60 transition-colors"
+          title="Fold"
+        >
+          ▴
+        </button>
 
-        {/* Reboot animation inside slots area */}
-        {deviceState === 'rebooting' && (
-          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
-            <span className="font-mono text-[6px] text-[var(--neon-amber)] animate-pulse">
-              REBOOTING...
-            </span>
-          </div>
-        )}
-
-        {/* (offline state removed — PWB uses standby instead) */}
-
-        {/* Standby/Shutdown overlay */}
-        {(deviceState === 'standby' || deviceState === 'shutdown') && (
-          <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
-            <span className="font-mono text-[6px] text-[var(--neon-red)]/60">
-              {shutdownPhase ? shutdownPhase.toUpperCase() : 'STANDBY'}
-            </span>
-          </div>
-        )}
-
-        {/* Test animation inside slots area */}
-        {deviceState === 'testing' && testPhase && (
-          <div className="absolute inset-0 bg-black/80 z-10 flex items-center justify-center rounded">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[6px] text-[var(--neon-purple)]">
-                {testPhase.toUpperCase()}
-              </span>
-              <div className="flex gap-0.5">
-                {['motors', 'clamps', 'sensors', 'calibrate'].map((phase) => (
-                  <div
-                    key={phase}
-                    className="w-1 h-1 rounded-full"
-                    style={{
-                      backgroundColor:
-                        testPhase === phase ? 'var(--neon-purple)' :
-                        ['motors', 'clamps', 'sensors', 'calibrate'].indexOf(phase) <
-                        ['motors', 'clamps', 'sensors', 'calibrate'].indexOf(testPhase || 'motors')
-                          ? 'var(--neon-green)' : '#333',
-                      boxShadow: testPhase === phase ? '0 0 4px var(--neon-purple)' : 'none',
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Crafting slot buttons */}
-        {[0, 1, 2].map((slot) => {
-          const hasItem = slot < queuedItems
-          const isActive = activeSlot === slot
-          return (
+        <div className="p-2">
+          {/* Thin nano buttons - LEFT SIDE vertical strip */}
+          <div className="absolute left-1 top-1/2 -translate-y-1/2 flex flex-col gap-1.5 z-10">
+            {/* Test button */}
             <button
-              key={slot}
-              onClick={() => selectSlot(slot)}
+              onClick={runTest}
               disabled={deviceState !== 'online'}
-              className="flex-1 h-4 bg-black/40 rounded border transition-all"
-              style={{
-                borderColor: isActive
-                  ? 'var(--neon-cyan)'
-                  : hasItem ? 'var(--neon-amber)' : 'rgba(255,255,255,0.1)',
-                boxShadow: isActive
-                  ? 'inset 0 0 6px var(--neon-cyan)'
-                  : hasItem ? 'inset 0 0 4px var(--neon-amber)' : 'none',
-              }}
+              className="group relative"
+              title="Test"
             >
-              {hasItem && (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div
-                    className="w-2 h-2 rounded-sm transition-all"
-                    style={{
-                      backgroundColor: isActive ? 'var(--neon-cyan)' : 'var(--neon-amber)',
-                      opacity: 0.6,
-                    }}
-                  />
-                </div>
-              )}
+              <div
+                className={cn('transition-all border', getButtonClass(), getButtonSize())}
+                style={{
+                  background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                  borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a',
+                  boxShadow: deviceState === 'testing'
+                    ? '0 0 5px var(--neon-purple), inset 0 0 2px var(--neon-purple)'
+                    : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                }}
+              />
+              <div
+                className={cn('absolute inset-0 pointer-events-none', getButtonClass())}
+                style={{
+                  border: '1px solid',
+                  borderColor: deviceState === 'online' ? 'var(--neon-cyan)' : 'transparent',
+                  opacity: deviceState === 'online' ? 0.5 : 0,
+                  animation: deviceState === 'testing' ? 'pulse 0.4s ease-in-out infinite' : 'none',
+                }}
+              />
             </button>
-          )
-        })}
-      </div>
+            {/* Reboot button */}
+            <button
+              onClick={reboot}
+              disabled={deviceState === 'booting' || deviceState === 'rebooting'}
+              className="group relative"
+              title="Reboot"
+            >
+              <div
+                className={cn('transition-all border', getButtonClass(), getButtonSize())}
+                style={{
+                  background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                  borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a',
+                  boxShadow: deviceState === 'rebooting'
+                    ? '0 0 5px var(--neon-amber), inset 0 0 2px var(--neon-amber)'
+                    : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                }}
+              />
+              <div
+                className={cn('absolute inset-0 pointer-events-none', getButtonClass())}
+                style={{
+                  border: '1px solid',
+                  borderColor: deviceState === 'online' ? 'var(--neon-amber)' : 'transparent',
+                  opacity: deviceState === 'online' ? 0.4 : 0,
+                  animation: deviceState === 'rebooting' ? 'pulse 0.3s ease-in-out infinite' : 'none',
+                }}
+              />
+            </button>
+            {/* Power micro-toggle */}
+            <button
+              onClick={() => {
+                if (deviceState === 'online') pwb?.powerOff()
+                else if (deviceState === 'standby') pwb?.powerOn()
+              }}
+              disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'shutdown'}
+              className="group relative flex items-center justify-center"
+              title="Power"
+              style={{ width: '6px', height: '6px' }}
+            >
+              <div
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background: 'radial-gradient(circle at 50% 50%, #0a0a0f 0%, #1a1a2a 70%)',
+                  boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.8), 0 0.5px 0 rgba(255,255,255,0.05)',
+                  border: '0.5px solid #2a2a3a',
+                }}
+              />
+              <div
+                className="relative rounded-full"
+                style={{
+                  width: '2px',
+                  height: '2px',
+                  backgroundColor: (deviceState === 'online' || deviceState === 'booting' || deviceState === 'testing' || deviceState === 'rebooting')
+                    ? 'var(--neon-green)'
+                    : 'var(--neon-red)',
+                  boxShadow: (deviceState === 'online' || deviceState === 'booting' || deviceState === 'testing' || deviceState === 'rebooting')
+                    ? '0 0 3px var(--neon-green)'
+                    : '0 0 2px var(--neon-red)',
+                  opacity: (deviceState === 'shutdown') ? 0.3 : 0.7,
+                }}
+              />
+            </button>
+          </div>
 
-      {/* Progress bar with left margin */}
-      <div className="h-1.5 bg-black/40 rounded overflow-hidden ml-5">
-        <div
-          className="h-full transition-all duration-300"
-          style={{
-            width: deviceState === 'online' ? `${craftingProgress}%` : '0%',
-            background: 'linear-gradient(90deg, var(--neon-amber), var(--neon-orange))',
-            boxShadow: isCrafting && deviceState === 'online' ? '0 0 4px var(--neon-amber)' : 'none',
-          }}
-        />
-      </div>
+          {/* Company logo - FABX (Fabrication Systems) */}
+          <div
+            className="absolute font-mono text-[5px] text-white/15 pointer-events-none z-0 tracking-wider"
+            style={logoPosition}
+          >
+            FABX
+          </div>
 
-      <div className="flex justify-between font-mono text-[7px] mt-1 ml-5">
-        <span className="text-white/40">QUEUE: {queuedItems}</span>
-        <span className="text-[var(--neon-amber)]">{deviceState === 'online' ? `${craftingProgress}%` : '--'}</span>
+          {/* Header with left margin for buttons */}
+          <div className="flex items-center justify-between mb-1 ml-5">
+            <div className="flex items-center gap-1">
+              <div
+                className="w-1.5 h-1.5 rounded-full"
+                style={{
+                  backgroundColor: getStatusColor(),
+                  boxShadow: `0 0 4px ${getStatusColor()}`,
+                  animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+                }}
+              />
+              <div className="font-mono text-[9px] text-[var(--neon-amber)]">
+                PORTABLE WORKBENCH
+              </div>
+            </div>
+            <div className="font-mono text-[7px] text-white/30">T1</div>
+          </div>
+
+          {/* Crafting slots area - all animations happen inside */}
+          <div className="relative flex gap-1 mb-1 ml-5">
+            {/* Boot animation inside slots area */}
+            {deviceState === 'booting' && bootPhase && (
+              <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[6px] text-[var(--neon-cyan)]">
+                    {bootPhase === 'post' && 'POST'}
+                    {bootPhase === 'firmware' && 'FIRMWARE'}
+                    {bootPhase === 'calibration' && 'CALIBRATE'}
+                    {bootPhase === 'tools' && 'TOOLS'}
+                    {bootPhase === 'ready' && 'READY'}
+                  </span>
+                  <div className="flex gap-0.5">
+                    {['post', 'firmware', 'calibration', 'tools', 'ready'].map((phase, i) => (
+                      <div
+                        key={phase}
+                        className="w-1 h-1 rounded-full"
+                        style={{
+                          backgroundColor: ['post', 'firmware', 'calibration', 'tools', 'ready'].indexOf(bootPhase) >= i
+                            ? 'var(--neon-cyan)'
+                            : '#333',
+                          boxShadow: bootPhase === phase ? '0 0 4px var(--neon-cyan)' : 'none',
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Reboot animation inside slots area */}
+            {deviceState === 'rebooting' && (
+              <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
+                <span className="font-mono text-[6px] text-[var(--neon-amber)] animate-pulse">
+                  REBOOTING...
+                </span>
+              </div>
+            )}
+
+            {/* Standby/Shutdown overlay */}
+            {(deviceState === 'standby' || deviceState === 'shutdown') && (
+              <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
+                <span className="font-mono text-[6px] text-[var(--neon-red)]/60">
+                  {shutdownPhase ? shutdownPhase.toUpperCase() : 'STANDBY'}
+                </span>
+              </div>
+            )}
+
+            {/* Test animation inside slots area */}
+            {deviceState === 'testing' && testPhase && (
+              <div className="absolute inset-0 bg-black/80 z-10 flex items-center justify-center rounded">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[6px] text-[var(--neon-purple)]">
+                    {testPhase.toUpperCase()}
+                  </span>
+                  <div className="flex gap-0.5">
+                    {['motors', 'clamps', 'sensors', 'calibrate'].map((phase) => (
+                      <div
+                        key={phase}
+                        className="w-1 h-1 rounded-full"
+                        style={{
+                          backgroundColor:
+                            testPhase === phase ? 'var(--neon-purple)' :
+                            ['motors', 'clamps', 'sensors', 'calibrate'].indexOf(phase) <
+                            ['motors', 'clamps', 'sensors', 'calibrate'].indexOf(testPhase || 'motors')
+                              ? 'var(--neon-green)' : '#333',
+                          boxShadow: testPhase === phase ? '0 0 4px var(--neon-purple)' : 'none',
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Crafting slot buttons */}
+            {[0, 1, 2].map((slot) => {
+              const hasItem = slot < queuedItems
+              const isActive = activeSlot === slot
+              return (
+                <button
+                  key={slot}
+                  onClick={() => selectSlot(slot)}
+                  disabled={deviceState !== 'online'}
+                  className="flex-1 h-4 bg-black/40 rounded border transition-all"
+                  style={{
+                    borderColor: isActive
+                      ? 'var(--neon-cyan)'
+                      : hasItem ? 'var(--neon-amber)' : 'rgba(255,255,255,0.1)',
+                    boxShadow: isActive
+                      ? 'inset 0 0 6px var(--neon-cyan)'
+                      : hasItem ? 'inset 0 0 4px var(--neon-amber)' : 'none',
+                  }}
+                >
+                  {hasItem && (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <div
+                        className="w-2 h-2 rounded-sm transition-all"
+                        style={{
+                          backgroundColor: isActive ? 'var(--neon-cyan)' : 'var(--neon-amber)',
+                          opacity: 0.6,
+                        }}
+                      />
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Progress bar with left margin */}
+          <div className="h-1.5 bg-black/40 rounded overflow-hidden ml-5">
+            <div
+              className="h-full transition-all duration-300"
+              style={{
+                width: deviceState === 'online' ? `${craftingProgress}%` : '0%',
+                background: 'linear-gradient(90deg, var(--neon-amber), var(--neon-orange))',
+                boxShadow: isCrafting && deviceState === 'online' ? '0 0 4px var(--neon-amber)' : 'none',
+              }}
+            />
+          </div>
+
+          <div className="flex justify-between font-mono text-[7px] mt-1 ml-5">
+            <span className="text-white/40">QUEUE: {queuedItems}</span>
+            <span className="text-[var(--neon-amber)]">{deviceState === 'online' ? `${craftingProgress}%` : '--'}</span>
+          </div>
+        </div>
       </div>
     </PanelFrame>
   )
@@ -4864,206 +6292,265 @@ export function MicrofusionReactor({
   const isLedOn = isPowered && deviceState !== 'standby' && deviceState !== 'shutdown'
   const coreActive = isPowered && (deviceState === 'online' || deviceState === 'testing' || (deviceState === 'booting' && bootPhase && bootPhase !== 'ignition'))
 
-  return (
-    <PanelFrame variant="default" className={cn('p-2', className)}>
-      {/* Header with power button and nano LED buttons */}
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1.5">
-          <LED on={isLedOn} color={getLedColor()} size="sm" />
-          <div className="font-mono text-[9px] text-[var(--neon-cyan)]">
-            MICROFUSION REACTOR
-          </div>
-        </div>
+  // Fold state
+  const isExpanded = mfrManager?.isExpanded ?? true
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-        {/* Controls: Atomic power button + hexagonal test/reboot */}
-        <div className="flex items-center gap-1">
-          {/* Atomic power button - concentric rings with core */}
-          <button
-            onClick={handlePowerToggle}
-            disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
-            className="group relative disabled:opacity-30"
-            title={isPowered && deviceState === 'online' ? 'SCRAM (Power Off)' : 'Ignite (Power On)'}
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" className="transition-all">
-              {/* Outer electron orbit */}
-              <ellipse
-                cx="6" cy="6" rx="5" ry="2.5"
-                fill="none"
-                stroke={isPowered && deviceState === 'online' ? 'var(--neon-cyan)' : '#3a3a4a'}
-                strokeWidth="0.4"
-                transform="rotate(0 6 6)"
-                opacity="0.6"
-              />
-              <ellipse
-                cx="6" cy="6" rx="5" ry="2.5"
-                fill="none"
-                stroke={isPowered && deviceState === 'online' ? 'var(--neon-cyan)' : '#3a3a4a'}
-                strokeWidth="0.4"
-                transform="rotate(60 6 6)"
-                opacity="0.6"
-              />
-              <ellipse
-                cx="6" cy="6" rx="5" ry="2.5"
-                fill="none"
-                stroke={isPowered && deviceState === 'online' ? 'var(--neon-cyan)' : '#3a3a4a'}
-                strokeWidth="0.4"
-                transform="rotate(120 6 6)"
-                opacity="0.6"
-              />
-              {/* Nucleus core */}
-              <circle
-                cx="6" cy="6"
-                r="1.5"
-                fill={isPowered && deviceState === 'online' ? 'var(--neon-cyan)' : '#2a2a3a'}
-                className="transition-all"
-              >
-                {isPowered && deviceState === 'online' && (
-                  <animate attributeName="r" values="1.5;1.8;1.5" dur="1.5s" repeatCount="indefinite" />
-                )}
-              </circle>
-              {/* Inner glow */}
-              {isPowered && deviceState === 'online' && (
-                <circle cx="6" cy="6" r="0.6" fill="#ffffff" opacity="0.8">
-                  <animate attributeName="opacity" values="0.8;0.4;0.8" dur="1s" repeatCount="indefinite" />
-                </circle>
-              )}
-            </svg>
-            {/* Glow effect */}
-            {isPowered && deviceState === 'online' && (
-              <div className="absolute inset-0 rounded-full opacity-30"
-                style={{ boxShadow: '0 0 6px var(--neon-cyan)' }}
-              />
-            )}
-          </button>
+  const handleToggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current)
+      if (next) {
+        foldedInfoTimerRef.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      }
+      return next
+    })
+  }
 
-          {/* Test - hexagonal */}
-          <button
-            onClick={handleTest}
-            disabled={deviceState !== 'online'}
-            className="group relative disabled:opacity-30"
-            title="Test"
-          >
-            <div className={cn(
-              'w-2.5 h-2.5 transition-all',
-              'bg-[#0a0a0f] border border-[var(--neon-cyan)]/30',
-              'flex items-center justify-center',
-              'group-hover:border-[var(--neon-cyan)]/60'
-            )}
-            style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}
-            >
-              <div className={cn(
-                'w-1 h-1 rounded-full transition-all',
-                deviceState === 'testing'
-                  ? 'bg-[var(--neon-cyan)] shadow-[0_0_4px_var(--neon-cyan)]'
-                  : testResult === 'pass'
-                  ? 'bg-[var(--neon-green)] shadow-[0_0_4px_var(--neon-green)]'
-                  : testResult === 'fail'
-                  ? 'bg-[var(--neon-red)] shadow-[0_0_4px_var(--neon-red)]'
-                  : 'bg-white/20'
-              )} />
-            </div>
-          </button>
+  useEffect(() => {
+    return () => { if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current) }
+  }, [])
 
-          {/* Reboot - hexagonal */}
-          <button
-            onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
-            className="group relative disabled:opacity-30"
-            title="Reboot"
-          >
-            <div className={cn(
-              'w-2.5 h-2.5 transition-all',
-              'bg-[#0a0a0f] border border-[var(--neon-amber)]/30',
-              'flex items-center justify-center',
-              'group-hover:border-[var(--neon-amber)]/60'
-            )}
-            style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}
-            >
-              <div className={cn(
-                'w-1 h-1 rounded-full transition-all',
-                deviceState === 'rebooting' || deviceState === 'booting'
-                  ? 'bg-[var(--neon-amber)] shadow-[0_0_4px_var(--neon-amber)]'
-                  : 'bg-white/20'
-              )} />
-            </div>
-          </button>
-          <div className="font-mono text-[6px] text-white/30 ml-0.5">T2</div>
-        </div>
-      </div>
-
-      {/* Reactor core visualization */}
-      <div className={cn(
-        'relative h-12 bg-black/40 rounded overflow-hidden flex items-center justify-center',
-        deviceState === 'testing' && testPhase === 'containment' && 'ring-1 ring-[var(--neon-cyan)]/50'
-      )}>
-        {/* Rotating rings */}
-        {[1, 2, 3].map((ring) => (
-          <div
-            key={ring}
-            className="absolute rounded-full border transition-all duration-500"
-            style={{
-              width: `${ring * 25}%`,
-              height: `${ring * 50}%`,
-              borderColor: coreActive ? 'var(--neon-cyan)' : '#333',
-              opacity: coreActive ? (0.3 + ring * 0.15) * ringSpeed : 0.1,
-              animation: coreActive && ringSpeed > 0
-                ? `spin ${(3 + ring) / ringSpeed}s linear infinite ${ring % 2 === 0 ? 'reverse' : ''}`
-                : 'none',
-            }}
-          />
+  // Atomic power button helper
+  const AtomicPowerButton = () => (
+    <button
+      onClick={handlePowerToggle}
+      disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
+      className="group relative disabled:opacity-30"
+      title={isPowered && deviceState === 'online' ? 'SCRAM (Power Off)' : 'Ignite (Power On)'}
+    >
+      <svg width="12" height="12" viewBox="0 0 12 12" className="transition-all">
+        {[0, 60, 120].map(angle => (
+          <ellipse key={angle} cx="6" cy="6" rx="5" ry="2.5" fill="none"
+            stroke={isPowered && deviceState === 'online' ? 'var(--neon-cyan)' : '#3a3a4a'}
+            strokeWidth="0.4" transform={`rotate(${angle} 6 6)`} opacity="0.6" />
         ))}
-        {/* Core */}
-        <div
-          className="w-3 h-3 rounded-full transition-all duration-300"
-          style={{
-            background: coreActive
-              ? `radial-gradient(circle, #fff 0%, var(--neon-cyan) 60%, transparent 100%)`
-              : '#333',
-            boxShadow: coreActive ? `0 0 ${10 + ringSpeed * 10}px var(--neon-cyan)` : 'none',
-            opacity: deviceState === 'booting' ? 0.6 : 1,
-          }}
-        />
-
-        {/* Test overlay for plasma phase */}
-        {deviceState === 'testing' && testPhase === 'plasma' && (
-          <div className="absolute inset-0 bg-[var(--neon-cyan)]/10 animate-pulse" />
+        <circle cx="6" cy="6" r="1.5" fill={isPowered && deviceState === 'online' ? 'var(--neon-cyan)' : '#2a2a3a'} className="transition-all">
+          {isPowered && deviceState === 'online' && (
+            <animate attributeName="r" values="1.5;1.8;1.5" dur="1.5s" repeatCount="indefinite" />
+          )}
+        </circle>
+        {isPowered && deviceState === 'online' && (
+          <circle cx="6" cy="6" r="0.6" fill="#ffffff" opacity="0.8">
+            <animate attributeName="opacity" values="0.8;0.4;0.8" dur="1s" repeatCount="indefinite" />
+          </circle>
         )}
+      </svg>
+      {isPowered && deviceState === 'online' && (
+        <div className="absolute inset-0 rounded-full opacity-30" style={{ boxShadow: '0 0 6px var(--neon-cyan)' }} />
+      )}
+    </button>
+  )
 
-        {/* Standby indicator */}
-        {(!isPowered || deviceState === 'standby') && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="font-mono text-[8px] text-white/30">STANDBY</span>
+  // Hexagonal button helper
+  const hexBtn = (onClick: () => void, disabled: boolean, title: string, borderColor: string, hoverColor: string, ledColor: string) => (
+    <button onClick={onClick} disabled={disabled} className="group relative disabled:opacity-30" title={title}>
+      <div className={cn(
+        'w-2.5 h-2.5 transition-all',
+        `bg-[#0a0a0f] border ${borderColor}`,
+        'flex items-center justify-center',
+        `group-hover:${hoverColor}`
+      )}
+      style={{ clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' }}
+      >
+        <div className={cn('w-1 h-1 rounded-full transition-all', ledColor)} />
+      </div>
+    </button>
+  )
+
+  const testLedColor = deviceState === 'testing'
+    ? 'bg-[var(--neon-cyan)] shadow-[0_0_4px_var(--neon-cyan)]'
+    : testResult === 'pass'
+    ? 'bg-[var(--neon-green)] shadow-[0_0_4px_var(--neon-green)]'
+    : testResult === 'fail'
+    ? 'bg-[var(--neon-red)] shadow-[0_0_4px_var(--neon-red)]'
+    : 'bg-white/20'
+
+  const rebootLedColor = (deviceState === 'rebooting' || deviceState === 'booting')
+    ? 'bg-[var(--neon-amber)] shadow-[0_0_4px_var(--neon-amber)]'
+    : 'bg-white/20'
+
+  const chevronBtn = (onClick: () => void, label: string, title: string, enabled = true) => (
+    <button
+      onClick={enabled ? onClick : undefined}
+      className={cn(
+        'w-3 h-3 flex items-center justify-center rounded-sm border border-[#3a3a4a] bg-gradient-to-b from-[#2a2a3a] to-[#1a1a2a] transition-all',
+        enabled ? 'cursor-pointer hover:border-[var(--neon-cyan)]/50' : 'opacity-30 cursor-default',
+      )}
+      title={title}
+    >
+      <span className="text-[6px] text-white/50">{label}</span>
+    </button>
+  )
+
+  return (
+    <PanelFrame variant="default" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+
+      {/* ===== FOLDED FRONT PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+        width: '100%',
+        left: 0,
+        top: 0,
+      }}>
+        <div className="p-2">
+          <div className="flex items-center gap-1.5">
+            <LED on={isLedOn} color={getLedColor()} size="sm" />
+            <span className="font-mono text-[9px] text-[var(--neon-cyan)] font-medium">MFR-001</span>
+            <span className={cn(
+              'font-mono text-[7px] ml-1',
+              isPowered ? 'text-[var(--neon-green)]' : 'text-white/30'
+            )}>
+              {isPowered ? (deviceState === 'online' ? 'ONLINE' : deviceState.toUpperCase()) : 'STANDBY'}
+            </span>
+            <div className="flex-1" />
+            {isPowered && (
+              <>
+                {hexBtn(handleTest, deviceState !== 'online', 'Test', 'border-[var(--neon-cyan)]/30', 'border-[var(--neon-cyan)]/60', testLedColor)}
+                {hexBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown', 'Reboot', 'border-[var(--neon-amber)]/30', 'border-[var(--neon-amber)]/60', rebootLedColor)}
+              </>
+            )}
+            <AtomicPowerButton />
+            {chevronBtn(handleToggleFoldedInfo, showFoldedInfo ? '▲' : '▼', showFoldedInfo ? 'Hide info' : 'Show info', isPowered)}
           </div>
-        )}
+
+          {/* Folded info expansion */}
+          <div style={{
+            maxHeight: showFoldedInfo && isPowered ? '80px' : '0px',
+            overflow: 'hidden',
+            transition: 'max-height 300ms ease',
+          }}>
+            <div className="mt-1.5 pt-1 border-t border-white/5 grid grid-cols-3 gap-x-3 gap-y-0.5">
+              {[
+                ['Output', `${Math.round(powerOutput)} MW`],
+                ['Stable', `${Math.round(stability)}%`],
+                ['Plasma', `${Math.round(mfrManager?.plasmaTemp ?? 0)}K`],
+                ['Effic', `${Math.round(mfrManager?.efficiency ?? 92)}%`],
+                ['Tier', 'T2'],
+                ['Type', 'GEN'],
+              ].map(([label, val]) => (
+                <div key={label} className="flex justify-between">
+                  <span className="font-mono text-[6px] text-white/30">{label}</span>
+                  <span className="font-mono text-[6px] text-[var(--neon-cyan)]">{val}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Status bar with values - fixed layout to prevent shifts */}
-      <div className="flex items-center font-mono text-[7px] mt-1 pt-1 border-t border-white/5">
-        <span className={cn(
-          'w-10 shrink-0 transition-colors',
-          !isPowered || deviceState === 'standby' ? 'text-white/20' :
-          deviceState === 'booting' ? 'text-white/30' : 'text-[var(--neon-cyan)]'
-        )}>
-          {Math.round(powerOutput)} MW
-        </span>
-        <span className={cn(
-          'flex-1 text-[5px] text-center transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
-          deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
-          deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
-          !isPowered || deviceState === 'standby' ? 'text-white/20' :
-          testResult === 'pass' ? 'text-[var(--neon-green)]' :
-          testResult === 'fail' ? 'text-[var(--neon-red)]' :
-          'text-white/30'
-        )}>
-          {statusMessage}
-        </span>
-        <span className={cn(
-          'w-6 shrink-0 text-right transition-colors',
-          !isPowered || deviceState === 'standby' ? 'text-white/20' :
-          stability > 80 ? 'text-[var(--neon-green)]' : 'text-[var(--neon-amber)]'
-        )}>
-          {Math.round(stability)}%
-        </span>
+      {/* ===== UNFOLDED INNER PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+        width: '100%',
+        left: 0,
+        top: 0,
+      }}>
+        <div className="p-2">
+          {/* Fold chevron */}
+          <div className="absolute top-1 right-1 z-10">
+            {chevronBtn(() => mfrManager?.toggleExpanded(), '▲', 'Fold')}
+          </div>
+
+          {/* Header with power button and nano LED buttons */}
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5">
+              <LED on={isLedOn} color={getLedColor()} size="sm" />
+              <div className="font-mono text-[9px] text-[var(--neon-cyan)]">
+                MICROFUSION REACTOR
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 mr-4">
+              <AtomicPowerButton />
+              {hexBtn(handleTest, deviceState !== 'online', 'Test', 'border-[var(--neon-cyan)]/30', 'border-[var(--neon-cyan)]/60', testLedColor)}
+              {hexBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown', 'Reboot', 'border-[var(--neon-amber)]/30', 'border-[var(--neon-amber)]/60', rebootLedColor)}
+              <div className="font-mono text-[6px] text-white/30 ml-0.5">T2</div>
+            </div>
+          </div>
+
+          {/* Reactor core visualization */}
+          <div className={cn(
+            'relative h-12 bg-black/40 rounded overflow-hidden flex items-center justify-center',
+            deviceState === 'testing' && testPhase === 'containment' && 'ring-1 ring-[var(--neon-cyan)]/50'
+          )}>
+            {[1, 2, 3].map((ring) => (
+              <div
+                key={ring}
+                className="absolute rounded-full border transition-all duration-500"
+                style={{
+                  width: `${ring * 25}%`,
+                  height: `${ring * 50}%`,
+                  borderColor: coreActive ? 'var(--neon-cyan)' : '#333',
+                  opacity: coreActive ? (0.3 + ring * 0.15) * ringSpeed : 0.1,
+                  animation: coreActive && ringSpeed > 0
+                    ? `spin ${(3 + ring) / ringSpeed}s linear infinite ${ring % 2 === 0 ? 'reverse' : ''}`
+                    : 'none',
+                }}
+              />
+            ))}
+            <div
+              className="w-3 h-3 rounded-full transition-all duration-300"
+              style={{
+                background: coreActive
+                  ? `radial-gradient(circle, #fff 0%, var(--neon-cyan) 60%, transparent 100%)`
+                  : '#333',
+                boxShadow: coreActive ? `0 0 ${10 + ringSpeed * 10}px var(--neon-cyan)` : 'none',
+                opacity: deviceState === 'booting' ? 0.6 : 1,
+              }}
+            />
+            {deviceState === 'testing' && testPhase === 'plasma' && (
+              <div className="absolute inset-0 bg-[var(--neon-cyan)]/10 animate-pulse" />
+            )}
+            {(!isPowered || deviceState === 'standby') && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="font-mono text-[8px] text-white/30">STANDBY</span>
+              </div>
+            )}
+          </div>
+
+          {/* Status bar with values */}
+          <div className="flex items-center font-mono text-[7px] mt-1 pt-1 border-t border-white/5">
+            <span className={cn(
+              'w-10 shrink-0 transition-colors',
+              !isPowered || deviceState === 'standby' ? 'text-white/20' :
+              deviceState === 'booting' ? 'text-white/30' : 'text-[var(--neon-cyan)]'
+            )}>
+              {Math.round(powerOutput)} MW
+            </span>
+            <span className={cn(
+              'flex-1 text-[5px] text-center transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
+              deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
+              deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+              !isPowered || deviceState === 'standby' ? 'text-white/20' :
+              testResult === 'pass' ? 'text-[var(--neon-green)]' :
+              testResult === 'fail' ? 'text-[var(--neon-red)]' :
+              'text-white/30'
+            )}>
+              {statusMessage}
+            </span>
+            <span className={cn(
+              'w-6 shrink-0 text-right transition-colors',
+              !isPowered || deviceState === 'standby' ? 'text-white/20' :
+              stability > 80 ? 'text-[var(--neon-green)]' : 'text-[var(--neon-amber)]'
+            )}>
+              {Math.round(stability)}%
+            </span>
+          </div>
+        </div>
       </div>
     </PanelFrame>
   )
@@ -5129,279 +6616,286 @@ export function AIAssistant({ className }: AIAssistantProps) {
   const nodesActive = deviceState === 'online' || deviceState === 'testing' || (deviceState === 'booting' && bootPhase && ['nodes', 'training', 'calibrate', 'ready'].includes(bootPhase))
   const isTransitioning = deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting'
 
-  return (
-    <PanelFrame variant="default" className={cn('p-2', className)}>
-      {/* Header with neural brain power button */}
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1.5">
-          {/* Neural Brain Power Button - tiny creative button */}
-          <button
-            onClick={handlePowerToggle}
-            disabled={isTransitioning || deviceState === 'testing'}
-            className="group relative disabled:opacity-50"
-            title={isPowered ? 'Power Off' : 'Power On'}
-          >
-            <div className={cn(
-              'w-4 h-4 rounded-full relative transition-all duration-300',
-              'border',
-              isPowered
-                ? 'border-[var(--neon-green)]/60 bg-[#0a1a0f]'
-                : 'border-white/20 bg-[#0a0a0a]',
-              'group-hover:border-[var(--neon-green)]/80',
-              'group-active:scale-95',
-              isTransitioning && 'animate-pulse'
-            )}
-            style={{
-              boxShadow: isPowered
-                ? '0 0 6px var(--neon-green), inset 0 0 4px rgba(0,255,100,0.2)'
-                : 'inset 0 1px 3px rgba(0,0,0,0.8)',
-            }}
-            >
-              {/* Neural brain pattern - 3 lobes */}
-              <svg viewBox="0 0 16 16" className="absolute inset-0 w-full h-full">
-                {/* Left lobe */}
-                <ellipse
-                  cx="5.5"
-                  cy="8"
-                  rx="2.5"
-                  ry="3"
-                  fill="none"
-                  stroke={isPowered ? 'var(--neon-green)' : '#333'}
-                  strokeWidth="0.5"
-                  className="transition-all duration-300"
-                  style={{
-                    opacity: isPowered ? 0.8 : 0.3,
-                    filter: isPowered ? 'drop-shadow(0 0 2px var(--neon-green))' : 'none',
-                  }}
-                />
-                {/* Right lobe */}
-                <ellipse
-                  cx="10.5"
-                  cy="8"
-                  rx="2.5"
-                  ry="3"
-                  fill="none"
-                  stroke={isPowered ? 'var(--neon-green)' : '#333'}
-                  strokeWidth="0.5"
-                  className="transition-all duration-300"
-                  style={{
-                    opacity: isPowered ? 0.8 : 0.3,
-                    filter: isPowered ? 'drop-shadow(0 0 2px var(--neon-green))' : 'none',
-                  }}
-                />
-                {/* Central connection (corpus callosum) */}
-                <line
-                  x1="6"
-                  y1="8"
-                  x2="10"
-                  y2="8"
-                  stroke={isPowered ? 'var(--neon-green)' : '#333'}
-                  strokeWidth="0.5"
-                  className="transition-all duration-300"
-                  style={{ opacity: isPowered ? 0.6 : 0.2 }}
-                />
-                {/* Synaptic nodes - firing when active */}
-                {[
-                  { cx: 4, cy: 6.5 },
-                  { cx: 5.5, cy: 5.5 },
-                  { cx: 7, cy: 7 },
-                  { cx: 9, cy: 7 },
-                  { cx: 10.5, cy: 5.5 },
-                  { cx: 12, cy: 6.5 },
-                  { cx: 5, cy: 9.5 },
-                  { cx: 8, cy: 10 },
-                  { cx: 11, cy: 9.5 },
-                ].map((node, i) => (
-                  <circle
-                    key={i}
-                    cx={node.cx}
-                    cy={node.cy}
-                    r={isPowered && isLearning ? 0.6 : 0.4}
-                    fill={isPowered ? 'var(--neon-green)' : '#222'}
-                    className="transition-all duration-300"
-                    style={{
-                      opacity: isPowered ? 0.4 + (nodeActivity[i % 5] || 0) * 0.6 : 0.2,
-                      filter: isPowered ? `drop-shadow(0 0 ${1 + (nodeActivity[i % 5] || 0) * 2}px var(--neon-green))` : 'none',
-                      animation: isPowered && isLearning ? `pulse ${0.6 + i * 0.15}s ease-in-out infinite` : 'none',
-                    }}
-                  />
-                ))}
-              </svg>
-            </div>
-          </button>
+  // Fold state
+  const isExpanded = aicManager?.isExpanded ?? true
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-          <LED on={isLedOn} color={getLedColor()} size="sm" />
-          <div className="font-mono text-[9px] text-[var(--neon-green)]">
-            AI ASSISTANT CORE
+  const handleToggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current)
+      if (next) {
+        foldedInfoTimerRef.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      }
+      return next
+    })
+  }
+
+  useEffect(() => {
+    return () => { if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current) }
+  }, [])
+
+  // Neural brain power button helper
+  const NeuralPowerButton = () => (
+    <button
+      onClick={handlePowerToggle}
+      disabled={isTransitioning || deviceState === 'testing'}
+      className="group relative disabled:opacity-50"
+      title={isPowered ? 'Power Off' : 'Power On'}
+    >
+      <div className={cn(
+        'w-4 h-4 rounded-full relative transition-all duration-300 border',
+        isPowered ? 'border-[var(--neon-green)]/60 bg-[#0a1a0f]' : 'border-white/20 bg-[#0a0a0a]',
+        'group-hover:border-[var(--neon-green)]/80 group-active:scale-95',
+        isTransitioning && 'animate-pulse'
+      )}
+      style={{
+        boxShadow: isPowered ? '0 0 6px var(--neon-green), inset 0 0 4px rgba(0,255,100,0.2)' : 'inset 0 1px 3px rgba(0,0,0,0.8)',
+      }}
+      >
+        <svg viewBox="0 0 16 16" className="absolute inset-0 w-full h-full">
+          {[{ cx: 5.5, cy: 8, rx: 2.5, ry: 3 }, { cx: 10.5, cy: 8, rx: 2.5, ry: 3 }].map((lobe, i) => (
+            <ellipse key={i} cx={lobe.cx} cy={lobe.cy} rx={lobe.rx} ry={lobe.ry} fill="none"
+              stroke={isPowered ? 'var(--neon-green)' : '#333'} strokeWidth="0.5"
+              className="transition-all duration-300"
+              style={{ opacity: isPowered ? 0.8 : 0.3, filter: isPowered ? 'drop-shadow(0 0 2px var(--neon-green))' : 'none' }}
+            />
+          ))}
+          <line x1="6" y1="8" x2="10" y2="8" stroke={isPowered ? 'var(--neon-green)' : '#333'} strokeWidth="0.5" style={{ opacity: isPowered ? 0.6 : 0.2 }} />
+          {[{ cx: 4, cy: 6.5 }, { cx: 5.5, cy: 5.5 }, { cx: 7, cy: 7 }, { cx: 9, cy: 7 }, { cx: 10.5, cy: 5.5 }, { cx: 12, cy: 6.5 }, { cx: 5, cy: 9.5 }, { cx: 8, cy: 10 }, { cx: 11, cy: 9.5 }].map((node, i) => (
+            <circle key={i} cx={node.cx} cy={node.cy} r={isPowered && isLearning ? 0.6 : 0.4}
+              fill={isPowered ? 'var(--neon-green)' : '#222'} className="transition-all duration-300"
+              style={{
+                opacity: isPowered ? 0.4 + (nodeActivity[i % 5] || 0) * 0.6 : 0.2,
+                filter: isPowered ? `drop-shadow(0 0 ${1 + (nodeActivity[i % 5] || 0) * 2}px var(--neon-green))` : 'none',
+                animation: isPowered && isLearning ? `pulse ${0.6 + i * 0.15}s ease-in-out infinite` : 'none',
+              }}
+            />
+          ))}
+        </svg>
+      </div>
+    </button>
+  )
+
+  // Worn rubber button helper
+  const rubberBtn = (onClick: () => void, disabled: boolean, title: string, isActive: boolean, activeBg: string, inactiveBg: string, borderColor: string, hoverColor: string, ledColor: string) => (
+    <button onClick={onClick} disabled={disabled} className="group relative disabled:opacity-30" title={title}>
+      <div className={cn(
+        'w-2.5 h-2 rounded-sm transition-all flex items-center justify-center',
+        isActive ? activeBg : inactiveBg,
+        `border ${borderColor}`,
+        `group-hover:${hoverColor}`,
+        'group-active:scale-95'
+      )}
+      style={{
+        boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.6), inset 0 -0.5px 0 rgba(255,255,255,0.05)',
+      }}
+      >
+        <div className="absolute inset-0 rounded-sm opacity-30"
+          style={{ backgroundImage: 'radial-gradient(circle at 30% 70%, rgba(255,255,255,0.1) 0%, transparent 50%)' }}
+        />
+        <div className={cn('w-1 h-1 rounded-full transition-all', ledColor)} />
+      </div>
+    </button>
+  )
+
+  const testLedColor = deviceState === 'testing' || testResult === 'pass'
+    ? 'bg-[var(--neon-green)] shadow-[0_0_3px_var(--neon-green)]'
+    : testResult === 'fail'
+    ? 'bg-[var(--neon-red)] shadow-[0_0_3px_var(--neon-red)]'
+    : 'bg-[#2a3a2a]'
+
+  const rebootLedColor = (deviceState === 'rebooting' || deviceState === 'booting')
+    ? 'bg-[var(--neon-amber)] shadow-[0_0_3px_var(--neon-amber)]'
+    : 'bg-[#3a2a2a]'
+
+  const chevronBtn = (onClick: () => void, label: string, title: string, enabled = true) => (
+    <button
+      onClick={enabled ? onClick : undefined}
+      className={cn(
+        'w-3 h-3 flex items-center justify-center rounded-sm border border-[#2a3a2a]/60 bg-gradient-to-b from-[#1a1f1a] to-[#0d120d] transition-all',
+        enabled ? 'cursor-pointer hover:border-[var(--neon-green)]/50' : 'opacity-30 cursor-default',
+      )}
+      title={title}
+    >
+      <span className="text-[6px] text-white/50">{label}</span>
+    </button>
+  )
+
+  return (
+    <PanelFrame variant="default" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+
+      {/* ===== FOLDED FRONT PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+        width: '100%',
+        left: 0,
+        top: 0,
+      }}>
+        <div className="p-2">
+          <div className="flex items-center gap-1.5">
+            <NeuralPowerButton />
+            <LED on={isLedOn} color={getLedColor()} size="sm" />
+            <span className="font-mono text-[9px] text-[var(--neon-green)] font-medium">AIC-001</span>
+            <span className={cn(
+              'font-mono text-[7px] ml-1',
+              isPowered ? 'text-[var(--neon-green)]' : 'text-white/30'
+            )}>
+              {isPowered ? (deviceState === 'online' ? (isLearning ? 'LEARNING' : 'MONITOR') : deviceState.toUpperCase()) : 'STANDBY'}
+            </span>
+            <div className="flex-1" />
+            {isPowered && (
+              <>
+                {rubberBtn(handleTest, deviceState !== 'online', 'Test', deviceState === 'testing', 'bg-[#1a3a2a]', 'bg-[#1a1f1a]', 'border-[#2a3a2a]/60', 'border-[var(--neon-green)]/40', testLedColor)}
+                {rubberBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown', 'Reboot', deviceState === 'rebooting' || deviceState === 'booting', 'bg-[#3a2a1a]', 'bg-[#1f1a1a]', 'border-[#3a2a2a]/60', 'border-[var(--neon-amber)]/40', rebootLedColor)}
+              </>
+            )}
+            {chevronBtn(handleToggleFoldedInfo, showFoldedInfo ? '▲' : '▼', showFoldedInfo ? 'Hide info' : 'Show info', isPowered)}
+          </div>
+
+          {/* Folded info expansion */}
+          <div style={{
+            maxHeight: showFoldedInfo && isPowered ? '80px' : '0px',
+            overflow: 'hidden',
+            transition: 'max-height 300ms ease',
+          }}>
+            <div className="mt-1.5 pt-1 border-t border-white/5 grid grid-cols-3 gap-x-3 gap-y-0.5">
+              {[
+                ['Queue', `${taskQueue}`],
+                ['Effic', `${efficiency}%`],
+                ['Mode', isLearning ? 'LEARN' : 'MON'],
+                ['Nodes', `${nodeActivity.filter(n => n > 0.5).length}/5`],
+                ['Tier', 'T2'],
+                ['Draw', `${isLearning ? '50' : '35'} E/s`],
+              ].map(([label, val]) => (
+                <div key={label} className="flex justify-between">
+                  <span className="font-mono text-[6px] text-white/30">{label}</span>
+                  <span className="font-mono text-[6px] text-[var(--neon-green)]">{val}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-
-        {/* Worn rubber micro buttons - rounded soft style with wear marks */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={handleTest}
-            disabled={deviceState !== 'online'}
-            className="group relative disabled:opacity-30"
-            title="Test"
-          >
-            <div className={cn(
-              'w-2.5 h-2 rounded-sm transition-all',
-              'flex items-center justify-center',
-              deviceState === 'testing'
-                ? 'bg-[#1a3a2a]'
-                : 'bg-[#1a1f1a]',
-              'border border-[#2a3a2a]/60',
-              'group-hover:border-[var(--neon-green)]/40',
-              'group-active:scale-95'
-            )}
-            style={{
-              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.6), inset 0 -0.5px 0 rgba(255,255,255,0.05)',
-              background: deviceState === 'testing'
-                ? 'linear-gradient(180deg, #0d2818 0%, #1a3a2a 40%, #153020 100%)'
-                : 'linear-gradient(180deg, #0d120d 0%, #1a1f1a 40%, #151a15 100%)',
-            }}
-            >
-              {/* Worn texture overlay */}
-              <div className="absolute inset-0 rounded-sm opacity-30"
-                style={{
-                  backgroundImage: 'radial-gradient(circle at 30% 70%, rgba(255,255,255,0.1) 0%, transparent 50%)',
-                }}
-              />
-              {/* Nano LED indicator */}
-              <div className={cn(
-                'w-1 h-1 rounded-full transition-all',
-                deviceState === 'testing'
-                  ? 'bg-[var(--neon-green)] shadow-[0_0_3px_var(--neon-green)]'
-                  : testResult === 'pass'
-                  ? 'bg-[var(--neon-green)] shadow-[0_0_3px_var(--neon-green)]'
-                  : testResult === 'fail'
-                  ? 'bg-[var(--neon-red)] shadow-[0_0_3px_var(--neon-red)]'
-                  : 'bg-[#2a3a2a]'
-              )} />
-            </div>
-          </button>
-          <button
-            onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
-            className="group relative disabled:opacity-30"
-            title="Reboot"
-          >
-            <div className={cn(
-              'w-2.5 h-2 rounded-sm transition-all',
-              'flex items-center justify-center',
-              deviceState === 'rebooting' || deviceState === 'booting'
-                ? 'bg-[#3a2a1a]'
-                : 'bg-[#1f1a1a]',
-              'border border-[#3a2a2a]/60',
-              'group-hover:border-[var(--neon-amber)]/40',
-              'group-active:scale-95'
-            )}
-            style={{
-              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.6), inset 0 -0.5px 0 rgba(255,255,255,0.05)',
-              background: deviceState === 'rebooting' || deviceState === 'booting'
-                ? 'linear-gradient(180deg, #281a0d 0%, #3a2a1a 40%, #302015 100%)'
-                : 'linear-gradient(180deg, #120d0d 0%, #1f1a1a 40%, #1a1515 100%)',
-            }}
-            >
-              {/* Worn texture overlay */}
-              <div className="absolute inset-0 rounded-sm opacity-30"
-                style={{
-                  backgroundImage: 'radial-gradient(circle at 70% 30%, rgba(255,255,255,0.1) 0%, transparent 50%)',
-                }}
-              />
-              {/* Nano LED indicator */}
-              <div className={cn(
-                'w-1 h-1 rounded-full transition-all',
-                deviceState === 'rebooting' || deviceState === 'booting'
-                  ? 'bg-[var(--neon-amber)] shadow-[0_0_3px_var(--neon-amber)]'
-                  : 'bg-[#3a2a2a]'
-              )} />
-            </div>
-          </button>
-          <div className="font-mono text-[6px] text-white/30 ml-0.5">T2</div>
-        </div>
       </div>
 
-      {/* Neural network visualization */}
-      <div className={cn(
-        'relative h-10 bg-black/40 rounded overflow-hidden',
-        deviceState === 'testing' && testPhase === 'neural' && 'ring-1 ring-[var(--neon-green)]/50'
-      )}>
-        {/* Neural nodes */}
-        <div className="absolute inset-0 flex items-center justify-around px-2">
-          {[0, 1, 2, 3, 4].map((node) => (
-            <div key={node} className="flex flex-col items-center gap-1">
+      {/* ===== UNFOLDED INNER PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+        width: '100%',
+        left: 0,
+        top: 0,
+      }}>
+        <div className="p-2">
+          {/* Fold chevron */}
+          <div className="absolute top-1 right-1 z-10">
+            {chevronBtn(() => aicManager?.toggleExpanded(), '▲', 'Fold')}
+          </div>
+
+          {/* Header with neural brain power button */}
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5">
+              <NeuralPowerButton />
+              <LED on={isLedOn} color={getLedColor()} size="sm" />
+              <div className="font-mono text-[9px] text-[var(--neon-green)]">
+                AI ASSISTANT CORE
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 mr-4">
+              {rubberBtn(handleTest, deviceState !== 'online', 'Test', deviceState === 'testing', 'bg-[#1a3a2a]', 'bg-[#1a1f1a]', 'border-[#2a3a2a]/60', 'border-[var(--neon-green)]/40', testLedColor)}
+              {rubberBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown', 'Reboot', deviceState === 'rebooting' || deviceState === 'booting', 'bg-[#3a2a1a]', 'bg-[#1f1a1a]', 'border-[#3a2a2a]/60', 'border-[var(--neon-amber)]/40', rebootLedColor)}
+              <div className="font-mono text-[6px] text-white/30 ml-0.5">T2</div>
+            </div>
+          </div>
+
+          {/* Neural network visualization */}
+          <div className={cn(
+            'relative h-10 bg-black/40 rounded overflow-hidden',
+            deviceState === 'testing' && testPhase === 'neural' && 'ring-1 ring-[var(--neon-green)]/50'
+          )}>
+            <div className="absolute inset-0 flex items-center justify-around px-2">
+              {[0, 1, 2, 3, 4].map((node) => (
+                <div key={node} className="flex flex-col items-center gap-1">
+                  <div
+                    className={cn(
+                      'w-1.5 h-1.5 rounded-full transition-all duration-300',
+                      nodesActive ? 'bg-[var(--neon-green)]' : 'bg-[#333]',
+                      deviceState === 'testing' && testPhase === 'neural' && 'ring-1 ring-[var(--neon-cyan)]'
+                    )}
+                    style={{
+                      opacity: nodesActive ? 0.4 + nodeActivity[node] * 0.6 : 0.2,
+                      animation: nodesActive && isLearning ? `pulse ${0.8 + node * 0.1}s ease-in-out infinite` : 'none',
+                      boxShadow: nodesActive ? `0 0 ${4 + nodeActivity[node] * 4}px var(--neon-green)` : 'none',
+                    }}
+                  />
+                  <div
+                    className={cn(
+                      'w-0.5 h-3 transition-all duration-300',
+                      nodesActive ? 'bg-[var(--neon-green)]/30' : 'bg-[#333]/30',
+                      deviceState === 'testing' && testPhase === 'logic' && 'bg-[var(--neon-cyan)]/50'
+                    )}
+                    style={{ transform: `rotate(${-20 + node * 10}deg)` }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className={cn(
+              'absolute bottom-1 left-1 right-1 h-0.5 bg-black/50 rounded overflow-hidden',
+              deviceState === 'testing' && testPhase === 'memory' && 'ring-1 ring-[var(--neon-cyan)]/50'
+            )}>
               <div
-                className={cn(
-                  'w-1.5 h-1.5 rounded-full transition-all duration-300',
-                  nodesActive ? 'bg-[var(--neon-green)]' : 'bg-[#333]',
-                  deviceState === 'testing' && testPhase === 'neural' && 'ring-1 ring-[var(--neon-cyan)]'
-                )}
+                className={cn('h-full transition-all duration-300', nodesActive ? 'bg-[var(--neon-green)]' : 'bg-[#333]')}
                 style={{
-                  opacity: nodesActive ? 0.4 + nodeActivity[node] * 0.6 : 0.2,
-                  animation: nodesActive && isLearning ? `pulse ${0.8 + node * 0.1}s ease-in-out infinite` : 'none',
-                  boxShadow: nodesActive ? `0 0 ${4 + nodeActivity[node] * 4}px var(--neon-green)` : 'none',
+                  width: nodesActive ? '60%' : '0%',
+                  animation: nodesActive && isLearning ? 'loading 1.5s ease-in-out infinite' : 'none',
                 }}
               />
-              <div
-                className={cn(
-                  'w-0.5 h-3 transition-all duration-300',
-                  nodesActive ? 'bg-[var(--neon-green)]/30' : 'bg-[#333]/30',
-                  deviceState === 'testing' && testPhase === 'logic' && 'bg-[var(--neon-cyan)]/50'
-                )}
-                style={{ transform: `rotate(${-20 + node * 10}deg)` }}
-              />
             </div>
-          ))}
-        </div>
-        {/* Processing indicator */}
-        <div className={cn(
-          'absolute bottom-1 left-1 right-1 h-0.5 bg-black/50 rounded overflow-hidden',
-          deviceState === 'testing' && testPhase === 'memory' && 'ring-1 ring-[var(--neon-cyan)]/50'
-        )}>
-          <div
-            className={cn(
-              'h-full transition-all duration-300',
-              nodesActive ? 'bg-[var(--neon-green)]' : 'bg-[#333]'
+            {deviceState === 'testing' && (testPhase === 'learning' || testPhase === 'optimization') && (
+              <div className="absolute inset-0 bg-[var(--neon-green)]/10 animate-pulse" />
             )}
-            style={{
-              width: nodesActive ? '60%' : '0%',
-              animation: nodesActive && isLearning ? 'loading 1.5s ease-in-out infinite' : 'none',
-            }}
-          />
+          </div>
+
+          {/* Status bar */}
+          <div className="flex items-center font-mono text-[7px] mt-1">
+            <span className={cn(
+              'w-12 shrink-0 transition-colors',
+              deviceState === 'booting' && bootPhase && ['neural', 'memory'].includes(bootPhase) ? 'text-white/30' : 'text-white/40'
+            )}>
+              QUEUE: {taskQueue}
+            </span>
+            <span className={cn(
+              'flex-1 text-[5px] text-center transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
+              deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
+              deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+              testResult === 'pass' ? 'text-[var(--neon-green)]' :
+              testResult === 'fail' ? 'text-[var(--neon-red)]' :
+              deviceState === 'standby' ? 'text-white/20' :
+              'text-white/30'
+            )}>
+              {statusMessage}
+            </span>
+            <span className={cn(
+              'w-12 shrink-0 text-right transition-colors',
+              nodesActive ? 'text-[var(--neon-green)]' : 'text-white/30'
+            )}>
+              {efficiency}% EFF
+            </span>
+          </div>
         </div>
-
-        {/* Test overlay for learning/optimization phases */}
-        {deviceState === 'testing' && (testPhase === 'learning' || testPhase === 'optimization') && (
-          <div className="absolute inset-0 bg-[var(--neon-green)]/10 animate-pulse" />
-        )}
-      </div>
-
-      {/* Status bar with fixed layout */}
-      <div className="flex items-center font-mono text-[7px] mt-1">
-        <span className={cn(
-          'w-12 shrink-0 transition-colors',
-          deviceState === 'booting' && bootPhase && ['neural', 'memory'].includes(bootPhase) ? 'text-white/30' : 'text-white/40'
-        )}>
-          QUEUE: {taskQueue}
-        </span>
-        <span className={cn(
-          'flex-1 text-[5px] text-center transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
-          deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
-          deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
-          testResult === 'pass' ? 'text-[var(--neon-green)]' :
-          testResult === 'fail' ? 'text-[var(--neon-red)]' :
-          deviceState === 'standby' ? 'text-white/20' :
-          'text-white/30'
-        )}>
-          {statusMessage}
-        </span>
-        <span className={cn(
-          'w-12 shrink-0 text-right transition-colors',
-          nodesActive ? 'text-[var(--neon-green)]' : 'text-white/30'
-        )}>
-          {efficiency}% EFF
-        </span>
       </div>
     </PanelFrame>
   )
@@ -5436,6 +6930,27 @@ export function ExplorerDrone({
   const displayBattery = exdManager?.battery ?? battery
   const isRadarActive = exdManager?.radarActive ?? true
   const exdStandby = exdManager?.deviceState === 'standby'
+  const isTransitioning = ['booting', 'shutdown', 'rebooting', 'testing'].includes(deviceState)
+  const isExpanded = exdManager?.isExpanded ?? true
+
+  // Folded info toggle
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const toggleFoldedInfo = useCallback(() => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current)
+      if (next) {
+        foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      }
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) }
+  }, [])
 
   const handlePowerToggle = () => {
     if (!exdManager) return
@@ -5467,222 +6982,350 @@ export function ExplorerDrone({
   const isLedOn = !exdStandby && deviceState !== 'shutdown'
   const radarActive = isRadarActive && (deviceState === 'online' || deviceState === 'testing')
 
+  // Propeller power button
+  const PropellerPowerButton = () => (
+    <button
+      onClick={handlePowerToggle}
+      disabled={isTransitioning}
+      className="group relative disabled:opacity-30"
+      title={exdStandby ? 'Power On' : 'Power Off'}
+    >
+      <div
+        className="w-3 h-3 flex items-center justify-center transition-all"
+        style={{
+          background: !exdStandby
+            ? 'radial-gradient(circle, rgba(191,255,0,0.4) 0%, rgba(191,255,0,0.1) 50%, transparent 70%)'
+            : 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 50%)',
+          borderRadius: '50%',
+          boxShadow: !exdStandby ? '0 0 4px rgba(191,255,0,0.3)' : 'none',
+          animation: !exdStandby && deviceState === 'online' ? 'spin 1s linear infinite' : 'none',
+        }}
+      >
+        <div className="relative w-2.5 h-2.5">
+          <div
+            className="absolute inset-0"
+            style={{
+              background: !exdStandby
+                ? 'linear-gradient(0deg, transparent 40%, var(--neon-lime, #bfff00) 40%, var(--neon-lime, #bfff00) 60%, transparent 60%), linear-gradient(90deg, transparent 40%, var(--neon-lime, #bfff00) 40%, var(--neon-lime, #bfff00) 60%, transparent 60%)'
+                : 'linear-gradient(0deg, transparent 40%, rgba(255,255,255,0.3) 40%, rgba(255,255,255,0.3) 60%, transparent 60%), linear-gradient(90deg, transparent 40%, rgba(255,255,255,0.3) 40%, rgba(255,255,255,0.3) 60%, transparent 60%)',
+              borderRadius: '50%',
+            }}
+          />
+          <div className={cn(
+            'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-1 rounded-full',
+            !exdStandby ? 'bg-[var(--neon-lime,#bfff00)]' : 'bg-white/30'
+          )} />
+        </div>
+      </div>
+    </button>
+  )
+
+  // Anodized aluminum micro button for folded bar
+  const milBtn = (label: string, onClick: () => void, disabled: boolean) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="font-mono transition-all"
+      style={{
+        fontSize: '6px',
+        lineHeight: 1,
+        padding: '2px 3px',
+        background: 'linear-gradient(180deg, #4a5a3a 0%, #2a3a1a 100%)',
+        border: '0.5px solid #3a4a2a',
+        borderRadius: '1px',
+        color: disabled ? '#333' : '#8a9a6a',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.15), inset 0 -0.5px 0 rgba(0,0,0,0.4)',
+        opacity: disabled ? 0.4 : 1,
+      }}
+    >
+      {label}
+    </button>
+  )
+
+  // State label for folded bar
+  const stateLabel = exdStandby ? 'STANDBY' : isTransitioning ? deviceState.toUpperCase() : (exdManager?.isDeployed ? 'DEPLOYED' : 'DOCKED')
+  const stateLedColor = exdStandby ? '#555' : isTransitioning ? 'var(--neon-amber)' : 'var(--neon-lime, #bfff00)'
+
   return (
-    <PanelFrame variant="military" className={cn('p-2 transition-opacity', exdStandby && 'opacity-50', className)}>
-      {/* Header with power button and worn metal micro buttons */}
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1">
-          <LED on={isLedOn} color={getLedColor()} size="sm" />
-          <div className="font-mono text-[8px] text-[var(--neon-lime,#bfff00)]">
-            EXPLORER DRONE
-          </div>
-          {/* Power button - tiny propeller-shaped */}
-          <button
-            onClick={handlePowerToggle}
-            disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
-            className="group relative disabled:opacity-30"
-            title={exdStandby ? 'Power On' : 'Power Off'}
-          >
-            <div
-              className="w-3 h-3 flex items-center justify-center transition-all"
-              style={{
-                background: !exdStandby
-                  ? 'radial-gradient(circle, rgba(191,255,0,0.4) 0%, rgba(191,255,0,0.1) 50%, transparent 70%)'
-                  : 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 50%)',
-                borderRadius: '50%',
-                boxShadow: !exdStandby ? '0 0 4px rgba(191,255,0,0.3)' : 'none',
-                animation: !exdStandby && deviceState === 'online' ? 'spin 1s linear infinite' : 'none',
-              }}
-            >
-              {/* Propeller cross */}
-              <div className="relative w-2.5 h-2.5">
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background: !exdStandby
-                      ? 'linear-gradient(0deg, transparent 40%, var(--neon-lime, #bfff00) 40%, var(--neon-lime, #bfff00) 60%, transparent 60%), linear-gradient(90deg, transparent 40%, var(--neon-lime, #bfff00) 40%, var(--neon-lime, #bfff00) 60%, transparent 60%)'
-                      : 'linear-gradient(0deg, transparent 40%, rgba(255,255,255,0.3) 40%, rgba(255,255,255,0.3) 60%, transparent 60%), linear-gradient(90deg, transparent 40%, rgba(255,255,255,0.3) 40%, rgba(255,255,255,0.3) 60%, transparent 60%)',
-                    borderRadius: '50%',
-                  }}
-                />
-                {/* Center dot */}
-                <div className={cn(
-                  'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1 h-1 rounded-full',
-                  !exdStandby ? 'bg-[var(--neon-lime,#bfff00)]' : 'bg-white/30'
-                )} />
-              </div>
+    <PanelFrame variant="military" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+      {/* ═══════════ FOLDED FRONT PANEL ═══════════ */}
+      <div
+        style={{
+          transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 0 : 1,
+          position: isExpanded ? 'absolute' : 'relative',
+          pointerEvents: isExpanded ? 'none' : 'auto',
+          zIndex: isExpanded ? 0 : 2,
+          width: '100%', left: 0, top: 0,
+        }}
+      >
+        <div className="flex items-center gap-1 px-1.5 py-1">
+          <div
+            className="w-1.5 h-1.5 rounded-full shrink-0"
+            style={{
+              backgroundColor: stateLedColor,
+              boxShadow: !exdStandby ? `0 0 4px ${stateLedColor}` : 'none',
+            }}
+          />
+          <span className="font-mono text-[7px] font-bold shrink-0" style={{ color: 'var(--neon-lime, #bfff00)' }}>EXD-001</span>
+          <span className="font-mono text-[6px] shrink-0" style={{ color: stateLedColor }}>{stateLabel}</span>
+          <div className="flex-1" />
+          {!exdStandby && (
+            <div className="flex gap-0.5">
+              {milBtn('T', handleTest, isTransitioning || exdStandby)}
+              {milBtn('R', handleReboot, isTransitioning || exdStandby)}
             </div>
-          </button>
-          {exdManager && (
-            <span className="font-mono text-[4px] text-white/20">v{EXD_FIRMWARE.version}</span>
+          )}
+          <PropellerPowerButton />
+          {!exdStandby && (
+            <button
+              onClick={toggleFoldedInfo}
+              className="font-mono transition-all"
+              style={{
+                fontSize: '8px', lineHeight: 1, padding: '1px 2px',
+                color: showFoldedInfo ? 'var(--neon-lime, #bfff00)' : '#556',
+                cursor: 'pointer', background: 'none', border: 'none',
+              }}
+              title={showFoldedInfo ? 'Hide info' : 'Show info'}
+            >
+              {showFoldedInfo ? '▲' : '▼'}
+            </button>
           )}
         </div>
 
-        {/* Worn metal micro buttons - anodized aluminum style */}
-        <div className="flex items-center gap-0.5">
-          {/* Mini company logo - DJI style */}
-          <div
-            className="font-mono text-[3px] text-[#8a9a6a] px-0.5 rounded-[1px] mr-0.5"
-            style={{
-              background: 'linear-gradient(180deg, #3a4a2a 0%, #2a3a1a 100%)',
-              border: '0.5px solid #4a5a3a',
-            }}
-          >
-            DJI
+        <div
+          style={{
+            maxHeight: showFoldedInfo && !exdStandby ? '60px' : '0px',
+            overflow: 'hidden',
+            transition: 'max-height 300ms ease',
+          }}
+        >
+          <div className="px-2 pb-1.5 grid grid-cols-3 gap-x-3 gap-y-0.5">
+            {[
+              { label: 'Range', value: `${displayRange.toFixed(1)} km` },
+              { label: 'BAT', value: `${Math.round(displayBattery)}%` },
+              { label: 'GPS', value: `${Math.round(exdManager?.gpsSignal ?? 95)}%` },
+              { label: 'Speed', value: `${Math.round(exdManager?.speed ?? 25)} km/h` },
+              { label: 'Cargo', value: `${exdManager?.cargoLoad ?? 0}` },
+              { label: 'Draw', value: `${Math.round(exdManager?.currentDraw ?? 40)} E/s` },
+            ].map(({ label: l, value: v }) => (
+              <div key={l} className="flex justify-between">
+                <span className="font-mono text-[5px] text-white/30">{l}</span>
+                <span className="font-mono text-[6px]" style={{ color: 'var(--neon-lime, #bfff00)' }}>{v}</span>
+              </div>
+            ))}
           </div>
-          <button
-            onClick={handleTest}
-            disabled={deviceState !== 'online'}
-            className="group relative disabled:opacity-30"
-            title="Test"
-          >
-            <div className={cn(
-              'w-2.5 h-[7px] rounded-[1px] transition-all',
-              'flex items-center justify-center',
-              'group-hover:brightness-110',
-              'group-active:scale-95'
-            )}
-            style={{
-              background: 'linear-gradient(180deg, #4a5a3a 0%, #3a4a2a 30%, #2a3a1a 70%, #1a2a0a 100%)',
-              boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.15), inset 0 -0.5px 0 rgba(0,0,0,0.4), 0 1px 1px rgba(0,0,0,0.3)',
-              border: '0.5px solid #3a4a2a',
-            }}
-            >
-              <div className="absolute inset-0 rounded-[1px] opacity-20"
-                style={{
-                  backgroundImage: 'linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%)',
-                }}
-              />
-              <div className={cn(
-                'w-[3px] h-[3px] rounded-full transition-all z-10',
-                deviceState === 'testing'
-                  ? 'bg-[var(--neon-lime,#bfff00)] shadow-[0_0_2px_var(--neon-lime,#bfff00)]'
-                  : testResult === 'pass'
-                  ? 'bg-[var(--neon-green)] shadow-[0_0_2px_var(--neon-green)]'
-                  : testResult === 'fail'
-                  ? 'bg-[var(--neon-red)] shadow-[0_0_2px_var(--neon-red)]'
-                  : 'bg-[#1a2a0a]'
-              )} />
-            </div>
-          </button>
-          <button
-            onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || exdStandby}
-            className="group relative disabled:opacity-30"
-            title="Reboot"
-          >
-            <div className={cn(
-              'w-2.5 h-[7px] rounded-[1px] transition-all',
-              'flex items-center justify-center',
-              'group-hover:brightness-110',
-              'group-active:scale-95'
-            )}
-            style={{
-              background: 'linear-gradient(180deg, #5a4a3a 0%, #4a3a2a 30%, #3a2a1a 70%, #2a1a0a 100%)',
-              boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.15), inset 0 -0.5px 0 rgba(0,0,0,0.4), 0 1px 1px rgba(0,0,0,0.3)',
-              border: '0.5px solid #4a3a2a',
-            }}
-            >
-              <div className="absolute inset-0 rounded-[1px] opacity-20"
-                style={{
-                  backgroundImage: 'linear-gradient(-45deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%)',
-                }}
-              />
-              <div className={cn(
-                'w-[3px] h-[3px] rounded-full transition-all z-10',
-                deviceState === 'rebooting' || deviceState === 'booting'
-                  ? 'bg-[var(--neon-amber)] shadow-[0_0_2px_var(--neon-amber)]'
-                  : 'bg-[#2a1a0a]'
-              )} />
-            </div>
-          </button>
-          <div className="font-mono text-[5px] text-white/30">T2</div>
         </div>
       </div>
 
-      {/* Drone radar visualization */}
-      <div className={cn(
-        'relative h-10 bg-black/40 rounded overflow-hidden',
-        deviceState === 'testing' && testPhase === 'gps' && 'ring-1 ring-[var(--neon-lime,#bfff00)]/50'
-      )}>
-        {/* Standby overlay */}
-        {exdStandby && (
-          <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/60">
-            <span className="font-mono text-[8px] text-white/40">STANDBY</span>
+      {/* ═══════════ UNFOLDED INNER PANEL ═══════════ */}
+      <div
+        style={{
+          transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 1 : 0,
+          position: isExpanded ? 'relative' : 'absolute',
+          pointerEvents: isExpanded ? 'auto' : 'none',
+          zIndex: isExpanded ? 2 : 0,
+          width: '100%', left: 0, top: 0,
+        }}
+      >
+        {/* Fold chevron */}
+        {exdManager && (
+          <button
+            onClick={() => exdManager.toggleExpanded()}
+            className="absolute top-0.5 right-0.5 z-10 font-mono transition-all"
+            style={{
+              fontSize: '7px', lineHeight: 1, padding: '1px 2px',
+              color: '#445', cursor: 'pointer',
+              background: 'rgba(0,0,0,0.3)', border: '1px solid #222',
+              borderRadius: '2px',
+            }}
+            title="Fold panel"
+          >
+            ▴
+          </button>
+        )}
+
+        {/* Original full content */}
+        <div className={cn('p-2 transition-opacity', exdStandby && 'opacity-50')}>
+          {/* Header with power button and worn metal micro buttons */}
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1">
+              <LED on={isLedOn} color={getLedColor()} size="sm" />
+              <div className="font-mono text-[8px] text-[var(--neon-lime,#bfff00)]">
+                EXPLORER DRONE
+              </div>
+              <PropellerPowerButton />
+              {exdManager && (
+                <span className="font-mono text-[4px] text-white/20">v{EXD_FIRMWARE.version}</span>
+              )}
+            </div>
+
+            {/* Worn metal micro buttons - anodized aluminum style */}
+            <div className="flex items-center gap-0.5">
+              <div
+                className="font-mono text-[3px] text-[#8a9a6a] px-0.5 rounded-[1px] mr-0.5"
+                style={{
+                  background: 'linear-gradient(180deg, #3a4a2a 0%, #2a3a1a 100%)',
+                  border: '0.5px solid #4a5a3a',
+                }}
+              >
+                DJI
+              </div>
+              <button
+                onClick={handleTest}
+                disabled={deviceState !== 'online'}
+                className="group relative disabled:opacity-30"
+                title="Test"
+              >
+                <div className={cn(
+                  'w-2.5 h-[7px] rounded-[1px] transition-all',
+                  'flex items-center justify-center',
+                  'group-hover:brightness-110',
+                  'group-active:scale-95'
+                )}
+                style={{
+                  background: 'linear-gradient(180deg, #4a5a3a 0%, #3a4a2a 30%, #2a3a1a 70%, #1a2a0a 100%)',
+                  boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.15), inset 0 -0.5px 0 rgba(0,0,0,0.4), 0 1px 1px rgba(0,0,0,0.3)',
+                  border: '0.5px solid #3a4a2a',
+                }}
+                >
+                  <div className="absolute inset-0 rounded-[1px] opacity-20"
+                    style={{
+                      backgroundImage: 'linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%)',
+                    }}
+                  />
+                  <div className={cn(
+                    'w-[3px] h-[3px] rounded-full transition-all z-10',
+                    deviceState === 'testing'
+                      ? 'bg-[var(--neon-lime,#bfff00)] shadow-[0_0_2px_var(--neon-lime,#bfff00)]'
+                      : testResult === 'pass'
+                      ? 'bg-[var(--neon-green)] shadow-[0_0_2px_var(--neon-green)]'
+                      : testResult === 'fail'
+                      ? 'bg-[var(--neon-red)] shadow-[0_0_2px_var(--neon-red)]'
+                      : 'bg-[#1a2a0a]'
+                  )} />
+                </div>
+              </button>
+              <button
+                onClick={handleReboot}
+                disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || exdStandby}
+                className="group relative disabled:opacity-30"
+                title="Reboot"
+              >
+                <div className={cn(
+                  'w-2.5 h-[7px] rounded-[1px] transition-all',
+                  'flex items-center justify-center',
+                  'group-hover:brightness-110',
+                  'group-active:scale-95'
+                )}
+                style={{
+                  background: 'linear-gradient(180deg, #5a4a3a 0%, #4a3a2a 30%, #3a2a1a 70%, #2a1a0a 100%)',
+                  boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.15), inset 0 -0.5px 0 rgba(0,0,0,0.4), 0 1px 1px rgba(0,0,0,0.3)',
+                  border: '0.5px solid #4a3a2a',
+                }}
+                >
+                  <div className="absolute inset-0 rounded-[1px] opacity-20"
+                    style={{
+                      backgroundImage: 'linear-gradient(-45deg, transparent 40%, rgba(255,255,255,0.1) 50%, transparent 60%)',
+                    }}
+                  />
+                  <div className={cn(
+                    'w-[3px] h-[3px] rounded-full transition-all z-10',
+                    deviceState === 'rebooting' || deviceState === 'booting'
+                      ? 'bg-[var(--neon-amber)] shadow-[0_0_2px_var(--neon-amber)]'
+                      : 'bg-[#2a1a0a]'
+                  )} />
+                </div>
+              </button>
+              <div className="font-mono text-[5px] text-white/30">T2</div>
+            </div>
           </div>
-        )}
-        {/* Radar sweep */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div
-            className="w-full h-full transition-opacity duration-300"
-            style={{
-              background: radarActive
-                ? 'conic-gradient(from 0deg, transparent 0deg, var(--neon-lime, #bfff00) 30deg, transparent 60deg)'
-                : 'none',
-              opacity: radarActive ? 0.3 : 0,
-              animation: radarActive ? 'spin 2s linear infinite' : 'none',
-            }}
-          />
-        </div>
-        {/* Grid lines */}
-        <div className="absolute inset-0 flex items-center justify-center">
+
+          {/* Drone radar visualization */}
           <div className={cn(
-            'w-8 h-8 rounded-full border transition-colors duration-300',
-            radarActive ? 'border-white/10' : 'border-white/5'
-          )} />
-          <div className={cn(
-            'absolute w-4 h-4 rounded-full border transition-colors duration-300',
-            radarActive ? 'border-white/10' : 'border-white/5'
-          )} />
-        </div>
-        {/* Drone blip */}
-        {radarActive && (
-          <div
-            className={cn(
-              'absolute w-1.5 h-1.5 rounded-full bg-[var(--neon-lime,#bfff00)]',
-              deviceState === 'testing' && testPhase === 'camera' && 'ring-2 ring-[var(--neon-cyan)]/50'
+            'relative h-10 bg-black/40 rounded overflow-hidden',
+            deviceState === 'testing' && testPhase === 'gps' && 'ring-1 ring-[var(--neon-lime,#bfff00)]/50'
+          )}>
+            {exdStandby && (
+              <div className="absolute inset-0 flex items-center justify-center z-20 bg-black/60">
+                <span className="font-mono text-[8px] text-white/40">STANDBY</span>
+              </div>
             )}
-            style={{
-              top: '30%',
-              left: '60%',
-              boxShadow: '0 0 6px var(--neon-lime, #bfff00)',
-              animation: 'pulse 1.5s ease-in-out infinite',
-            }}
-          />
-        )}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div
+                className="w-full h-full transition-opacity duration-300"
+                style={{
+                  background: radarActive
+                    ? 'conic-gradient(from 0deg, transparent 0deg, var(--neon-lime, #bfff00) 30deg, transparent 60deg)'
+                    : 'none',
+                  opacity: radarActive ? 0.3 : 0,
+                  animation: radarActive ? 'spin 2s linear infinite' : 'none',
+                }}
+              />
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className={cn(
+                'w-8 h-8 rounded-full border transition-colors duration-300',
+                radarActive ? 'border-white/10' : 'border-white/5'
+              )} />
+              <div className={cn(
+                'absolute w-4 h-4 rounded-full border transition-colors duration-300',
+                radarActive ? 'border-white/10' : 'border-white/5'
+              )} />
+            </div>
+            {radarActive && (
+              <div
+                className={cn(
+                  'absolute w-1.5 h-1.5 rounded-full bg-[var(--neon-lime,#bfff00)]',
+                  deviceState === 'testing' && testPhase === 'camera' && 'ring-2 ring-[var(--neon-cyan)]/50'
+                )}
+                style={{
+                  top: '30%',
+                  left: '60%',
+                  boxShadow: '0 0 6px var(--neon-lime, #bfff00)',
+                  animation: 'pulse 1.5s ease-in-out infinite',
+                }}
+              />
+            )}
+            {deviceState === 'testing' && testPhase === 'motors' && (
+              <div className="absolute inset-0 bg-[var(--neon-lime,#bfff00)]/10 animate-pulse" />
+            )}
+          </div>
 
-        {/* Test overlay for motors phase */}
-        {deviceState === 'testing' && testPhase === 'motors' && (
-          <div className="absolute inset-0 bg-[var(--neon-lime,#bfff00)]/10 animate-pulse" />
-        )}
-      </div>
-
-      {/* Status bar with fixed layout */}
-      <div className="flex items-center font-mono text-[7px] mt-1">
-        <span className={cn(
-          'w-8 shrink-0 transition-colors',
-          radarActive ? 'text-[var(--neon-lime,#bfff00)]' : 'text-white/30'
-        )}>
-          {exdStandby ? '---' : `${displayRange.toFixed(1)} km`}
-        </span>
-        <span className={cn(
-          'flex-1 text-[5px] text-center transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
-          deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
-          deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
-          deviceState === 'shutdown' ? 'text-[var(--neon-red)]' :
-          testResult === 'pass' ? 'text-[var(--neon-green)]' :
-          testResult === 'fail' ? 'text-[var(--neon-red)]' :
-          'text-white/30'
-        )}>
-          {statusMessage}
-        </span>
-        <span className={cn(
-          'w-10 shrink-0 text-right transition-colors',
-          exdStandby ? 'text-white/30' :
-          displayBattery > 30 ? 'text-white/40' : 'text-[var(--neon-amber)]'
-        )}>
-          {exdStandby ? 'BAT: ---' : `BAT: ${Math.round(displayBattery)}%`}
-        </span>
+          {/* Status bar with fixed layout */}
+          <div className="flex items-center font-mono text-[7px] mt-1">
+            <span className={cn(
+              'w-8 shrink-0 transition-colors',
+              radarActive ? 'text-[var(--neon-lime,#bfff00)]' : 'text-white/30'
+            )}>
+              {exdStandby ? '---' : `${displayRange.toFixed(1)} km`}
+            </span>
+            <span className={cn(
+              'flex-1 text-[5px] text-center transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
+              deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
+              deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+              deviceState === 'shutdown' ? 'text-[var(--neon-red)]' :
+              testResult === 'pass' ? 'text-[var(--neon-green)]' :
+              testResult === 'fail' ? 'text-[var(--neon-red)]' :
+              'text-white/30'
+            )}>
+              {statusMessage}
+            </span>
+            <span className={cn(
+              'w-10 shrink-0 text-right transition-colors',
+              exdStandby ? 'text-white/30' :
+              displayBattery > 30 ? 'text-white/40' : 'text-[var(--neon-amber)]'
+            )}>
+              {exdStandby ? 'BAT: ---' : `BAT: ${Math.round(displayBattery)}%`}
+            </span>
+          </div>
+        </div>
       </div>
     </PanelFrame>
   )
@@ -5694,171 +7337,161 @@ export function ExplorerDrone({
 // Compatible: QSM-001, DIM-001, EMC-001, QAN-001
 // unOS Commands: DEVICE ANOMALY [TEST|RESET|STATUS]
 // ==================================================
-type AnomalyState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type AnomalyTestPhase = 'sensors' | 'calibrate' | 'sweep' | 'analyze' | 'verify' | 'complete' | null
-
 interface AnomalyDetectorProps {
-  signalStrength?: number
-  anomaliesFound?: number
   className?: string
-  onTest?: () => void
-  onReset?: () => void
 }
 
-export function AnomalyDetector({
-  signalStrength = 67,
-  anomaliesFound = 3,
-  className,
-  onTest,
-  onReset,
-}: AnomalyDetectorProps) {
-  const [deviceState, setDeviceState] = useState<AnomalyState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<AnomalyTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Init...')
-  const [displaySignal, setDisplaySignal] = useState(0)
-  const [displayAnomalies, setDisplayAnomalies] = useState(0)
+export function AnomalyDetector({ className }: AnomalyDetectorProps) {
+  const andManager = useANDManagerOptional()
+  const deviceState = andManager?.deviceState ?? 'online'
+  const signalStrength = andManager?.signalStrength ?? 67
+  const anomaliesFound = andManager?.anomaliesFound ?? 3
+  const isPowered = andManager?.isPowered ?? true
+  const testResult = andManager?.testResult ?? null
+  const statusMessage = andManager?.statusMessage ?? 'SCANNING'
+  const isExpanded = andManager?.isExpanded ?? true
+
+  const handleFoldToggle = useCallback(() => andManager?.toggleExpanded(), [andManager])
+
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const toggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current)
+      if (next) { foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000) }
+      return next
+    })
+  }
+  useEffect(() => { return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) } }, [])
+
+  const getStatusColor = () => {
+    switch (deviceState) {
+      case 'online': return 'var(--neon-green)'
+      case 'booting': return 'var(--neon-cyan)'
+      case 'testing': return 'var(--neon-purple)'
+      case 'rebooting': return 'var(--neon-amber)'
+      case 'standby': case 'shutdown': return 'var(--neon-red)'
+      default: return 'var(--neon-green)'
+    }
+  }
+  const stateLabel = deviceState === 'online' ? 'ONLINE' : deviceState === 'testing' ? 'TESTING' : deviceState === 'booting' ? 'BOOTING' : deviceState === 'rebooting' ? 'REBOOT' : deviceState === 'shutdown' ? 'SHUTDOWN' : 'STANDBY'
+
+  // Local waveOffset for visual animation
   const [waveOffset, setWaveOffset] = useState(0)
 
-  // Animate waveform
   useEffect(() => {
-    if (deviceState === 'offline') return
+    if (deviceState === 'standby' || deviceState === 'shutdown') return
     const interval = setInterval(() => {
       setWaveOffset(prev => (prev + 1) % 100)
-      if (deviceState === 'online') {
-        // Slight signal fluctuation
-        setDisplaySignal(prev => {
-          const target = signalStrength
-          return prev + (target - prev) * 0.1 + (Math.random() - 0.5) * 5
-        })
-      }
     }, 100)
     return () => clearInterval(interval)
-  }, [deviceState, signalStrength])
+  }, [deviceState])
 
-  // Boot sequence
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Sensor init...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Calibrating...')
-      setBootPhase(2)
-      setDisplaySignal(20)
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Freq sweep...')
-      setBootPhase(3)
-      setDisplaySignal(40)
-      await new Promise(r => setTimeout(r, 400))
-
-      setStatusMessage('Scanning...')
-      setBootPhase(4)
-      setDisplaySignal(signalStrength)
-      setDisplayAnomalies(1)
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Analysis...')
-      setBootPhase(5)
-      setDisplayAnomalies(anomaliesFound)
-      await new Promise(r => setTimeout(r, 300))
-
-      setBootPhase(6)
-      setDeviceState('online')
-      setStatusMessage('SCANNING')
-    }
-    bootSequence()
-  }, [])
-
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayAnomalies(anomaliesFound)
-    }
-  }, [anomaliesFound, deviceState])
-
-  const handleTest = async () => {
-    if (deviceState !== 'online') return
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<AnomalyTestPhase>[] = ['sensors', 'calibrate', 'sweep', 'analyze', 'verify', 'complete']
-    const msgs: Record<NonNullable<AnomalyTestPhase>, string> = {
-      sensors: 'Testing sensors...',
-      calibrate: 'Calibration...',
-      sweep: 'Full sweep...',
-      analyze: 'Deep analysis...',
-      verify: 'Verifying...',
-      complete: 'Test complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(msgs[phase])
-      if (phase === 'sweep') {
-        setDisplaySignal(95)
-        await new Promise(r => setTimeout(r, 500))
-      } else {
-        await new Promise(r => setTimeout(r, 350))
-      }
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setDisplaySignal(signalStrength)
-    setStatusMessage('PASSED')
-    onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('SCANNING')
-    }, 2500)
+  const handleTest = () => {
+    andManager?.runTest()
   }
 
-  const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-    setDeviceState('rebooting')
-    setTestResult(null)
+  const handleReboot = () => {
+    andManager?.reboot()
+  }
 
-    setStatusMessage('Shutdown...')
-    setDisplaySignal(0)
-    setDisplayAnomalies(0)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Reset...')
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 350))
-
-    // Boot
-    setDeviceState('booting')
-    setStatusMessage('Sensor init...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('Calibrating...')
-    setBootPhase(2)
-    setDisplaySignal(30)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Scanning...')
-    setBootPhase(4)
-    setDisplaySignal(signalStrength)
-    setDisplayAnomalies(anomaliesFound)
-    await new Promise(r => setTimeout(r, 300))
-
-    setBootPhase(6)
-    setDeviceState('online')
-    setStatusMessage('SCANNING')
-    onReset?.()
+  const handlePowerToggle = () => {
+    if (isPowered) {
+      andManager?.powerOff()
+    } else {
+      andManager?.powerOn()
+    }
   }
 
   const isActive = deviceState === 'online' || deviceState === 'testing'
 
   return (
-    <PanelFrame variant="teal" className={cn('p-1.5', className)}>
+    <PanelFrame variant="teal" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+      {/* FOLDED FRONT PANEL */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+      }} className="w-full">
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
+          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{
+            backgroundColor: getStatusColor(), boxShadow: `0 0 4px ${getStatusColor()}`,
+            animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+          }} />
+          <span className="font-mono text-[8px] font-bold text-[var(--neon-magenta,#e91e8c)]">AND-001</span>
+          <span className={cn('font-mono text-[7px]', isPowered ? 'text-[var(--neon-magenta,#e91e8c)]/70' : 'text-white/30')}>{stateLabel}</span>
+          <div className="flex-1" />
+          {isPowered && (<>
+            <button onClick={handleTest} disabled={deviceState !== 'online'} className="group relative" title="Test">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{
+                background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a',
+                boxShadow: deviceState === 'testing' ? '0 0 6px var(--neon-purple), inset 0 0 3px var(--neon-purple)' : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                opacity: deviceState !== 'online' ? 0.3 : 1,
+              }} />
+            </button>
+            <button onClick={handleReboot} disabled={deviceState === 'booting' || deviceState === 'rebooting'} className="group relative" title="Reboot">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{
+                background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a',
+                boxShadow: deviceState === 'rebooting' ? '0 0 6px var(--neon-amber), inset 0 0 3px var(--neon-amber)' : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                opacity: deviceState === 'booting' || deviceState === 'rebooting' ? 0.3 : 1,
+              }} />
+            </button>
+          </>)}
+          {/* Hexagonal power button */}
+          <button onClick={handlePowerToggle} className="relative group" title={isPowered ? 'Power Off' : 'Power On'}>
+            <div style={{
+              width: '5px', height: '5px',
+              clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+              background: isPowered ? 'var(--neon-magenta,#e91e8c)' : '#2a1a2a',
+              boxShadow: isPowered ? '0 0 4px var(--neon-magenta,#e91e8c), 0 0 8px var(--neon-magenta,#e91e8c)' : 'none',
+              transition: 'all 0.2s ease',
+            }} />
+          </button>
+          {isPowered ? (
+            <button onClick={toggleFoldedInfo} className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center cursor-pointer hover:border-[var(--neon-magenta,#e91e8c)]/40 transition-colors" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }} title={showFoldedInfo ? 'Hide info' : 'Show info'}>
+              <span className="font-mono text-[6px] text-[var(--neon-magenta,#e91e8c)]/60">{showFoldedInfo ? '\u25B2' : '\u25BC'}</span>
+            </button>
+          ) : <div className="w-3" />}
+        </div>
+        <div style={{ maxHeight: showFoldedInfo && isPowered ? '40px' : '0px', transition: 'max-height 400ms ease, opacity 300ms ease', opacity: showFoldedInfo && isPowered ? 1 : 0, overflow: 'hidden' }}>
+          <div className="px-2 pb-1.5 font-mono text-[7px] text-[var(--neon-magenta,#e91e8c)]/60 flex gap-3 flex-wrap">
+            <span>Signal: {Math.round(signalStrength)}%</span>
+            <span>Found: {anomaliesFound}</span>
+            <span>Tier: T2</span>
+          </div>
+        </div>
+      </div>
+
+      {/* UNFOLDED INNER PANEL */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+      }} className="w-full p-1.5">
+        <button onClick={handleFoldToggle} className="absolute top-1 right-1 z-10 group" title="Fold">
+          <div className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center transition-all hover:border-[var(--neon-magenta,#e91e8c)]/40" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }}>
+            <span className="font-mono text-[6px] text-[var(--neon-magenta,#e91e8c)]/60">{'\u25B4'}</span>
+          </div>
+        </button>
+
+      {/* Standby overlay */}
+      {(deviceState === 'standby' || deviceState === 'shutdown') && (
+        <div className="absolute inset-0 z-30 bg-black/80 flex items-center justify-center rounded">
+          <span className="font-mono text-[7px] text-white/40 tracking-widest">STANDBY</span>
+        </div>
+      )}
+
       {/* Header with logo */}
       <div className="flex items-center justify-between mb-1">
         <div className="font-mono text-[8px] text-[var(--neon-magenta,#e91e8c)]">
@@ -5876,6 +7509,27 @@ export function AnomalyDetector({
           >
             HALO
           </div>
+          {/* Hexagonal power button */}
+          <button
+            onClick={handlePowerToggle}
+            className="relative group"
+            title={isPowered ? 'Power Off' : 'Power On'}
+          >
+            <div
+              style={{
+                width: '5px',
+                height: '5px',
+                clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+                background: isPowered
+                  ? 'var(--neon-magenta,#e91e8c)'
+                  : '#2a1a2a',
+                boxShadow: isPowered
+                  ? '0 0 4px var(--neon-magenta,#e91e8c), 0 0 8px var(--neon-magenta,#e91e8c)'
+                  : 'none',
+                transition: 'all 0.2s ease',
+              }}
+            />
+          </button>
           <div className="font-mono text-[6px] text-white/30">T2</div>
         </div>
       </div>
@@ -5889,7 +7543,7 @@ export function AnomalyDetector({
         <div className="absolute inset-0 flex items-center justify-center">
           {Array.from({ length: 24 }).map((_, i) => {
             const waveHeight = isActive
-              ? 15 + Math.sin((i + waveOffset) * 0.4) * (displaySignal * 0.4) + Math.random() * 5
+              ? 15 + Math.sin((i + waveOffset) * 0.4) * (signalStrength * 0.4) + Math.random() * 5
               : 5
             return (
               <div
@@ -5908,7 +7562,7 @@ export function AnomalyDetector({
         </div>
 
         {/* Anomaly markers */}
-        {isActive && Array.from({ length: displayAnomalies }).map((_, i) => (
+        {isActive && Array.from({ length: anomaliesFound }).map((_, i) => (
           <div
             key={i}
             className="absolute top-1 w-1.5 h-1.5 rounded-full"
@@ -5947,7 +7601,7 @@ export function AnomalyDetector({
       {/* Status bar */}
       <div className="flex items-center justify-between font-mono text-[6px] mt-1">
         <span className="text-[var(--neon-magenta,#e91e8c)]">
-          SIG: {isActive ? Math.round(displaySignal) : '--'}%
+          SIG: {isActive ? Math.round(signalStrength) : '--'}%
         </span>
 
         {/* LED buttons - bottom center */}
@@ -6017,10 +7671,11 @@ export function AnomalyDetector({
 
         <span className={cn(
           'transition-colors',
-          displayAnomalies > 0 ? 'text-[var(--neon-red)]' : 'text-white/40'
+          anomaliesFound > 0 ? 'text-[var(--neon-red)]' : 'text-white/40'
         )}>
-          {isActive ? displayAnomalies : '-'} DETECTED
+          {isActive ? anomaliesFound : '-'} DETECTED
         </span>
+      </div>
       </div>
     </PanelFrame>
   )
@@ -6032,162 +7687,164 @@ export function AnomalyDetector({
 // Compatible: UEC-001, MFR-001, DIM-001, QSM-001
 // unOS Commands: DEVICE TELEPORT [TEST|RESET|STATUS]
 // ==================================================
-type TeleportState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type TeleportTestPhase = 'capacitor' | 'matrix' | 'quantum-lock' | 'coordinates' | 'stabilize' | 'complete' | null
 
 interface TeleportPadProps {
-  chargeLevel?: number
-  lastDestination?: string
   className?: string
-  onTest?: () => void
-  onReset?: () => void
 }
 
-export function TeleportPad({
-  chargeLevel = 65,
-  lastDestination = 'LAB-Ω',
-  className,
-  onTest,
-  onReset,
-}: TeleportPadProps) {
-  const [deviceState, setDeviceState] = useState<TeleportState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<TeleportTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Init...')
-  const [displayCharge, setDisplayCharge] = useState(0)
+export function TeleportPad({ className }: TeleportPadProps) {
+  const tlpManager = useTLPManagerOptional()
+
+  const deviceState = tlpManager?.deviceState ?? 'online'
+  const statusMessage = tlpManager?.statusMessage ?? 'READY'
+  const displayCharge = tlpManager?.chargeLevel ?? 65
+  const lastDestination = tlpManager?.lastDestination ?? 'LAB-Ω'
+  const testResult = tlpManager?.testResult ?? null
+  const isPowered = tlpManager?.isPowered ?? true
+  const isExpanded = tlpManager?.isExpanded ?? true
+
+  const handleFoldToggle = useCallback(() => tlpManager?.toggleExpanded(), [tlpManager])
+
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const toggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current)
+      if (next) { foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000) }
+      return next
+    })
+  }
+  useEffect(() => { return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) } }, [])
+
   const [ringPulse, setRingPulse] = useState(0)
 
   // Animate portal rings
   useEffect(() => {
-    if (deviceState === 'offline') return
+    if (deviceState === 'standby' || deviceState === 'shutdown') return
     const interval = setInterval(() => {
       setRingPulse(prev => (prev + 1) % 100)
     }, 50)
     return () => clearInterval(interval)
   }, [deviceState])
 
-  // Boot sequence
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Capacitor charge...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Matrix align...')
-      setBootPhase(2)
-      setDisplayCharge(20)
-      await new Promise(r => setTimeout(r, 400))
-
-      setStatusMessage('Quantum lock...')
-      setBootPhase(3)
-      setDisplayCharge(45)
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Loading coords...')
-      setBootPhase(4)
-      setDisplayCharge(70)
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Stabilizing...')
-      setBootPhase(5)
-      setDisplayCharge(chargeLevel)
-      await new Promise(r => setTimeout(r, 300))
-
-      setBootPhase(6)
-      setDeviceState('online')
-      setStatusMessage('READY')
-    }
-    bootSequence()
-  }, [])
-
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayCharge(chargeLevel)
-    }
-  }, [chargeLevel, deviceState])
-
-  const handleTest = async () => {
-    if (deviceState !== 'online') return
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<TeleportTestPhase>[] = ['capacitor', 'matrix', 'quantum-lock', 'coordinates', 'stabilize', 'complete']
-    const msgs: Record<NonNullable<TeleportTestPhase>, string> = {
-      capacitor: 'Capacitor test...',
-      matrix: 'Matrix verify...',
-      'quantum-lock': 'Quantum lock...',
-      coordinates: 'Coord check...',
-      stabilize: 'Stabilizing...',
-      complete: 'Test complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(msgs[phase])
-      if (phase === 'quantum-lock') {
-        setDisplayCharge(100)
-        await new Promise(r => setTimeout(r, 500))
-      } else {
-        await new Promise(r => setTimeout(r, 350))
-      }
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setDisplayCharge(chargeLevel)
-    setStatusMessage('PASSED')
-    onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('READY')
-    }, 2500)
+  const handleTest = () => {
+    tlpManager?.runTest()
   }
 
-  const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-    setDeviceState('rebooting')
-    setTestResult(null)
+  const handleReboot = () => {
+    tlpManager?.reboot()
+  }
 
-    setStatusMessage('Discharge...')
-    setDisplayCharge(0)
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Reset matrix...')
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 400))
-
-    // Boot
-    setDeviceState('booting')
-    setStatusMessage('Capacitor charge...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Quantum lock...')
-    setBootPhase(3)
-    setDisplayCharge(50)
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Stabilizing...')
-    setBootPhase(5)
-    setDisplayCharge(chargeLevel)
-    await new Promise(r => setTimeout(r, 300))
-
-    setBootPhase(6)
-    setDeviceState('online')
-    setStatusMessage('READY')
-    onReset?.()
+  const handlePowerToggle = () => {
+    if (isPowered) {
+      tlpManager?.powerOff()
+    } else {
+      tlpManager?.powerOn()
+    }
   }
 
   const isActive = deviceState === 'online' || deviceState === 'testing'
   const portalIntensity = deviceState === 'testing' ? 1 : displayCharge / 100
 
+  const getStatusColor = () => {
+    switch (deviceState) {
+      case 'online': return 'var(--neon-green)'
+      case 'booting': return 'var(--neon-cyan)'
+      case 'testing': return 'var(--neon-purple)'
+      case 'rebooting': return 'var(--neon-amber)'
+      case 'standby': case 'shutdown': return 'var(--neon-red)'
+      default: return 'var(--neon-green)'
+    }
+  }
+  const stateLabel = deviceState === 'online' ? 'ONLINE' : deviceState === 'testing' ? 'TESTING' : deviceState === 'booting' ? 'BOOTING' : deviceState === 'rebooting' ? 'REBOOT' : deviceState === 'shutdown' ? 'SHUTDOWN' : 'STANDBY'
+
   return (
-    <PanelFrame variant="default" className={cn('p-1.5', className)}>
-      {/* Header with logo */}
+    <PanelFrame variant="default" className={cn('overflow-hidden relative', className)} style={{ perspective: '600px' }}>
+      {/* Folded front panel */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+      }} className="w-full">
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
+          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{
+            backgroundColor: getStatusColor(), boxShadow: `0 0 4px ${getStatusColor()}`,
+            animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+          }} />
+          <span className="font-mono text-[8px] font-bold text-[var(--neon-blue)]">TLP-001</span>
+          <span className={cn('font-mono text-[7px]', isPowered ? 'text-[var(--neon-blue)]/70' : 'text-white/30')}>{stateLabel}</span>
+          <div className="flex-1" />
+          {isPowered && (<>
+            <button onClick={handleTest} disabled={deviceState !== 'online'} className="group relative" title="Test">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{
+                background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a',
+                boxShadow: deviceState === 'testing' ? '0 0 6px var(--neon-purple), inset 0 0 3px var(--neon-purple)' : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                opacity: deviceState !== 'online' ? 0.3 : 1,
+              }} />
+            </button>
+            <button onClick={handleReboot} disabled={deviceState === 'booting' || deviceState === 'rebooting'} className="group relative" title="Reboot">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{
+                background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a',
+                boxShadow: deviceState === 'rebooting' ? '0 0 6px var(--neon-amber), inset 0 0 3px var(--neon-amber)' : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                opacity: deviceState === 'booting' || deviceState === 'rebooting' ? 0.3 : 1,
+              }} />
+            </button>
+          </>)}
+          {/* Diamond power button */}
+          <div
+            onClick={handlePowerToggle}
+            className="cursor-pointer"
+            title={isPowered ? 'Power Off' : 'Power On'}
+            style={{
+              width: '4px',
+              height: '4px',
+              clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
+              background: isPowered
+                ? 'linear-gradient(135deg, #88ccff 0%, var(--neon-blue) 100%)'
+                : '#333',
+              boxShadow: isPowered ? '0 0 4px var(--neon-blue)' : 'none',
+            }}
+          />
+          {/* Info toggle */}
+          {isPowered ? (
+            <button onClick={toggleFoldedInfo} className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center cursor-pointer hover:border-[var(--neon-blue)]/40 transition-colors" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }} title={showFoldedInfo ? 'Hide info' : 'Show info'}>
+              <span className="font-mono text-[6px] text-[var(--neon-blue)]/60">{showFoldedInfo ? '▲' : '▼'}</span>
+            </button>
+          ) : <div className="w-3" />}
+        </div>
+        <div style={{ maxHeight: showFoldedInfo && isPowered ? '40px' : '0px', transition: 'max-height 400ms ease, opacity 300ms ease', opacity: showFoldedInfo && isPowered ? 1 : 0, overflow: 'hidden' }}>
+          <div className="px-2 pb-1.5 font-mono text-[7px] text-[var(--neon-blue)]/60 flex gap-3 flex-wrap">
+            <span>Charge: {displayCharge}%</span>
+            <span>Dest: {lastDestination}</span>
+            <span>Tier: T2</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Unfolded inner panel */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+      }} className="w-full p-1.5">
+        <button onClick={handleFoldToggle} className="absolute top-1 right-1 z-10 group" title="Fold">
+          <div className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center transition-all hover:border-[var(--neon-blue)]/40" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }}>
+            <span className="font-mono text-[6px] text-[var(--neon-blue)]/60">▴</span>
+          </div>
+        </button>
+
+        {/* Header with logo */}
       <div className="flex items-center justify-between mb-1">
         <div className="font-mono text-[8px] text-[var(--neon-blue)]">
           TELEPORT PAD
@@ -6204,6 +7861,21 @@ export function TeleportPad({
           >
             WARP
           </div>
+          {/* Diamond power button */}
+          <div
+            onClick={handlePowerToggle}
+            className="cursor-pointer"
+            title={isPowered ? 'Power Off' : 'Power On'}
+            style={{
+              width: '4px',
+              height: '4px',
+              clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)',
+              background: isPowered
+                ? 'linear-gradient(135deg, #88ccff 0%, var(--neon-blue) 100%)'
+                : '#333',
+              boxShadow: isPowered ? '0 0 4px var(--neon-blue)' : 'none',
+            }}
+          />
           <div className="font-mono text-[6px] text-white/30">T2</div>
         </div>
       </div>
@@ -6258,6 +7930,13 @@ export function TeleportPad({
             <span className="font-mono text-[6px] text-[var(--neon-blue)] animate-pulse">
               {statusMessage}
             </span>
+          </div>
+        )}
+
+        {/* Standby overlay */}
+        {(deviceState === 'standby' || deviceState === 'shutdown') && (
+          <div className="absolute inset-0 z-30 bg-black/80 flex items-center justify-center rounded">
+            <span className="font-mono text-[7px] text-white/40">STANDBY</span>
           </div>
         )}
 
@@ -6336,6 +8015,7 @@ export function TeleportPad({
           />
         </button>
       </div>
+      </div>
 
       <style jsx global>{`
         @keyframes teleport-surge {
@@ -6350,116 +8030,50 @@ export function TeleportPad({
 // ==================================================
 // PRECISION LASER CUTTER - Tier 2 Tools fabrication
 // ==================================================
-type LaserState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type LaserTestPhase = 'alignment' | 'power' | 'calibration' | 'focus' | 'complete' | null
 
 interface LaserCutterProps {
-  power?: number
-  precision?: number
   className?: string
-  onTest?: () => void
-  onReset?: () => void
 }
 
-export function LaserCutter({
-  power = 450,
-  precision = 0.01,
-  className,
-  onTest,
-  onReset,
-}: LaserCutterProps) {
-  const [deviceState, setDeviceState] = useState<LaserState>('booting')
-  const [testPhase, setTestPhase] = useState<LaserTestPhase>(null)
-  const [bootStatus, setBootStatus] = useState('INITIALIZING...')
-  const [laserPosition, setLaserPosition] = useState(50)
-  const [currentPower, setCurrentPower] = useState(0)
+export function LaserCutter({ className }: LaserCutterProps) {
+  const lctManager = useLCTManagerOptional()
 
-  // Boot sequence
-  useEffect(() => {
-    const bootSequence = async () => {
-      setBootStatus('INITIALIZING...')
-      await new Promise(r => setTimeout(r, 300))
-      setBootStatus('LOADING FIRMWARE...')
-      await new Promise(r => setTimeout(r, 400))
-      setBootStatus('OPTICS CHECK...')
-      await new Promise(r => setTimeout(r, 350))
-      setBootStatus('LASER INIT...')
-      setCurrentPower(100)
-      await new Promise(r => setTimeout(r, 300))
-      setCurrentPower(250)
-      await new Promise(r => setTimeout(r, 200))
-      setCurrentPower(power)
-      setBootStatus('CALIBRATING...')
-      await new Promise(r => setTimeout(r, 400))
-      setBootStatus('READY')
-      setDeviceState('online')
-    }
-    if (deviceState === 'booting') {
-      bootSequence()
-    }
-  }, [deviceState, power])
+  const deviceState = lctManager?.deviceState ?? 'booting'
+  const testPhase = lctManager?.testPhase ?? null
+  const statusMessage = lctManager?.statusMessage ?? 'INITIALIZING...'
+  const laserPosition = lctManager?.laserPosition ?? 50
+  const currentPower = lctManager?.laserPower ?? 450
+  const isPowered = lctManager?.isPowered ?? true
+  const isExpanded = lctManager?.isExpanded ?? true
 
-  // Laser animation when online
-  useEffect(() => {
-    if (deviceState !== 'online' && deviceState !== 'testing') return
-    const interval = setInterval(() => {
-      setLaserPosition(prev => {
-        const delta = (Math.random() - 0.5) * 8
-        return Math.min(90, Math.max(10, prev + delta))
-      })
-    }, 100)
-    return () => clearInterval(interval)
-  }, [deviceState])
+  const handleFoldToggle = useCallback(() => lctManager?.toggleExpanded(), [lctManager])
 
-  // Test sequence
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const toggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current)
+      if (next) { foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000) }
+      return next
+    })
+  }
+  useEffect(() => { return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) } }, [])
+
   const handleTest = () => {
-    if (deviceState !== 'online') return
-    setDeviceState('testing')
-    onTest?.()
-
-    const runTest = async () => {
-      setTestPhase('alignment')
-      for (let i = 0; i < 5; i++) {
-        setLaserPosition(20 + i * 15)
-        await new Promise(r => setTimeout(r, 200))
-      }
-      setTestPhase('power')
-      setCurrentPower(100)
-      await new Promise(r => setTimeout(r, 300))
-      setCurrentPower(250)
-      await new Promise(r => setTimeout(r, 300))
-      setCurrentPower(450)
-      await new Promise(r => setTimeout(r, 300))
-      setCurrentPower(power)
-      setTestPhase('calibration')
-      await new Promise(r => setTimeout(r, 500))
-      setTestPhase('focus')
-      setLaserPosition(50)
-      await new Promise(r => setTimeout(r, 400))
-      setTestPhase('complete')
-      await new Promise(r => setTimeout(r, 300))
-      setTestPhase(null)
-      setDeviceState('online')
-    }
-    runTest()
+    lctManager?.runTest()
   }
 
-  // Reboot sequence
   const handleReboot = () => {
-    onReset?.()
-    setDeviceState('rebooting')
-    setTestPhase(null)
-    setCurrentPower(0)
+    lctManager?.reboot()
+  }
 
-    setTimeout(() => {
-      setBootStatus('SHUTDOWN...')
-    }, 100)
-    setTimeout(() => {
-      setBootStatus('POWER OFF')
-    }, 400)
-    setTimeout(() => {
-      setDeviceState('booting')
-    }, 800)
+  const handlePowerToggle = () => {
+    if (!lctManager?.isPowered) {
+      lctManager?.powerOn()
+    } else {
+      lctManager?.powerOff()
+    }
   }
 
   const isActive = deviceState === 'online' || deviceState === 'testing'
@@ -6477,10 +8091,133 @@ export function LaserCutter({
     'top-left': 'top-0.5 left-8',
   }[logoPosition]
 
+  const getStatusColor = () => {
+    switch (deviceState) {
+      case 'online': return 'var(--neon-green)'
+      case 'booting': return 'var(--neon-cyan)'
+      case 'testing': return 'var(--neon-purple)'
+      case 'rebooting': return 'var(--neon-amber)'
+      case 'standby': case 'shutdown': return 'var(--neon-red)'
+      default: return 'var(--neon-green)'
+    }
+  }
+  const stateLabel = deviceState === 'online' ? 'ONLINE' : deviceState === 'testing' ? 'TESTING' : deviceState === 'booting' ? 'BOOTING' : deviceState === 'rebooting' ? 'REBOOT' : deviceState === 'shutdown' ? 'SHUTDOWN' : 'STANDBY'
+
   return (
-    <PanelFrame variant="default" className={cn('p-2 flex', className)}>
+    <PanelFrame variant="default" className={cn('overflow-hidden relative', className)} style={{ perspective: '600px' }}>
+      {/* Folded front panel */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+      }} className="w-full">
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
+          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{
+            backgroundColor: getStatusColor(), boxShadow: `0 0 4px ${getStatusColor()}`,
+            animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+          }} />
+          <span className="font-mono text-[8px] font-bold text-[var(--neon-red)]">LCT-001</span>
+          <span className={cn('font-mono text-[7px]', isPowered ? 'text-[var(--neon-red)]/70' : 'text-white/30')}>{stateLabel}</span>
+          <div className="flex-1" />
+          {isPowered && (<>
+            <button onClick={handleTest} disabled={deviceState !== 'online'} className="group relative" title="Test">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{
+                background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a',
+                boxShadow: deviceState === 'testing' ? '0 0 6px var(--neon-purple), inset 0 0 3px var(--neon-purple)' : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                opacity: deviceState !== 'online' ? 0.3 : 1,
+              }} />
+            </button>
+            <button onClick={handleReboot} disabled={deviceState === 'booting' || deviceState === 'rebooting'} className="group relative" title="Reboot">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{
+                background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)',
+                borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a',
+                boxShadow: deviceState === 'rebooting' ? '0 0 6px var(--neon-amber), inset 0 0 3px var(--neon-amber)' : 'inset 0 1px 2px rgba(0,0,0,0.5)',
+                opacity: deviceState === 'booting' || deviceState === 'rebooting' ? 0.3 : 1,
+              }} />
+            </button>
+          </>)}
+          {/* Laser beam power button */}
+          <button
+            onClick={handlePowerToggle}
+            className="flex items-center justify-center cursor-pointer"
+            title={isPowered ? 'Power Off' : 'Power On'}
+          >
+            <div
+              style={{
+                width: '2px',
+                height: '12px',
+                borderRadius: '1px',
+                background: isPowered
+                  ? 'linear-gradient(180deg, #ff6666 0%, var(--neon-red) 50%, #ff6666 100%)'
+                  : '#333',
+                boxShadow: isPowered
+                  ? '0 0 4px var(--neon-red), 0 0 8px var(--neon-red), 0 0 12px rgba(255,80,80,0.4)'
+                  : 'none',
+                transition: 'all 0.2s ease',
+              }}
+            />
+          </button>
+          {/* Info toggle */}
+          {isPowered ? (
+            <button onClick={toggleFoldedInfo} className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center cursor-pointer hover:border-[var(--neon-red)]/40 transition-colors" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }} title={showFoldedInfo ? 'Hide info' : 'Show info'}>
+              <span className="font-mono text-[6px] text-[var(--neon-red)]/60">{showFoldedInfo ? '\u25B2' : '\u25BC'}</span>
+            </button>
+          ) : <div className="w-3" />}
+        </div>
+        <div style={{ maxHeight: showFoldedInfo && isPowered ? '40px' : '0px', transition: 'max-height 400ms ease, opacity 300ms ease', opacity: showFoldedInfo && isPowered ? 1 : 0, overflow: 'hidden' }}>
+          <div className="px-2 pb-1.5 font-mono text-[7px] text-[var(--neon-red)]/60 flex gap-3 flex-wrap">
+            <span>Power: {currentPower}W</span>
+            <span>Precision: ±0.01mm</span>
+            <span>Tier: T2</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Unfolded inner panel */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+      }} className="w-full p-2 flex">
+        <button onClick={handleFoldToggle} className="absolute top-1 right-1 z-10 group" title="Fold">
+          <div className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center transition-all hover:border-[var(--neon-red)]/40" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }}>
+            <span className="font-mono text-[6px] text-[var(--neon-red)]/60">\u25B4</span>
+          </div>
+        </button>
+
       {/* Left side - Square nano buttons */}
       <div className="flex flex-col gap-1.5 mr-2 justify-center shrink-0">
+        {/* Power button - laser beam shaped */}
+        <button
+          onClick={handlePowerToggle}
+          className="flex items-center justify-center cursor-pointer"
+          title={isPowered ? 'Power Off' : 'Power On'}
+        >
+          <div
+            style={{
+              width: '2px',
+              height: '12px',
+              borderRadius: '1px',
+              background: isPowered
+                ? 'linear-gradient(180deg, #ff6666 0%, var(--neon-red) 50%, #ff6666 100%)'
+                : '#333',
+              boxShadow: isPowered
+                ? '0 0 4px var(--neon-red), 0 0 8px var(--neon-red), 0 0 12px rgba(255,80,80,0.4)'
+                : 'none',
+              transition: 'all 0.2s ease',
+            }}
+          />
+        </button>
+
         {/* Test button - lightly illuminated nano */}
         <button
           onClick={handleTest}
@@ -6583,7 +8320,7 @@ export function LaserCutter({
                 className="font-mono text-[7px] animate-pulse"
                 style={{ color: 'var(--neon-red)' }}
               >
-                {bootStatus}
+                {statusMessage}
               </span>
             </div>
           )}
@@ -6629,12 +8366,20 @@ export function LaserCutter({
               }}
             />
           )}
+
+          {/* Standby overlay */}
+          {!isPowered && lctManager && (
+            <div className="absolute inset-0 z-30 bg-black/80 flex items-center justify-center rounded">
+              <span className="font-mono text-[7px] text-white/40">STANDBY</span>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-between font-mono text-[7px] mt-1">
           <span className="text-[var(--neon-red)]">{currentPower}W</span>
-          <span className="text-white/40">±{precision}mm</span>
+          <span className="text-white/40">&plusmn;0.01mm</span>
         </div>
+      </div>
       </div>
     </PanelFrame>
   )
@@ -6642,134 +8387,57 @@ export function LaserCutter({
 
 // ==================================================
 // 3D PRINTER - Tier 2 Tools fabrication
+// Uses P3DManager for bidirectional terminal<->UI sync
 // ==================================================
-type PrinterState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type PrinterTestPhase = 'bed' | 'nozzle' | 'extrusion' | 'layer' | 'complete' | null
 
 interface Printer3DProps {
-  progress?: number
-  layerCount?: number
   className?: string
-  onTest?: () => void
-  onReset?: () => void
 }
 
 export function Printer3D({
-  progress = 67,
-  layerCount = 234,
   className,
-  onTest,
-  onReset,
 }: Printer3DProps) {
-  const [deviceState, setDeviceState] = useState<PrinterState>('booting')
-  const [testPhase, setTestPhase] = useState<PrinterTestPhase>(null)
-  const [bootStatus, setBootStatus] = useState('INITIALIZING...')
-  const [currentProgress, setCurrentProgress] = useState(0)
-  const [currentLayer, setCurrentLayer] = useState(0)
-  const [headPosition, setHeadPosition] = useState(50)
-  const [bedTemp, setBedTemp] = useState(0)
+  const p3dManager = useP3DManagerOptional()
 
-  // Boot sequence
-  useEffect(() => {
-    const bootSequence = async () => {
-      setBootStatus('INITIALIZING...')
-      await new Promise(r => setTimeout(r, 300))
-      setBootStatus('FIRMWARE v3.2.1')
-      await new Promise(r => setTimeout(r, 350))
-      setBootStatus('HEATING BED...')
-      setBedTemp(25)
-      await new Promise(r => setTimeout(r, 200))
-      setBedTemp(45)
-      await new Promise(r => setTimeout(r, 200))
-      setBedTemp(60)
-      await new Promise(r => setTimeout(r, 150))
-      setBootStatus('HOMING AXES...')
-      setHeadPosition(0)
-      await new Promise(r => setTimeout(r, 200))
-      setHeadPosition(100)
-      await new Promise(r => setTimeout(r, 200))
-      setHeadPosition(50)
-      setBootStatus('CALIBRATING...')
-      await new Promise(r => setTimeout(r, 400))
-      setBootStatus('READY')
-      setCurrentProgress(progress)
-      setCurrentLayer(layerCount)
-      setDeviceState('online')
-    }
-    if (deviceState === 'booting') {
-      bootSequence()
-    }
-  }, [deviceState, progress, layerCount])
+  const deviceState = p3dManager?.deviceState ?? 'booting'
+  const testPhase = p3dManager?.testPhase ?? null
+  const bootStatus = p3dManager?.statusMessage ?? 'INITIALIZING...'
+  const currentProgress = p3dManager?.progress ?? 67
+  const currentLayer = p3dManager?.layerCount ?? 234
+  const headPosition = p3dManager?.headPosition ?? 50
+  const bedTemp = p3dManager?.bedTemp ?? 60
+  const isPowered = p3dManager?.isPowered ?? true
+  const isExpanded = p3dManager?.isExpanded ?? true
+  const displayMode = p3dManager?.displayMode ?? 'plastic'
 
-  // Print head animation when online
-  useEffect(() => {
-    if (deviceState !== 'online') return
-    const interval = setInterval(() => {
-      setHeadPosition(prev => {
-        const delta = (Math.random() - 0.5) * 6
-        return Math.min(95, Math.max(5, prev + delta))
-      })
-    }, 150)
-    return () => clearInterval(interval)
-  }, [deviceState])
-
-  // Test sequence
-  const handleTest = () => {
-    if (deviceState !== 'online') return
-    setDeviceState('testing')
-    onTest?.()
-
-    const runTest = async () => {
-      setTestPhase('bed')
-      setBedTemp(40)
-      await new Promise(r => setTimeout(r, 300))
-      setBedTemp(55)
-      await new Promise(r => setTimeout(r, 300))
-      setBedTemp(60)
-      setTestPhase('nozzle')
-      setHeadPosition(10)
-      await new Promise(r => setTimeout(r, 250))
-      setHeadPosition(90)
-      await new Promise(r => setTimeout(r, 250))
-      setHeadPosition(50)
-      setTestPhase('extrusion')
-      await new Promise(r => setTimeout(r, 400))
-      setTestPhase('layer')
-      for (let i = 0; i <= 100; i += 20) {
-        setCurrentProgress(i)
-        await new Promise(r => setTimeout(r, 150))
-      }
-      setCurrentProgress(progress)
-      setTestPhase('complete')
-      await new Promise(r => setTimeout(r, 300))
-      setTestPhase(null)
-      setDeviceState('online')
-    }
-    runTest()
+  const handleTest = () => { p3dManager?.runTest() }
+  const handleReboot = () => { p3dManager?.reboot() }
+  const handlePower = () => {
+    if (!p3dManager?.isPowered) { p3dManager?.powerOn() } else { p3dManager?.powerOff() }
   }
-
-  // Reboot sequence
-  const handleReboot = () => {
-    onReset?.()
-    setDeviceState('rebooting')
-    setTestPhase(null)
-    setCurrentProgress(0)
-    setCurrentLayer(0)
-    setBedTemp(0)
-
-    setTimeout(() => {
-      setBootStatus('COOLING...')
-    }, 100)
-    setTimeout(() => {
-      setBootStatus('SHUTDOWN')
-    }, 400)
-    setTimeout(() => {
-      setDeviceState('booting')
-    }, 800)
-  }
+  const handleFoldToggle = () => { p3dManager?.toggleExpanded() }
 
   const isActive = deviceState === 'online' || deviceState === 'testing'
   const isTesting = deviceState === 'testing'
+
+  // Folded info toggle
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const toggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current)
+      if (next) {
+        foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      }
+      return next
+    })
+  }
+
+  useEffect(() => {
+    return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) }
+  }, [])
 
   // Company logo position (random on mount)
   const [logoPosition] = useState(() => {
@@ -6783,204 +8451,270 @@ export function Printer3D({
     'bottom-left': 'bottom-0.5 left-0.5',
   }[logoPosition]
 
-  return (
-    <PanelFrame variant="military" className={cn('p-2 flex', className)}>
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <div className="flex items-center justify-between mb-1">
-          <div className="font-mono text-[9px] text-[var(--neon-amber)]">
-            3D FABRICATOR
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="font-mono text-[7px] text-white/30">T2</div>
-            <LED
-              on={isActive}
-              color="amber"
-              size="sm"
-              className={isTesting ? 'animate-pulse' : ''}
-            />
-          </div>
-        </div>
+  // Status label for folded bar
+  const stateLabel = deviceState === 'online' ? 'ONLINE' : deviceState === 'testing' ? 'TESTING' : deviceState === 'booting' ? 'BOOTING' : deviceState === 'rebooting' ? 'REBOOT' : deviceState === 'shutdown' ? 'SHUTDOWN' : 'STANDBY'
 
-        {/* Print bed visualization */}
-        <div className="relative flex-1 min-h-[2.5rem] bg-black/40 rounded overflow-hidden">
-          {/* Company logo */}
-          <div
+  // Knurled micro button helper
+  const knurlBtn = (onClick: () => void, disabled: boolean, title: string, icon: React.ReactNode, glowColor?: string) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'w-3.5 h-3.5 rounded-[2px] border transition-all duration-200',
+        'flex items-center justify-center relative overflow-hidden',
+        !disabled ? 'border-white/30 cursor-pointer hover:border-[var(--neon-amber)]/60' : 'border-white/10 cursor-not-allowed opacity-50'
+      )}
+      style={{
+        background: !disabled
+          ? 'linear-gradient(135deg, #4a4a5a 0%, #2a2a3a 50%, #3a3a4a 100%)'
+          : 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)',
+        boxShadow: glowColor
+          ? `0 0 4px ${glowColor}, inset 0 1px 0 rgba(255,255,255,0.1)`
+          : 'inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.3)',
+      }}
+      title={title}
+    >
+      <div className="absolute inset-0 pointer-events-none opacity-40" style={{
+        backgroundImage: `repeating-linear-gradient(45deg, transparent 0px, transparent 1px, rgba(255,255,255,0.1) 1px, rgba(255,255,255,0.1) 2px)`,
+      }} />
+      {icon}
+    </button>
+  )
+
+  return (
+    <PanelFrame variant="military" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+      {/* ===== FOLDED FRONT PANEL ===== */}
+      <div
+        style={{
+          transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 0 : 1,
+          position: isExpanded ? 'absolute' : 'relative',
+          pointerEvents: isExpanded ? 'none' : 'auto',
+          zIndex: isExpanded ? 0 : 2,
+        }}
+        className="w-full"
+      >
+        {/* Main folded bar */}
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
+          {/* LED */}
+          <LED on={isPowered && isActive} color="amber" size="sm" className={isTesting ? 'animate-pulse' : ''} />
+          {/* Device ID */}
+          <span className="font-mono text-[8px] font-bold text-[var(--neon-amber)]">P3D-001</span>
+          {/* State */}
+          <span className={cn('font-mono text-[7px]', isPowered ? 'text-[var(--neon-amber)]/70' : 'text-white/30')}>
+            {stateLabel}
+          </span>
+          <div className="flex-1" />
+          {/* Buttons */}
+          {isPowered && (
+            <>
+              {knurlBtn(handleTest, deviceState !== 'online', 'TEST',
+                <div className="w-1.5 h-1.5 rounded-[1px] relative z-10" style={{
+                  background: isTesting ? 'var(--neon-amber)' : 'linear-gradient(135deg, #5a5a6a 0%, #3a3a4a 100%)',
+                  boxShadow: isTesting ? '0 0 4px var(--neon-amber)' : 'inset 0 1px 0 rgba(255,255,255,0.2)',
+                }} />,
+                isTesting ? 'var(--neon-amber)' : undefined
+              )}
+              {knurlBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting', 'RESET',
+                <div className="w-1.5 h-1.5 rounded-[1px] relative z-10" style={{
+                  background: deviceState === 'rebooting' ? 'var(--neon-red)' : 'linear-gradient(135deg, #5a5a6a 0%, #3a3a4a 100%)',
+                  boxShadow: deviceState === 'rebooting' ? '0 0 4px var(--neon-red)' : 'inset 0 1px 0 rgba(255,255,255,0.2)',
+                }} />,
+                deviceState === 'rebooting' ? 'var(--neon-red)' : undefined
+              )}
+            </>
+          )}
+          {/* Power button - nozzle shape */}
+          <button
+            onClick={handlePower}
             className={cn(
-              'absolute font-mono text-[5px] font-bold z-10',
-              logoPositionClass
+              'w-3.5 h-3.5 rounded-[2px] border transition-all duration-200',
+              'flex items-center justify-center relative overflow-hidden',
+              'border-white/20 cursor-pointer',
+              isPowered ? 'hover:border-[var(--neon-amber)]/60' : 'hover:border-white/40'
             )}
             style={{
-              color: 'rgba(255,180,100,0.4)',
-              textShadow: '0 0 2px rgba(255,180,100,0.3)',
+              background: 'linear-gradient(135deg, #3a3a4a 0%, #1a1a2a 100%)',
+              boxShadow: isPowered
+                ? '0 0 3px rgba(255,180,100,0.3), inset 0 1px 0 rgba(255,255,255,0.1)'
+                : 'inset 0 1px 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.3)',
             }}
+            title={isPowered ? 'POWER OFF' : 'POWER ON'}
           >
-            PRSA
-          </div>
-
-          {/* Status display when booting/rebooting */}
-          {(deviceState === 'booting' || deviceState === 'rebooting') && (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <span
-                className="font-mono text-[7px] animate-pulse"
-                style={{ color: 'var(--neon-amber)' }}
-              >
-                {bootStatus}
-              </span>
-            </div>
-          )}
-
-          {/* Test phase indicator */}
-          {testPhase && testPhase !== 'complete' && (
-            <div className="absolute top-0.5 left-0.5 font-mono text-[6px] text-[var(--neon-amber)] bg-black/60 px-0.5 rounded z-20">
-              {testPhase.toUpperCase()}
-            </div>
-          )}
-
-          {/* Build layers */}
-          {isActive && (
-            <div
-              className="absolute bottom-0 left-2 right-2 bg-[var(--neon-amber)]/30 transition-all duration-300"
-              style={{ height: `${currentProgress}%` }}
+            <svg width="6" height="6" viewBox="0 0 6 6" className="relative z-10">
+              <polygon points="1,0 5,0 3,5" fill={isPowered ? 'var(--neon-amber)' : '#3a3a4a'} stroke={isPowered ? 'var(--neon-amber)' : '#5a5a6a'} strokeWidth="0.5" style={{ filter: isPowered ? 'drop-shadow(0 0 2px var(--neon-amber))' : 'none' }} />
+            </svg>
+          </button>
+          {/* Info / Fold toggle */}
+          {isPowered ? (
+            <button
+              onClick={toggleFoldedInfo}
+              className="w-3.5 h-3.5 rounded-[2px] border border-white/20 flex items-center justify-center cursor-pointer hover:border-[var(--neon-amber)]/40 transition-colors"
+              style={{ background: 'linear-gradient(135deg, #3a3a4a 0%, #1a1a2a 100%)' }}
+              title={showFoldedInfo ? 'Hide info' : 'Show info'}
             >
-              {/* Layer lines */}
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="absolute left-0 right-0 h-px bg-[var(--neon-amber)]/50"
-                  style={{ bottom: `${i * 20}%` }}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Print head */}
-          {isActive && (
-            <div
-              className="absolute h-0.5 bg-[var(--neon-amber)] transition-all"
-              style={{
-                bottom: `${currentProgress}%`,
-                left: `${headPosition - 10}%`,
-                width: '20%',
-                boxShadow: '0 0 4px var(--neon-amber)',
-                transitionDuration: isTesting ? '200ms' : '150ms',
-              }}
-            />
-          )}
-
-          {/* Bed temperature indicator */}
-          {isActive && (
-            <div
-              className="absolute bottom-0.5 right-0.5 font-mono text-[5px]"
-              style={{ color: 'rgba(255,180,100,0.6)' }}
-            >
-              {bedTemp}°C
-            </div>
+              <span className="font-mono text-[7px] text-[var(--neon-amber)]/60">{showFoldedInfo ? '▲' : '▼'}</span>
+            </button>
+          ) : (
+            <div className="w-3.5" />
           )}
         </div>
 
-        <div className="flex justify-between font-mono text-[7px] mt-1">
-          <span className="text-[var(--neon-amber)]">{currentProgress}%</span>
-          <span className="text-white/40">L:{currentLayer}</span>
+        {/* Folded info expansion */}
+        <div
+          style={{
+            maxHeight: showFoldedInfo && isPowered ? '60px' : '0px',
+            transition: 'max-height 400ms ease, opacity 300ms ease',
+            opacity: showFoldedInfo && isPowered ? 1 : 0,
+            overflow: 'hidden',
+          }}
+        >
+          <div className="px-2 pb-1.5 font-mono text-[7px] text-[var(--neon-amber)]/60 grid grid-cols-3 gap-x-2 gap-y-0.5">
+            <span>Progress: {currentProgress}%</span>
+            <span>Layers: {currentLayer}</span>
+            <span>Bed: {bedTemp}°C</span>
+            <span>Mode: {displayMode.toUpperCase()}</span>
+            <span>Tier: T2</span>
+            <span>Draw: {p3dManager?.currentDraw?.toFixed(1) ?? '0.0'} W</span>
+          </div>
         </div>
       </div>
 
-      {/* Right side - Square metal knurled buttons at bottom edge */}
-      <div className="flex flex-col justify-end ml-1.5 shrink-0 pb-0">
-        <div className="flex flex-col gap-1">
-          {/* Test button - metal knurled */}
-          <button
-            onClick={handleTest}
-            disabled={deviceState !== 'online'}
-            className={cn(
-              'w-3.5 h-3.5 rounded-[2px] border transition-all duration-200',
-              'flex items-center justify-center relative overflow-hidden',
-              deviceState === 'online'
-                ? 'border-white/30 cursor-pointer hover:border-[var(--neon-amber)]/60'
-                : 'border-white/10 cursor-not-allowed opacity-50'
-            )}
-            style={{
-              background: deviceState === 'online'
-                ? 'linear-gradient(135deg, #4a4a5a 0%, #2a2a3a 50%, #3a3a4a 100%)'
-                : 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)',
-              boxShadow: isTesting
-                ? '0 0 4px var(--neon-amber), inset 0 1px 0 rgba(255,255,255,0.1)'
-                : 'inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.3)',
-            }}
-            title="TEST"
-          >
-            {/* Knurl pattern - diagonal lines */}
-            <div
-              className="absolute inset-0 pointer-events-none opacity-40"
-              style={{
-                backgroundImage: `repeating-linear-gradient(
-                  45deg,
-                  transparent 0px,
-                  transparent 1px,
-                  rgba(255,255,255,0.1) 1px,
-                  rgba(255,255,255,0.1) 2px
-                )`,
-              }}
-            />
-            <div
-              className="w-1.5 h-1.5 rounded-[1px] relative z-10"
-              style={{
-                background: isTesting
-                  ? 'var(--neon-amber)'
-                  : 'linear-gradient(135deg, #5a5a6a 0%, #3a3a4a 100%)',
-                boxShadow: isTesting
-                  ? '0 0 4px var(--neon-amber)'
-                  : 'inset 0 1px 0 rgba(255,255,255,0.2)',
-              }}
-            />
-          </button>
+      {/* ===== UNFOLDED INNER PANEL ===== */}
+      <div
+        style={{
+          transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 1 : 0,
+          position: isExpanded ? 'relative' : 'absolute',
+          pointerEvents: isExpanded ? 'auto' : 'none',
+          zIndex: isExpanded ? 2 : 0,
+        }}
+        className="w-full p-2 flex"
+      >
+        {/* Main content */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex items-center justify-between mb-1">
+            <div className="font-mono text-[9px] text-[var(--neon-amber)]">
+              3D FABRICATOR
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="font-mono text-[7px] text-white/30">T2</div>
+              <LED on={isActive} color="amber" size="sm" className={isTesting ? 'animate-pulse' : ''} />
+            </div>
+          </div>
 
-          {/* Reset button - metal knurled */}
-          <button
-            onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting'}
-            className={cn(
-              'w-3.5 h-3.5 rounded-[2px] border transition-all duration-200',
-              'flex items-center justify-center relative overflow-hidden',
-              deviceState !== 'booting' && deviceState !== 'rebooting'
-                ? 'border-white/30 cursor-pointer hover:border-red-500/60'
-                : 'border-white/10 cursor-not-allowed opacity-50'
+          {/* Print bed visualization */}
+          <div className="relative flex-1 min-h-[2.5rem] bg-black/40 rounded overflow-hidden">
+            {/* Company logo */}
+            <div className={cn('absolute font-mono text-[5px] font-bold z-10', logoPositionClass)} style={{ color: 'rgba(255,180,100,0.4)', textShadow: '0 0 2px rgba(255,180,100,0.3)' }}>PRSA</div>
+
+            {/* Status display when booting/rebooting */}
+            {(deviceState === 'booting' || deviceState === 'rebooting') && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="font-mono text-[7px] animate-pulse" style={{ color: 'var(--neon-amber)' }}>{bootStatus}</span>
+              </div>
             )}
-            style={{
-              background: deviceState !== 'booting' && deviceState !== 'rebooting'
-                ? 'linear-gradient(135deg, #4a4a5a 0%, #2a2a3a 50%, #3a3a4a 100%)'
-                : 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)',
-              boxShadow: deviceState === 'rebooting'
-                ? '0 0 4px var(--neon-red), inset 0 1px 0 rgba(255,255,255,0.1)'
-                : 'inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.3)',
-            }}
-            title="RESET"
-          >
-            {/* Knurl pattern - diagonal lines */}
-            <div
-              className="absolute inset-0 pointer-events-none opacity-40"
+
+            {/* Test phase indicator */}
+            {testPhase && testPhase !== 'complete' && (
+              <div className="absolute top-0.5 left-0.5 font-mono text-[6px] text-[var(--neon-amber)] bg-black/60 px-0.5 rounded z-20">
+                {testPhase.toUpperCase()}
+              </div>
+            )}
+
+            {/* Build layers */}
+            {isActive && (
+              <div className="absolute bottom-0 left-2 right-2 bg-[var(--neon-amber)]/30 transition-all duration-300" style={{ height: `${currentProgress}%` }}>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="absolute left-0 right-0 h-px bg-[var(--neon-amber)]/50" style={{ bottom: `${i * 20}%` }} />
+                ))}
+              </div>
+            )}
+
+            {/* Print head */}
+            {isActive && (
+              <div className="absolute h-0.5 bg-[var(--neon-amber)] transition-all" style={{
+                bottom: `${currentProgress}%`, left: `${headPosition - 10}%`, width: '20%',
+                boxShadow: '0 0 4px var(--neon-amber)', transitionDuration: isTesting ? '200ms' : '150ms',
+              }} />
+            )}
+
+            {/* Bed temperature indicator */}
+            {isActive && (
+              <div className="absolute bottom-0.5 right-0.5 font-mono text-[5px]" style={{ color: 'rgba(255,180,100,0.6)' }}>{bedTemp}°C</div>
+            )}
+
+            {/* Standby overlay */}
+            {!isPowered && p3dManager && (
+              <div className="absolute inset-0 z-30 bg-black/80 flex items-center justify-center rounded">
+                <span className="font-mono text-[7px] text-white/40">STANDBY</span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-between font-mono text-[7px] mt-1">
+            <span className="text-[var(--neon-amber)]">{currentProgress}%</span>
+            <span className="text-white/40">L:{currentLayer}</span>
+          </div>
+        </div>
+
+        {/* Right side buttons */}
+        <div className="flex flex-col justify-end ml-1.5 shrink-0 pb-0">
+          <div className="flex flex-col gap-1">
+            {/* Fold chevron */}
+            <button
+              onClick={handleFoldToggle}
+              className="w-3.5 h-3.5 rounded-[2px] border border-white/20 flex items-center justify-center cursor-pointer hover:border-[var(--neon-amber)]/40 transition-colors"
+              style={{ background: 'linear-gradient(135deg, #3a3a4a 0%, #1a1a2a 100%)' }}
+              title="Fold"
+            >
+              <span className="font-mono text-[7px] text-[var(--neon-amber)]/60">▴</span>
+            </button>
+
+            {/* Power button - nozzle shape */}
+            <button
+              onClick={handlePower}
+              className={cn(
+                'w-3.5 h-3.5 rounded-[2px] border transition-all duration-200',
+                'flex items-center justify-center relative overflow-hidden',
+                'border-white/20 cursor-pointer',
+                isPowered ? 'hover:border-[var(--neon-amber)]/60' : 'hover:border-white/40'
+              )}
               style={{
-                backgroundImage: `repeating-linear-gradient(
-                  -45deg,
-                  transparent 0px,
-                  transparent 1px,
-                  rgba(255,255,255,0.1) 1px,
-                  rgba(255,255,255,0.1) 2px
-                )`,
+                background: 'linear-gradient(135deg, #3a3a4a 0%, #1a1a2a 100%)',
+                boxShadow: isPowered
+                  ? '0 0 3px rgba(255,180,100,0.3), inset 0 1px 0 rgba(255,255,255,0.1)'
+                  : 'inset 0 1px 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.3)',
               }}
-            />
-            <div
-              className="w-1.5 h-1.5 rounded-[1px] relative z-10"
-              style={{
-                background: deviceState === 'rebooting'
-                  ? 'var(--neon-red)'
-                  : 'linear-gradient(135deg, #5a5a6a 0%, #3a3a4a 100%)',
-                boxShadow: deviceState === 'rebooting'
-                  ? '0 0 4px var(--neon-red)'
-                  : 'inset 0 1px 0 rgba(255,255,255,0.2)',
-              }}
-            />
-          </button>
+              title={isPowered ? 'POWER OFF' : 'POWER ON'}
+            >
+              <svg width="6" height="6" viewBox="0 0 6 6" className="relative z-10">
+                <polygon points="1,0 5,0 3,5" fill={isPowered ? 'var(--neon-amber)' : '#3a3a4a'} stroke={isPowered ? 'var(--neon-amber)' : '#5a5a6a'} strokeWidth="0.5" style={{ filter: isPowered ? 'drop-shadow(0 0 2px var(--neon-amber))' : 'none' }} />
+              </svg>
+            </button>
+
+            {/* Test button */}
+            {knurlBtn(handleTest, deviceState !== 'online', 'TEST',
+              <div className="w-1.5 h-1.5 rounded-[1px] relative z-10" style={{
+                background: isTesting ? 'var(--neon-amber)' : 'linear-gradient(135deg, #5a5a6a 0%, #3a3a4a 100%)',
+                boxShadow: isTesting ? '0 0 4px var(--neon-amber)' : 'inset 0 1px 0 rgba(255,255,255,0.2)',
+              }} />,
+              isTesting ? 'var(--neon-amber)' : undefined
+            )}
+
+            {/* Reset button */}
+            {knurlBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting', 'RESET',
+              <div className="w-1.5 h-1.5 rounded-[1px] relative z-10" style={{
+                background: deviceState === 'rebooting' ? 'var(--neon-red)' : 'linear-gradient(135deg, #5a5a6a 0%, #3a3a4a 100%)',
+                boxShadow: deviceState === 'rebooting' ? '0 0 4px var(--neon-red)' : 'inset 0 1px 0 rgba(255,255,255,0.2)',
+              }} />,
+              deviceState === 'rebooting' ? 'var(--neon-red)' : undefined
+            )}
+          </div>
         </div>
       </div>
     </PanelFrame>
@@ -7014,31 +8748,40 @@ export function ExoticMatterContainment({
   onTest,
   onReset,
 }: ExoticMatterProps) {
-  // Use EMCManager for bidirectional sync
   const emcManager = useEMCManagerOptional()
 
-  // Derive state from manager when available
   const deviceState = emcManager?.deviceState ?? 'online'
   const testResult = emcManager?.testResult ?? null
   const statusMessage = emcManager?.statusMessage ?? 'CONTAINED'
   const isStandby = deviceState === 'standby'
   const isTransitioning = ['booting', 'shutdown', 'rebooting'].includes(deviceState)
+  const isExpanded = emcManager?.isExpanded ?? true
 
   const displayUnits = emcManager?.units ?? propUnits
   const displayStability = emcManager?.stability ?? propStability
   const displayContained = emcManager?.isContained ?? propContained
+  const displayField = emcManager?.fieldStrength ?? 95
+  const displayTemp = emcManager?.temperature ?? 1050
+  const displayDraw = emcManager?.currentDraw ?? 18
+
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 5-min auto-close for folded info
+  useEffect(() => {
+    if (showFoldedInfo) {
+      foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) }
+    }
+  }, [showFoldedInfo])
 
   const handleTest = async () => {
-    if (emcManager) {
-      await emcManager.runTest()
-    }
+    if (emcManager) await emcManager.runTest()
     onTest?.()
   }
 
   const handleReboot = async () => {
-    if (emcManager) {
-      await emcManager.reboot()
-    }
+    if (emcManager) await emcManager.reboot()
     onReset?.()
   }
 
@@ -7065,312 +8808,360 @@ export function ExoticMatterContainment({
     return () => clearInterval(interval)
   }, [isStandby])
 
-  return (
-    <PanelFrame variant="default" className={cn('p-1', isStandby && 'opacity-60', className)}>
-      {/* Compact header */}
-      <div className="flex items-center justify-between mb-0.5">
-        <div className="flex items-center gap-0.5">
-          <LED on={isLedOn} color={getLedColor()} size="sm" className="scale-75" />
-          <div className="font-mono text-[5px] text-[var(--neon-pink)]">EXOTIC MATTER</div>
-          {/* CERN logo */}
-          <div
-            className="font-mono text-[3px] text-[#d060d0] px-0.5 leading-none"
-            style={{
-              background: 'linear-gradient(180deg, #3a2a3a 0%, #2a1a2a 100%)',
-              border: '0.5px solid #5a3a5a',
-              borderRadius: '1px',
-            }}
-          >
-            CERN
-          </div>
-          {/* Biohazard-shaped power button — 3 overlapping crescents */}
-          {emcManager && (
-            <button
-              onClick={() => isStandby ? emcManager.powerOn() : emcManager.powerOff()}
-              disabled={isTransitioning}
-              className="relative transition-all"
-              style={{
-                width: '11px',
-                height: '11px',
-                opacity: isTransitioning ? 0.4 : 1,
-                cursor: isTransitioning ? 'not-allowed' : 'pointer',
-              }}
-              title={isStandby ? 'Power ON' : 'Power OFF'}
-            >
-              {/* Rotating outer ring */}
-              <div
-                className="absolute inset-0 rounded-full"
-                style={{
-                  border: `1px solid ${isStandby ? '#2a1a2a' : 'var(--neon-pink)'}`,
-                  boxShadow: isStandby ? 'none' : '0 0 4px var(--neon-pink), inset 0 0 2px rgba(255,0,255,0.3)',
-                  transform: `rotate(${btnRotation}deg)`,
-                }}
-              />
-              {/* Inner dot */}
-              <div
-                className="absolute rounded-full"
-                style={{
-                  width: '3px',
-                  height: '3px',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
-                  background: isStandby ? '#1a0a1a' : 'var(--neon-pink)',
-                  boxShadow: isStandby ? 'none' : '0 0 3px var(--neon-pink)',
-                }}
-              />
-              {/* Three spokes (biohazard) */}
-              {[0, 120, 240].map(angle => (
-                <div
-                  key={angle}
-                  className="absolute"
-                  style={{
-                    width: '1px',
-                    height: '4px',
-                    background: isStandby ? '#2a1a2a' : 'var(--neon-pink)',
-                    top: '1px',
-                    left: '50%',
-                    transformOrigin: '50% 4.5px',
-                    transform: `translateX(-50%) rotate(${angle}deg)`,
-                    boxShadow: isStandby ? 'none' : '0 0 2px var(--neon-pink)',
-                  }}
-                />
-              ))}
-            </button>
-          )}
-        </div>
-
-        {/* Tiny LED buttons */}
-        <div className="flex items-center gap-0.5">
-          {/* Round LED test button */}
-          <button
-            onClick={handleTest}
-            disabled={deviceState !== 'online'}
-            className="group relative disabled:opacity-30"
-            title="Test"
-          >
-            <div
-              className="w-2.5 h-2 rounded-full p-[1px] transition-all group-active:scale-95"
-              style={{
-                background: 'linear-gradient(180deg, #5a3a5a 0%, #4a2a4a 50%, #3a1a3a 100%)',
-                boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.1), 0 0.5px 1px rgba(0,0,0,0.5)',
-                border: '0.5px solid #6a4a6a',
-              }}
-            >
-              <div
-                className={cn(
-                  'w-full h-full rounded-full transition-all',
-                  deviceState === 'testing'
-                    ? 'bg-[var(--neon-pink)] shadow-[0_0_4px_var(--neon-pink)]'
-                    : testResult === 'pass'
-                    ? 'bg-[var(--neon-green)] shadow-[0_0_4px_var(--neon-green)]'
-                    : testResult === 'fail'
-                    ? 'bg-[var(--neon-red)] shadow-[0_0_4px_var(--neon-red)]'
-                    : 'bg-[#1a0a1a]'
-                )}
-              />
-            </div>
-          </button>
-
-          {/* Square LED reset button */}
-          <button
-            onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || isStandby}
-            className="group relative disabled:opacity-30"
-            title="Reboot"
-          >
-            <div
-              className="w-2.5 h-2 rounded-[1px] p-[1px] transition-all group-active:scale-95"
-              style={{
-                background: 'linear-gradient(180deg, #4a3a3a 0%, #3a2a2a 50%, #2a1a1a 100%)',
-                boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.1), 0 0.5px 1px rgba(0,0,0,0.5)',
-                border: '0.5px solid #5a4a4a',
-              }}
-            >
-              <div
-                className={cn(
-                  'w-full h-full rounded-[0.5px] transition-all',
-                  deviceState === 'rebooting' || deviceState === 'booting'
-                    ? 'bg-[var(--neon-amber)] shadow-[0_0_4px_var(--neon-amber)]'
-                    : 'bg-[#0a0505]'
-                )}
-              />
-            </div>
-          </button>
-          <div className="font-mono text-[3px] text-white/20">RES-X</div>
-        </div>
-      </div>
-
-      {/* Tall containment field visualization - 3 rows */}
-      <div className={cn(
-        'relative h-14 bg-black/60 rounded overflow-hidden',
-        deviceState === 'testing' && 'ring-1 ring-[var(--neon-pink)]/50'
-      )}>
-        {/* Containment field border */}
+  // Biohazard power button component
+  const BiohazardPowerButton = () => emcManager ? (
+    <button
+      onClick={() => isStandby ? emcManager.powerOn() : emcManager.powerOff()}
+      disabled={isTransitioning}
+      className="relative transition-all"
+      style={{
+        width: '11px',
+        height: '11px',
+        opacity: isTransitioning ? 0.4 : 1,
+        cursor: isTransitioning ? 'not-allowed' : 'pointer',
+      }}
+      title={isStandby ? 'Power ON' : 'Power OFF'}
+    >
+      <div
+        className="absolute inset-0 rounded-full"
+        style={{
+          border: `1px solid ${isStandby ? '#2a1a2a' : 'var(--neon-pink)'}`,
+          boxShadow: isStandby ? 'none' : '0 0 4px var(--neon-pink), inset 0 0 2px rgba(255,0,255,0.3)',
+          transform: `rotate(${btnRotation}deg)`,
+        }}
+      />
+      <div
+        className="absolute rounded-full"
+        style={{
+          width: '3px', height: '3px', top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%)',
+          background: isStandby ? '#1a0a1a' : 'var(--neon-pink)',
+          boxShadow: isStandby ? 'none' : '0 0 3px var(--neon-pink)',
+        }}
+      />
+      {[0, 120, 240].map(angle => (
         <div
-          className="absolute inset-[2px] rounded border transition-all duration-300"
+          key={angle}
+          className="absolute"
           style={{
-            borderColor: fieldActive ? 'var(--neon-pink)' : isStandby ? '#1a1a1a' : '#333',
-            boxShadow: fieldActive ? '0 0 6px var(--neon-pink), inset 0 0 12px rgba(255,0,255,0.15)' : 'none',
-            animation: fieldActive ? 'containment-pulse 2s ease-in-out infinite' : 'none',
+            width: '1px', height: '4px',
+            background: isStandby ? '#2a1a2a' : 'var(--neon-pink)',
+            top: '1px', left: '50%',
+            transformOrigin: '50% 4.5px',
+            transform: `translateX(-50%) rotate(${angle}deg)`,
+            boxShadow: isStandby ? 'none' : '0 0 2px var(--neon-pink)',
           }}
         />
+      ))}
+    </button>
+  ) : null
 
-        {/* Standby message */}
-        {isStandby && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="font-mono text-[6px] text-white/15 tracking-widest">STANDBY</div>
+  // LED micro button helper
+  const ledBtn = (onClick: () => void, disabled: boolean, round: boolean, title: string, activeColor?: string) => (
+    <button onClick={onClick} disabled={disabled} className="group relative disabled:opacity-30" title={title}>
+      <div
+        className={cn('w-2.5 h-2 p-[1px] transition-all group-active:scale-95', round ? 'rounded-full' : 'rounded-[1px]')}
+        style={{
+          background: round
+            ? 'linear-gradient(180deg, #5a3a5a 0%, #4a2a4a 50%, #3a1a3a 100%)'
+            : 'linear-gradient(180deg, #4a3a3a 0%, #3a2a2a 50%, #2a1a1a 100%)',
+          boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.1), 0 0.5px 1px rgba(0,0,0,0.5)',
+          border: round ? '0.5px solid #6a4a6a' : '0.5px solid #5a4a4a',
+        }}
+      >
+        <div className={cn(
+          'w-full h-full transition-all', round ? 'rounded-full' : 'rounded-[0.5px]',
+          activeColor ?? 'bg-[#1a0a1a]'
+        )} />
+      </div>
+    </button>
+  )
+
+  const testBtnColor = deviceState === 'testing'
+    ? 'bg-[var(--neon-pink)] shadow-[0_0_4px_var(--neon-pink)]'
+    : testResult === 'pass'
+    ? 'bg-[var(--neon-green)] shadow-[0_0_4px_var(--neon-green)]'
+    : testResult === 'fail'
+    ? 'bg-[var(--neon-red)] shadow-[0_0_4px_var(--neon-red)]'
+    : undefined
+
+  const rebootBtnColor = (deviceState === 'rebooting' || deviceState === 'booting')
+    ? 'bg-[var(--neon-amber)] shadow-[0_0_4px_var(--neon-amber)]'
+    : 'bg-[#0a0505]'
+
+  const stateLabel = isStandby ? 'STANDBY' : deviceState === 'booting' ? 'BOOTING' : deviceState === 'testing' ? 'TESTING' : deviceState === 'rebooting' ? 'REBOOTING' : deviceState === 'shutdown' ? 'SHUTDOWN' : 'ONLINE'
+
+  return (
+    <PanelFrame variant="default" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+      {/* ===== FOLDED FRONT PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+        width: '100%', left: 0, top: 0,
+      }}>
+        <div className="flex items-center gap-1 px-1 py-0.5">
+          <LED on={isLedOn} color={getLedColor()} size="sm" className="scale-75 shrink-0" />
+          <span className="font-mono text-[5px] text-[var(--neon-pink)] shrink-0">EMC-001</span>
+          <span className={cn(
+            'font-mono text-[4px] shrink-0',
+            isStandby ? 'text-white/30' : 'text-[var(--neon-pink)]/70'
+          )}>{stateLabel}</span>
+          <div className="flex-1" />
+
+          {!isStandby && (
+            <>
+              {ledBtn(handleTest, deviceState !== 'online', true, 'Test', testBtnColor)}
+              {ledBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || isStandby, false, 'Reboot', rebootBtnColor)}
+            </>
+          )}
+          <BiohazardPowerButton />
+          {!isStandby ? (
+            <button
+              onClick={() => setShowFoldedInfo(p => !p)}
+              className="font-mono text-[5px] text-[var(--neon-pink)]/50 hover:text-[var(--neon-pink)] transition-colors px-0.5"
+              title={showFoldedInfo ? 'Hide info' : 'Show info'}
+            >{showFoldedInfo ? '▲' : '▼'}</button>
+          ) : null}
+        </div>
+
+        {/* Folded info expansion */}
+        <div style={{
+          maxHeight: showFoldedInfo && !isStandby ? '60px' : '0px',
+          overflow: 'hidden',
+          transition: 'max-height 300ms ease',
+        }}>
+          <div className="px-1.5 pb-1 grid grid-cols-3 gap-x-2 gap-y-0 font-mono text-[4px]">
+            <span className="text-white/40">Units: <span className="text-[var(--neon-pink)]">{displayUnits}</span></span>
+            <span className="text-white/40">Stab: <span className="text-[var(--neon-pink)]">{displayStability}%</span></span>
+            <span className="text-white/40">Field: <span className="text-[var(--neon-pink)]">{displayField}%</span></span>
+            <span className="text-white/40">Temp: <span className="text-[var(--neon-pink)]">{displayTemp}°K</span></span>
+            <span className="text-white/40">Cont: <span className="text-[var(--neon-pink)]">{displayContained ? 'YES' : 'NO'}</span></span>
+            <span className="text-white/40">Draw: <span className="text-[var(--neon-pink)]">{displayDraw} E/s</span></span>
           </div>
-        )}
-
-        {/* Exotic particles spread across full screen */}
-        {!isStandby && (
-          <div className="absolute inset-[4px]">
-            {Array.from({ length: displayUnits }).map((_, i) => {
-              const isTesting = deviceState === 'testing'
-              const isBooting = deviceState === 'booting' || deviceState === 'rebooting'
-              const isShutdown = deviceState === 'shutdown'
-
-              const testColors = ['var(--neon-pink)', 'var(--neon-cyan)', 'var(--neon-purple)', '#fff', 'var(--neon-green)']
-              const bootColors = ['var(--neon-amber)', 'var(--neon-pink)', '#ff6600', 'var(--neon-amber)']
-
-              const particleColor = isTesting
-                ? testColors[i % testColors.length]
-                : isBooting
-                ? bootColors[i % bootColors.length]
-                : isShutdown
-                ? '#663366'
-                : fieldActive ? 'var(--neon-pink)' : '#444'
-
-              const cols = 14
-              const rows = 3
-              const col = i % cols
-              const row = Math.floor(i / cols) % rows
-              const xPos = 4 + (col / (cols - 1)) * 92
-              const yPos = 15 + (row / (rows - 1 || 1)) * 70
-
-              let animationName = 'none'
-              let animationDuration = '1s'
-              let animationTimingFunction = 'ease-in-out'
-              let animationDelay = '0s'
-
-              if (isTesting) {
-                animationName = 'exotic-test'
-                animationDuration = `${0.15 + (i % 6) * 0.08}s`
-                animationDelay = `${i * 0.015}s`
-              } else if (isBooting) {
-                animationName = 'exotic-boot'
-                animationDuration = `${0.4 + (i % 4) * 0.15}s`
-                animationTimingFunction = 'ease-out'
-                animationDelay = `${(row * 0.1) + (col * 0.03)}s`
-              } else if (fieldActive) {
-                animationName = 'exotic-float'
-                animationDuration = `${1 + (i % 5) * 0.15}s`
-                animationDelay = `${i * 0.02}s`
-              }
-
-              return (
-                <div
-                  key={i}
-                  className="absolute w-[5px] h-[5px] rounded-full"
-                  style={{
-                    left: `${xPos}%`,
-                    top: `${yPos}%`,
-                    background: particleColor,
-                    boxShadow: `0 0 ${isTesting ? '8' : isBooting ? '5' : '3'}px ${particleColor}`,
-                    opacity: isShutdown ? 0.3 : 1,
-                    animationName,
-                    animationDuration,
-                    animationTimingFunction,
-                    animationIterationCount: 'infinite',
-                    animationDelay,
-                  }}
-                />
-              )
-            })}
-          </div>
-        )}
-
-        {/* Test overlay - quantum interference */}
-        {deviceState === 'testing' && (
-          <>
-            <div
-              className="absolute inset-0 pointer-events-none opacity-25"
-              style={{
-                background: 'repeating-linear-gradient(90deg, transparent 0px, transparent 2px, var(--neon-cyan) 2px, var(--neon-cyan) 3px)',
-                animation: 'exotic-scan 0.3s linear infinite',
-              }}
-            />
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background: 'radial-gradient(ellipse at center, var(--neon-purple) 0%, transparent 50%)',
-                opacity: 0.25,
-                animation: 'exotic-quantum 0.4s ease-in-out infinite',
-              }}
-            />
-            <div
-              className="absolute inset-0 pointer-events-none opacity-15"
-              style={{
-                background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 4px, var(--neon-pink) 4px, var(--neon-pink) 5px)',
-                animation: 'exotic-wave 0.2s linear infinite',
-              }}
-            />
-          </>
-        )}
-
-        {/* Boot/reboot overlay */}
-        {(deviceState === 'booting' || deviceState === 'rebooting') && (
-          <>
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background: 'radial-gradient(circle at center, transparent 0%, var(--neon-amber) 30%, transparent 50%)',
-                opacity: 0.3,
-                animation: 'exotic-materialize 0.8s ease-out infinite',
-              }}
-            />
-            <div
-              className="absolute inset-0 pointer-events-none opacity-20"
-              style={{
-                backgroundImage: `
-                  linear-gradient(var(--neon-amber) 1px, transparent 1px),
-                  linear-gradient(90deg, var(--neon-amber) 1px, transparent 1px)
-                `,
-                backgroundSize: '8px 8px',
-                animation: 'exotic-grid 0.6s ease-in-out infinite',
-              }}
-            />
-          </>
-        )}
+        </div>
       </div>
 
-      {/* Compact status bar */}
-      <div className="flex items-center justify-between font-mono text-[5px] mt-0.5">
-        <span className={cn(
-          'w-10 shrink-0 transition-colors',
-          fieldActive ? 'text-[var(--neon-pink)]' : 'text-white/30'
-        )}>
-          {isStandby ? '--' : displayUnits} UNITS
-        </span>
-        <span className={cn(
-          'flex-1 text-[4px] text-center transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
-          deviceState === 'testing' ? 'text-[var(--neon-pink)]' :
-          deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
-          isStandby ? 'text-white/15' :
-          testResult === 'pass' ? 'text-[var(--neon-green)]' :
-          testResult === 'fail' ? 'text-[var(--neon-red)]' :
-          'text-white/20'
-        )}>
-          {isStandby ? 'STANDBY' : statusMessage}
-        </span>
-        <span className={cn(
-          'w-12 shrink-0 text-right transition-colors',
-          isStandby ? 'text-white/30' :
-          displayStability > 70 ? 'text-[var(--neon-green)]' : 'text-[var(--neon-red)]'
-        )}>
-          {isStandby ? '--' : displayStability}% STABLE
-        </span>
+      {/* ===== UNFOLDED INNER PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+        width: '100%', left: 0, top: 0,
+      }}>
+        {/* Fold chevron */}
+        {emcManager && !isStandby && (
+          <button
+            onClick={() => emcManager.toggleExpanded()}
+            className="absolute top-[2px] right-[2px] z-10 font-mono text-[5px] text-[var(--neon-pink)]/40 hover:text-[var(--neon-pink)] transition-colors"
+            title="Fold"
+          >▴</button>
+        )}
+
+        <div className="p-1">
+          {/* Compact header */}
+          <div className="flex items-center justify-between mb-0.5">
+            <div className="flex items-center gap-0.5">
+              <LED on={isLedOn} color={getLedColor()} size="sm" className="scale-75" />
+              <div className="font-mono text-[5px] text-[var(--neon-pink)]">EXOTIC MATTER</div>
+              <div
+                className="font-mono text-[3px] text-[#d060d0] px-0.5 leading-none"
+                style={{
+                  background: 'linear-gradient(180deg, #3a2a3a 0%, #2a1a2a 100%)',
+                  border: '0.5px solid #5a3a5a',
+                  borderRadius: '1px',
+                }}
+              >
+                CERN
+              </div>
+              <BiohazardPowerButton />
+            </div>
+
+            <div className="flex items-center gap-0.5">
+              {ledBtn(handleTest, deviceState !== 'online', true, 'Test', testBtnColor)}
+              {ledBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || isStandby, false, 'Reboot', rebootBtnColor)}
+              <div className="font-mono text-[3px] text-white/20">RES-X</div>
+            </div>
+          </div>
+
+          {/* Tall containment field visualization - 3 rows */}
+          <div className={cn(
+            'relative h-14 bg-black/60 rounded overflow-hidden',
+            deviceState === 'testing' && 'ring-1 ring-[var(--neon-pink)]/50'
+          )}>
+            {/* Containment field border */}
+            <div
+              className="absolute inset-[2px] rounded border transition-all duration-300"
+              style={{
+                borderColor: fieldActive ? 'var(--neon-pink)' : isStandby ? '#1a1a1a' : '#333',
+                boxShadow: fieldActive ? '0 0 6px var(--neon-pink), inset 0 0 12px rgba(255,0,255,0.15)' : 'none',
+                animation: fieldActive ? 'containment-pulse 2s ease-in-out infinite' : 'none',
+              }}
+            />
+
+            {isStandby && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="font-mono text-[6px] text-white/15 tracking-widest">STANDBY</div>
+              </div>
+            )}
+
+            {!isStandby && (
+              <div className="absolute inset-[4px]">
+                {Array.from({ length: displayUnits }).map((_, i) => {
+                  const isTesting = deviceState === 'testing'
+                  const isBooting = deviceState === 'booting' || deviceState === 'rebooting'
+                  const isShutdown = deviceState === 'shutdown'
+
+                  const testColors = ['var(--neon-pink)', 'var(--neon-cyan)', 'var(--neon-purple)', '#fff', 'var(--neon-green)']
+                  const bootColors = ['var(--neon-amber)', 'var(--neon-pink)', '#ff6600', 'var(--neon-amber)']
+
+                  const particleColor = isTesting
+                    ? testColors[i % testColors.length]
+                    : isBooting
+                    ? bootColors[i % bootColors.length]
+                    : isShutdown
+                    ? '#663366'
+                    : fieldActive ? 'var(--neon-pink)' : '#444'
+
+                  const cols = 14
+                  const rows = 3
+                  const col = i % cols
+                  const row = Math.floor(i / cols) % rows
+                  const xPos = 4 + (col / (cols - 1)) * 92
+                  const yPos = 15 + (row / (rows - 1 || 1)) * 70
+
+                  let animationName = 'none'
+                  let animationDuration = '1s'
+                  let animationTimingFunction = 'ease-in-out'
+                  let animationDelay = '0s'
+
+                  if (isTesting) {
+                    animationName = 'exotic-test'
+                    animationDuration = `${0.15 + (i % 6) * 0.08}s`
+                    animationDelay = `${i * 0.015}s`
+                  } else if (isBooting) {
+                    animationName = 'exotic-boot'
+                    animationDuration = `${0.4 + (i % 4) * 0.15}s`
+                    animationTimingFunction = 'ease-out'
+                    animationDelay = `${(row * 0.1) + (col * 0.03)}s`
+                  } else if (fieldActive) {
+                    animationName = 'exotic-float'
+                    animationDuration = `${1 + (i % 5) * 0.15}s`
+                    animationDelay = `${i * 0.02}s`
+                  }
+
+                  return (
+                    <div
+                      key={i}
+                      className="absolute w-[5px] h-[5px] rounded-full"
+                      style={{
+                        left: `${xPos}%`,
+                        top: `${yPos}%`,
+                        background: particleColor,
+                        boxShadow: `0 0 ${isTesting ? '8' : isBooting ? '5' : '3'}px ${particleColor}`,
+                        opacity: isShutdown ? 0.3 : 1,
+                        animationName,
+                        animationDuration,
+                        animationTimingFunction,
+                        animationIterationCount: 'infinite',
+                        animationDelay,
+                      }}
+                    />
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Test overlay - quantum interference */}
+            {deviceState === 'testing' && (
+              <>
+                <div
+                  className="absolute inset-0 pointer-events-none opacity-25"
+                  style={{
+                    background: 'repeating-linear-gradient(90deg, transparent 0px, transparent 2px, var(--neon-cyan) 2px, var(--neon-cyan) 3px)',
+                    animation: 'exotic-scan 0.3s linear infinite',
+                  }}
+                />
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background: 'radial-gradient(ellipse at center, var(--neon-purple) 0%, transparent 50%)',
+                    opacity: 0.25,
+                    animation: 'exotic-quantum 0.4s ease-in-out infinite',
+                  }}
+                />
+                <div
+                  className="absolute inset-0 pointer-events-none opacity-15"
+                  style={{
+                    background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 4px, var(--neon-pink) 4px, var(--neon-pink) 5px)',
+                    animation: 'exotic-wave 0.2s linear infinite',
+                  }}
+                />
+              </>
+            )}
+
+            {/* Boot/reboot overlay */}
+            {(deviceState === 'booting' || deviceState === 'rebooting') && (
+              <>
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background: 'radial-gradient(circle at center, transparent 0%, var(--neon-amber) 30%, transparent 50%)',
+                    opacity: 0.3,
+                    animation: 'exotic-materialize 0.8s ease-out infinite',
+                  }}
+                />
+                <div
+                  className="absolute inset-0 pointer-events-none opacity-20"
+                  style={{
+                    backgroundImage: `
+                      linear-gradient(var(--neon-amber) 1px, transparent 1px),
+                      linear-gradient(90deg, var(--neon-amber) 1px, transparent 1px)
+                    `,
+                    backgroundSize: '8px 8px',
+                    animation: 'exotic-grid 0.6s ease-in-out infinite',
+                  }}
+                />
+              </>
+            )}
+          </div>
+
+          {/* Compact status bar */}
+          <div className="flex items-center justify-between font-mono text-[5px] mt-0.5">
+            <span className={cn(
+              'w-10 shrink-0 transition-colors',
+              fieldActive ? 'text-[var(--neon-pink)]' : 'text-white/30'
+            )}>
+              {isStandby ? '--' : displayUnits} UNITS
+            </span>
+            <span className={cn(
+              'flex-1 text-[4px] text-center transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
+              deviceState === 'testing' ? 'text-[var(--neon-pink)]' :
+              deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+              isStandby ? 'text-white/15' :
+              testResult === 'pass' ? 'text-[var(--neon-green)]' :
+              testResult === 'fail' ? 'text-[var(--neon-red)]' :
+              'text-white/20'
+            )}>
+              {isStandby ? 'STANDBY' : statusMessage}
+            </span>
+            <span className={cn(
+              'w-12 shrink-0 text-right transition-colors',
+              isStandby ? 'text-white/30' :
+              displayStability > 70 ? 'text-[var(--neon-green)]' : 'text-[var(--neon-red)]'
+            )}>
+              {isStandby ? '--' : displayStability}% STABLE
+            </span>
+          </div>
+        </div>
       </div>
 
       <style jsx global>{`
@@ -7447,21 +9238,25 @@ export function QuantumStateMonitor({
   onTest,
   onReset,
 }: QuantumStateProps) {
-  // Try to use QSMManager for bidirectional sync
   const qsmManager = useQSMManagerOptional()
 
-  // Derive state from manager when available, otherwise use local state
   const deviceState = qsmManager?.deviceState ?? 'online'
   const testResult = qsmManager?.testResult ?? null
   const statusMessage = qsmManager?.statusMessage ?? 'COHERENT'
   const isStandby = deviceState === 'standby'
   const isTransitioning = ['booting', 'shutdown', 'rebooting'].includes(deviceState)
+  const isExpanded = qsmManager?.isExpanded ?? true
 
   const displayCoherence = qsmManager?.coherence ?? propCoherence
   const displayQubits = qsmManager?.qubits ?? propQubits
   const displayEntangled = qsmManager?.isEntangled ?? propEntangled
+  const displayDraw = qsmManager?.currentDraw ?? 7
+  const displayError = qsmManager?.errorRate ?? 0.8
+  const displayTemp = qsmManager?.temperature ?? 15
 
   const [wavePhase, setWavePhase] = useState(0)
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Animate wave function
   useEffect(() => {
@@ -7472,17 +9267,21 @@ export function QuantumStateMonitor({
     return () => clearInterval(interval)
   }, [isStandby])
 
-  const handleTest = async () => {
-    if (qsmManager) {
-      await qsmManager.runTest()
+  // 5-min auto-close for folded info
+  useEffect(() => {
+    if (showFoldedInfo) {
+      foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) }
     }
+  }, [showFoldedInfo])
+
+  const handleTest = async () => {
+    if (qsmManager) await qsmManager.runTest()
     onTest?.()
   }
 
   const handleReboot = async () => {
-    if (qsmManager) {
-      await qsmManager.reboot()
-    }
+    if (qsmManager) await qsmManager.reboot()
     onReset?.()
   }
 
@@ -7498,208 +9297,264 @@ export function QuantumStateMonitor({
   const isLedOn = !isStandby
   const isActive = deviceState === 'online' || deviceState === 'testing'
 
+  // Triangular crystal power button
+  const CrystalPowerButton = () => qsmManager ? (
+    <button
+      onClick={() => isStandby ? qsmManager.powerOn() : qsmManager.powerOff()}
+      disabled={isTransitioning}
+      className="transition-all"
+      style={{
+        width: '10px',
+        height: '10px',
+        background: isStandby ? '#0a1a2a' : 'rgba(0,220,255,0.1)',
+        border: `1px solid ${isStandby ? '#1a3a4a' : 'var(--neon-cyan)'}`,
+        boxShadow: isStandby ? 'none' : '0 0 4px var(--neon-cyan), inset 0 0 3px rgba(0,220,255,0.2)',
+        opacity: isTransitioning ? 0.4 : 1,
+        cursor: isTransitioning ? 'not-allowed' : 'pointer',
+        clipPath: 'polygon(50% 0%, 100% 100%, 0% 100%)',
+      }}
+      title={isStandby ? 'Power ON' : 'Power OFF'}
+    />
+  ) : null
+
+  // Wooden micro button helper
+  const woodBtn = (label: string, onClick: () => void, disabled: boolean, round: boolean, title: string, glowColor?: string) => (
+    <button onClick={onClick} disabled={disabled} className="group relative disabled:opacity-30" title={title}>
+      <div
+        className={cn('w-2.5 h-2.5 p-[1px] transition-all group-active:scale-95', round ? 'rounded-full' : 'rounded-[2px]')}
+        style={{
+          background: round
+            ? 'linear-gradient(180deg, #8b6914 0%, #5a4510 50%, #3a2a08 100%)'
+            : 'linear-gradient(180deg, #6a4a20 0%, #4a3010 50%, #2a1a05 100%)',
+          boxShadow: round
+            ? 'inset 0 1px 0 rgba(255,220,150,0.3), inset 0 -1px 2px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4)'
+            : 'inset 0 1px 0 rgba(255,200,100,0.2), inset 0 -1px 2px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4)',
+          border: round ? '0.5px solid #2a1a00' : '0.5px solid #1a0a00',
+        }}
+      >
+        <div
+          className={cn('w-full h-full flex items-center justify-center', round ? 'rounded-full' : 'rounded-[1px]', glowColor)}
+          style={{
+            background: round
+              ? 'radial-gradient(circle at 30% 30%, #a07820 0%, #6a4a12 60%, #4a3008 100%)'
+              : 'linear-gradient(135deg, #7a5a18 0%, #5a3a10 50%, #3a2008 100%)',
+          }}
+        >
+          <span className={cn('font-mono text-[3px] font-bold', round ? 'text-[#2a1a00]' : 'text-[#1a0a00]')}>{label}</span>
+        </div>
+      </div>
+    </button>
+  )
+
+  const stateLabel = isStandby ? 'STANDBY' : deviceState === 'booting' ? 'BOOTING' : deviceState === 'testing' ? 'TESTING' : deviceState === 'rebooting' ? 'REBOOTING' : deviceState === 'shutdown' ? 'SHUTDOWN' : 'ONLINE'
+
   return (
-    <PanelFrame variant="teal" className={cn('p-1', isStandby && 'opacity-60', className)}>
-      {/* Header with wooden buttons */}
-      <div className="flex items-center justify-between mb-0.5">
-        <div className="flex items-center gap-0.5">
-          <LED on={isLedOn} color={getLedColor()} size="sm" className="scale-75" />
-          <div className="font-mono text-[5px] text-[var(--neon-cyan)]">QUANTUM</div>
-          {/* IBM style logo */}
-          <div
-            className="font-mono text-[3px] text-[#6090c0] px-0.5 leading-none font-bold"
-            style={{
-              background: 'linear-gradient(180deg, #2a3a4a 0%, #1a2a3a 100%)',
-              border: '0.5px solid #4a5a6a',
-              borderRadius: '1px',
-            }}
-          >
-            IBM
-          </div>
-          {/* Triangular power button - unique crystal/prism shape */}
-          {qsmManager && (
-            <button
-              onClick={() => isStandby ? qsmManager.powerOn() : qsmManager.powerOff()}
-              disabled={isTransitioning}
-              className="transition-all"
-              style={{
-                width: '10px',
-                height: '10px',
-                background: isStandby ? '#0a1a2a' : 'rgba(0,220,255,0.1)',
-                border: `1px solid ${isStandby ? '#1a3a4a' : 'var(--neon-cyan)'}`,
-                boxShadow: isStandby ? 'none' : '0 0 4px var(--neon-cyan), inset 0 0 3px rgba(0,220,255,0.2)',
-                opacity: isTransitioning ? 0.4 : 1,
-                cursor: isTransitioning ? 'not-allowed' : 'pointer',
-                clipPath: 'polygon(50% 0%, 100% 100%, 0% 100%)',
-              }}
-              title={isStandby ? 'Power ON' : 'Power OFF'}
-            />
+    <PanelFrame variant="teal" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+      {/* ===== FOLDED FRONT PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+        width: '100%', left: 0, top: 0,
+      }}>
+        <div className="flex items-center gap-1 px-1 py-0.5">
+          <LED on={isLedOn} color={getLedColor()} size="sm" className="scale-75 shrink-0" />
+          <span className="font-mono text-[5px] text-[var(--neon-cyan)] shrink-0">QSM-001</span>
+          <span className={cn(
+            'font-mono text-[4px] shrink-0',
+            isStandby ? 'text-white/30' : 'text-[var(--neon-cyan)]/70'
+          )}>{stateLabel}</span>
+          <div className="flex-1" />
+
+          {!isStandby && (
+            <>
+              {woodBtn('T', handleTest, deviceState !== 'online', true, 'Test',
+                deviceState === 'testing' ? 'shadow-[0_0_4px_var(--neon-cyan)]' : undefined)}
+              {woodBtn('R', handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || isStandby, false, 'Reboot',
+                (deviceState === 'rebooting' || deviceState === 'booting') ? 'shadow-[0_0_4px_var(--neon-amber)]' : undefined)}
+            </>
           )}
+          <CrystalPowerButton />
+          {/* Info toggle / fold toggle */}
+          {!isStandby ? (
+            <button
+              onClick={() => setShowFoldedInfo(p => !p)}
+              className="font-mono text-[5px] text-[var(--neon-cyan)]/50 hover:text-[var(--neon-cyan)] transition-colors px-0.5"
+              title={showFoldedInfo ? 'Hide info' : 'Show info'}
+            >{showFoldedInfo ? '▲' : '▼'}</button>
+          ) : null}
         </div>
 
-        {/* Worn wooden buttons */}
-        <div className="flex items-center gap-0.5">
-          {/* Round wooden test button */}
-          <button
-            onClick={handleTest}
-            disabled={deviceState !== 'online'}
-            className="group relative disabled:opacity-30"
-            title="Test"
-          >
-            <div
-              className="w-2.5 h-2.5 rounded-full p-[1px] transition-all group-active:scale-95"
-              style={{
-                background: 'linear-gradient(180deg, #8b6914 0%, #5a4510 50%, #3a2a08 100%)',
-                boxShadow: 'inset 0 1px 0 rgba(255,220,150,0.3), inset 0 -1px 2px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4)',
-                border: '0.5px solid #2a1a00',
-              }}
-            >
-              <div
-                className={cn(
-                  'w-full h-full rounded-full flex items-center justify-center',
-                  deviceState === 'testing' && 'shadow-[0_0_4px_var(--neon-cyan)]'
-                )}
-                style={{
-                  background: 'radial-gradient(circle at 30% 30%, #a07820 0%, #6a4a12 60%, #4a3008 100%)',
-                }}
-              >
-                <span className="font-mono text-[3px] text-[#2a1a00] font-bold">T</span>
-              </div>
-            </div>
-          </button>
-
-          {/* Square wooden reset button */}
-          <button
-            onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || isStandby}
-            className="group relative disabled:opacity-30"
-            title="Reboot"
-          >
-            <div
-              className="w-2.5 h-2.5 rounded-[2px] p-[1px] transition-all group-active:scale-95"
-              style={{
-                background: 'linear-gradient(180deg, #6a4a20 0%, #4a3010 50%, #2a1a05 100%)',
-                boxShadow: 'inset 0 1px 0 rgba(255,200,100,0.2), inset 0 -1px 2px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4)',
-                border: '0.5px solid #1a0a00',
-              }}
-            >
-              <div
-                className={cn(
-                  'w-full h-full rounded-[1px] flex items-center justify-center',
-                  (deviceState === 'rebooting' || deviceState === 'booting') && 'shadow-[0_0_4px_var(--neon-amber)]'
-                )}
-                style={{
-                  background: 'linear-gradient(135deg, #7a5a18 0%, #5a3a10 50%, #3a2008 100%)',
-                }}
-              >
-                <span className="font-mono text-[3px] text-[#1a0a00] font-bold">R</span>
-              </div>
-            </div>
-          </button>
-          <div className="font-mono text-[3px] text-white/20">QSM-2</div>
-        </div>
-      </div>
-
-      {/* Quantum state visualization */}
-      <div className={cn(
-        'relative h-10 bg-black/60 rounded overflow-hidden',
-        deviceState === 'testing' && 'ring-1 ring-[var(--neon-cyan)]/30'
-      )}>
-        {/* Wave function display */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          {/* Animated wave */}
-          <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="var(--neon-cyan)" stopOpacity="0" />
-                <stop offset="50%" stopColor="var(--neon-cyan)" stopOpacity={isActive ? "0.6" : isStandby ? "0.05" : "0.2"} />
-                <stop offset="100%" stopColor="var(--neon-cyan)" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path
-              d={`M 0 20 ${Array.from({ length: 20 }, (_, i) => {
-                const x = (i / 19) * 100
-                const amplitude = isStandby ? 1 : isActive ? 8 : 3
-                const testMul = deviceState === 'testing' ? 1.5 : 1
-                const y = 20 + Math.sin(wavePhase + i * 0.5) * amplitude * testMul
-                return `L ${x} ${y}`
-              }).join(' ')}`}
-              stroke="url(#waveGrad)"
-              strokeWidth={deviceState === 'testing' ? "2" : "1.5"}
-              fill="none"
-              style={{
-                filter: isActive ? 'drop-shadow(0 0 3px var(--neon-cyan))' : 'none',
-              }}
-            />
-          </svg>
-
-          {/* Psi symbol */}
-          <div
-            className={cn(
-              'relative z-10 font-mono text-[14px] transition-all',
-              isActive ? 'text-[var(--neon-cyan)]' :
-              isStandby ? 'text-[var(--neon-cyan)]/10' :
-              'text-[var(--neon-cyan)]/30'
-            )}
-            style={{
-              textShadow: isActive ? '0 0 8px var(--neon-cyan)' : 'none',
-              animation: deviceState === 'testing' ? 'quantum-pulse 0.3s ease-in-out infinite' : 'none',
-            }}
-          >
-            |ψ⟩
+        {/* Folded info expansion */}
+        <div style={{
+          maxHeight: showFoldedInfo && !isStandby ? '60px' : '0px',
+          overflow: 'hidden',
+          transition: 'max-height 300ms ease',
+        }}>
+          <div className="px-1.5 pb-1 grid grid-cols-3 gap-x-2 gap-y-0 font-mono text-[4px]">
+            <span className="text-white/40">COH: <span className="text-[var(--neon-cyan)]">{displayCoherence}%</span></span>
+            <span className="text-white/40">Qubits: <span className="text-[var(--neon-cyan)]">{displayQubits}</span></span>
+            <span className="text-white/40">Entgl: <span className="text-[var(--neon-cyan)]">{displayEntangled ? 'YES' : 'NO'}</span></span>
+            <span className="text-white/40">Err: <span className="text-[var(--neon-cyan)]">{displayError}%</span></span>
+            <span className="text-white/40">Temp: <span className="text-[var(--neon-cyan)]">{displayTemp}°K</span></span>
+            <span className="text-white/40">Draw: <span className="text-[var(--neon-cyan)]">{displayDraw} E/s</span></span>
           </div>
         </div>
-
-        {/* Test overlays */}
-        {deviceState === 'testing' && (
-          <>
-            <div
-              className="absolute inset-0 pointer-events-none opacity-20"
-              style={{
-                background: 'repeating-linear-gradient(90deg, transparent 0px, transparent 5px, var(--neon-cyan) 5px, var(--neon-cyan) 6px)',
-                animation: 'quantum-scan 0.5s linear infinite',
-              }}
-            />
-          </>
-        )}
-
-        {/* Boot overlay */}
-        {(deviceState === 'booting' || deviceState === 'rebooting') && (
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background: 'radial-gradient(circle at center, var(--neon-amber) 0%, transparent 60%)',
-              opacity: 0.2,
-              animation: 'quantum-init 0.6s ease-out infinite',
-            }}
-          />
-        )}
       </div>
 
-      {/* Status bar */}
-      <div className="flex items-center justify-between font-mono text-[5px] mt-0.5">
-        <span className={cn(
-          'w-10 shrink-0 transition-colors',
-          isActive ? 'text-[var(--neon-cyan)]' : 'text-white/30'
-        )}>
-          {isStandby ? '--' : displayCoherence}% COH
-        </span>
-        <span className={cn(
-          'flex-1 text-[4px] text-center whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
-          isStandby ? 'text-white/30' :
-          deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
-          deviceState === 'booting' || deviceState === 'rebooting' ? 'text-[var(--neon-amber)]' :
-          testResult === 'pass' ? 'text-[var(--neon-green)]' :
-          'text-white/20'
-        )}>
-          {isStandby ? 'STANDBY' : statusMessage}
-        </span>
-        <span className={cn(
-          'w-10 shrink-0 text-right transition-colors',
-          !isStandby && displayEntangled ? 'text-[var(--neon-cyan)]' : 'text-white/30'
-        )}>
-          {isStandby ? '--' : displayQubits}Q
-        </span>
+      {/* ===== UNFOLDED INNER PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+        width: '100%', left: 0, top: 0,
+      }}>
+        {/* Fold chevron */}
+        {qsmManager && !isStandby && (
+          <button
+            onClick={() => qsmManager.toggleExpanded()}
+            className="absolute top-[2px] right-[2px] z-10 font-mono text-[5px] text-[var(--neon-cyan)]/40 hover:text-[var(--neon-cyan)] transition-colors"
+            title="Fold"
+          >▴</button>
+        )}
+
+        <div className="p-1">
+          {/* Header with wooden buttons */}
+          <div className="flex items-center justify-between mb-0.5">
+            <div className="flex items-center gap-0.5">
+              <LED on={isLedOn} color={getLedColor()} size="sm" className="scale-75" />
+              <div className="font-mono text-[5px] text-[var(--neon-cyan)]">QUANTUM</div>
+              {/* IBM style logo */}
+              <div
+                className="font-mono text-[3px] text-[#6090c0] px-0.5 leading-none font-bold"
+                style={{
+                  background: 'linear-gradient(180deg, #2a3a4a 0%, #1a2a3a 100%)',
+                  border: '0.5px solid #4a5a6a',
+                  borderRadius: '1px',
+                }}
+              >
+                IBM
+              </div>
+              <CrystalPowerButton />
+            </div>
+
+            {/* Worn wooden buttons */}
+            <div className="flex items-center gap-0.5">
+              {woodBtn('T', handleTest, deviceState !== 'online', true, 'Test',
+                deviceState === 'testing' ? 'shadow-[0_0_4px_var(--neon-cyan)]' : undefined)}
+              {woodBtn('R', handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || isStandby, false, 'Reboot',
+                (deviceState === 'rebooting' || deviceState === 'booting') ? 'shadow-[0_0_4px_var(--neon-amber)]' : undefined)}
+              <div className="font-mono text-[3px] text-white/20">QSM-2</div>
+            </div>
+          </div>
+
+          {/* Quantum state visualization */}
+          <div className={cn(
+            'relative h-10 bg-black/60 rounded overflow-hidden',
+            deviceState === 'testing' && 'ring-1 ring-[var(--neon-cyan)]/30'
+          )}>
+            {/* Wave function display */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <svg className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="var(--neon-cyan)" stopOpacity="0" />
+                    <stop offset="50%" stopColor="var(--neon-cyan)" stopOpacity={isActive ? "0.6" : isStandby ? "0.05" : "0.2"} />
+                    <stop offset="100%" stopColor="var(--neon-cyan)" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d={`M 0 20 ${Array.from({ length: 20 }, (_, i) => {
+                    const x = (i / 19) * 100
+                    const amplitude = isStandby ? 1 : isActive ? 8 : 3
+                    const testMul = deviceState === 'testing' ? 1.5 : 1
+                    const y = 20 + Math.sin(wavePhase + i * 0.5) * amplitude * testMul
+                    return `L ${x} ${y}`
+                  }).join(' ')}`}
+                  stroke="url(#waveGrad)"
+                  strokeWidth={deviceState === 'testing' ? "2" : "1.5"}
+                  fill="none"
+                  style={{
+                    filter: isActive ? 'drop-shadow(0 0 3px var(--neon-cyan))' : 'none',
+                  }}
+                />
+              </svg>
+
+              {/* Psi symbol */}
+              <div
+                className={cn(
+                  'relative z-10 font-mono text-[14px] transition-all',
+                  isActive ? 'text-[var(--neon-cyan)]' :
+                  isStandby ? 'text-[var(--neon-cyan)]/10' :
+                  'text-[var(--neon-cyan)]/30'
+                )}
+                style={{
+                  textShadow: isActive ? '0 0 8px var(--neon-cyan)' : 'none',
+                  animation: deviceState === 'testing' ? 'quantum-pulse 0.3s ease-in-out infinite' : 'none',
+                }}
+              >
+                |ψ⟩
+              </div>
+            </div>
+
+            {/* Test overlays */}
+            {deviceState === 'testing' && (
+              <div
+                className="absolute inset-0 pointer-events-none opacity-20"
+                style={{
+                  background: 'repeating-linear-gradient(90deg, transparent 0px, transparent 5px, var(--neon-cyan) 5px, var(--neon-cyan) 6px)',
+                  animation: 'quantum-scan 0.5s linear infinite',
+                }}
+              />
+            )}
+
+            {/* Boot overlay */}
+            {(deviceState === 'booting' || deviceState === 'rebooting') && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: 'radial-gradient(circle at center, var(--neon-amber) 0%, transparent 60%)',
+                  opacity: 0.2,
+                  animation: 'quantum-init 0.6s ease-out infinite',
+                }}
+              />
+            )}
+          </div>
+
+          {/* Status bar */}
+          <div className="flex items-center justify-between font-mono text-[5px] mt-0.5">
+            <span className={cn(
+              'w-10 shrink-0 transition-colors',
+              isActive ? 'text-[var(--neon-cyan)]' : 'text-white/30'
+            )}>
+              {isStandby ? '--' : displayCoherence}% COH
+            </span>
+            <span className={cn(
+              'flex-1 text-[4px] text-center whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
+              isStandby ? 'text-white/30' :
+              deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
+              deviceState === 'booting' || deviceState === 'rebooting' ? 'text-[var(--neon-amber)]' :
+              testResult === 'pass' ? 'text-[var(--neon-green)]' :
+              'text-white/20'
+            )}>
+              {isStandby ? 'STANDBY' : statusMessage}
+            </span>
+            <span className={cn(
+              'w-10 shrink-0 text-right transition-colors',
+              !isStandby && displayEntangled ? 'text-[var(--neon-cyan)]' : 'text-white/30'
+            )}>
+              {isStandby ? '--' : displayQubits}Q
+            </span>
+          </div>
+        </div>
       </div>
 
       <style jsx global>{`
@@ -7723,8 +9578,6 @@ export function QuantumStateMonitor({
 // ==================================================
 // NETWORK MONITOR - Tech Tier 2/4 network throughput
 // ==================================================
-type NetworkState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type NetworkTestPhase = 'latency' | 'bandwidth' | 'packet' | 'security' | 'complete' | null
 
 interface NetworkMonitorProps {
   bandwidth?: number
@@ -7743,19 +9596,46 @@ export function NetworkMonitor({
   onTest,
   onReset,
 }: NetworkMonitorProps) {
-  const [deviceState, setDeviceState] = useState<NetworkState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<NetworkTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Init...')
-  const [displayValues, setDisplayValues] = useState({ bandwidth: 0, latency: 0, connected: false })
+  const manager = useNETManagerOptional()
+  const deviceState = manager?.deviceState ?? 'online'
+  const testPhase = manager?.testPhase ?? null
+  const testResult = manager?.testResult ?? null
+  const statusMessage = manager?.statusMessage ?? 'CONNECTED'
+  const isPowered = manager?.isPowered ?? true
+  const isExpanded = manager?.isExpanded ?? true
+  const shutdownPhase = manager?.shutdownPhase ?? null
+  const currentDraw = manager?.currentDraw ?? 0.8
+
+  const displayBandwidth = manager?.bandwidth ?? bandwidth
+  const displayLatency = manager?.latencyMs ?? latency
+  const displayConnected = manager?.isConnected ?? isConnected
+
   const [bars, setBars] = useState([20, 35, 25, 45, 30, 50, 40, 55, 35, 45])
+
+  // Folded info toggle
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const toggleFoldedInfo = useCallback(() => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current)
+      if (next) {
+        foldedInfoTimerRef.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      }
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    return () => { if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current) }
+  }, [])
 
   // Animate bandwidth bars
   useEffect(() => {
-    if (deviceState === 'offline') return
+    if (deviceState === 'standby' || deviceState === 'shutdown') return
     const interval = setInterval(() => {
-      setBars(prev => prev.map((v, i) => {
+      setBars(prev => prev.map(() => {
         const base = deviceState === 'testing' ? 70 : 50
         const variance = deviceState === 'testing' ? 30 : 40
         return Math.max(15, Math.min(95, base + (Math.random() - 0.5) * variance))
@@ -7764,264 +9644,312 @@ export function NetworkMonitor({
     return () => clearInterval(interval)
   }, [deviceState])
 
-  // Boot sequence
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Detecting NIC...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('DHCP request...')
-      setBootPhase(2)
-      setDisplayValues({ bandwidth: 0, latency: 999, connected: false })
-      await new Promise(r => setTimeout(r, 400))
-
-      setStatusMessage('Handshake...')
-      setBootPhase(3)
-      setDisplayValues({ bandwidth: bandwidth * 0.3, latency: 80, connected: false })
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Sync routes...')
-      setBootPhase(4)
-      setDisplayValues({ bandwidth: bandwidth * 0.7, latency: 30, connected: true })
-      await new Promise(r => setTimeout(r, 400))
-
-      setDisplayValues({ bandwidth, latency, connected: isConnected })
-      setBootPhase(5)
-      setDeviceState('online')
-      setStatusMessage('CONNECTED')
-    }
-    bootSequence()
-  }, [])
-
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayValues({ bandwidth, latency, connected: isConnected })
-    }
-  }, [bandwidth, latency, isConnected, deviceState])
-
-  const handleTest = async () => {
-    if (deviceState !== 'online') return
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<NetworkTestPhase>[] = ['latency', 'bandwidth', 'packet', 'security', 'complete']
-    const msgs: Record<NonNullable<NetworkTestPhase>, string> = {
-      latency: 'Ping test...',
-      bandwidth: 'Bandwidth test...',
-      packet: 'Packet integrity...',
-      security: 'Security check...',
-      complete: 'Test complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(msgs[phase])
-      await new Promise(r => setTimeout(r, 420))
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('PASSED')
-    onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('CONNECTED')
-    }, 2500)
+  const handleTest = () => {
+    if (manager) { manager.runTest(); onTest?.() }
   }
 
-  const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-    setDeviceState('rebooting')
-    setTestResult(null)
+  const handleReboot = () => {
+    if (manager) { manager.reboot(); onReset?.() }
+  }
 
-    setStatusMessage('Disconnect...')
-    setDisplayValues(prev => ({ ...prev, connected: false, bandwidth: 0 }))
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Reset NIC...')
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 400))
-
-    // Boot sequence
-    setDeviceState('booting')
-    setStatusMessage('Detecting NIC...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('DHCP request...')
-    setBootPhase(2)
-    setDisplayValues({ bandwidth: 0, latency: 200, connected: false })
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Handshake...')
-    setBootPhase(3)
-    setDisplayValues({ bandwidth: bandwidth * 0.5, latency: 50, connected: true })
-    await new Promise(r => setTimeout(r, 350))
-
-    setDisplayValues({ bandwidth, latency, connected: isConnected })
-    setBootPhase(5)
-    setDeviceState('online')
-    setStatusMessage('CONNECTED')
-    onReset?.()
+  const handlePowerToggle = () => {
+    if (!manager) return
+    if (isPowered && deviceState !== 'standby') {
+      manager.powerOff()
+    } else if (deviceState === 'standby') {
+      manager.powerOn()
+    }
   }
 
   const getLedColor = () => {
-    if (deviceState === 'offline' || deviceState === 'rebooting') return 'red'
+    if (deviceState === 'standby' || deviceState === 'shutdown' || deviceState === 'rebooting') return 'red'
     if (deviceState === 'booting') return 'amber'
     if (deviceState === 'testing') return 'cyan'
     if (testResult === 'pass') return 'green'
-    return displayValues.connected ? 'lime' : 'red'
+    return displayConnected ? 'lime' : 'red'
   }
 
-  const isLedOn = deviceState !== 'offline'
+  const isLedOn = deviceState !== 'standby' && deviceState !== 'shutdown'
   const isActive = deviceState === 'online' || deviceState === 'testing'
 
+  const getStatusColor = () => {
+    switch (deviceState) {
+      case 'online': return 'var(--neon-lime,#bfff00)'
+      case 'booting': return 'var(--neon-amber)'
+      case 'testing': return 'var(--neon-cyan)'
+      case 'rebooting': return 'var(--neon-amber)'
+      case 'standby': return 'var(--neon-red)'
+      case 'shutdown': return 'var(--neon-red)'
+      default: return 'var(--neon-lime,#bfff00)'
+    }
+  }
+
+  const getStatusLabel = () => {
+    switch (deviceState) {
+      case 'online': return displayConnected ? 'CONNECTED' : 'ONLINE'
+      case 'booting': return 'BOOT'
+      case 'testing': return 'TEST'
+      case 'rebooting': return 'REBOOT'
+      case 'standby': return 'STANDBY'
+      case 'shutdown': return 'SHTDWN'
+      default: return 'ONLINE'
+    }
+  }
+
+  // Toggle power switch helper for folded & unfolded
+  const powerSwitch = (
+    <button
+      onClick={handlePowerToggle}
+      disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
+      className="group flex-shrink-0"
+      title={isPowered && deviceState !== 'standby' ? 'Power Off' : 'Power On'}
+    >
+      <div
+        className="w-[7px] h-[4px] rounded-full border transition-all relative overflow-hidden"
+        style={{
+          background: '#0a0a0a',
+          borderColor: isPowered && deviceState !== 'standby' ? '#5a8a00' : deviceState === 'standby' ? '#8a6a00' : '#2a2a2a',
+          boxShadow: isPowered && deviceState !== 'standby' ? '0 0 3px rgba(191,255,0,0.4)' : 'none',
+        }}
+      >
+        <div
+          className="absolute top-[0.5px] w-[3px] h-[2px] rounded-full transition-all"
+          style={{
+            left: isPowered && deviceState !== 'standby' ? '3px' : '0.5px',
+            backgroundColor: isPowered && deviceState !== 'standby' ? 'var(--neon-lime,#bfff00)' : deviceState === 'standby' ? '#8a6a00' : '#333',
+            boxShadow: isPowered && deviceState !== 'standby' ? '0 0 2px var(--neon-lime,#bfff00)' : 'none',
+          }}
+        />
+      </div>
+    </button>
+  )
+
+  // LED button helper
+  const ledBtn = (onClick: () => void, disabled: boolean, title: string, bgGrad: string, borderColor: string, activeClass: string, inactiveClass: string, isActiveState: boolean) => (
+    <button onClick={onClick} disabled={disabled} className="group relative disabled:opacity-30" title={title}>
+      <div className="w-2.5 h-2.5 rounded-full p-[1px] transition-all group-active:scale-95"
+        style={{ background: bgGrad, boxShadow: `inset 0 1px 0 rgba(100,255,100,0.1), 0 1px 2px rgba(0,0,0,0.5)`, border: `1px solid ${borderColor}` }}>
+        <div className={cn('w-full h-full rounded-full transition-all', isActiveState ? activeClass : inactiveClass)} />
+      </div>
+    </button>
+  )
+
   return (
-    <PanelFrame variant="military" className={cn('p-1', className)}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-0.5">
-        <div className="flex items-center gap-0.5">
-          <div className="font-mono text-[5px] text-[var(--neon-lime,#bfff00)]">NETWORK</div>
-          {/* Cisco style logo */}
-          <div
-            className="font-mono text-[3px] text-[#60c0a0] px-0.5 leading-none"
-            style={{
-              background: 'linear-gradient(180deg, #1a3a2a 0%, #0a2a1a 100%)',
-              border: '0.5px solid #3a5a4a',
-              borderRadius: '1px',
-            }}
-          >
-            CSCO
+    <PanelFrame variant="military" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+      {/* ===== FOLDED FRONT PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+        width: '100%', left: 0, top: 0,
+      }}>
+        <div className="px-2 py-1.5">
+          {/* Main folded row */}
+          <div className="flex items-center gap-1.5">
+            {/* Status LED */}
+            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{
+              backgroundColor: getStatusColor(),
+              boxShadow: `0 0 4px ${getStatusColor()}`,
+              animation: (deviceState === 'booting' || deviceState === 'rebooting') ? 'pulse 0.5s ease-in-out infinite' : 'none',
+            }} />
+            <span className="font-mono text-[8px] text-[var(--neon-lime,#bfff00)] font-bold tracking-wide">NET-001</span>
+            <span className="font-mono text-[7px] text-white/50">{getStatusLabel()}</span>
+            <div className="flex-1" />
+
+            {/* Action buttons - only when powered */}
+            {isPowered && (
+              <>
+                {ledBtn(handleTest, deviceState !== 'online', 'Test',
+                  'linear-gradient(180deg, #2a3a2a 0%, #1a2a1a 50%, #0a1a0a 100%)', '#3a4a3a',
+                  'bg-[var(--neon-lime,#bfff00)] shadow-[0_0_6px_var(--neon-lime,#bfff00),0_0_12px_var(--neon-lime,#bfff00)]',
+                  testResult === 'pass' ? 'bg-[var(--neon-green)] shadow-[0_0_6px_var(--neon-green)]' : 'bg-[#1a2a1a]',
+                  deviceState === 'testing')}
+                {ledBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown', 'Reboot',
+                  'linear-gradient(180deg, #3a2a1a 0%, #2a1a0a 50%, #1a0a00 100%)', '#4a3a2a',
+                  'bg-[var(--neon-amber)] shadow-[0_0_6px_var(--neon-amber),0_0_12px_var(--neon-amber)]',
+                  'bg-[#2a1a0a]',
+                  deviceState === 'rebooting' || deviceState === 'booting')}
+              </>
+            )}
+
+            {powerSwitch}
+
+            {/* Info / Unfold toggle */}
+            {isPowered ? (
+              <button
+                onClick={toggleFoldedInfo}
+                className="font-mono text-[7px] text-white/40 hover:text-white/70 transition-colors flex-shrink-0"
+                title={showFoldedInfo ? 'Hide info' : 'Show info'}
+              >
+                {showFoldedInfo ? '▲' : '▼'}
+              </button>
+            ) : (
+              <button
+                onClick={() => manager?.setExpanded(true)}
+                className="font-mono text-[7px] text-white/30 hover:text-white/50 transition-colors flex-shrink-0"
+                title="Unfold"
+              >
+                ▼
+              </button>
+            )}
+          </div>
+
+          {/* Folded info expansion */}
+          <div style={{
+            maxHeight: showFoldedInfo && isPowered ? '40px' : '0px',
+            overflow: 'hidden',
+            transition: 'max-height 300ms ease',
+          }}>
+            <div className="mt-1 grid grid-cols-3 gap-x-3 gap-y-0.5 font-mono text-[6px]">
+              <span className="text-white/30">BW: <span className="text-[var(--neon-lime,#bfff00)]">{displayBandwidth.toFixed(1)} Gbps</span></span>
+              <span className="text-white/30">Lat: <span className="text-[var(--neon-lime,#bfff00)]">{displayLatency}ms</span></span>
+              <span className="text-white/30">Link: <span className="text-[var(--neon-lime,#bfff00)]">{displayConnected ? 'UP' : 'DOWN'}</span></span>
+              <span className="text-white/30">Loss: <span className="text-[var(--neon-lime,#bfff00)]">{manager?.packetLoss ?? 0}%</span></span>
+              <span className="text-white/30">Draw: <span className="text-[var(--neon-lime,#bfff00)]">{currentDraw.toFixed(1)}</span></span>
+              <span className="text-white/30">Tier: <span className="text-white/50">T1</span></span>
+            </div>
           </div>
         </div>
-        <div className="font-mono text-[3px] text-white/20">NET-2</div>
       </div>
 
-      {/* Bandwidth visualization - expanded */}
-      <div className={cn(
-        'relative h-12 bg-black/60 rounded overflow-hidden p-1',
-        deviceState === 'testing' && 'ring-1 ring-[var(--neon-lime,#bfff00)]/30'
-      )}>
-        {/* Bandwidth bars */}
-        <div className="h-full flex items-end gap-[2px]">
-          {bars.map((h, i) => (
-            <div
-              key={i}
-              className="flex-1 rounded-t transition-all duration-200"
-              style={{
-                height: `${isActive ? h : h * 0.3}%`,
-                background: isActive
-                  ? `linear-gradient(180deg, var(--neon-lime,#bfff00) 0%, #5a8a00 100%)`
-                  : '#333',
-                boxShadow: isActive ? '0 0 4px var(--neon-lime,#bfff00)' : 'none',
-                opacity: deviceState === 'testing' ? (testPhase === 'bandwidth' ? 1 : 0.7) : 0.8,
-              }}
-            />
-          ))}
-        </div>
+      {/* ===== UNFOLDED INNER PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+        width: '100%', left: 0, top: 0,
+      }}>
+        {/* Fold chevron */}
+        <button
+          onClick={() => manager?.setExpanded(false)}
+          className="absolute top-0.5 right-1 z-20 font-mono text-[7px] text-white/30 hover:text-white/60 transition-colors"
+          title="Fold"
+        >
+          ▴
+        </button>
 
-        {/* Test overlay */}
-        {deviceState === 'testing' && (
-          <div
-            className="absolute inset-0 pointer-events-none opacity-20"
-            style={{
-              background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 3px, var(--neon-lime,#bfff00) 3px, var(--neon-lime,#bfff00) 4px)',
-              animation: 'network-scan 0.4s linear infinite',
-            }}
-          />
-        )}
-
-        {/* Boot overlay */}
-        {(deviceState === 'booting' || deviceState === 'rebooting') && (
-          <div
-            className="absolute inset-0 pointer-events-none flex items-center justify-center"
-            style={{ background: 'rgba(0,0,0,0.5)' }}
-          >
-            <div className="font-mono text-[6px] text-[var(--neon-amber)] animate-pulse">
-              {statusMessage}
-            </div>
+        <div className="p-1 relative">
+          {/* Tiny toggle power switch — top-right */}
+          <div className="absolute top-[3px] right-[10px] z-10">
+            {powerSwitch}
           </div>
-        )}
-      </div>
 
-      {/* Status bar with LED buttons on left */}
-      <div className="flex items-center justify-between font-mono text-[5px] mt-0.5">
-        {/* LED buttons - bottom left */}
-        <div className="flex items-center gap-0.5">
-          {/* Round LED test button with glow */}
-          <button
-            onClick={handleTest}
-            disabled={deviceState !== 'online'}
-            className="group relative disabled:opacity-30"
-            title="Test"
-          >
-            <div
-              className="w-2.5 h-2.5 rounded-full p-[1px] transition-all group-active:scale-95"
-              style={{
-                background: 'linear-gradient(180deg, #2a3a2a 0%, #1a2a1a 50%, #0a1a0a 100%)',
-                boxShadow: 'inset 0 1px 0 rgba(100,255,100,0.1), 0 1px 2px rgba(0,0,0,0.5)',
-                border: '1px solid #3a4a3a',
-              }}
-            >
+          {/* Header */}
+          <div className="flex items-center justify-between mb-0.5">
+            <div className="flex items-center gap-0.5">
+              <div className="font-mono text-[5px] text-[var(--neon-lime,#bfff00)]">NETWORK</div>
+              {/* Cisco style logo */}
               <div
-                className={cn(
-                  'w-full h-full rounded-full transition-all',
-                  deviceState === 'testing'
-                    ? 'bg-[var(--neon-lime,#bfff00)] shadow-[0_0_6px_var(--neon-lime,#bfff00),0_0_12px_var(--neon-lime,#bfff00)]'
-                    : testResult === 'pass'
-                    ? 'bg-[var(--neon-green)] shadow-[0_0_6px_var(--neon-green)]'
-                    : 'bg-[#1a2a1a]'
-                )}
-              />
+                className="font-mono text-[3px] text-[#60c0a0] px-0.5 leading-none"
+                style={{
+                  background: 'linear-gradient(180deg, #1a3a2a 0%, #0a2a1a 100%)',
+                  border: '0.5px solid #3a5a4a',
+                  borderRadius: '1px',
+                }}
+              >
+                CSCO
+              </div>
             </div>
-          </button>
+            <div className="font-mono text-[3px] text-white/20 mr-5">NET-001</div>
+          </div>
 
-          {/* Round LED reset button with glow */}
-          <button
-            onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
-            className="group relative disabled:opacity-30"
-            title="Reboot"
-          >
-            <div
-              className="w-2.5 h-2.5 rounded-full p-[1px] transition-all group-active:scale-95"
-              style={{
-                background: 'linear-gradient(180deg, #3a2a1a 0%, #2a1a0a 50%, #1a0a00 100%)',
-                boxShadow: 'inset 0 1px 0 rgba(255,150,50,0.1), 0 1px 2px rgba(0,0,0,0.5)',
-                border: '1px solid #4a3a2a',
-              }}
-            >
-              <div
-                className={cn(
-                  'w-full h-full rounded-full transition-all',
-                  (deviceState === 'rebooting' || deviceState === 'booting')
-                    ? 'bg-[var(--neon-amber)] shadow-[0_0_6px_var(--neon-amber),0_0_12px_var(--neon-amber)]'
-                    : 'bg-[#2a1a0a]'
-                )}
-              />
-            </div>
-          </button>
-
-          <span className={cn(
-            'transition-colors ml-0.5',
-            isActive ? 'text-[var(--neon-lime,#bfff00)]' : 'text-white/30'
+          {/* Bandwidth visualization - expanded */}
+          <div className={cn(
+            'relative h-12 bg-black/60 rounded overflow-hidden p-1',
+            deviceState === 'testing' && 'ring-1 ring-[var(--neon-lime,#bfff00)]/30'
           )}>
-            {displayValues.bandwidth.toFixed(1)} Gbps
-          </span>
-        </div>
+            {/* Bandwidth bars */}
+            <div className="h-full flex items-end gap-[2px]">
+              {bars.map((h, i) => (
+                <div
+                  key={i}
+                  className="flex-1 rounded-t transition-all duration-200"
+                  style={{
+                    height: `${isActive ? h : h * 0.3}%`,
+                    background: isActive
+                      ? `linear-gradient(180deg, var(--neon-lime,#bfff00) 0%, #5a8a00 100%)`
+                      : '#333',
+                    boxShadow: isActive ? '0 0 4px var(--neon-lime,#bfff00)' : 'none',
+                    opacity: deviceState === 'testing' ? (testPhase === 'bandwidth' ? 1 : 0.7) : 0.8,
+                  }}
+                />
+              ))}
+            </div>
 
-        <span className={cn(
-          'text-[4px] transition-colors',
-          deviceState === 'testing' ? 'text-[var(--neon-lime,#bfff00)]' :
-          testResult === 'pass' ? 'text-[var(--neon-green)]' :
-          'text-white/20'
-        )}>
-          {deviceState === 'online' || deviceState === 'testing' ? `${displayValues.latency}ms` : statusMessage}
-        </span>
+            {/* Test overlay */}
+            {deviceState === 'testing' && (
+              <div
+                className="absolute inset-0 pointer-events-none opacity-20"
+                style={{
+                  background: 'repeating-linear-gradient(0deg, transparent 0px, transparent 3px, var(--neon-lime,#bfff00) 3px, var(--neon-lime,#bfff00) 4px)',
+                  animation: 'network-scan 0.4s linear infinite',
+                }}
+              />
+            )}
+
+            {/* Boot overlay */}
+            {(deviceState === 'booting' || deviceState === 'rebooting') && (
+              <div
+                className="absolute inset-0 pointer-events-none flex items-center justify-center"
+                style={{ background: 'rgba(0,0,0,0.5)' }}
+              >
+                <div className="font-mono text-[6px] text-[var(--neon-amber)] animate-pulse">
+                  {statusMessage}
+                </div>
+              </div>
+            )}
+
+            {/* Standby/Shutdown overlay */}
+            {(deviceState === 'standby' || deviceState === 'shutdown') && (
+              <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
+                <span className="font-mono text-[6px] text-[var(--neon-red)]/60">
+                  {shutdownPhase ? shutdownPhase.toUpperCase() : 'STANDBY'}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Status bar with LED buttons on left */}
+          <div className="flex items-center justify-between font-mono text-[5px] mt-0.5">
+            {/* LED buttons - bottom left */}
+            <div className="flex items-center gap-0.5">
+              {ledBtn(handleTest, deviceState !== 'online', 'Test',
+                'linear-gradient(180deg, #2a3a2a 0%, #1a2a1a 50%, #0a1a0a 100%)', '#3a4a3a',
+                'bg-[var(--neon-lime,#bfff00)] shadow-[0_0_6px_var(--neon-lime,#bfff00),0_0_12px_var(--neon-lime,#bfff00)]',
+                testResult === 'pass' ? 'bg-[var(--neon-green)] shadow-[0_0_6px_var(--neon-green)]' : 'bg-[#1a2a1a]',
+                deviceState === 'testing')}
+              {ledBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown', 'Reboot',
+                'linear-gradient(180deg, #3a2a1a 0%, #2a1a0a 50%, #1a0a00 100%)', '#4a3a2a',
+                'bg-[var(--neon-amber)] shadow-[0_0_6px_var(--neon-amber),0_0_12px_var(--neon-amber)]',
+                'bg-[#2a1a0a]',
+                deviceState === 'rebooting' || deviceState === 'booting')}
+
+              <span className={cn(
+                'transition-colors ml-0.5',
+                isActive ? 'text-[var(--neon-lime,#bfff00)]' : 'text-white/30'
+              )}>
+                {displayBandwidth.toFixed(1)} Gbps
+              </span>
+            </div>
+
+            <span className={cn(
+              'text-[4px] transition-colors',
+              deviceState === 'testing' ? 'text-[var(--neon-lime,#bfff00)]' :
+              testResult === 'pass' ? 'text-[var(--neon-green)]' :
+              'text-white/20'
+            )}>
+              {deviceState === 'online' || deviceState === 'testing' ? `${displayLatency}ms` : statusMessage}
+            </span>
+          </div>
+        </div>
       </div>
 
       <style jsx global>{`
@@ -8037,9 +9965,6 @@ export function NetworkMonitor({
 // ==================================================
 // TEMPERATURE MONITOR - Thermal monitoring system
 // ==================================================
-type TempState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type TempTestPhase = 'sensors' | 'calibration' | 'threshold' | 'cooling' | 'complete' | null
-
 interface TemperatureMonitorProps {
   temperature?: number
   maxTemp?: number
@@ -8057,290 +9982,338 @@ export function TemperatureMonitor({
   onTest,
   onReset,
 }: TemperatureMonitorProps) {
-  const [deviceState, setDeviceState] = useState<TempState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<TempTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Init...')
-  const [displayTemp, setDisplayTemp] = useState(0)
-  const [fluctuation, setFluctuation] = useState(0)
+  const manager = useTMPManagerOptional()
+  const deviceState = manager?.deviceState ?? 'online'
+  const testPhase = manager?.testPhase ?? null
+  const testResult = manager?.testResult ?? null
+  const statusMessage = manager?.statusMessage ?? 'NOMINAL'
+  const isPowered = manager?.isPowered ?? true
+  const isExpanded = manager?.isExpanded ?? true
+  const shutdownPhase = manager?.shutdownPhase ?? null
+  const currentDraw = manager?.currentDraw ?? 0.8
 
-  // Animate temperature fluctuation
-  useEffect(() => {
-    if (deviceState === 'offline') return
-    const interval = setInterval(() => {
-      const variance = deviceState === 'testing' ? 2 : 0.3
-      setFluctuation((Math.random() - 0.5) * variance)
-    }, 500)
-    return () => clearInterval(interval)
-  }, [deviceState])
+  const displayTemp = manager?.temperature ?? temperature
+  const displayFluctuation = manager?.fluctuation ?? 0
+  const displayMaxTemp = manager?.maxTemp ?? maxTemp
+  const displayMinTemp = manager?.minTemp ?? minTemp
 
-  // Boot sequence
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Sensor init...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 350))
+  const isActive = deviceState === 'online' || deviceState === 'testing'
+  const currentTemp = displayTemp + displayFluctuation
+  const tempPercent = ((currentTemp - displayMinTemp) / (displayMaxTemp - displayMinTemp)) * 100
+  const tempColor = currentTemp < 40 ? 'var(--neon-cyan)' : currentTemp < 60 ? 'var(--neon-green)' : currentTemp < 75 ? 'var(--neon-amber)' : 'var(--neon-red)'
 
-      setStatusMessage('Probing thermal...')
-      setBootPhase(2)
-      setDisplayTemp(50)
-      await new Promise(r => setTimeout(r, 400))
+  // Folded info toggle
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-      setStatusMessage('Calibrating...')
-      setBootPhase(3)
-      setDisplayTemp(35)
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Reading temps...')
-      setBootPhase(4)
-      setDisplayTemp(temperature)
-      await new Promise(r => setTimeout(r, 300))
-
-      setBootPhase(5)
-      setDeviceState('online')
-      setStatusMessage('NOMINAL')
-    }
-    bootSequence()
+  const toggleFoldedInfo = useCallback(() => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current)
+      if (next) {
+        foldedInfoTimerRef.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      }
+      return next
+    })
   }, [])
 
   useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayTemp(temperature)
-    }
-  }, [temperature, deviceState])
+    return () => { if (foldedInfoTimerRef.current) clearTimeout(foldedInfoTimerRef.current) }
+  }, [])
 
-  const handleTest = async () => {
-    if (deviceState !== 'online') return
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<TempTestPhase>[] = ['sensors', 'calibration', 'threshold', 'cooling', 'complete']
-    const msgs: Record<NonNullable<TempTestPhase>, string> = {
-      sensors: 'Testing sensors...',
-      calibration: 'Calibration check...',
-      threshold: 'Threshold verify...',
-      cooling: 'Cooling system...',
-      complete: 'Test complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(msgs[phase])
-      await new Promise(r => setTimeout(r, 400))
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('PASSED')
-    onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('NOMINAL')
-    }, 2500)
+  const handleTest = () => {
+    if (manager) { manager.runTest(); onTest?.() }
   }
 
-  const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    setStatusMessage('Shutdown...')
-    setDisplayTemp(0)
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Reset sensors...')
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 400))
-
-    // Boot
-    setDeviceState('booting')
-    setStatusMessage('Sensor init...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Probing thermal...')
-    setBootPhase(2)
-    setDisplayTemp(40)
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Calibrating...')
-    setBootPhase(3)
-    setDisplayTemp(temperature)
-    await new Promise(r => setTimeout(r, 300))
-
-    setBootPhase(5)
-    setDeviceState('online')
-    setStatusMessage('NOMINAL')
-    onReset?.()
+  const handleReboot = () => {
+    if (manager) { manager.reboot(); onReset?.() }
   }
 
-  const isActive = deviceState === 'online' || deviceState === 'testing'
-  const currentTemp = displayTemp + fluctuation
-  const tempPercent = ((currentTemp - minTemp) / (maxTemp - minTemp)) * 100
-  const tempColor = currentTemp < 40 ? 'var(--neon-cyan)' : currentTemp < 60 ? 'var(--neon-green)' : currentTemp < 75 ? 'var(--neon-amber)' : 'var(--neon-red)'
+  const handlePowerToggle = () => {
+    if (!manager) return
+    if (isPowered && deviceState !== 'standby') {
+      manager.powerOff()
+    } else if (deviceState === 'standby') {
+      manager.powerOn()
+    }
+  }
+
+  const getStatusColor = () => {
+    switch (deviceState) {
+      case 'online': return 'var(--neon-amber)'
+      case 'booting': return 'var(--neon-cyan)'
+      case 'testing': return 'var(--neon-purple)'
+      case 'rebooting': return 'var(--neon-amber)'
+      case 'standby': return 'var(--neon-red)'
+      case 'shutdown': return 'var(--neon-red)'
+      default: return 'var(--neon-amber)'
+    }
+  }
+
+  const getStatusLabel = () => {
+    switch (deviceState) {
+      case 'online': return isActive ? `${currentTemp.toFixed(1)}°C` : 'ONLINE'
+      case 'booting': return 'BOOT'
+      case 'testing': return 'TEST'
+      case 'rebooting': return 'REBOOT'
+      case 'standby': return 'STANDBY'
+      case 'shutdown': return 'SHTDWN'
+      default: return 'ONLINE'
+    }
+  }
+
+  // Hex power button helper
+  const hexPowerBtn = (
+    <button
+      onClick={handlePowerToggle}
+      disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
+      className="group flex-shrink-0"
+      title={isPowered && deviceState !== 'standby' ? 'Power Off' : 'Power On'}
+    >
+      <div
+        className="w-[6px] h-[6px] transition-all"
+        style={{
+          clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+          background: isPowered && deviceState !== 'standby'
+            ? 'linear-gradient(135deg, var(--neon-amber) 0%, #8a5a00 100%)'
+            : deviceState === 'standby' ? '#4a3a1a' : '#2a2a2a',
+          boxShadow: isPowered && deviceState !== 'standby' ? '0 0 3px var(--neon-amber)' : 'none',
+        }}
+      />
+    </button>
+  )
+
+  // LED button helper
+  const ledBtn = (onClick: () => void, disabled: boolean, title: string, bgGrad: string, borderColor: string, activeClass: string, inactiveClass: string, isActiveState: boolean) => (
+    <button onClick={onClick} disabled={disabled} className="group relative disabled:opacity-30" title={title}>
+      <div className="w-2.5 h-2.5 rounded-full p-[1px] transition-all group-active:scale-95"
+        style={{ background: bgGrad, boxShadow: `inset 0 1px 0 rgba(255,200,100,0.15), 0 1px 2px rgba(0,0,0,0.5)`, border: `1px solid ${borderColor}` }}>
+        <div className={cn('w-full h-full rounded-full transition-all', isActiveState ? activeClass : inactiveClass)} />
+      </div>
+    </button>
+  )
 
   return (
-    <PanelFrame variant="default" className={cn('p-1', className)}>
-      {/* Header with company logo */}
-      <div className="flex items-center justify-between mb-0.5">
-        <div className="flex items-center gap-0.5">
-          <div className="font-mono text-[5px] text-[var(--neon-amber)]">TEMP</div>
-        </div>
-        <div className="flex items-center gap-0.5">
-          {/* Intel style logo */}
-          <div
-            className="font-mono text-[3px] text-[#0088cc] px-0.5 leading-none"
-            style={{
-              background: 'linear-gradient(180deg, #1a2a4a 0%, #0a1a3a 100%)',
-              border: '0.5px solid #3a4a6a',
-              borderRadius: '1px',
-            }}
-          >
-            INTL
+    <PanelFrame variant="default" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+      {/* ===== FOLDED FRONT PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+        width: '100%', left: 0, top: 0,
+      }}>
+        <div className="px-2 py-1.5">
+          <div className="flex items-center gap-1.5">
+            {/* Status LED */}
+            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{
+              backgroundColor: getStatusColor(),
+              boxShadow: `0 0 4px ${getStatusColor()}`,
+              animation: (deviceState === 'booting' || deviceState === 'rebooting') ? 'pulse 0.5s ease-in-out infinite' : 'none',
+            }} />
+            <span className="font-mono text-[8px] text-[var(--neon-amber)] font-bold tracking-wide">TMP-001</span>
+            <span className="font-mono text-[7px] text-white/50">{getStatusLabel()}</span>
+            <div className="flex-1" />
+
+            {isPowered && (
+              <>
+                {ledBtn(handleTest, deviceState !== 'online', 'Test',
+                  'linear-gradient(180deg, #4a3a2a 0%, #3a2a1a 50%, #2a1a0a 100%)', '#5a4a3a',
+                  'bg-[var(--neon-amber)] shadow-[0_0_6px_var(--neon-amber),0_0_12px_var(--neon-amber)]',
+                  testResult === 'pass' ? 'bg-[var(--neon-green)] shadow-[0_0_6px_var(--neon-green)]' : 'bg-[#2a1a0a]',
+                  deviceState === 'testing')}
+                {ledBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown', 'Reboot',
+                  'linear-gradient(180deg, #4a2a2a 0%, #3a1a1a 50%, #2a0a0a 100%)', '#5a3a3a',
+                  'bg-[var(--neon-red)] shadow-[0_0_6px_var(--neon-red),0_0_12px_var(--neon-red)]',
+                  'bg-[#2a0a0a]',
+                  deviceState === 'rebooting' || deviceState === 'booting')}
+              </>
+            )}
+
+            {hexPowerBtn}
+
+            {isPowered ? (
+              <button
+                onClick={toggleFoldedInfo}
+                className="font-mono text-[7px] text-white/40 hover:text-white/70 transition-colors flex-shrink-0"
+                title={showFoldedInfo ? 'Hide info' : 'Show info'}
+              >
+                {showFoldedInfo ? '▲' : '▼'}
+              </button>
+            ) : (
+              <button
+                onClick={() => manager?.setExpanded(true)}
+                className="font-mono text-[7px] text-white/30 hover:text-white/50 transition-colors flex-shrink-0"
+                title="Unfold"
+              >
+                ▼
+              </button>
+            )}
           </div>
-          <div className="font-mono text-[3px] text-white/20">TMP-1</div>
+
+          {/* Folded info expansion */}
+          <div style={{
+            maxHeight: showFoldedInfo && isPowered ? '40px' : '0px',
+            overflow: 'hidden',
+            transition: 'max-height 300ms ease',
+          }}>
+            <div className="mt-1 grid grid-cols-3 gap-x-3 gap-y-0.5 font-mono text-[6px]">
+              <span className="text-white/30">Temp: <span style={{ color: tempColor }}>{currentTemp.toFixed(1)}°C</span></span>
+              <span className="text-white/30">Range: <span className="text-[var(--neon-amber)]">{displayMinTemp}-{displayMaxTemp}°</span></span>
+              <span className="text-white/30">Status: <span className="text-[var(--neon-green)]">{statusMessage}</span></span>
+              <span className="text-white/30">Draw: <span className="text-[var(--neon-amber)]">{currentDraw.toFixed(1)}</span></span>
+              <span className="text-white/30">Tier: <span className="text-white/50">T1</span></span>
+              <span className="text-white/30">Mode: <span className="text-[var(--neon-amber)]">AUTO</span></span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Temperature visualization - expanded */}
-      <div className={cn(
-        'relative h-10 bg-black/60 rounded overflow-hidden',
-        deviceState === 'testing' && 'ring-1 ring-[var(--neon-amber)]/30'
-      )}>
-        {/* Temperature gradient bar */}
-        <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 h-3 rounded overflow-hidden">
-          {/* Background gradient */}
-          <div
-            className="absolute inset-0 rounded"
-            style={{
-              background: 'linear-gradient(90deg, var(--neon-cyan) 0%, var(--neon-green) 35%, var(--neon-amber) 65%, var(--neon-red) 100%)',
-              opacity: isActive ? 0.8 : 0.3,
-            }}
-          />
-          {/* Temperature indicator */}
-          {isActive && (
-            <div
-              className="absolute top-0 bottom-0 w-1 rounded transition-all duration-300"
-              style={{
-                left: `${Math.max(0, Math.min(100, tempPercent))}%`,
-                transform: 'translateX(-50%)',
-                background: '#fff',
-                boxShadow: `0 0 6px ${tempColor}, 0 0 12px ${tempColor}`,
-              }}
-            />
-          )}
-          {/* Grid lines */}
-          <div className="absolute inset-0 flex justify-between px-1">
-            {[0, 1, 2, 3, 4].map(i => (
-              <div key={i} className="w-px h-full bg-white/20" />
-            ))}
+      {/* ===== UNFOLDED INNER PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+        width: '100%', left: 0, top: 0,
+      }}>
+        {/* Fold chevron */}
+        <button
+          onClick={() => manager?.setExpanded(false)}
+          className="absolute top-0.5 right-1 z-20 font-mono text-[7px] text-white/30 hover:text-white/60 transition-colors"
+          title="Fold"
+        >
+          ▴
+        </button>
+
+        <div className="p-1 relative">
+          {/* Tiny hexagonal power button — top left */}
+          <div className="absolute top-[3px] left-[3px] z-10">
+            {hexPowerBtn}
           </div>
-        </div>
 
-        {/* Temperature labels */}
-        <div className="absolute inset-x-2 bottom-0.5 flex justify-between">
-          <span className="font-mono text-[4px] text-[var(--neon-cyan)]/60">{minTemp}°</span>
-          <span className="font-mono text-[4px] text-[var(--neon-green)]/60">40°</span>
-          <span className="font-mono text-[4px] text-[var(--neon-amber)]/60">60°</span>
-          <span className="font-mono text-[4px] text-[var(--neon-red)]/60">{maxTemp}°</span>
-        </div>
-
-        {/* Test overlay */}
-        {deviceState === 'testing' && (
-          <div
-            className="absolute inset-0 pointer-events-none opacity-20"
-            style={{
-              background: 'repeating-linear-gradient(90deg, transparent 0px, transparent 4px, var(--neon-amber) 4px, var(--neon-amber) 5px)',
-              animation: 'temp-scan 0.5s linear infinite',
-            }}
-          />
-        )}
-
-        {/* Boot overlay */}
-        {(deviceState === 'booting' || deviceState === 'rebooting') && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-            <span className="font-mono text-[5px] text-[var(--neon-amber)] animate-pulse">{statusMessage}</span>
+          {/* Header with company logo */}
+          <div className="flex items-center justify-between mb-0.5">
+            <div className="flex items-center gap-0.5">
+              <div className="font-mono text-[5px] text-[var(--neon-amber)] ml-2">TEMP</div>
+            </div>
+            <div className="flex items-center gap-0.5 mr-3">
+              {/* Intel style logo */}
+              <div
+                className="font-mono text-[3px] text-[#0088cc] px-0.5 leading-none"
+                style={{
+                  background: 'linear-gradient(180deg, #1a2a4a 0%, #0a1a3a 100%)',
+                  border: '0.5px solid #3a4a6a',
+                  borderRadius: '1px',
+                }}
+              >
+                INTL
+              </div>
+              <div className="font-mono text-[3px] text-white/20">TMP-001</div>
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* Status bar with LED buttons on right */}
-      <div className="flex items-center justify-between font-mono text-[5px] mt-0.5">
-        <span className={cn(
-          'transition-colors',
-          isActive ? (currentTemp > 60 ? 'text-[var(--neon-amber)]' : 'text-[var(--neon-green)]') : 'text-white/30'
-        )}>
-          {isActive ? `${currentTemp.toFixed(1)}°C` : '--.-°C'}
-        </span>
-
-        <span className={cn(
-          'text-[4px] flex-1 text-center',
-          deviceState === 'testing' ? 'text-[var(--neon-amber)]' :
-          testResult === 'pass' ? 'text-[var(--neon-green)]' :
-          'text-white/20'
-        )}>
-          {deviceState === 'online' ? statusMessage : ''}
-        </span>
-
-        {/* LED buttons - bottom right */}
-        <div className="flex items-center gap-0.5">
-          {/* Round LED test button with orange glow */}
-          <button
-            onClick={handleTest}
-            disabled={deviceState !== 'online'}
-            className="group relative disabled:opacity-30"
-            title="Test"
-          >
-            <div
-              className="w-2.5 h-2.5 rounded-full p-[1px] transition-all group-active:scale-95"
-              style={{
-                background: 'linear-gradient(180deg, #4a3a2a 0%, #3a2a1a 50%, #2a1a0a 100%)',
-                boxShadow: 'inset 0 1px 0 rgba(255,200,100,0.15), 0 1px 2px rgba(0,0,0,0.5)',
-                border: '1px solid #5a4a3a',
-              }}
-            >
+          {/* Temperature visualization - expanded */}
+          <div className={cn(
+            'relative h-10 bg-black/60 rounded overflow-hidden',
+            deviceState === 'testing' && 'ring-1 ring-[var(--neon-amber)]/30'
+          )}>
+            {/* Temperature gradient bar */}
+            <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 h-3 rounded overflow-hidden">
               <div
-                className={cn(
-                  'w-full h-full rounded-full transition-all',
-                  deviceState === 'testing'
-                    ? 'bg-[var(--neon-amber)] shadow-[0_0_6px_var(--neon-amber),0_0_12px_var(--neon-amber)]'
-                    : testResult === 'pass'
-                    ? 'bg-[var(--neon-green)] shadow-[0_0_6px_var(--neon-green)]'
-                    : 'bg-[#2a1a0a]'
-                )}
+                className="absolute inset-0 rounded"
+                style={{
+                  background: 'linear-gradient(90deg, var(--neon-cyan) 0%, var(--neon-green) 35%, var(--neon-amber) 65%, var(--neon-red) 100%)',
+                  opacity: isActive ? 0.8 : 0.3,
+                }}
               />
+              {isActive && (
+                <div
+                  className="absolute top-0 bottom-0 w-1 rounded transition-all duration-300"
+                  style={{
+                    left: `${Math.max(0, Math.min(100, tempPercent))}%`,
+                    transform: 'translateX(-50%)',
+                    background: '#fff',
+                    boxShadow: `0 0 6px ${tempColor}, 0 0 12px ${tempColor}`,
+                  }}
+                />
+              )}
+              <div className="absolute inset-0 flex justify-between px-1">
+                {[0, 1, 2, 3, 4].map(i => (
+                  <div key={i} className="w-px h-full bg-white/20" />
+                ))}
+              </div>
             </div>
-          </button>
 
-          {/* Round LED reset button with red glow */}
-          <button
-            onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
-            className="group relative disabled:opacity-30"
-            title="Reboot"
-          >
-            <div
-              className="w-2.5 h-2.5 rounded-full p-[1px] transition-all group-active:scale-95"
-              style={{
-                background: 'linear-gradient(180deg, #4a2a2a 0%, #3a1a1a 50%, #2a0a0a 100%)',
-                boxShadow: 'inset 0 1px 0 rgba(255,100,100,0.15), 0 1px 2px rgba(0,0,0,0.5)',
-                border: '1px solid #5a3a3a',
-              }}
-            >
-              <div
-                className={cn(
-                  'w-full h-full rounded-full transition-all',
-                  (deviceState === 'rebooting' || deviceState === 'booting')
-                    ? 'bg-[var(--neon-red)] shadow-[0_0_6px_var(--neon-red),0_0_12px_var(--neon-red)]'
-                    : 'bg-[#2a0a0a]'
-                )}
-              />
+            <div className="absolute inset-x-2 bottom-0.5 flex justify-between">
+              <span className="font-mono text-[4px] text-[var(--neon-cyan)]/60">{displayMinTemp}°</span>
+              <span className="font-mono text-[4px] text-[var(--neon-green)]/60">40°</span>
+              <span className="font-mono text-[4px] text-[var(--neon-amber)]/60">60°</span>
+              <span className="font-mono text-[4px] text-[var(--neon-red)]/60">{displayMaxTemp}°</span>
             </div>
-          </button>
+
+            {deviceState === 'testing' && (
+              <div
+                className="absolute inset-0 pointer-events-none opacity-20"
+                style={{
+                  background: 'repeating-linear-gradient(90deg, transparent 0px, transparent 4px, var(--neon-amber) 4px, var(--neon-amber) 5px)',
+                  animation: 'temp-scan 0.5s linear infinite',
+                }}
+              />
+            )}
+
+            {(deviceState === 'booting' || deviceState === 'rebooting') && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                <span className="font-mono text-[5px] text-[var(--neon-amber)] animate-pulse">{statusMessage}</span>
+              </div>
+            )}
+
+            {(deviceState === 'standby' || deviceState === 'shutdown') && (
+              <div className="absolute inset-0 bg-black/90 z-10 flex items-center justify-center rounded">
+                <span className="font-mono text-[6px] text-[var(--neon-red)]/60">
+                  {shutdownPhase ? shutdownPhase.toUpperCase() : 'STANDBY'}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Status bar with LED buttons on right */}
+          <div className="flex items-center justify-between font-mono text-[5px] mt-0.5">
+            <span className={cn(
+              'transition-colors',
+              isActive ? (currentTemp > 60 ? 'text-[var(--neon-amber)]' : 'text-[var(--neon-green)]') : 'text-white/30'
+            )}>
+              {isActive ? `${currentTemp.toFixed(1)}°C` : '--.-°C'}
+            </span>
+
+            <span className={cn(
+              'text-[4px] flex-1 text-center',
+              deviceState === 'testing' ? 'text-[var(--neon-amber)]' :
+              testResult === 'pass' ? 'text-[var(--neon-green)]' :
+              'text-white/20'
+            )}>
+              {deviceState === 'online' ? statusMessage : ''}
+            </span>
+
+            <div className="flex items-center gap-0.5">
+              {ledBtn(handleTest, deviceState !== 'online', 'Test',
+                'linear-gradient(180deg, #4a3a2a 0%, #3a2a1a 50%, #2a1a0a 100%)', '#5a4a3a',
+                'bg-[var(--neon-amber)] shadow-[0_0_6px_var(--neon-amber),0_0_12px_var(--neon-amber)]',
+                testResult === 'pass' ? 'bg-[var(--neon-green)] shadow-[0_0_6px_var(--neon-green)]' : 'bg-[#2a1a0a]',
+                deviceState === 'testing')}
+              {ledBtn(handleReboot, deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown', 'Reboot',
+                'linear-gradient(180deg, #4a2a2a 0%, #3a1a1a 50%, #2a0a0a 100%)', '#5a3a3a',
+                'bg-[var(--neon-red)] shadow-[0_0_6px_var(--neon-red),0_0_12px_var(--neon-red)]',
+                'bg-[#2a0a0a]',
+                deviceState === 'rebooting' || deviceState === 'booting')}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -8384,6 +10357,26 @@ export function SupercomputerArray({
   const displayLoad = scaManager?.utilization ?? 87
   const isStandby = deviceState === 'standby'
   const isTransitioning = ['booting', 'shutdown', 'rebooting', 'testing'].includes(deviceState)
+  const isExpanded = scaManager?.isExpanded ?? true
+
+  // Folded info toggle
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const toggleFoldedInfo = useCallback(() => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current)
+      if (next) {
+        foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      }
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) }
+  }, [])
 
   const handleTest = () => scaManager?.runTest()
   const handleReboot = () => scaManager?.reboot()
@@ -8405,200 +10398,341 @@ export function SupercomputerArray({
   const isLedOn = !isStandby
   const nodesActive = deviceState === 'online' || deviceState === 'testing' || deviceState === 'booting'
 
-  return (
-    <PanelFrame variant="teal" className={cn('p-2', isStandby && 'opacity-50', className)}>
-      {/* Header with worn metal micro buttons */}
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1">
-          <LED on={isLedOn} color={getLedColor()} size="sm" />
-          <div className="font-mono text-[8px] text-[var(--neon-cyan)]">
-            SUPERCOMPUTER
-          </div>
-          <span className="font-mono text-[4px] text-white/15">v{SCA_FIRMWARE.version}</span>
+  // Hexagonal power button for SCA
+  const HexPowerButton = ({ small }: { small?: boolean }) => {
+    if (!scaManager) return null
+    const size = small ? '12px' : '12px'
+    return (
+      <button
+        onClick={handlePowerToggle}
+        disabled={isTransitioning}
+        className="group relative"
+        title={isStandby ? 'Power ON' : 'Power OFF'}
+        style={{ opacity: isTransitioning ? 0.4 : 1, cursor: isTransitioning ? 'not-allowed' : 'pointer' }}
+      >
+        <div
+          className="flex items-center justify-center transition-all"
+          style={{
+            width: size,
+            height: size,
+            clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+            background: isStandby
+              ? 'linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%)'
+              : 'linear-gradient(180deg, rgba(0,255,255,0.3) 0%, rgba(0,180,200,0.2) 100%)',
+            boxShadow: isStandby ? 'none' : '0 0 6px rgba(0,255,255,0.4)',
+          }}
+        >
+          <span style={{
+            fontSize: '6px',
+            color: isStandby ? '#444' : 'var(--neon-cyan)',
+            textShadow: isStandby ? 'none' : '0 0 3px var(--neon-cyan)',
+            lineHeight: 1,
+          }}>⏻</span>
         </div>
+      </button>
+    )
+  }
 
-        {/* Worn metal micro buttons - brushed steel style */}
-        <div className="flex items-center gap-0.5">
-          {/* Mini company logo - CRAY style */}
+  // Brushed steel micro button
+  const steelBtn = (label: string, onClick: () => void, disabled: boolean) => (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="font-mono transition-all"
+      style={{
+        fontSize: '6px',
+        lineHeight: 1,
+        padding: '2px 3px',
+        background: '#2a3a4a',
+        border: '1px solid #4a5a6a',
+        borderRadius: '1px',
+        color: disabled ? '#333' : '#8899aa',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.15), inset 0 -0.5px 0 rgba(0,0,0,0.3)',
+        opacity: disabled ? 0.4 : 1,
+      }}
+    >
+      {label}
+    </button>
+  )
+
+  // State label for folded bar
+  const stateLabel = isStandby ? 'STANDBY' : isTransitioning ? deviceState.toUpperCase() : 'ONLINE'
+  const stateLedColor = isStandby ? '#555' : isTransitioning ? 'var(--neon-amber)' : 'var(--neon-cyan)'
+
+  return (
+    <PanelFrame variant="teal" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+      {/* ═══════════ FOLDED FRONT PANEL ═══════════ */}
+      <div
+        style={{
+          transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 0 : 1,
+          position: isExpanded ? 'absolute' : 'relative',
+          pointerEvents: isExpanded ? 'none' : 'auto',
+          zIndex: isExpanded ? 0 : 2,
+          width: '100%', left: 0, top: 0,
+        }}
+      >
+        {/* Main folded bar */}
+        <div className="flex items-center gap-1 px-1.5 py-1">
           <div
-            className="font-mono text-[3px] text-white/25 px-0.5 border border-white/10 rounded-[1px] mr-0.5"
+            className="w-1.5 h-1.5 rounded-full shrink-0"
             style={{
-              background: 'linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.1) 100%)',
+              backgroundColor: stateLedColor,
+              boxShadow: !isStandby ? `0 0 4px ${stateLedColor}` : 'none',
             }}
-          >
-            CRAY
-          </div>
-          {/* Power toggle - hexagonal/diamond shape for uniqueness */}
-          {scaManager && (
+          />
+          <span className="font-mono text-[7px] font-bold shrink-0" style={{ color: 'var(--neon-cyan)' }}>SCA-001</span>
+          <span className="font-mono text-[6px] shrink-0" style={{ color: stateLedColor }}>{stateLabel}</span>
+          <div className="flex-1" />
+          {!isStandby && (
+            <div className="flex gap-0.5">
+              {steelBtn('T', handleTest, isTransitioning || isStandby)}
+              {steelBtn('R', handleReboot, isTransitioning || isStandby)}
+            </div>
+          )}
+          <HexPowerButton small />
+          {!isStandby && (
             <button
-              onClick={handlePowerToggle}
-              disabled={isTransitioning}
-              className="group relative"
-              title={isStandby ? 'Power ON' : 'Power OFF'}
-              style={{ opacity: isTransitioning ? 0.4 : 1, cursor: isTransitioning ? 'not-allowed' : 'pointer' }}
+              onClick={toggleFoldedInfo}
+              className="font-mono transition-all"
+              style={{
+                fontSize: '8px', lineHeight: 1, padding: '1px 2px',
+                color: showFoldedInfo ? 'var(--neon-cyan)' : '#556',
+                cursor: 'pointer', background: 'none', border: 'none',
+              }}
+              title={showFoldedInfo ? 'Hide info' : 'Show info'}
             >
-              <div
-                className="flex items-center justify-center transition-all"
-                style={{
-                  width: '12px',
-                  height: '12px',
-                  clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
-                  background: isStandby
-                    ? 'linear-gradient(180deg, #2a2a2a 0%, #1a1a1a 100%)'
-                    : 'linear-gradient(180deg, rgba(0,255,255,0.3) 0%, rgba(0,180,200,0.2) 100%)',
-                  boxShadow: isStandby ? 'none' : '0 0 6px rgba(0,255,255,0.4)',
-                }}
-              >
-                <span style={{
-                  fontSize: '6px',
-                  color: isStandby ? '#444' : 'var(--neon-cyan)',
-                  textShadow: isStandby ? 'none' : '0 0 3px var(--neon-cyan)',
-                  lineHeight: 1,
-                }}>⏻</span>
-              </div>
+              {showFoldedInfo ? '▲' : '▼'}
             </button>
           )}
-          <button
-            onClick={handleTest}
-            disabled={deviceState !== 'online'}
-            className="group relative disabled:opacity-30"
-            title="Test"
-          >
-            <div className={cn(
-              'w-2.5 h-[7px] rounded-[1px] transition-all',
-              'flex items-center justify-center',
-              'border border-[#4a5a6a]/60',
-              'group-hover:border-[var(--neon-cyan)]/50',
-              'group-active:scale-95'
-            )}
-            style={{
-              background: 'linear-gradient(180deg, #5a6a7a 0%, #3a4a5a 20%, #2a3a4a 80%, #1a2a3a 100%)',
-              boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.2), inset 0 -0.5px 0 rgba(0,0,0,0.3)',
-            }}
-            >
-              <div className="absolute inset-0 rounded-[1px] opacity-30"
-                style={{
-                  backgroundImage: 'repeating-linear-gradient(90deg, transparent 0px, rgba(255,255,255,0.1) 1px, transparent 2px)',
-                }}
-              />
-              <div className={cn(
-                'w-[3px] h-[3px] rounded-full transition-all z-10',
-                deviceState === 'testing'
-                  ? 'bg-[var(--neon-cyan)] shadow-[0_0_2px_var(--neon-cyan)]'
-                  : testResult === 'pass'
-                  ? 'bg-[var(--neon-green)] shadow-[0_0_2px_var(--neon-green)]'
-                  : testResult === 'fail'
-                  ? 'bg-[var(--neon-red)] shadow-[0_0_2px_var(--neon-red)]'
-                  : 'bg-[#1a2a3a]'
-              )} />
-            </div>
-          </button>
-          <button
-            onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || isStandby}
-            className="group relative disabled:opacity-30"
-            title="Reboot"
-          >
-            <div className={cn(
-              'w-2.5 h-[7px] rounded-[1px] transition-all',
-              'flex items-center justify-center',
-              'border border-[#6a5a4a]/60',
-              'group-hover:border-[var(--neon-amber)]/50',
-              'group-active:scale-95'
-            )}
-            style={{
-              background: 'linear-gradient(180deg, #7a6a5a 0%, #5a4a3a 20%, #4a3a2a 80%, #3a2a1a 100%)',
-              boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.2), inset 0 -0.5px 0 rgba(0,0,0,0.3)',
-            }}
-            >
-              <div className="absolute inset-0 rounded-[1px] opacity-30"
-                style={{
-                  backgroundImage: 'repeating-linear-gradient(90deg, transparent 0px, rgba(255,255,255,0.1) 1px, transparent 2px)',
-                }}
-              />
-              <div className={cn(
-                'w-[3px] h-[3px] rounded-full transition-all z-10',
-                deviceState === 'rebooting' || deviceState === 'booting'
-                  ? 'bg-[var(--neon-amber)] shadow-[0_0_2px_var(--neon-amber)]'
-                  : 'bg-[#2a1a0a]'
-              )} />
-            </div>
-          </button>
-          <div className="font-mono text-[5px] text-white/30">T3</div>
+        </div>
+
+        {/* Folded info expansion */}
+        <div
+          style={{
+            maxHeight: showFoldedInfo && !isStandby ? '60px' : '0px',
+            overflow: 'hidden',
+            transition: 'max-height 300ms ease',
+          }}
+        >
+          <div className="px-2 pb-1.5 grid grid-cols-3 gap-x-3 gap-y-0.5">
+            {[
+              { label: 'PFLOPS', value: `${displayFlops.toFixed(1)}` },
+              { label: 'Load', value: `${Math.round(displayLoad)}%` },
+              { label: 'Nodes', value: `${activeNodes}/16` },
+              { label: 'Jobs', value: `${scaManager?.jobQueue ?? 0}` },
+              { label: 'Temp', value: `${Math.round(scaManager?.temperature ?? 42)}°C` },
+              { label: 'Draw', value: `${Math.round(scaManager?.currentDraw ?? 15)} E/s` },
+            ].map(({ label: l, value: v }) => (
+              <div key={l} className="flex justify-between">
+                <span className="font-mono text-[5px] text-white/30">{l}</span>
+                <span className="font-mono text-[6px]" style={{ color: 'var(--neon-cyan)' }}>{v}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Compute nodes visualization */}
-      <div className={cn(
-        'relative h-8 bg-black/40 rounded overflow-hidden p-1',
-        deviceState === 'testing' && testPhase === 'nodes' && 'ring-1 ring-[var(--neon-cyan)]/50'
-      )}>
-        <div className="grid grid-cols-8 grid-rows-2 gap-0.5 h-full">
-          {Array.from({ length: 16 }).map((_, i) => {
-            const isActive = nodesActive && i < activeNodes
-            const nodeLoad = i < Math.floor(displayLoad / 6.25)
-            return (
+      {/* ═══════════ UNFOLDED INNER PANEL ═══════════ */}
+      <div
+        style={{
+          transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+          transformOrigin: 'top center',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+          opacity: isExpanded ? 1 : 0,
+          position: isExpanded ? 'relative' : 'absolute',
+          pointerEvents: isExpanded ? 'auto' : 'none',
+          zIndex: isExpanded ? 2 : 0,
+          width: '100%', left: 0, top: 0,
+        }}
+      >
+        {/* Fold chevron */}
+        {scaManager && (
+          <button
+            onClick={() => scaManager.toggleExpanded()}
+            className="absolute top-0.5 right-0.5 z-10 font-mono transition-all"
+            style={{
+              fontSize: '7px', lineHeight: 1, padding: '1px 2px',
+              color: '#445', cursor: 'pointer',
+              background: 'rgba(0,0,0,0.3)', border: '1px solid #222',
+              borderRadius: '2px',
+            }}
+            title="Fold panel"
+          >
+            ▴
+          </button>
+        )}
+
+        {/* Original full content */}
+        <div className={cn('p-2', isStandby && 'opacity-50')}>
+          {/* Header with worn metal micro buttons */}
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1">
+              <LED on={isLedOn} color={getLedColor()} size="sm" />
+              <div className="font-mono text-[8px] text-[var(--neon-cyan)]">
+                SUPERCOMPUTER
+              </div>
+              <span className="font-mono text-[4px] text-white/15">v{SCA_FIRMWARE.version}</span>
+            </div>
+
+            {/* Worn metal micro buttons - brushed steel style */}
+            <div className="flex items-center gap-0.5">
+              {/* Mini company logo - CRAY style */}
               <div
-                key={i}
-                className={cn(
-                  'rounded-sm transition-all duration-300',
-                  deviceState === 'testing' && testPhase === 'interconnect' && isActive && 'ring-1 ring-[var(--neon-green)]/50'
+                className="font-mono text-[3px] text-white/25 px-0.5 border border-white/10 rounded-[1px] mr-0.5"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.1) 100%)',
+                }}
+              >
+                CRAY
+              </div>
+              <HexPowerButton />
+              <button
+                onClick={handleTest}
+                disabled={deviceState !== 'online'}
+                className="group relative disabled:opacity-30"
+                title="Test"
+              >
+                <div className={cn(
+                  'w-2.5 h-[7px] rounded-[1px] transition-all',
+                  'flex items-center justify-center',
+                  'border border-[#4a5a6a]/60',
+                  'group-hover:border-[var(--neon-cyan)]/50',
+                  'group-active:scale-95'
                 )}
                 style={{
-                  background: isActive && nodeLoad
-                    ? 'var(--neon-cyan)'
-                    : isActive
-                    ? 'rgba(0,255,255,0.3)'
-                    : 'rgba(255,255,255,0.1)',
-                  opacity: isActive ? (nodeLoad ? 0.8 : 0.4) : 0.15,
-                  animation: isActive && nodeLoad && !isStandby
-                    ? `node-blink ${0.5 + (i % 4) * 0.1}s ease-in-out infinite`
-                    : 'none',
-                  boxShadow: isActive && nodeLoad ? '0 0 4px var(--neon-cyan)' : 'none',
+                  background: 'linear-gradient(180deg, #5a6a7a 0%, #3a4a5a 20%, #2a3a4a 80%, #1a2a3a 100%)',
+                  boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.2), inset 0 -0.5px 0 rgba(0,0,0,0.3)',
                 }}
-              />
-            )
-          })}
-        </div>
-
-        {/* Test overlay for memory/cache phases */}
-        {deviceState === 'testing' && (testPhase === 'memory' || testPhase === 'cache') && (
-          <div className="absolute inset-0 bg-[var(--neon-cyan)]/10 animate-pulse" />
-        )}
-
-        {/* Standby overlay */}
-        {isStandby && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="font-mono text-[7px] text-white/30">STANDBY</span>
+                >
+                  <div className="absolute inset-0 rounded-[1px] opacity-30"
+                    style={{
+                      backgroundImage: 'repeating-linear-gradient(90deg, transparent 0px, rgba(255,255,255,0.1) 1px, transparent 2px)',
+                    }}
+                  />
+                  <div className={cn(
+                    'w-[3px] h-[3px] rounded-full transition-all z-10',
+                    deviceState === 'testing'
+                      ? 'bg-[var(--neon-cyan)] shadow-[0_0_2px_var(--neon-cyan)]'
+                      : testResult === 'pass'
+                      ? 'bg-[var(--neon-green)] shadow-[0_0_2px_var(--neon-green)]'
+                      : testResult === 'fail'
+                      ? 'bg-[var(--neon-red)] shadow-[0_0_2px_var(--neon-red)]'
+                      : 'bg-[#1a2a3a]'
+                  )} />
+                </div>
+              </button>
+              <button
+                onClick={handleReboot}
+                disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || isStandby}
+                className="group relative disabled:opacity-30"
+                title="Reboot"
+              >
+                <div className={cn(
+                  'w-2.5 h-[7px] rounded-[1px] transition-all',
+                  'flex items-center justify-center',
+                  'border border-[#6a5a4a]/60',
+                  'group-hover:border-[var(--neon-amber)]/50',
+                  'group-active:scale-95'
+                )}
+                style={{
+                  background: 'linear-gradient(180deg, #7a6a5a 0%, #5a4a3a 20%, #4a3a2a 80%, #3a2a1a 100%)',
+                  boxShadow: 'inset 0 0.5px 0 rgba(255,255,255,0.2), inset 0 -0.5px 0 rgba(0,0,0,0.3)',
+                }}
+                >
+                  <div className="absolute inset-0 rounded-[1px] opacity-30"
+                    style={{
+                      backgroundImage: 'repeating-linear-gradient(90deg, transparent 0px, rgba(255,255,255,0.1) 1px, transparent 2px)',
+                    }}
+                  />
+                  <div className={cn(
+                    'w-[3px] h-[3px] rounded-full transition-all z-10',
+                    deviceState === 'rebooting' || deviceState === 'booting'
+                      ? 'bg-[var(--neon-amber)] shadow-[0_0_2px_var(--neon-amber)]'
+                      : 'bg-[#2a1a0a]'
+                  )} />
+                </div>
+              </button>
+              <div className="font-mono text-[5px] text-white/30">T3</div>
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* Status bar with fixed layout */}
-      <div className="flex items-center font-mono text-[7px] mt-1">
-        <span className={cn(
-          'w-12 shrink-0 transition-colors',
-          nodesActive && !isStandby ? 'text-[var(--neon-cyan)]' : 'text-white/30'
-        )}>
-          {isStandby ? '---' : `${displayFlops.toFixed(1)} PFLOPS`}
-        </span>
-        <span className={cn(
-          'flex-1 text-[5px] text-center transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
-          deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
-          deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
-          deviceState === 'shutdown' ? 'text-[var(--neon-red)]' :
-          testResult === 'pass' ? 'text-[var(--neon-green)]' :
-          testResult === 'fail' ? 'text-[var(--neon-red)]' :
-          'text-white/30'
-        )}>
-          {statusMessage}
-        </span>
-        <span className={cn(
-          'w-10 shrink-0 text-right transition-colors',
-          'text-white/40'
-        )}>
-          {isStandby ? '---' : `${Math.round(displayLoad)}% LOAD`}
-        </span>
+          {/* Compute nodes visualization */}
+          <div className={cn(
+            'relative h-8 bg-black/40 rounded overflow-hidden p-1',
+            deviceState === 'testing' && testPhase === 'nodes' && 'ring-1 ring-[var(--neon-cyan)]/50'
+          )}>
+            <div className="grid grid-cols-8 grid-rows-2 gap-0.5 h-full">
+              {Array.from({ length: 16 }).map((_, i) => {
+                const isActive = nodesActive && i < activeNodes
+                const nodeLoad = i < Math.floor(displayLoad / 6.25)
+                return (
+                  <div
+                    key={i}
+                    className={cn(
+                      'rounded-sm transition-all duration-300',
+                      deviceState === 'testing' && testPhase === 'interconnect' && isActive && 'ring-1 ring-[var(--neon-green)]/50'
+                    )}
+                    style={{
+                      background: isActive && nodeLoad
+                        ? 'var(--neon-cyan)'
+                        : isActive
+                        ? 'rgba(0,255,255,0.3)'
+                        : 'rgba(255,255,255,0.1)',
+                      opacity: isActive ? (nodeLoad ? 0.8 : 0.4) : 0.15,
+                      animation: isActive && nodeLoad && !isStandby
+                        ? `node-blink ${0.5 + (i % 4) * 0.1}s ease-in-out infinite`
+                        : 'none',
+                      boxShadow: isActive && nodeLoad ? '0 0 4px var(--neon-cyan)' : 'none',
+                    }}
+                  />
+                )
+              })}
+            </div>
+
+            {/* Test overlay for memory/cache phases */}
+            {deviceState === 'testing' && (testPhase === 'memory' || testPhase === 'cache') && (
+              <div className="absolute inset-0 bg-[var(--neon-cyan)]/10 animate-pulse" />
+            )}
+
+            {/* Standby overlay */}
+            {isStandby && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="font-mono text-[7px] text-white/30">STANDBY</span>
+              </div>
+            )}
+          </div>
+
+          {/* Status bar with fixed layout */}
+          <div className="flex items-center font-mono text-[7px] mt-1">
+            <span className={cn(
+              'w-12 shrink-0 transition-colors',
+              nodesActive && !isStandby ? 'text-[var(--neon-cyan)]' : 'text-white/30'
+            )}>
+              {isStandby ? '---' : `${displayFlops.toFixed(1)} PFLOPS`}
+            </span>
+            <span className={cn(
+              'flex-1 text-[5px] text-center transition-colors whitespace-nowrap overflow-hidden text-ellipsis px-0.5',
+              deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
+              deviceState === 'rebooting' || deviceState === 'booting' ? 'text-[var(--neon-amber)]' :
+              deviceState === 'shutdown' ? 'text-[var(--neon-red)]' :
+              testResult === 'pass' ? 'text-[var(--neon-green)]' :
+              testResult === 'fail' ? 'text-[var(--neon-red)]' :
+              'text-white/30'
+            )}>
+              {statusMessage}
+            </span>
+            <span className={cn(
+              'w-10 shrink-0 text-right transition-colors',
+              'text-white/40'
+            )}>
+              {isStandby ? '---' : `${Math.round(displayLoad)}% LOAD`}
+            </span>
+          </div>
+        </div>
       </div>
     </PanelFrame>
   )
@@ -8610,9 +10744,6 @@ export function SupercomputerArray({
 // Compatible: QuantumStateMonitor, ExoticMatterContainment
 // unOS Commands: DEVICE DIM [TEST|RESET|STATUS]
 // ==================================================
-type DimState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type DimTestPhase = 'sensors' | 'rift-scan' | 'stability' | 'calibration' | 'complete' | null
-
 interface DimensionMonitorProps {
   dimension?: number
   stability?: number
@@ -8630,143 +10761,155 @@ export function DimensionMonitor({
   onTest,
   onReset,
 }: DimensionMonitorProps) {
-  const [deviceState, setDeviceState] = useState<DimState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<DimTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Init...')
-  const [displayDim, setDisplayDim] = useState(0)
-  const [displayStability, setDisplayStability] = useState(0)
-  const [fluctuation, setFluctuation] = useState(0)
+  const dim = useDIMManagerOptional()
 
-  // Dimensional fluctuation animation
-  useEffect(() => {
-    if (deviceState === 'offline') return
-    const interval = setInterval(() => {
-      const variance = deviceState === 'testing' ? 0.05 : 0.01
-      setFluctuation((Math.random() - 0.5) * variance)
-    }, 300)
-    return () => clearInterval(interval)
-  }, [deviceState])
-
-  // Boot sequence
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Sensor init...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Probing D-space...')
-      setBootPhase(2)
-      setDisplayDim(1.0)
-      await new Promise(r => setTimeout(r, 400))
-
-      setStatusMessage('Calibrating rift...')
-      setBootPhase(3)
-      setDisplayDim(2.5)
-      setDisplayStability(50)
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Locking dimension...')
-      setBootPhase(4)
-      setDisplayDim(dimension)
-      setDisplayStability(stability)
-      await new Promise(r => setTimeout(r, 300))
-
-      setBootPhase(5)
-      setDeviceState('online')
-      setStatusMessage('STABLE')
-    }
-    bootSequence()
-  }, [])
-
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayDim(dimension)
-      setDisplayStability(stability)
-    }
-  }, [dimension, stability, deviceState])
-
-  const handleTest = async () => {
-    if (deviceState !== 'online') return
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<DimTestPhase>[] = ['sensors', 'rift-scan', 'stability', 'calibration', 'complete']
-    const msgs: Record<NonNullable<DimTestPhase>, string> = {
-      sensors: 'Testing sensors...',
-      'rift-scan': 'Scanning rifts...',
-      stability: 'Stability check...',
-      calibration: 'Calibrating D-lock...',
-      complete: 'Test complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(msgs[phase])
-      await new Promise(r => setTimeout(r, 400))
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('PASSED')
-    onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('STABLE')
-    }, 2500)
-  }
-
-  const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    setStatusMessage('Shutdown...')
-    setDisplayDim(0)
-    setDisplayStability(0)
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Reset D-lock...')
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 400))
-
-    // Boot
-    setDeviceState('booting')
-    setStatusMessage('Sensor init...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Probing D-space...')
-    setBootPhase(2)
-    setDisplayDim(2.0)
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Locking dimension...')
-    setBootPhase(3)
-    setDisplayDim(dimension)
-    setDisplayStability(stability)
-    await new Promise(r => setTimeout(r, 300))
-
-    setBootPhase(5)
-    setDeviceState('online')
-    setStatusMessage('STABLE')
-    onReset?.()
-  }
+  const deviceState = dim?.deviceState ?? 'online'
+  const bootPhase = dim?.bootPhase ?? null
+  const testPhase = dim?.testPhase ?? null
+  const testResult = dim?.testResult ?? null
+  const statusMessage = dim?.statusMessage ?? 'STABLE'
+  const isPowered = dim?.isPowered ?? true
+  const shutdownPhase = dim?.shutdownPhase ?? null
+  const displayDim = dim?.dimension ?? dimension
+  const displayStability = dim?.stability ?? stability
+  const displayRiftActivity = dim?.riftActivity ?? riftActivity
+  const fluctuation = dim?.fluctuation ?? 0
+  const isExpanded = dim?.isExpanded ?? true
 
   const isActive = deviceState === 'online' || deviceState === 'testing'
-  const currentDim = displayDim + fluctuation
+  const currentDim = (dim?.dimension ?? dimension) + (dim?.fluctuation ?? fluctuation)
   const stabilityColor = displayStability > 80 ? 'var(--neon-green)' : displayStability > 50 ? 'var(--neon-amber)' : 'var(--neon-red)'
 
   // Additional computed values
-  const haloProximity = Math.max(0, 100 - displayStability + riftActivity * 100)
+  const haloProximity = Math.max(0, 100 - displayStability + displayRiftActivity * 100)
   const entanglementStrength = displayStability > 90 ? 'STRONG' : displayStability > 70 ? 'MODERATE' : 'WEAK'
 
+  const handleFoldToggle = useCallback(() => dim?.toggleExpanded(), [dim])
+
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const toggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current)
+      if (next) { foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000) }
+      return next
+    })
+  }
+  useEffect(() => { return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) } }, [])
+
+  const getStatusColor = () => {
+    switch (deviceState) {
+      case 'online': return 'var(--neon-green)'
+      case 'booting': return 'var(--neon-cyan)'
+      case 'testing': return 'var(--neon-purple)'
+      case 'rebooting': return 'var(--neon-amber)'
+      case 'standby': case 'shutdown': return 'var(--neon-red)'
+      default: return 'var(--neon-green)'
+    }
+  }
+  const stateLabel = deviceState === 'online' ? 'ONLINE' : deviceState === 'testing' ? 'TESTING' : deviceState === 'booting' ? 'BOOTING' : deviceState === 'rebooting' ? 'REBOOT' : deviceState === 'shutdown' ? 'SHUTDOWN' : 'STANDBY'
+
+  const handleTest = () => {
+    if (dim) { dim.runTest(); onTest?.() }
+  }
+
+  const handleReboot = () => {
+    if (dim) { dim.reboot(); onReset?.() }
+  }
+
+  const handlePowerToggle = () => {
+    if (!dim) return
+    if (isPowered && deviceState !== 'standby') {
+      dim.powerOff()
+    } else if (deviceState === 'standby') {
+      dim.powerOn()
+    }
+  }
+
   return (
-    <PanelFrame variant="teal" className={cn('p-1 flex flex-col', className)}>
+    <PanelFrame variant="teal" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+      {/* FOLDED FRONT PANEL */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+      }} className="w-full">
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
+          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{
+            backgroundColor: getStatusColor(), boxShadow: `0 0 4px ${getStatusColor()}`,
+            animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+          }} />
+          <span className="font-mono text-[8px] font-bold text-[var(--neon-purple,#9d00ff)]">DIM-001</span>
+          <span className={cn('font-mono text-[7px]', isPowered ? 'text-[var(--neon-purple,#9d00ff)]/70' : 'text-white/30')}>{stateLabel}</span>
+          <div className="flex-1" />
+          {isPowered && (<>
+            <button onClick={handleTest} disabled={deviceState !== 'online'} className="group relative" title="Test">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)', borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a', boxShadow: deviceState === 'testing' ? '0 0 6px var(--neon-purple), inset 0 0 3px var(--neon-purple)' : 'inset 0 1px 2px rgba(0,0,0,0.5)', opacity: deviceState !== 'online' ? 0.3 : 1 }} />
+            </button>
+            <button onClick={handleReboot} disabled={deviceState === 'booting' || deviceState === 'rebooting'} className="group relative" title="Reboot">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)', borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a', boxShadow: deviceState === 'rebooting' ? '0 0 6px var(--neon-amber), inset 0 0 3px var(--neon-amber)' : 'inset 0 1px 2px rgba(0,0,0,0.5)', opacity: deviceState === 'booting' || deviceState === 'rebooting' ? 0.3 : 1 }} />
+            </button>
+          </>)}
+          {/* Diamond power button */}
+          <button
+            onClick={handlePowerToggle}
+            disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
+            className="relative disabled:opacity-30"
+            title={isPowered ? 'Power Off' : 'Power On'}
+          >
+            <div style={{
+              width: '6px', height: '6px', transform: 'rotate(45deg)',
+              background: isPowered && deviceState !== 'standby' ? 'var(--neon-purple, #9d00ff)' : '#1a0a2a',
+              boxShadow: isPowered && deviceState !== 'standby' ? '0 0 4px var(--neon-purple, #9d00ff), 0 0 8px var(--neon-purple, #9d00ff)' : 'none',
+              border: '0.5px solid #4a3a5a', transition: 'all 0.2s ease',
+            }} />
+          </button>
+          {/* Info toggle */}
+          {isPowered ? (
+            <button onClick={toggleFoldedInfo} className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center cursor-pointer hover:border-[var(--neon-purple,#9d00ff)]/40 transition-colors" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }} title={showFoldedInfo ? 'Hide info' : 'Show info'}>
+              <span className="font-mono text-[6px] text-[var(--neon-purple,#9d00ff)]/60">{showFoldedInfo ? '▲' : '▼'}</span>
+            </button>
+          ) : <div className="w-3" />}
+        </div>
+        <div style={{ maxHeight: showFoldedInfo && isPowered ? '40px' : '0px', transition: 'max-height 400ms ease, opacity 300ms ease', opacity: showFoldedInfo && isPowered ? 1 : 0, overflow: 'hidden' }}>
+          <div className="px-2 pb-1.5 font-mono text-[7px] text-[var(--neon-purple,#9d00ff)]/60 flex gap-3 flex-wrap">
+            <span>Dim: D-{currentDim.toFixed(2)}</span>
+            <span>Stability: {displayStability}%</span>
+            <span>Rift: {(displayRiftActivity * 100).toFixed(1)}%</span>
+          </div>
+        </div>
+      </div>
+
+      {/* UNFOLDED INNER PANEL */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+      }} className="w-full p-1 flex flex-col">
+        <button onClick={handleFoldToggle} className="absolute top-1 right-1 z-10 group" title="Fold">
+          <div className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center transition-all hover:border-[var(--neon-purple,#9d00ff)]/40" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }}>
+            <span className="font-mono text-[6px] text-[var(--neon-purple,#9d00ff)]/60">▴</span>
+          </div>
+        </button>
+
+      {/* Standby/Shutdown overlay */}
+      {(dim?.deviceState === 'standby' || dim?.deviceState === 'shutdown') && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 rounded pointer-events-none">
+          <span className="font-mono text-[7px] text-white/50 tracking-widest">
+            {dim?.deviceState === 'shutdown' ? dim?.statusMessage : 'STANDBY'}
+          </span>
+        </div>
+      )}
+
       {/* Header with company logo */}
       <div className="flex items-center justify-between mb-0.5">
         <div className="flex items-center gap-0.5">
@@ -8804,7 +10947,7 @@ export function DimensionMonitor({
             {/* Round LED reset button with magenta glow */}
             <button
               onClick={handleReboot}
-              disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+              disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
               className="group relative disabled:opacity-30"
               title="Reboot"
             >
@@ -8840,52 +10983,81 @@ export function DimensionMonitor({
           >
             DIME
           </div>
-          <div className="font-mono text-[3px] text-white/20">DIM-1</div>
+          <div className="font-mono text-[3px] text-white/20">DIM-001</div>
         </div>
       </div>
 
       {/* Dimensional visualization - expanded to fill space */}
       <div className={cn(
         'relative flex-1 min-h-[3rem] bg-black/60 rounded overflow-hidden',
-        deviceState === 'testing' && 'ring-1 ring-[var(--neon-purple,#9d00ff)]/30'
+        deviceState === 'testing' && 'ring-1 ring-[var(--neon-purple,#9d00ff)]/50',
+        (deviceState === 'booting' || deviceState === 'rebooting') && 'ring-1 ring-[var(--neon-pink)]/30',
       )}>
-        {/* Dimensional grid pattern */}
+        {/* Dimensional grid pattern - animates with perspective */}
         <div
-          className="absolute inset-0 opacity-30"
+          className={cn('absolute inset-0 transition-opacity duration-300', isActive ? 'opacity-30' : 'opacity-10')}
           style={{
             backgroundImage: `
               linear-gradient(90deg, var(--neon-purple,#9d00ff) 1px, transparent 1px),
               linear-gradient(var(--neon-purple,#9d00ff) 1px, transparent 1px)
             `,
             backgroundSize: '10px 10px',
-            transform: isActive ? `perspective(100px) rotateX(${5 + fluctuation * 10}deg)` : 'none',
-            transition: 'transform 0.3s ease',
+            transform: isActive
+              ? `perspective(80px) rotateX(${5 + fluctuation * 8}deg) rotateY(${fluctuation * 3}deg)`
+              : deviceState === 'booting' || deviceState === 'rebooting'
+              ? `perspective(80px) rotateX(${fluctuation * 12}deg)`
+              : 'perspective(80px) rotateX(0deg)',
+            transition: 'transform 0.15s ease-out',
           }}
         />
+
+        {/* Ambient glow - pulses when active */}
+        {isActive && (
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: 'radial-gradient(ellipse at center, var(--neon-purple,#9d00ff) 0%, transparent 65%)',
+              opacity: 0.08,
+              animation: 'dim-ambient 3s ease-in-out infinite',
+            }}
+          />
+        )}
 
         {/* Central dimension indicator */}
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="relative">
-            {/* Glow ring */}
-            {isActive && (
+            {/* Glow ring - pulses in all active states */}
+            {(isActive || deviceState === 'booting' || deviceState === 'rebooting') && (
               <div
-                className="absolute inset-0 rounded-full"
+                className="absolute rounded-full"
                 style={{
-                  width: '32px',
-                  height: '32px',
-                  margin: '-6px',
+                  width: '36px',
+                  height: '36px',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
                   background: `radial-gradient(circle, var(--neon-purple,#9d00ff) 0%, transparent 70%)`,
-                  opacity: 0.3 + (deviceState === 'testing' ? Math.sin(Date.now() / 200) * 0.2 : 0),
-                  animation: deviceState === 'testing' ? 'dim-pulse 1s ease-in-out infinite' : 'none',
+                  opacity: deviceState === 'testing' ? 0.5 : deviceState === 'booting' || deviceState === 'rebooting' ? 0.25 : 0.15,
+                  animation: deviceState === 'testing'
+                    ? 'dim-pulse 0.6s ease-in-out infinite'
+                    : deviceState === 'booting' || deviceState === 'rebooting'
+                    ? 'dim-pulse 1.2s ease-in-out infinite'
+                    : 'dim-pulse 3s ease-in-out infinite',
                 }}
               />
             )}
             {/* Dimension value */}
             <span
-              className="font-mono text-[14px] relative z-10"
+              className={cn('font-mono text-[14px] relative z-10 transition-all duration-200',
+                deviceState === 'testing' && 'scale-105',
+              )}
               style={{
-                color: isActive ? 'var(--neon-purple,#9d00ff)' : 'white/30',
-                textShadow: isActive ? '0 0 8px var(--neon-purple,#9d00ff)' : 'none',
+                color: isActive ? 'var(--neon-purple,#9d00ff)' : (deviceState === 'booting' || deviceState === 'rebooting') ? 'var(--neon-purple,#9d00ff)' : 'rgba(255,255,255,0.2)',
+                textShadow: isActive
+                  ? `0 0 8px var(--neon-purple,#9d00ff), 0 0 ${deviceState === 'testing' ? '16' : '4'}px var(--neon-purple,#9d00ff)`
+                  : (deviceState === 'booting' || deviceState === 'rebooting')
+                  ? '0 0 4px var(--neon-purple,#9d00ff)'
+                  : 'none',
               }}
             >
               D-{currentDim.toFixed(2)}
@@ -8897,7 +11069,7 @@ export function DimensionMonitor({
         <div className="absolute left-1 top-1 bottom-1 flex flex-col justify-between">
           <div>
             <div className="font-mono text-[4px] text-white/30">RIFT ACTIVITY</div>
-            <div className="font-mono text-[5px] text-[var(--neon-pink)]">{(riftActivity * 100).toFixed(1)}%</div>
+            <div className="font-mono text-[5px] text-[var(--neon-pink)]">{(displayRiftActivity * 100).toFixed(1)}%</div>
           </div>
           <div>
             <div className="font-mono text-[4px] text-white/30">HALO PROX</div>
@@ -8942,22 +11114,44 @@ export function DimensionMonitor({
           </div>
         </div>
 
-        {/* Test overlay - rift scan effect */}
-        {deviceState === 'testing' && testPhase === 'rift-scan' && (
+        {/* Test overlay - rift scan expanding rings */}
+        {deviceState === 'testing' && (
           <div
             className="absolute inset-0 pointer-events-none"
             style={{
-              background: 'radial-gradient(circle at center, transparent 0%, var(--neon-purple,#9d00ff) 50%, transparent 100%)',
-              animation: 'dim-scan 0.8s ease-out infinite',
-              opacity: 0.3,
+              background: testPhase === 'rift-scan'
+                ? 'radial-gradient(circle at center, transparent 0%, var(--neon-purple,#9d00ff) 40%, transparent 70%)'
+                : testPhase === 'stability'
+                ? 'radial-gradient(circle at center, var(--neon-green) 0%, transparent 50%)'
+                : testPhase === 'calibration'
+                ? 'radial-gradient(circle at center, var(--neon-amber) 0%, transparent 50%)'
+                : 'radial-gradient(circle at center, var(--neon-purple,#9d00ff) 0%, transparent 60%)',
+              animation: testPhase === 'rift-scan' ? 'dim-scan 0.8s ease-out infinite' : 'dim-pulse 0.8s ease-in-out infinite',
+              opacity: 0.25,
             }}
           />
         )}
 
-        {/* Boot overlay */}
+        {/* Boot/Reboot overlay with scanline */}
         {(deviceState === 'booting' || deviceState === 'rebooting') && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-            <span className="font-mono text-[6px] text-[var(--neon-purple,#9d00ff)] animate-pulse">{statusMessage}</span>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50">
+            {/* Scanning line */}
+            <div
+              className="absolute left-0 right-0 h-px pointer-events-none"
+              style={{
+                background: 'linear-gradient(90deg, transparent 0%, var(--neon-purple,#9d00ff) 50%, transparent 100%)',
+                boxShadow: '0 0 6px var(--neon-purple,#9d00ff)',
+                animation: 'dim-scanline 1.5s ease-in-out infinite',
+              }}
+            />
+            <span className="font-mono text-[6px] text-[var(--neon-purple,#9d00ff)] animate-pulse relative z-10">{statusMessage}</span>
+          </div>
+        )}
+
+        {/* Shutdown overlay - fade to black */}
+        {deviceState === 'shutdown' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+            <span className="font-mono text-[6px] text-[var(--neon-pink)] animate-pulse">{statusMessage}</span>
           </div>
         )}
       </div>
@@ -8973,22 +11167,61 @@ export function DimensionMonitor({
           {statusMessage}
         </span>
 
-        <span className={cn(
-          'text-[4px] transition-colors',
-          isActive ? 'text-[var(--neon-green)]' : 'text-white/30'
-        )}>
-          {isActive ? 'LOCKED' : 'OFFLINE'}
-        </span>
+        <div className="flex items-center gap-1">
+          <span className={cn(
+            'text-[4px] transition-colors',
+            isActive ? 'text-[var(--neon-green)]' : 'text-white/30'
+          )}>
+            {isActive ? 'LOCKED' : 'OFFLINE'}
+          </span>
+
+          {/* Diamond power button */}
+          <button
+            onClick={handlePowerToggle}
+            disabled={deviceState === 'booting' || deviceState === 'shutdown' || deviceState === 'rebooting' || deviceState === 'testing'}
+            className="relative disabled:opacity-30"
+            title={isPowered ? 'Power Off' : 'Power On'}
+          >
+            <div
+              style={{
+                width: '6px',
+                height: '6px',
+                transform: 'rotate(45deg)',
+                background: isPowered && deviceState !== 'standby'
+                  ? 'var(--neon-purple, #9d00ff)'
+                  : '#1a0a2a',
+                boxShadow: isPowered && deviceState !== 'standby'
+                  ? '0 0 4px var(--neon-purple, #9d00ff), 0 0 8px var(--neon-purple, #9d00ff)'
+                  : 'none',
+                border: '0.5px solid #4a3a5a',
+                transition: 'all 0.2s ease',
+              }}
+            />
+          </button>
+        </div>
       </div>
+
+      </div>
+      {/* END UNFOLDED INNER PANEL */}
 
       <style jsx global>{`
         @keyframes dim-pulse {
-          0%, 100% { transform: scale(1); opacity: 0.3; }
-          50% { transform: scale(1.2); opacity: 0.5; }
+          0%, 100% { transform: scale(1); opacity: 0.15; }
+          50% { transform: scale(1.3); opacity: 0.5; }
         }
         @keyframes dim-scan {
           0% { transform: scale(0); opacity: 0.5; }
-          100% { transform: scale(2); opacity: 0; }
+          100% { transform: scale(2.5); opacity: 0; }
+        }
+        @keyframes dim-ambient {
+          0%, 100% { opacity: 0.05; }
+          50% { opacity: 0.12; }
+        }
+        @keyframes dim-scanline {
+          0% { top: 0%; opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { top: 100%; opacity: 0; }
         }
       `}</style>
     </PanelFrame>
@@ -9001,173 +11234,135 @@ export function DimensionMonitor({
 // Compatible: TMP-001, VNT-001, SCA-001, MFR-001
 // unOS Commands: DEVICE CPU [TEST|RESET|STATUS]
 // ==================================================
-type CpuState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type CpuTestPhase = 'cores' | 'cache' | 'frequency' | 'thermal' | 'stress' | 'complete' | null
+export function CpuMonitor({ className }: { className?: string }) {
+  const cpuManager = useCPUManagerOptional()
 
-interface CpuMonitorProps {
-  cores?: number
-  utilization?: number
-  frequency?: number
-  className?: string
-  onTest?: () => void
-  onReset?: () => void
-}
-
-export function CpuMonitor({
-  cores = 8,
-  utilization = 67,
-  frequency = 4.2,
-  className,
-  onTest,
-  onReset,
-}: CpuMonitorProps) {
-  const [deviceState, setDeviceState] = useState<CpuState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<CpuTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Init...')
-  const [displayUtil, setDisplayUtil] = useState(0)
-  const [coreLoads, setCoreLoads] = useState<number[]>(Array(cores).fill(0))
-
-  // Animate core loads
-  useEffect(() => {
-    if (deviceState === 'offline') return
-    const interval = setInterval(() => {
-      if (deviceState === 'online' || deviceState === 'testing') {
-        setCoreLoads(prev => prev.map((_, i) => {
-          const base = deviceState === 'testing' ? 85 : utilization
-          const variance = deviceState === 'testing' ? 15 : 25
-          return Math.max(5, Math.min(100, base + (Math.random() - 0.5) * variance + (i % 2) * 10))
-        }))
-      }
-    }, 200)
-    return () => clearInterval(interval)
-  }, [deviceState, utilization, cores])
-
-  // Boot sequence
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('POST check...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Detecting cores...')
-      setBootPhase(2)
-      setCoreLoads(Array(cores).fill(10))
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Init L1/L2 cache...')
-      setBootPhase(3)
-      setCoreLoads(prev => prev.map((_, i) => 20 + i * 5))
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Freq scaling...')
-      setBootPhase(4)
-      setDisplayUtil(30)
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Calibrating...')
-      setBootPhase(5)
-      setDisplayUtil(utilization)
-      await new Promise(r => setTimeout(r, 300))
-
-      setBootPhase(6)
-      setDeviceState('online')
-      setStatusMessage('READY')
-    }
-    bootSequence()
-  }, [])
-
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayUtil(utilization)
-    }
-  }, [utilization, deviceState])
-
-  const handleTest = async () => {
-    if (deviceState !== 'online') return
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<CpuTestPhase>[] = ['cores', 'cache', 'frequency', 'thermal', 'stress', 'complete']
-    const msgs: Record<NonNullable<CpuTestPhase>, string> = {
-      cores: 'Testing cores...',
-      cache: 'Cache integrity...',
-      frequency: 'Freq validation...',
-      thermal: 'Thermal check...',
-      stress: 'Stress test...',
-      complete: 'Test complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(msgs[phase])
-      if (phase === 'stress') {
-        setCoreLoads(Array(cores).fill(95))
-        await new Promise(r => setTimeout(r, 600))
-      } else {
-        await new Promise(r => setTimeout(r, 350))
-      }
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('PASSED')
-    onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('READY')
-    }, 2500)
-  }
-
-  const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    setStatusMessage('Shutdown...')
-    setCoreLoads(Array(cores).fill(0))
-    setDisplayUtil(0)
-    await new Promise(r => setTimeout(r, 350))
-
-    setStatusMessage('Reset...')
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 400))
-
-    // Boot
-    setDeviceState('booting')
-    setStatusMessage('POST check...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('Detecting cores...')
-    setBootPhase(2)
-    setCoreLoads(Array(cores).fill(15))
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Init cache...')
-    setBootPhase(3)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Calibrating...')
-    setBootPhase(5)
-    setDisplayUtil(utilization)
-    await new Promise(r => setTimeout(r, 250))
-
-    setBootPhase(6)
-    setDeviceState('online')
-    setStatusMessage('READY')
-    onReset?.()
-  }
+  // Fallback values if no context
+  const deviceState = cpuManager?.deviceState ?? 'online'
+  const isPowered = cpuManager?.isPowered ?? true
+  const statusMessage = cpuManager?.statusMessage ?? 'READY'
+  const testResult = cpuManager?.testResult ?? null
+  const testPhase = cpuManager?.testPhase ?? null
+  const bootPhase = cpuManager?.bootPhase ?? null
+  const shutdownPhase = cpuManager?.shutdownPhase ?? null
+  const coreLoads = cpuManager?.coreLoads ?? Array(8).fill(67)
+  const cores = cpuManager?.cores ?? 8
+  const frequency = cpuManager?.frequency ?? 4.2
+  const utilization = cpuManager?.utilization ?? 67
+  const temperature = cpuManager?.temperature ?? 62
+  const isExpanded = cpuManager?.isExpanded ?? true
 
   const isActive = deviceState === 'online' || deviceState === 'testing'
   const avgLoad = coreLoads.length > 0 ? Math.round(coreLoads.reduce((a, b) => a + b, 0) / coreLoads.length) : 0
 
+  const handleFoldToggle = useCallback(() => cpuManager?.toggleExpanded(), [cpuManager])
+
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const toggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current)
+      if (next) { foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000) }
+      return next
+    })
+  }
+  useEffect(() => { return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) } }, [])
+
+  const getStatusColor = () => {
+    switch (deviceState) {
+      case 'online': return 'var(--neon-green)'
+      case 'booting': return 'var(--neon-cyan)'
+      case 'testing': return 'var(--neon-purple)'
+      case 'rebooting': return 'var(--neon-amber)'
+      case 'standby': case 'shutdown': return 'var(--neon-red)'
+      default: return 'var(--neon-green)'
+    }
+  }
+  const stateLabel = deviceState === 'online' ? 'ONLINE' : deviceState === 'testing' ? 'TESTING' : deviceState === 'booting' ? 'BOOTING' : deviceState === 'rebooting' ? 'REBOOT' : deviceState === 'shutdown' ? 'SHUTDOWN' : 'STANDBY'
+
+  // Handlers call context methods
+  const handleTest = () => cpuManager?.runTest()
+  const handleReboot = () => cpuManager?.reboot()
+  const handlePowerToggle = () => {
+    if (isPowered) cpuManager?.powerOff()
+    else cpuManager?.powerOn()
+  }
+
   return (
-    <PanelFrame variant="teal" className={cn('p-1 flex flex-col', className)}>
+    <PanelFrame variant="teal" className={cn('relative overflow-hidden', className)} style={{ perspective: '600px' }}>
+      {/* FOLDED FRONT PANEL */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+      }} className="w-full">
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
+          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{
+            backgroundColor: getStatusColor(), boxShadow: `0 0 4px ${getStatusColor()}`,
+            animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+          }} />
+          <span className="font-mono text-[8px] font-bold text-[var(--neon-cyan)]">CPU-001</span>
+          <span className={cn('font-mono text-[7px]', isPowered ? 'text-[var(--neon-cyan)]/70' : 'text-white/30')}>{stateLabel}</span>
+          <div className="flex-1" />
+          {isPowered && (<>
+            <button onClick={handleTest} disabled={deviceState !== 'online'} className="group relative" title="Test">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)', borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a', boxShadow: deviceState === 'testing' ? '0 0 6px var(--neon-purple), inset 0 0 3px var(--neon-purple)' : 'inset 0 1px 2px rgba(0,0,0,0.5)', opacity: deviceState !== 'online' ? 0.3 : 1 }} />
+            </button>
+            <button onClick={handleReboot} disabled={deviceState === 'booting' || deviceState === 'rebooting'} className="group relative" title="Reboot">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)', borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a', boxShadow: deviceState === 'rebooting' ? '0 0 6px var(--neon-amber), inset 0 0 3px var(--neon-amber)' : 'inset 0 1px 2px rgba(0,0,0,0.5)', opacity: deviceState === 'booting' || deviceState === 'rebooting' ? 0.3 : 1 }} />
+            </button>
+          </>)}
+          {/* Hexagonal power button */}
+          <button
+            onClick={handlePowerToggle}
+            className="relative group"
+            title={isPowered ? 'Power OFF' : 'Power ON'}
+            style={{
+              width: '6px', height: '6px',
+              clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+              background: isPowered ? 'linear-gradient(135deg, #00ffff 0%, #00cccc 100%)' : 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)',
+              boxShadow: isPowered ? '0 0 4px rgba(0,255,255,0.8), 0 0 8px rgba(0,255,255,0.4), inset 0 0 2px rgba(255,255,255,0.5)' : 'inset 0 1px 1px rgba(0,0,0,0.5)',
+              transition: 'all 0.2s ease',
+            }}
+          />
+          {/* Info toggle */}
+          {isPowered ? (
+            <button onClick={toggleFoldedInfo} className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center cursor-pointer hover:border-[var(--neon-cyan)]/40 transition-colors" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }} title={showFoldedInfo ? 'Hide info' : 'Show info'}>
+              <span className="font-mono text-[6px] text-[var(--neon-cyan)]/60">{showFoldedInfo ? '▲' : '▼'}</span>
+            </button>
+          ) : <div className="w-3" />}
+        </div>
+        <div style={{ maxHeight: showFoldedInfo && isPowered ? '40px' : '0px', transition: 'max-height 400ms ease, opacity 300ms ease', opacity: showFoldedInfo && isPowered ? 1 : 0, overflow: 'hidden' }}>
+          <div className="px-2 pb-1.5 font-mono text-[7px] text-[var(--neon-cyan)]/60 flex gap-3 flex-wrap">
+            <span>Load: {avgLoad}%</span>
+            <span>Cores: {cores}</span>
+            <span>Freq: {frequency.toFixed(1)} GHz</span>
+            <span>Temp: {temperature}&deg;C</span>
+          </div>
+        </div>
+      </div>
+
+      {/* UNFOLDED INNER PANEL */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+      }} className="w-full p-1 flex flex-col">
+        <button onClick={handleFoldToggle} className="absolute top-1 right-1 z-10 group" title="Fold">
+          <div className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center transition-all hover:border-[var(--neon-cyan)]/40" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }}>
+            <span className="font-mono text-[6px] text-[var(--neon-cyan)]/60">▴</span>
+          </div>
+        </button>
+
       {/* Header with lamps at top middle and logo */}
       <div className="flex items-center justify-between mb-0.5">
         <div className="font-mono text-[5px] text-[var(--neon-cyan)]">CPU</div>
@@ -9319,10 +11514,24 @@ export function CpuMonitor({
             <span className="font-mono text-[5px] text-[var(--neon-cyan)] animate-pulse">{statusMessage}</span>
           </div>
         )}
+
+        {/* Shutdown overlay */}
+        {deviceState === 'shutdown' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/70">
+            <span className="font-mono text-[5px] text-[var(--neon-amber)] animate-pulse">{statusMessage}</span>
+          </div>
+        )}
+
+        {/* Standby overlay */}
+        {deviceState === 'standby' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+            <span className="font-mono text-[6px] text-white/30 tracking-wide">STANDBY</span>
+          </div>
+        )}
       </div>
 
-      {/* Status bar */}
-      <div className="flex items-center justify-between font-mono text-[5px] mt-0.5">
+      {/* Status bar with power button */}
+      <div className="relative flex items-center justify-between font-mono text-[5px] mt-0.5">
         <span className={cn(
           'transition-colors',
           isActive ? (avgLoad > 80 ? 'text-[var(--neon-red)]' : 'text-[var(--neon-cyan)]') : 'text-white/30'
@@ -9334,13 +11543,38 @@ export function CpuMonitor({
           'text-[4px]',
           deviceState === 'testing' ? 'text-[var(--neon-cyan)]' :
           testResult === 'pass' ? 'text-[var(--neon-green)]' :
+          deviceState === 'standby' ? 'text-white/20' :
           'text-white/20'
         )}>
           {statusMessage}
         </span>
 
-        <span className="text-[3px] text-white/20">CPU-1</span>
+        <div className="flex items-center gap-1">
+          <span className="text-[3px] text-white/20">CPU-1</span>
+
+          {/* Hexagonal power button */}
+          <button
+            onClick={handlePowerToggle}
+            className="relative group"
+            title={isPowered ? 'Power OFF' : 'Power ON'}
+            style={{
+              width: '6px',
+              height: '6px',
+              clipPath: 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)',
+              background: isPowered
+                ? 'linear-gradient(135deg, #00ffff 0%, #00cccc 100%)'
+                : 'linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%)',
+              boxShadow: isPowered
+                ? '0 0 4px rgba(0,255,255,0.8), 0 0 8px rgba(0,255,255,0.4), inset 0 0 2px rgba(255,255,255,0.5)'
+                : 'inset 0 1px 1px rgba(0,0,0,0.5)',
+              transition: 'all 0.2s ease',
+            }}
+          />
+        </div>
       </div>
+
+      </div>
+      {/* END UNFOLDED INNER PANEL */}
 
       <style jsx global>{`
         @keyframes cpu-stress {
@@ -9358,173 +11592,63 @@ export function CpuMonitor({
 // Compatible: DGN-001, SCA-001, all monitoring devices
 // unOS Commands: DEVICE CLOCK [TEST|RESET|STATUS|MODE]
 // ==================================================
-type ClockState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type ClockTestPhase = 'crystal' | 'sync' | 'drift' | 'accuracy' | 'complete' | null
-type ClockMode = 'local' | 'utc' | 'date' | 'uptime' | 'countdown' | 'stopwatch'
 
-interface LabClockProps {
-  className?: string
-  onTest?: () => void
-  onReset?: () => void
-}
+export function LabClock({ className }: { className?: string }) {
+  const clk = useCLKManagerOptional()
 
-export function LabClock({
-  className,
-  onTest,
-  onReset,
-}: LabClockProps) {
-  const [deviceState, setDeviceState] = useState<ClockState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<ClockTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Init...')
-  const [displayMode, setDisplayMode] = useState<ClockMode>('local')
-  const [currentTime, setCurrentTime] = useState(new Date())
-  const [uptime, setUptime] = useState(0)
-  const [stopwatchTime, setStopwatchTime] = useState(0)
-  const [stopwatchRunning, setStopwatchRunning] = useState(false)
-  const [countdownTime, setCountdownTime] = useState(3600) // 1 hour default
-  const [countdownRunning, setCountdownRunning] = useState(false)
+  const deviceState = clk?.deviceState ?? 'online'
+  const isPowered = clk?.isPowered ?? true
+  const statusMessage = clk?.statusMessage ?? 'SYNCED'
+  const testResult = clk?.testResult ?? null
+  const testPhase = clk?.testPhase ?? null
+  const shutdownPhase = clk?.shutdownPhase ?? null
+  const displayMode = clk?.displayMode ?? 'local'
+  const currentTime = clk?.currentTime ?? new Date()
+  const uptime = clk?.uptime ?? 0
+  const stopwatchTime = clk?.stopwatchTime ?? 0
+  const stopwatchRunning = clk?.stopwatchRunning ?? false
+  const countdownTime = clk?.countdownTime ?? 3600
+  const countdownRunning = clk?.countdownRunning ?? false
 
-  // Update time every second
-  useEffect(() => {
-    if (deviceState === 'offline') return
-    const interval = setInterval(() => {
-      setCurrentTime(new Date())
-      if (deviceState === 'online') {
-        setUptime(prev => prev + 1)
-      }
-      if (stopwatchRunning) {
-        setStopwatchTime(prev => prev + 1)
-      }
-      if (countdownRunning && countdownTime > 0) {
-        setCountdownTime(prev => Math.max(0, prev - 1))
-      }
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [deviceState, stopwatchRunning, countdownRunning, countdownTime])
+  const isExpanded = clk?.isExpanded ?? true
 
-  // Boot sequence
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Crystal init...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 300))
+  const isActive = deviceState === 'online' || deviceState === 'testing'
 
-      setStatusMessage('RTC sync...')
-      setBootPhase(2)
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('NTP query...')
-      setBootPhase(3)
-      await new Promise(r => setTimeout(r, 400))
-
-      setStatusMessage('Calibrating...')
-      setBootPhase(4)
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Drift comp...')
-      setBootPhase(5)
-      await new Promise(r => setTimeout(r, 250))
-
-      setBootPhase(6)
-      setDeviceState('online')
-      setStatusMessage('SYNCED')
-    }
-    bootSequence()
-  }, [])
-
-  const handleTest = async () => {
-    if (deviceState !== 'online') return
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<ClockTestPhase>[] = ['crystal', 'sync', 'drift', 'accuracy', 'complete']
-    const msgs: Record<NonNullable<ClockTestPhase>, string> = {
-      crystal: 'Testing crystal...',
-      sync: 'Sync check...',
-      drift: 'Drift analysis...',
-      accuracy: 'Accuracy test...',
-      complete: 'Test complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(msgs[phase])
-      await new Promise(r => setTimeout(r, 400))
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setStatusMessage('PASSED')
-    onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('SYNCED')
-    }, 2500)
+  const handleTest = () => clk?.runTest()
+  const handleReboot = () => clk?.reboot()
+  const handlePowerToggle = () => {
+    if (isPowered) clk?.powerOff()
+    else clk?.powerOn()
   }
+  const handleFoldToggle = useCallback(() => clk?.toggleExpanded(), [clk])
+  const cycleMode = () => clk?.cycleMode()
+  const toggleStopwatch = () => clk?.toggleStopwatch()
+  const resetStopwatch = () => clk?.resetStopwatch()
+  const toggleCountdown = () => clk?.toggleCountdown()
 
-  const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    setStatusMessage('Shutdown...')
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Reset RTC...')
-    setBootPhase(0)
-    setUptime(0)
-    await new Promise(r => setTimeout(r, 350))
-
-    // Boot
-    setDeviceState('booting')
-    setStatusMessage('Crystal init...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('RTC sync...')
-    setBootPhase(2)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Calibrating...')
-    setBootPhase(4)
-    await new Promise(r => setTimeout(r, 250))
-
-    setBootPhase(6)
-    setDeviceState('online')
-    setStatusMessage('SYNCED')
-    onReset?.()
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const toggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current)
+      if (next) { foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000) }
+      return next
+    })
   }
+  useEffect(() => { return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) } }, [])
 
-  const cycleMode = () => {
-    if (deviceState !== 'online') return
-    const modes: ClockMode[] = ['local', 'utc', 'date', 'uptime', 'countdown', 'stopwatch']
-    const currentIndex = modes.indexOf(displayMode)
-    setDisplayMode(modes[(currentIndex + 1) % modes.length])
-  }
-
-  const toggleStopwatch = () => {
-    if (displayMode === 'stopwatch') {
-      setStopwatchRunning(!stopwatchRunning)
+  const getStatusColor = () => {
+    switch (deviceState) {
+      case 'online': return 'var(--neon-green)'
+      case 'booting': return 'var(--neon-cyan)'
+      case 'testing': return 'var(--neon-purple)'
+      case 'rebooting': return 'var(--neon-amber)'
+      case 'standby': case 'shutdown': return 'var(--neon-red)'
+      default: return 'var(--neon-green)'
     }
   }
-
-  const resetStopwatch = () => {
-    if (displayMode === 'stopwatch') {
-      setStopwatchTime(0)
-      setStopwatchRunning(false)
-    }
-  }
-
-  const toggleCountdown = () => {
-    if (displayMode === 'countdown') {
-      setCountdownRunning(!countdownRunning)
-    }
-  }
+  const stateLabel = deviceState === 'online' ? 'ONLINE' : deviceState === 'testing' ? 'TESTING' : deviceState === 'booting' ? 'BOOTING' : deviceState === 'rebooting' ? 'REBOOT' : deviceState === 'shutdown' ? 'SHUTDOWN' : 'STANDBY'
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600)
@@ -9532,8 +11656,6 @@ export function LabClock({
     const s = seconds % 60
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
-
-  const isActive = deviceState === 'online' || deviceState === 'testing'
 
   const getDisplayContent = () => {
     if (!isActive) return { main: '--:--:--', sub: 'OFFLINE', label: 'TIME' }
@@ -9581,7 +11703,90 @@ export function LabClock({
   const display = getDisplayContent()
 
   return (
-    <PanelFrame variant="default" className={cn('p-1 flex flex-col', className)}>
+    <PanelFrame variant="default" className={cn('overflow-hidden relative', className)} style={{ perspective: '600px' }}>
+      {/* FOLDED FRONT PANEL */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+      }} className="w-full">
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
+          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{
+            backgroundColor: getStatusColor(), boxShadow: `0 0 4px ${getStatusColor()}`,
+            animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+          }} />
+          <span className="font-mono text-[8px] font-bold text-[var(--neon-green)]">CLK-001</span>
+          <span className={cn('font-mono text-[7px]', isPowered ? 'text-[var(--neon-green)]/70' : 'text-white/30')}>{stateLabel}</span>
+          <div className="flex-1" />
+          {isPowered && (<>
+            <button onClick={handleTest} disabled={deviceState !== 'online'} className="group relative" title="Test">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)', borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a', boxShadow: deviceState === 'testing' ? '0 0 6px var(--neon-purple), inset 0 0 3px var(--neon-purple)' : 'inset 0 1px 2px rgba(0,0,0,0.5)', opacity: deviceState !== 'online' ? 0.3 : 1 }} />
+            </button>
+            <button onClick={handleReboot} disabled={deviceState === 'booting' || deviceState === 'rebooting'} className="group relative" title="Reboot">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)', borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a', boxShadow: deviceState === 'rebooting' ? '0 0 6px var(--neon-amber), inset 0 0 3px var(--neon-amber)' : 'inset 0 1px 2px rgba(0,0,0,0.5)', opacity: deviceState === 'booting' || deviceState === 'rebooting' ? 0.3 : 1 }} />
+            </button>
+          </>)}
+          {/* Power button - capsule */}
+          <button
+            onClick={handlePowerToggle}
+            className="group relative"
+            title={isPowered ? 'Power Off' : 'Power On'}
+          >
+            <div
+              className="w-2 h-1 rounded-full flex items-center px-0.5 transition-all"
+              style={{
+                background: 'linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%)',
+                border: '0.5px solid #2a2a2a',
+              }}
+            >
+              <div
+                className="w-0.5 h-0.5 rounded-full transition-all duration-200"
+                style={{
+                  background: isPowered
+                    ? 'radial-gradient(circle, var(--neon-green) 0%, #00aa00 100%)'
+                    : '#1a1a1a',
+                  boxShadow: isPowered ? '0 0 2px var(--neon-green)' : 'none',
+                  transform: isPowered ? 'translateX(0.5px)' : 'translateX(-0.5px)',
+                }}
+              />
+            </div>
+          </button>
+          {/* Info toggle */}
+          {isPowered ? (
+            <button onClick={toggleFoldedInfo} className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center cursor-pointer hover:border-[var(--neon-green)]/40 transition-colors" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }} title={showFoldedInfo ? 'Hide info' : 'Show info'}>
+              <span className="font-mono text-[6px] text-[var(--neon-green)]/60">{showFoldedInfo ? '\u25B2' : '\u25BC'}</span>
+            </button>
+          ) : <div className="w-3" />}
+        </div>
+        <div style={{ maxHeight: showFoldedInfo && isPowered ? '40px' : '0px', transition: 'max-height 400ms ease, opacity 300ms ease', opacity: showFoldedInfo && isPowered ? 1 : 0, overflow: 'hidden' }}>
+          <div className="px-2 pb-1.5 font-mono text-[7px] text-[var(--neon-green)]/60 flex gap-3 flex-wrap">
+            <span>Mode: {displayMode.toUpperCase()}</span>
+            <span>Time: {display.main}</span>
+            <span>Tier: T1</span>
+          </div>
+        </div>
+      </div>
+
+      {/* UNFOLDED INNER PANEL */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+      }} className="w-full p-1 flex flex-col">
+        <button onClick={handleFoldToggle} className="absolute top-1 right-1 z-10 group" title="Fold">
+          <div className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center transition-all hover:border-[var(--neon-green)]/40" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }}>
+            <span className="font-mono text-[6px] text-[var(--neon-green)]/60">{'\u25B4'}</span>
+          </div>
+        </button>
+
       {/* Header with mode button and logo */}
       <div className="flex items-center justify-between mb-0.5">
         <div className="flex items-center gap-1">
@@ -9712,6 +11917,13 @@ export function LabClock({
           </div>
         )}
 
+        {/* Standby/Shutdown overlay */}
+        {(deviceState === 'standby' || deviceState === 'shutdown') && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+            <span className="font-mono text-[6px] text-white/40">{statusMessage.toUpperCase()}</span>
+          </div>
+        )}
+
         {/* Test overlay - sync animation */}
         {deviceState === 'testing' && (
           <div
@@ -9725,18 +11937,47 @@ export function LabClock({
         )}
       </div>
 
-      {/* Status bar with LED buttons at bottom right center */}
+      {/* Status bar with power button, status message, LED buttons, and device ID */}
       <div className="flex items-center justify-between font-mono text-[5px] mt-0.5">
-        <span className={cn(
-          'text-[4px]',
-          deviceState === 'testing' ? 'text-[var(--neon-green)]' :
-          testResult === 'pass' ? 'text-[var(--neon-green)]' :
-          'text-white/20'
-        )}>
-          {statusMessage}
-        </span>
+        {/* Left: Power button + Status message */}
+        <div className="flex items-center gap-1">
+          {/* Tiny capsule power button */}
+          <button
+            onClick={handlePowerToggle}
+            className="group relative"
+            title={isPowered ? 'Power Off' : 'Power On'}
+          >
+            <div
+              className="w-2 h-1 rounded-full flex items-center px-0.5 transition-all"
+              style={{
+                background: 'linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%)',
+                border: '0.5px solid #2a2a2a',
+              }}
+            >
+              <div
+                className="w-0.5 h-0.5 rounded-full transition-all duration-200"
+                style={{
+                  background: isPowered
+                    ? 'radial-gradient(circle, var(--neon-green) 0%, #00aa00 100%)'
+                    : '#1a1a1a',
+                  boxShadow: isPowered ? '0 0 2px var(--neon-green)' : 'none',
+                  transform: isPowered ? 'translateX(0.5px)' : 'translateX(-0.5px)',
+                }}
+              />
+            </div>
+          </button>
 
-        {/* LED buttons - bottom right center */}
+          <span className={cn(
+            'text-[4px]',
+            deviceState === 'testing' ? 'text-[var(--neon-green)]' :
+            testResult === 'pass' ? 'text-[var(--neon-green)]' :
+            'text-white/20'
+          )}>
+            {statusMessage}
+          </span>
+        </div>
+
+        {/* Center: LED buttons */}
         <div className="flex items-center gap-1">
           {/* Worn round test LED with green glow */}
           <button
@@ -9799,8 +12040,10 @@ export function LabClock({
           </button>
         </div>
 
+        {/* Right: Device ID */}
         <span className="text-[3px] text-white/20">CLK-1</span>
       </div>
+      </div>{/* end UNFOLDED INNER PANEL */}
 
       <style jsx global>{`
         @keyframes clock-scan {
@@ -9818,36 +12061,22 @@ export function LabClock({
 // Compatible: CPU-001, SCA-001, DGN-001
 // unOS Commands: DEVICE MEM [TEST|RESET|STATUS|MODE]
 // ==================================================
-type MemState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type MemTestPhase = 'modules' | 'timing' | 'integrity' | 'bandwidth' | 'stress' | 'complete' | null
-type MemMode = 'usage' | 'heap' | 'cache' | 'swap' | 'processes' | 'allocation'
 
-interface MemoryMonitorProps {
-  totalMemory?: number // in GB
-  usedMemory?: number // in GB
-  className?: string
-  onTest?: () => void
-  onReset?: () => void
-}
+export function MemoryMonitor({ className }: { className?: string }) {
+  const memManager = useMEMManagerOptional()
 
-export function MemoryMonitor({
-  totalMemory = 16,
-  usedMemory = 11.5,
-  className,
-  onTest,
-  onReset,
-}: MemoryMonitorProps) {
-  const [deviceState, setDeviceState] = useState<MemState>('booting')
-  const [bootPhase, setBootPhase] = useState(0)
-  const [testPhase, setTestPhase] = useState<MemTestPhase>(null)
-  const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
-  const [statusMessage, setStatusMessage] = useState('Init...')
-  const [displayMode, setDisplayMode] = useState<MemMode>('usage')
-  const [displayUsed, setDisplayUsed] = useState(0)
-  const [fluctuation, setFluctuation] = useState(0)
-
-  // Simulated memory data for different modes
-  const [memData, setMemData] = useState({
+  // Context state with fallbacks
+  const deviceState = memManager?.deviceState ?? 'online'
+  const isPowered = memManager?.isPowered ?? true
+  const statusMessage = memManager?.statusMessage ?? 'READY'
+  const testResult = memManager?.testResult ?? null
+  const testPhase = memManager?.testPhase ?? null
+  const bootPhase = memManager?.bootPhase ?? null
+  const shutdownPhase = memManager?.shutdownPhase ?? null
+  const displayMode = memManager?.displayMode ?? 'usage'
+  const totalMemory = memManager?.totalMemory ?? 16
+  const usedMemory = memManager?.usedMemory ?? 11.5
+  const memData = memManager?.memData ?? {
     heap: { used: 2.8, total: 4.0 },
     cache: { used: 3.2, total: 4.0 },
     swap: { used: 0.5, total: 8.0 },
@@ -9859,154 +12088,47 @@ export function MemoryMonitor({
       { name: 'network-io', mem: 0.6 },
     ],
     allocation: { kernel: 1.2, user: 8.5, buffers: 1.8 },
-  })
-
-  // Memory fluctuation animation
-  useEffect(() => {
-    if (deviceState === 'offline') return
-    const interval = setInterval(() => {
-      const variance = deviceState === 'testing' ? 0.5 : 0.2
-      setFluctuation((Math.random() - 0.5) * variance)
-      // Fluctuate process memory slightly
-      if (deviceState === 'online') {
-        setMemData(prev => ({
-          ...prev,
-          processes: prev.processes.map(p => ({
-            ...p,
-            mem: Math.max(0.1, p.mem + (Math.random() - 0.5) * 0.1)
-          }))
-        }))
-      }
-    }, 500)
-    return () => clearInterval(interval)
-  }, [deviceState])
-
-  // Boot sequence
-  useEffect(() => {
-    const bootSequence = async () => {
-      setDeviceState('booting')
-      setStatusMessage('Detecting DIMMs...')
-      setBootPhase(1)
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('SPD read...')
-      setBootPhase(2)
-      setDisplayUsed(totalMemory * 0.3)
-      await new Promise(r => setTimeout(r, 350))
-
-      setStatusMessage('Timing config...')
-      setBootPhase(3)
-      setDisplayUsed(totalMemory * 0.5)
-      await new Promise(r => setTimeout(r, 300))
-
-      setStatusMessage('Memory test...')
-      setBootPhase(4)
-      setDisplayUsed(totalMemory * 0.7)
-      await new Promise(r => setTimeout(r, 400))
-
-      setStatusMessage('Mapping...')
-      setBootPhase(5)
-      setDisplayUsed(usedMemory)
-      await new Promise(r => setTimeout(r, 250))
-
-      setBootPhase(6)
-      setDeviceState('online')
-      setStatusMessage('READY')
-    }
-    bootSequence()
-  }, [])
-
-  useEffect(() => {
-    if (deviceState === 'online') {
-      setDisplayUsed(usedMemory)
-    }
-  }, [usedMemory, deviceState])
-
-  const handleTest = async () => {
-    if (deviceState !== 'online') return
-    setDeviceState('testing')
-    setTestResult(null)
-
-    const phases: NonNullable<MemTestPhase>[] = ['modules', 'timing', 'integrity', 'bandwidth', 'stress', 'complete']
-    const msgs: Record<NonNullable<MemTestPhase>, string> = {
-      modules: 'Testing modules...',
-      timing: 'Timing check...',
-      integrity: 'Data integrity...',
-      bandwidth: 'Bandwidth test...',
-      stress: 'Stress test...',
-      complete: 'Test complete',
-    }
-
-    for (const phase of phases) {
-      setTestPhase(phase)
-      setStatusMessage(msgs[phase])
-      if (phase === 'stress') {
-        setDisplayUsed(totalMemory * 0.95)
-        await new Promise(r => setTimeout(r, 600))
-      } else {
-        await new Promise(r => setTimeout(r, 350))
-      }
-    }
-
-    setTestResult('pass')
-    setTestPhase(null)
-    setDeviceState('online')
-    setDisplayUsed(usedMemory)
-    setStatusMessage('PASSED')
-    onTest?.()
-
-    setTimeout(() => {
-      setTestResult(null)
-      setStatusMessage('READY')
-    }, 2500)
   }
-
-  const handleReboot = async () => {
-    if (deviceState === 'booting' || deviceState === 'rebooting') return
-    setDeviceState('rebooting')
-    setTestResult(null)
-
-    setStatusMessage('Flushing...')
-    setDisplayUsed(0)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Reset controller...')
-    setBootPhase(0)
-    await new Promise(r => setTimeout(r, 350))
-
-    // Boot
-    setDeviceState('booting')
-    setStatusMessage('Detecting DIMMs...')
-    setBootPhase(1)
-    await new Promise(r => setTimeout(r, 250))
-
-    setStatusMessage('SPD read...')
-    setBootPhase(2)
-    setDisplayUsed(totalMemory * 0.4)
-    await new Promise(r => setTimeout(r, 300))
-
-    setStatusMessage('Mapping...')
-    setBootPhase(4)
-    setDisplayUsed(usedMemory)
-    await new Promise(r => setTimeout(r, 250))
-
-    setBootPhase(6)
-    setDeviceState('online')
-    setStatusMessage('READY')
-    onReset?.()
-  }
-
-  const cycleMode = () => {
-    if (deviceState !== 'online') return
-    const modes: MemMode[] = ['usage', 'heap', 'cache', 'swap', 'processes', 'allocation']
-    const currentIndex = modes.indexOf(displayMode)
-    setDisplayMode(modes[(currentIndex + 1) % modes.length])
-  }
+  const currentDraw = memManager?.currentDraw ?? 0.4
+  const isExpanded = memManager?.isExpanded ?? true
 
   const isActive = deviceState === 'online' || deviceState === 'testing'
-  const currentUsed = displayUsed + fluctuation
-  const usagePercent = (currentUsed / totalMemory) * 100
+  const usagePercent = (usedMemory / totalMemory) * 100
   const usageColor = usagePercent > 85 ? 'var(--neon-red)' : usagePercent > 70 ? 'var(--neon-amber)' : 'var(--neon-amber)'
+
+  // Handlers call context methods
+  const handleTest = () => memManager?.runTest()
+  const handleReboot = () => memManager?.reboot()
+  const handleCycleMode = () => memManager?.cycleMode()
+  const handlePowerToggle = () => {
+    if (isPowered) memManager?.powerOff()
+    else memManager?.powerOn()
+  }
+  const handleFoldToggle = useCallback(() => memManager?.toggleExpanded(), [memManager])
+
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimerMem = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const toggleFoldedInfo = () => {
+    setShowFoldedInfo(prev => {
+      const next = !prev
+      if (foldedInfoTimerMem.current) clearTimeout(foldedInfoTimerMem.current)
+      if (next) { foldedInfoTimerMem.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000) }
+      return next
+    })
+  }
+  useEffect(() => { return () => { if (foldedInfoTimerMem.current) clearTimeout(foldedInfoTimerMem.current) } }, [])
+
+  const getStatusColor = () => {
+    switch (deviceState) {
+      case 'online': return 'var(--neon-green)'
+      case 'booting': return 'var(--neon-cyan)'
+      case 'testing': return 'var(--neon-purple)'
+      case 'rebooting': return 'var(--neon-amber)'
+      case 'standby': case 'shutdown': return 'var(--neon-red)'
+      default: return 'var(--neon-green)'
+    }
+  }
+  const stateLabel = deviceState === 'online' ? 'ONLINE' : deviceState === 'testing' ? 'TESTING' : deviceState === 'booting' ? 'BOOTING' : deviceState === 'rebooting' ? 'REBOOT' : deviceState === 'shutdown' ? 'SHUTDOWN' : 'STANDBY'
 
   const getModeLabel = () => {
     switch (displayMode) {
@@ -10020,14 +12142,94 @@ export function MemoryMonitor({
   }
 
   return (
-    <PanelFrame variant="military" className={cn('p-1 flex flex-col', className)}>
-      {/* Header with mode button and logo */}
+    <PanelFrame variant="military" className={cn('overflow-hidden relative', className)} style={{ perspective: '600px' }}>
+      {/* FOLDED FRONT PANEL */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+      }} className="w-full">
+        <div className="flex items-center gap-1.5 px-2 py-1.5">
+          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{
+            backgroundColor: getStatusColor(), boxShadow: `0 0 4px ${getStatusColor()}`,
+            animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
+          }} />
+          <span className="font-mono text-[8px] font-bold text-[var(--neon-amber)]">MEM-001</span>
+          <span className={cn('font-mono text-[7px]', isPowered ? 'text-[var(--neon-amber)]/70' : 'text-white/30')}>{stateLabel}</span>
+          <div className="flex-1" />
+          {isPowered && (<>
+            <button onClick={handleTest} disabled={deviceState !== 'online'} className="group relative" title="Test">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)', borderColor: deviceState === 'testing' ? 'var(--neon-purple)' : '#3a3a4a', boxShadow: deviceState === 'testing' ? '0 0 6px var(--neon-purple), inset 0 0 3px var(--neon-purple)' : 'inset 0 1px 2px rgba(0,0,0,0.5)', opacity: deviceState !== 'online' ? 0.3 : 1 }} />
+            </button>
+            <button onClick={handleReboot} disabled={deviceState === 'booting' || deviceState === 'rebooting'} className="group relative" title="Reboot">
+              <div className="w-3 h-3 rounded-full border transition-all" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)', borderColor: deviceState === 'rebooting' ? 'var(--neon-amber)' : '#3a3a4a', boxShadow: deviceState === 'rebooting' ? '0 0 6px var(--neon-amber), inset 0 0 3px var(--neon-amber)' : 'inset 0 1px 2px rgba(0,0,0,0.5)', opacity: deviceState === 'booting' || deviceState === 'rebooting' ? 0.3 : 1 }} />
+            </button>
+          </>)}
+          {/* Power button - diamond */}
+          <button
+            onClick={handlePowerToggle}
+            className="relative group"
+            title={isPowered ? 'Power OFF' : 'Power ON'}
+          >
+            <div
+              style={{
+                width: '5px',
+                height: '5px',
+                transform: 'rotate(45deg)',
+                background: isPowered
+                  ? 'linear-gradient(135deg, #ffcc00 0%, #ff9900 100%)'
+                  : 'linear-gradient(135deg, #2a2a1a 0%, #1a1a0a 100%)',
+                boxShadow: isPowered
+                  ? '0 0 4px rgba(255,170,0,0.8), 0 0 8px rgba(255,170,0,0.4), inset 0 0 2px rgba(255,255,200,0.5)'
+                  : 'inset 0 1px 1px rgba(0,0,0,0.5)',
+                border: isPowered ? '0.5px solid #ffcc66' : '0.5px solid #3a3a2a',
+                transition: 'all 0.2s ease',
+              }}
+            />
+          </button>
+          {/* Info toggle */}
+          {isPowered ? (
+            <button onClick={toggleFoldedInfo} className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center cursor-pointer hover:border-[var(--neon-amber)]/40 transition-colors" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }} title={showFoldedInfo ? 'Hide info' : 'Show info'}>
+              <span className="font-mono text-[6px] text-[var(--neon-amber)]/60">{showFoldedInfo ? '\u25B2' : '\u25BC'}</span>
+            </button>
+          ) : <div className="w-3" />}
+        </div>
+        <div style={{ maxHeight: showFoldedInfo && isPowered ? '40px' : '0px', transition: 'max-height 400ms ease, opacity 300ms ease', opacity: showFoldedInfo && isPowered ? 1 : 0, overflow: 'hidden' }}>
+          <div className="px-2 pb-1.5 font-mono text-[7px] text-[var(--neon-amber)]/60 flex gap-3 flex-wrap">
+            <span>Used: {usedMemory.toFixed(1)}G / {totalMemory}G</span>
+            <span>Mode: {displayMode.toUpperCase()}</span>
+            <span>Draw: {currentDraw.toFixed(1)} E/s</span>
+          </div>
+        </div>
+      </div>
+
+      {/* UNFOLDED INNER PANEL */}
+      <div style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+      }} className="w-full p-1 flex flex-col">
+        <button onClick={handleFoldToggle} className="absolute top-1 right-1 z-10 group" title="Fold">
+          <div className="w-3 h-3 rounded-full border border-white/20 flex items-center justify-center transition-all hover:border-[var(--neon-amber)]/40" style={{ background: 'radial-gradient(circle at 30% 30%, #2a2a3a 0%, #0a0a0f 70%)' }}>
+            <span className="font-mono text-[6px] text-[var(--neon-amber)]/60">{'\u25B4'}</span>
+          </div>
+        </button>
+
+      {/* Header with mode button, diamond power button, and logo */}
       <div className="flex items-center justify-between mb-0.5">
         <div className="flex items-center gap-1">
           <div className="font-mono text-[5px] text-[var(--neon-amber)]">MEM</div>
           {/* Mode cycle button */}
           <button
-            onClick={cycleMode}
+            onClick={handleCycleMode}
             disabled={!isActive}
             className="group disabled:opacity-30"
             title="Cycle Mode"
@@ -10045,6 +12247,29 @@ export function MemoryMonitor({
             </div>
           </button>
         </div>
+
+        {/* Diamond/rhombus power button - center header */}
+        <button
+          onClick={handlePowerToggle}
+          className="relative group"
+          title={isPowered ? 'Power OFF' : 'Power ON'}
+        >
+          <div
+            style={{
+              width: '5px',
+              height: '5px',
+              transform: 'rotate(45deg)',
+              background: isPowered
+                ? 'linear-gradient(135deg, #ffcc00 0%, #ff9900 100%)'
+                : 'linear-gradient(135deg, #2a2a1a 0%, #1a1a0a 100%)',
+              boxShadow: isPowered
+                ? '0 0 4px rgba(255,170,0,0.8), 0 0 8px rgba(255,170,0,0.4), inset 0 0 2px rgba(255,255,200,0.5)'
+                : 'inset 0 1px 1px rgba(0,0,0,0.5)',
+              border: isPowered ? '0.5px solid #ffcc66' : '0.5px solid #3a3a2a',
+              transition: 'all 0.2s ease',
+            }}
+          />
+        </button>
 
         {/* CRSR logo (Corsair-style) - top right */}
         <div className="flex items-center gap-0.5">
@@ -10093,7 +12318,7 @@ export function MemoryMonitor({
             </div>
             {/* Usage text */}
             <div className="absolute bottom-1 left-2 font-mono text-[5px]" style={{ color: usageColor }}>
-              {isActive ? `${currentUsed.toFixed(1)}G` : '--'}
+              {isActive ? `${usedMemory.toFixed(1)}G` : '--'}
             </div>
             <div className="absolute bottom-1 right-2 font-mono text-[5px] text-white/40">
               / {totalMemory}G
@@ -10232,6 +12457,22 @@ export function MemoryMonitor({
             }}
           />
         )}
+
+        {/* Shutdown overlay */}
+        {deviceState === 'shutdown' && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 pointer-events-none">
+            <span className="font-mono text-[5px] text-[var(--neon-amber)] animate-pulse">
+              {shutdownPhase ? shutdownPhase.toUpperCase() : 'SHUTTING DOWN'}
+            </span>
+          </div>
+        )}
+
+        {/* Standby overlay */}
+        {deviceState === 'standby' && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 pointer-events-none">
+            <span className="font-mono text-[6px] text-white/30 tracking-wide">STANDBY</span>
+          </div>
+        )}
       </div>
 
       {/* Status bar with LED buttons at bottom right center */}
@@ -10240,6 +12481,7 @@ export function MemoryMonitor({
           'text-[4px]',
           deviceState === 'testing' ? 'text-[var(--neon-amber)]' :
           testResult === 'pass' ? 'text-[var(--neon-green)]' :
+          deviceState === 'standby' ? 'text-white/20' :
           'text-white/20'
         )}>
           {statusMessage}
@@ -10283,7 +12525,7 @@ export function MemoryMonitor({
           {/* Worn round reset LED with red glow */}
           <button
             onClick={handleReboot}
-            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing'}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'testing' || deviceState === 'standby' || deviceState === 'shutdown'}
             className="group relative disabled:opacity-30"
             title="Reboot"
           >
@@ -10312,6 +12554,7 @@ export function MemoryMonitor({
 
         <span className="text-[3px] text-white/20">MEM-1</span>
       </div>
+      </div>{/* end UNFOLDED INNER PANEL */}
 
       <style jsx global>{`
         @keyframes mem-scan {

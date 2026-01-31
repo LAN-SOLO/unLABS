@@ -50,6 +50,10 @@ interface MFRManagerContextType extends MFRState {
   powerOff: () => Promise<void>
   runTest: () => Promise<void>
   reboot: () => Promise<void>
+  // Fold state
+  isExpanded: boolean
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
   // Read-only info
   firmware: typeof MFR_FIRMWARE
   powerSpecs: typeof MFR_POWER_SPECS
@@ -59,7 +63,7 @@ const MFRManagerContext = createContext<MFRManagerContextType | null>(null)
 
 interface MFRManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean }
+  initialState?: { isPowered: boolean; isExpanded?: boolean }
 }
 
 export function MFRManagerProvider({ children, initialState }: MFRManagerProviderProps) {
@@ -76,6 +80,11 @@ export function MFRManagerProvider({ children, initialState }: MFRManagerProvide
   const [plasmaTemp, setPlasmaTemp] = useState(0)
   const [efficiency, setEfficiency] = useState(MFR_POWER_SPECS.efficiency)
   const [ringSpeed, setRingSpeed] = useState(0)
+
+  // Fold state
+  const startExpanded = initialState?.isExpanded ?? startPowered
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
+  const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev) }, [])
 
   // Stability fluctuation simulation
   useEffect(() => {
@@ -170,6 +179,7 @@ export function MFRManagerProvider({ children, initialState }: MFRManagerProvide
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
@@ -178,6 +188,7 @@ export function MFRManagerProvider({ children, initialState }: MFRManagerProvide
     if (deviceState !== 'online') return
     setIsPowered(false)
     await runShutdownSequence()
+    setIsExpanded(false)
   }, [deviceState, runShutdownSequence])
 
   // Run test
@@ -271,6 +282,9 @@ export function MFRManagerProvider({ children, initialState }: MFRManagerProvide
     powerOff,
     runTest,
     reboot,
+    isExpanded,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     firmware: MFR_FIRMWARE,
     powerSpecs: MFR_POWER_SPECS,
   }

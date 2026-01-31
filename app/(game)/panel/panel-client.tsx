@@ -75,6 +75,17 @@ import { PWBManagerProvider } from '@/contexts/PWBManager'
 import { BTKManagerProvider } from '@/contexts/BTKManager'
 import { RMGManagerProvider } from '@/contexts/RMGManager'
 import { MSCManagerProvider } from '@/contexts/MSCManager'
+import { NETManagerProvider } from '@/contexts/NETManager'
+import { TMPManagerProvider } from '@/contexts/TMPManager'
+import { DIMManagerProvider } from '@/contexts/DIMManager'
+import { CPUManagerProvider } from '@/contexts/CPUManager'
+import { CLKManagerProvider, type CLKMode } from '@/contexts/CLKManager'
+import { MEMManagerProvider, type MEMMode } from '@/contexts/MEMManager'
+import { ANDManagerProvider, type ANDMode } from '@/contexts/ANDManager'
+import { QCPManagerProvider, type QCPMode } from '@/contexts/QCPManager'
+import { TLPManagerProvider, type TLPMode } from '@/contexts/TLPManager'
+import { LCTManagerProvider, type LCTMode } from '@/contexts/LCTManager'
+import { P3DManagerProvider, type P3DMode } from '@/contexts/P3DManager'
 import { ScrewButtonManagerProvider } from '@/contexts/ScrewButtonManager'
 import type { EquipmentData } from '../terminal/actions/equipment'
 
@@ -165,6 +176,17 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
     <BTKManagerProvider initialState={saved?.btk}>
     <RMGManagerProvider initialState={saved?.rmg}>
     <MSCManagerProvider initialState={saved?.msc}>
+    <NETManagerProvider initialState={saved?.net}>
+    <TMPManagerProvider initialState={saved?.tmp}>
+    <DIMManagerProvider initialState={saved?.dim}>
+    <CPUManagerProvider initialState={saved?.cpu}>
+    <CLKManagerProvider initialState={saved?.clk ? { isPowered: saved.clk.isPowered, displayMode: saved.clk.displayMode as CLKMode | undefined } : undefined}>
+    <MEMManagerProvider initialState={saved?.mem ? { isPowered: saved.mem.isPowered, totalMemory: saved.mem.totalMemory, usedMemory: saved.mem.usedMemory, displayMode: saved.mem.displayMode as MEMMode | undefined } : undefined}>
+    <ANDManagerProvider initialState={saved?.and ? { isPowered: saved.and.isPowered, signalStrength: saved.and.signalStrength, anomaliesFound: saved.and.anomaliesFound, displayMode: saved.and.displayMode as ANDMode | undefined } : undefined}>
+    <QCPManagerProvider initialState={saved?.qcp ? { isPowered: saved.qcp.isPowered, anomalyDirection: saved.qcp.anomalyDirection, anomalyDistance: saved.qcp.anomalyDistance, displayMode: saved.qcp.displayMode as QCPMode | undefined } : undefined}>
+    <TLPManagerProvider initialState={saved?.tlp ? { isPowered: saved.tlp.isPowered, chargeLevel: saved.tlp.chargeLevel, lastDestination: saved.tlp.lastDestination, displayMode: saved.tlp.displayMode as TLPMode | undefined } : undefined}>
+    <LCTManagerProvider initialState={saved?.lct ? { isPowered: saved.lct.isPowered, laserPower: saved.lct.laserPower, precision: saved.lct.precision, displayMode: saved.lct.displayMode as LCTMode | undefined } : undefined}>
+    <P3DManagerProvider initialState={saved?.p3d ? { isPowered: saved.p3d.isPowered, progress: saved.p3d.progress, layerCount: saved.p3d.layerCount, bedTemp: saved.p3d.bedTemp, displayMode: saved.p3d.displayMode as P3DMode | undefined } : undefined}>
     <ScrewButtonManagerProvider initialState={saved?.screwButtons}>
     <WindowManagerProvider className="text-white">
       {/* Top Toolbar */}
@@ -431,8 +453,8 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                 <BasicToolkit />
                 <MaterialScanner scanProgress={78} detectedMaterials={5} />
                 <LabClock />
-                <CpuMonitor cores={8} utilization={67} frequency={4.2} />
-                <MemoryMonitor totalMemory={16} usedMemory={11.5} />
+                <CpuMonitor />
+                <MemoryMonitor />
               </div>
             </div>
 
@@ -683,22 +705,22 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
             {/* Section: SCANNING */}
             <div className="border-r-2 border-[var(--neon-magenta,#e91e8c)]/40 pr-1">
               <div className="font-mono text-[7px] text-[var(--neon-magenta,#e91e8c)]/60 mb-1 text-right">SCANNING</div>
-              <AnomalyDetector signalStrength={67} anomaliesFound={3} />
+              <AnomalyDetector />
               <div className="mt-1">
-                <QuantumCompass anomalyDirection={127} anomalyDistance={42} />
+                <QuantumCompass />
               </div>
             </div>
             {/* Section: TRANSPORT */}
             <div className="border-r-2 border-[var(--neon-blue)]/40 pr-1">
               <div className="font-mono text-[7px] text-[var(--neon-blue)]/60 mb-1 text-right">TRANSPORT</div>
-              <TeleportPad chargeLevel={65} lastDestination="LAB-Ω" />
+              <TeleportPad />
             </div>
             {/* Section: FABRICATION */}
             <div className="border-r-2 border-[var(--neon-red)]/40 pr-1">
               <div className="font-mono text-[7px] text-[var(--neon-red)]/60 mb-1 text-right">FABRICATION</div>
-              <LaserCutter power={450} precision={0.01} />
+              <LaserCutter />
               <div className="mt-1">
-                <Printer3D progress={67} layerCount={234} />
+                <Printer3D />
               </div>
             </div>
           </div>
@@ -726,6 +748,17 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
 
     </WindowManagerProvider>
     </ScrewButtonManagerProvider>
+    </P3DManagerProvider>
+    </LCTManagerProvider>
+    </TLPManagerProvider>
+    </QCPManagerProvider>
+    </ANDManagerProvider>
+    </MEMManagerProvider>
+    </CLKManagerProvider>
+    </CPUManagerProvider>
+    </DIMManagerProvider>
+    </TMPManagerProvider>
+    </NETManagerProvider>
     </MSCManagerProvider>
     </RMGManagerProvider>
     </BTKManagerProvider>

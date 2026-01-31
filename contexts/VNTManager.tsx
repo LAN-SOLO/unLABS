@@ -63,6 +63,10 @@ interface VNTManagerContextType extends VNTState {
   setFanMode: (fanId: 'cpu' | 'gpu', mode: 'AUTO' | 'LOW' | 'MED' | 'HIGH') => void
   toggleFan: (fanId: 'cpu' | 'gpu', on: boolean) => void
   emergencyPurge: () => Promise<void>
+  // Fold state
+  isExpanded: boolean
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
   // Read-only info
   firmware: typeof VNT_FIRMWARE
   powerSpecs: typeof VNT_POWER_SPECS
@@ -72,12 +76,15 @@ const VNTManagerContext = createContext<VNTManagerContextType | null>(null)
 
 interface VNTManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean; cpuFanSpeed?: number; gpuFanSpeed?: number; fanMode?: string }
+  initialState?: { isPowered: boolean; cpuFanSpeed?: number; gpuFanSpeed?: number; fanMode?: string; isExpanded?: boolean }
 }
 
 export function VNTManagerProvider({ children, initialState }: VNTManagerProviderProps) {
   const startPowered = initialState?.isPowered ?? true
+  const startExpanded = initialState?.isExpanded ?? startPowered
   const thermalManager = useThermalManagerOptional()
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
+  const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev) }, [])
 
   const [deviceState, setDeviceState] = useState<VNTDeviceState>(startPowered ? 'booting' : 'standby')
   const [bootPhase, setBootPhase] = useState<VNTBootPhase>(startPowered ? 'power' : null)
@@ -186,6 +193,7 @@ export function VNTManagerProvider({ children, initialState }: VNTManagerProvide
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
@@ -193,6 +201,7 @@ export function VNTManagerProvider({ children, initialState }: VNTManagerProvide
   const powerOff = useCallback(async () => {
     if (deviceState !== 'online') return
     setIsPowered(false)
+    setIsExpanded(false)
     await runShutdownSequence()
   }, [deviceState, runShutdownSequence])
 
@@ -355,6 +364,9 @@ export function VNTManagerProvider({ children, initialState }: VNTManagerProvide
     setFanMode,
     toggleFan,
     emergencyPurge,
+    isExpanded,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     firmware: VNT_FIRMWARE,
     powerSpecs: VNT_POWER_SPECS,
   }

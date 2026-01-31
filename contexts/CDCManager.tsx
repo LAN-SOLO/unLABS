@@ -34,6 +34,7 @@ interface CDCState {
   testResult: 'pass' | 'fail' | null
   statusMessage: string
   isPowered: boolean
+  isExpanded: boolean
   crystalCount: number
   sliceCount: number
   totalPower: number
@@ -47,6 +48,8 @@ interface CDCManagerContextType extends CDCState {
   runTest: () => Promise<void>
   reboot: () => Promise<void>
   updateData: (crystals: number, slices: number, power: number) => void
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
   // Read-only info
   firmware: typeof CDC_FIRMWARE
   powerSpecs: typeof CDC_POWER_SPECS
@@ -56,11 +59,12 @@ const CDCManagerContext = createContext<CDCManagerContextType | null>(null)
 
 interface CDCManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean }
+  initialState?: { isPowered: boolean; isExpanded?: boolean }
 }
 
 export function CDCManagerProvider({ children, initialState }: CDCManagerProviderProps) {
   const startPowered = initialState?.isPowered ?? true
+  const startExpanded = initialState?.isExpanded ?? startPowered
   const [deviceState, setDeviceState] = useState<CDCDeviceState>(startPowered ? 'booting' : 'standby')
   const [bootPhase, setBootPhase] = useState<CDCBootPhase>(startPowered ? 'post' : null)
   const [testPhase, setTestPhase] = useState<CDCTestPhase>(null)
@@ -72,6 +76,7 @@ export function CDCManagerProvider({ children, initialState }: CDCManagerProvide
   const [sliceCount, setSliceCount] = useState(0)
   const [totalPower, setTotalPower] = useState(0)
   const [currentDraw, setCurrentDraw] = useState(CDC_POWER_SPECS.idle)
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
 
   // Boot sequence
   const runBootSequence = useCallback(async () => {
@@ -132,19 +137,30 @@ export function CDCManagerProvider({ children, initialState }: CDCManagerProvide
     setStatusMessage('Standby mode')
   }, [])
 
-  // Power ON
+  // Power ON — auto-unfold
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
-  // Power OFF
+  // Power OFF — auto-fold
   const powerOff = useCallback(async () => {
     if (deviceState !== 'online') return
     setIsPowered(false)
     await runShutdownSequence()
+    setIsExpanded(false)
   }, [deviceState, runShutdownSequence])
+
+  // Expand/Collapse
+  const toggleExpanded = useCallback(() => {
+    setIsExpanded(prev => !prev)
+  }, [])
+
+  const setExpanded = useCallback((expanded: boolean) => {
+    setIsExpanded(expanded)
+  }, [])
 
   // Run test
   const runTest = useCallback(async () => {
@@ -238,6 +254,7 @@ export function CDCManagerProvider({ children, initialState }: CDCManagerProvide
     testResult,
     statusMessage,
     isPowered,
+    isExpanded,
     crystalCount,
     sliceCount,
     totalPower,
@@ -247,6 +264,8 @@ export function CDCManagerProvider({ children, initialState }: CDCManagerProvide
     runTest,
     reboot,
     updateData,
+    toggleExpanded,
+    setExpanded,
     firmware: CDC_FIRMWARE,
     powerSpecs: CDC_POWER_SPECS,
   }

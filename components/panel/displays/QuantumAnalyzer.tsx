@@ -42,6 +42,20 @@ export function QuantumAnalyzer({ className, onTest, onReset }: QuantumAnalyzerP
   const isBooting = deviceState === 'booting'
   const [bootProgress, setBootProgress] = useState(0)
 
+  // Foldable state
+  const isExpanded = mgr?.isExpanded ?? true
+  const isStandby = mgr?.deviceState === 'standby'
+  const [showFoldedInfo, setShowFoldedInfo] = useState(false)
+  const foldedInfoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 5-min auto-close for folded info
+  useEffect(() => {
+    if (showFoldedInfo) {
+      foldedInfoTimer.current = setTimeout(() => setShowFoldedInfo(false), 5 * 60 * 1000)
+      return () => { if (foldedInfoTimer.current) clearTimeout(foldedInfoTimer.current) }
+    }
+  }, [showFoldedInfo])
+
   // Analysis mode - use manager if available
   const [localMode, setLocalMode] = useState<AnalysisMode>('ANOMALY')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -357,11 +371,131 @@ export function QuantumAnalyzer({ className, onTest, onReset }: QuantumAnalyzerP
 
   const currentConfig = modeConfigs[mode]
 
+  const getLedColor = () => {
+    if (isStandby) return 'red'
+    if (deviceState === 'rebooting') return 'red'
+    if (deviceState === 'booting') return 'amber'
+    if (deviceState === 'testing') return 'cyan'
+    return isPowered ? 'green' : 'red'
+  }
+
+  const stateLabel = isStandby ? 'STANDBY' : deviceState === 'booting' ? 'BOOTING' : deviceState === 'testing' ? 'TESTING' : deviceState === 'rebooting' ? 'REBOOTING' : deviceState === 'offline' ? 'OFFLINE' : 'ONLINE'
+
   return (
     <div className={cn(
-      'flex flex-col h-full bg-gradient-to-b from-[#1a1a2a] to-[#0a0a1a] rounded-lg border border-[#2a2a4a] overflow-hidden',
+      'flex flex-col bg-gradient-to-b from-[#1a1a2a] to-[#0a0a1a] rounded-lg border border-[#2a2a4a] overflow-hidden relative',
+      isExpanded ? 'h-full' : '',
       className
-    )}>
+    )} style={{ perspective: '600px' }}>
+      {/* ===== FOLDED FRONT PANEL ===== */}
+      <div style={{
+        transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 0 : 1,
+        position: isExpanded ? 'absolute' : 'relative',
+        pointerEvents: isExpanded ? 'none' : 'auto',
+        zIndex: isExpanded ? 0 : 2,
+        width: '100%', left: 0, top: 0,
+      }}>
+        <div className="flex items-center gap-2 px-3 py-2">
+          <LED on={isPowered || isBooting} color={getLedColor()} size="sm" />
+          <span className="font-mono text-[10px] text-[var(--neon-cyan)] font-bold shrink-0">QUA-001</span>
+          <span className={cn(
+            'font-mono text-[8px] shrink-0',
+            isStandby || deviceState === 'offline' ? 'text-white/30' : 'text-[var(--neon-cyan)]/70'
+          )}>{stateLabel}</span>
+          <div className="flex-1" />
+
+          {isPowered && (
+            <>
+              {/* Compact test button */}
+              <button
+                onClick={handleTest}
+                disabled={deviceState !== 'online'}
+                className={cn(
+                  'px-2 py-0.5 rounded font-mono text-[7px] border transition-all disabled:opacity-30',
+                  deviceState === 'testing'
+                    ? 'bg-[var(--neon-cyan)]/20 border-[var(--neon-cyan)] text-[var(--neon-cyan)]'
+                    : 'bg-[#1a1a2a] border-[#3a3a4a] text-white/50 hover:border-white/30'
+                )}
+              >TEST</button>
+              {/* Compact reset button */}
+              <button
+                onClick={handleReboot}
+                disabled={!isPowered}
+                className="px-2 py-0.5 rounded font-mono text-[7px] border transition-all disabled:opacity-30 bg-[#1a1a2a] border-[#3a3a4a] text-white/50 hover:border-white/30"
+              >RST</button>
+            </>
+          )}
+
+          {/* Power button */}
+          <button
+            onClick={handlePowerToggle}
+            className={cn(
+              'w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all shrink-0',
+              isPowered
+                ? 'bg-[#1a3a2a] border-[var(--neon-green)] shadow-[0_0_8px_var(--neon-green)]'
+                : isBooting
+                ? 'bg-[#2a2a1a] border-[var(--neon-amber)] animate-pulse'
+                : 'bg-[#1a1a1a] border-[#3a3a3a] hover:border-[#5a5a5a]'
+            )}
+          >
+            <svg
+              className={cn('w-3 h-3', isPowered ? 'text-[var(--neon-green)]' : 'text-[#5a5a5a]')}
+              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+            >
+              <path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0" />
+            </svg>
+          </button>
+
+          {/* Info toggle */}
+          {isPowered && (
+            <button
+              onClick={() => setShowFoldedInfo(p => !p)}
+              className="font-mono text-[8px] text-[var(--neon-cyan)]/50 hover:text-[var(--neon-cyan)] transition-colors px-0.5"
+              title={showFoldedInfo ? 'Hide info' : 'Show info'}
+            >{showFoldedInfo ? '▲' : '▼'}</button>
+          )}
+        </div>
+
+        {/* Folded info expansion */}
+        <div style={{
+          maxHeight: showFoldedInfo && isPowered ? '60px' : '0px',
+          overflow: 'hidden',
+          transition: 'max-height 300ms ease',
+        }}>
+          <div className="px-3 pb-2 grid grid-cols-3 gap-x-4 gap-y-0.5 font-mono text-[7px]">
+            <span className="text-white/40">Mode: <span className="text-[var(--neon-cyan)]">{mode}</span></span>
+            <span className="text-white/40">Sens: <span className="text-[var(--neon-cyan)]">{sensitivity}%</span></span>
+            <span className="text-white/40">Depth: <span className="text-[var(--neon-cyan)]">{depth}%</span></span>
+            <span className="text-white/40">Freq: <span className="text-[var(--neon-cyan)]">{frequency}Hz</span></span>
+            <span className="text-white/40">COH: <span className="text-[var(--neon-cyan)]">{mgr?.coherence ?? 87}%</span></span>
+            <span className="text-white/40">Draw: <span className="text-[var(--neon-cyan)]">{mgr?.currentDraw ?? 10} E/s</span></span>
+          </div>
+        </div>
+      </div>
+
+      {/* ===== UNFOLDED INNER PANEL ===== */}
+      <div className={cn(isExpanded ? 'flex-1 flex flex-col overflow-hidden' : '')} style={{
+        transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
+        transformOrigin: 'top center',
+        transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
+        opacity: isExpanded ? 1 : 0,
+        position: isExpanded ? 'relative' : 'absolute',
+        pointerEvents: isExpanded ? 'auto' : 'none',
+        zIndex: isExpanded ? 2 : 0,
+        width: '100%', left: 0, top: 0,
+      }}>
+      {/* Fold chevron */}
+      {mgr && isPowered && (
+        <button
+          onClick={() => mgr.toggleExpanded()}
+          className="absolute top-[6px] right-[6px] z-10 font-mono text-[8px] text-[var(--neon-cyan)]/40 hover:text-[var(--neon-cyan)] transition-colors"
+          title="Fold"
+        >▴</button>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 bg-[#0a0a1a] border-b border-[#2a2a4a]">
         <div className="flex items-center gap-2">
@@ -788,6 +922,7 @@ export function QuantumAnalyzer({ className, onTest, onReset }: QuantumAnalyzerP
             }}
           />
         </button>
+      </div>
       </div>
     </div>
   )

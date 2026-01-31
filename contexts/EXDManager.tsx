@@ -56,6 +56,10 @@ interface EXDManagerContextType extends EXDState {
   reboot: () => Promise<void>
   deploy: () => void
   recall: () => void
+  // Fold state
+  isExpanded: boolean
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
   // Read-only info
   firmware: typeof EXD_FIRMWARE
   powerSpecs: typeof EXD_POWER_SPECS
@@ -65,12 +69,15 @@ const EXDManagerContext = createContext<EXDManagerContextType | null>(null)
 
 interface EXDManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean; isDeployed?: boolean }
+  initialState?: { isPowered: boolean; isDeployed?: boolean; isExpanded?: boolean }
 }
 
 export function EXDManagerProvider({ children, initialState }: EXDManagerProviderProps) {
   const startPowered = initialState?.isPowered ?? true
   const startDeployed = initialState?.isDeployed ?? true
+  const startExpanded = initialState?.isExpanded ?? startPowered
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
+  const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev) }, [])
   const [deviceState, setDeviceState] = useState<EXDDeviceState>(startPowered ? 'booting' : 'standby')
   const [bootPhase, setBootPhase] = useState<EXDBootPhase>(startPowered ? 'power' : null)
   const [testPhase, setTestPhase] = useState<EXDTestPhase>(null)
@@ -197,6 +204,7 @@ export function EXDManagerProvider({ children, initialState }: EXDManagerProvide
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
@@ -204,6 +212,7 @@ export function EXDManagerProvider({ children, initialState }: EXDManagerProvide
   const powerOff = useCallback(async () => {
     if (deviceState !== 'online') return
     setIsPowered(false)
+    setIsExpanded(false)
     await runShutdownSequence()
   }, [deviceState, runShutdownSequence])
 
@@ -327,6 +336,9 @@ export function EXDManagerProvider({ children, initialState }: EXDManagerProvide
     reboot,
     deploy,
     recall,
+    isExpanded,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     firmware: EXD_FIRMWARE,
     powerSpecs: EXD_POWER_SPECS,
   }

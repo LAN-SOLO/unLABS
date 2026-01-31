@@ -35,6 +35,7 @@ interface HMSState {
   testResult: 'pass' | 'fail' | null
   statusMessage: string
   isPowered: boolean
+  isExpanded: boolean
   // Synth-specific state
   pulseValue: number
   tempoValue: number
@@ -53,6 +54,8 @@ interface HMSManagerContextType extends HMSState {
   setKnobValue: (knob: 'pulse' | 'tempo' | 'freq', value: number) => void
   setWaveform: (type: 'sine' | 'square' | 'saw' | 'triangle') => void
   updateTier: (tier: number) => void
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
   // Read-only info
   firmware: typeof HMS_FIRMWARE
   powerSpecs: typeof HMS_POWER_SPECS
@@ -62,11 +65,12 @@ const HMSManagerContext = createContext<HMSManagerContextType | null>(null)
 
 interface HMSManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean; pulseValue: number; tempoValue: number; freqValue: number; waveformType: string }
+  initialState?: { isPowered: boolean; pulseValue: number; tempoValue: number; freqValue: number; waveformType: string; isExpanded?: boolean }
 }
 
 export function HMSManagerProvider({ children, initialState }: HMSManagerProviderProps) {
   const startPowered = initialState?.isPowered ?? true
+  const startExpanded = initialState?.isExpanded ?? startPowered
   const [deviceState, setDeviceState] = useState<HMSDeviceState>(startPowered ? 'booting' : 'standby')
   const [bootPhase, setBootPhase] = useState<HMSBootPhase>(startPowered ? 'power' : null)
   const [testPhase, setTestPhase] = useState<HMSTestPhase>(null)
@@ -74,6 +78,7 @@ export function HMSManagerProvider({ children, initialState }: HMSManagerProvide
   const [testResult, setTestResult] = useState<'pass' | 'fail' | null>(null)
   const [statusMessage, setStatusMessage] = useState(startPowered ? 'Initializing...' : 'Standby')
   const [isPowered, setIsPowered] = useState(startPowered)
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
   const [pulseValue, setPulseValue] = useState(35)
   const [tempoValue, setTempoValue] = useState(40)
   const [freqValue, setFreqValue] = useState(37)
@@ -149,10 +154,16 @@ export function HMSManagerProvider({ children, initialState }: HMSManagerProvide
     setStatusMessage('Standby')
   }, [])
 
+  // Toggle expanded
+  const toggleExpanded = useCallback(() => {
+    setIsExpanded(prev => !prev)
+  }, [])
+
   // Power ON
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
@@ -161,6 +172,7 @@ export function HMSManagerProvider({ children, initialState }: HMSManagerProvide
     if (deviceState !== 'online') return
     setIsPowered(false)
     await runShutdownSequence()
+    setIsExpanded(false)
   }, [deviceState, runShutdownSequence])
 
   // Run test
@@ -281,6 +293,7 @@ export function HMSManagerProvider({ children, initialState }: HMSManagerProvide
     testResult,
     statusMessage,
     isPowered,
+    isExpanded,
     pulseValue,
     tempoValue,
     freqValue,
@@ -294,6 +307,8 @@ export function HMSManagerProvider({ children, initialState }: HMSManagerProvide
     setKnobValue,
     setWaveform,
     updateTier,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     firmware: HMS_FIRMWARE,
     powerSpecs: HMS_POWER_SPECS,
   }

@@ -53,6 +53,10 @@ interface ECRManagerContextType extends ECRState {
   setKnobValue: (knob: 'pulse' | 'bloom', value: number) => void
   setRecording: (recording: boolean) => void
   updateTier: (tier: number) => void
+  // Fold state
+  isExpanded: boolean
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
   // Read-only info
   firmware: typeof ECR_FIRMWARE
   powerSpecs: typeof ECR_POWER_SPECS
@@ -62,7 +66,7 @@ const ECRManagerContext = createContext<ECRManagerContextType | null>(null)
 
 interface ECRManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean; pulseValue: number; bloomValue: number; isRecording: boolean }
+  initialState?: { isPowered: boolean; pulseValue: number; bloomValue: number; isRecording: boolean; isExpanded?: boolean }
 }
 
 export function ECRManagerProvider({ children, initialState }: ECRManagerProviderProps) {
@@ -80,6 +84,11 @@ export function ECRManagerProvider({ children, initialState }: ECRManagerProvide
   const [isRecording, setIsRecordingState] = useState(false)
   const [signalStrength, setSignalStrength] = useState(85)
   const [currentTier, setCurrentTier] = useState(1)
+
+  // Fold state
+  const startExpanded = initialState?.isExpanded ?? startPowered
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
+  const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev) }, [])
 
   // Ticker tap simulation
   useEffect(() => {
@@ -160,6 +169,7 @@ export function ECRManagerProvider({ children, initialState }: ECRManagerProvide
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
@@ -168,6 +178,7 @@ export function ECRManagerProvider({ children, initialState }: ECRManagerProvide
     if (deviceState !== 'online') return
     setIsPowered(false)
     await runShutdownSequence()
+    setIsExpanded(false)
   }, [deviceState, runShutdownSequence])
 
   // Run test
@@ -296,6 +307,9 @@ export function ECRManagerProvider({ children, initialState }: ECRManagerProvide
     setKnobValue,
     setRecording,
     updateTier,
+    isExpanded,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     firmware: ECR_FIRMWARE,
     powerSpecs: ECR_POWER_SPECS,
   }

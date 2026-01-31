@@ -50,6 +50,10 @@ interface IPLManagerContextType extends IPLState {
   runTest: () => Promise<void>
   reboot: () => Promise<void>
   updateTier: (tier: number) => void
+  // Fold state
+  isExpanded: boolean
+  toggleExpanded: () => void
+  setExpanded: (expanded: boolean) => void
   // Read-only info
   firmware: typeof IPL_FIRMWARE
   powerSpecs: typeof IPL_POWER_SPECS
@@ -59,7 +63,7 @@ const IPLManagerContext = createContext<IPLManagerContextType | null>(null)
 
 interface IPLManagerProviderProps {
   children: ReactNode
-  initialState?: { isPowered: boolean }
+  initialState?: { isPowered: boolean; isExpanded?: boolean }
 }
 
 export function IPLManagerProvider({ children, initialState }: IPLManagerProviderProps) {
@@ -76,6 +80,11 @@ export function IPLManagerProvider({ children, initialState }: IPLManagerProvide
   const [inputStreams, setInputStreams] = useState(8)
   const [predictionHorizon, setPredictionHorizon] = useState(60)
   const [currentTier, setCurrentTier] = useState(1)
+
+  // Fold state
+  const startExpanded = initialState?.isExpanded ?? startPowered
+  const [isExpanded, setIsExpanded] = useState(startExpanded)
+  const toggleExpanded = useCallback(() => { setIsExpanded(prev => !prev) }, [])
 
   // Accuracy fluctuation simulation
   useEffect(() => {
@@ -149,6 +158,7 @@ export function IPLManagerProvider({ children, initialState }: IPLManagerProvide
   const powerOn = useCallback(async () => {
     if (deviceState !== 'standby') return
     setIsPowered(true)
+    setIsExpanded(true)
     await runBootSequence()
   }, [deviceState, runBootSequence])
 
@@ -157,6 +167,7 @@ export function IPLManagerProvider({ children, initialState }: IPLManagerProvide
     if (deviceState !== 'online') return
     setIsPowered(false)
     await runShutdownSequence()
+    setIsExpanded(false)
   }, [deviceState, runShutdownSequence])
 
   // Run test
@@ -254,6 +265,9 @@ export function IPLManagerProvider({ children, initialState }: IPLManagerProvide
     runTest,
     reboot,
     updateTier,
+    isExpanded,
+    toggleExpanded,
+    setExpanded: setIsExpanded,
     firmware: IPL_FIRMWARE,
     powerSpecs: IPL_POWER_SPECS,
   }
