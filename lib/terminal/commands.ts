@@ -2641,6 +2641,7 @@ const deviceCommand: Command = {
           `    DEVICE ${deviceName.toUpperCase()} STATUS - Show current status`,
           `    DEVICE ${deviceName.toUpperCase()} COMBOS - Show compatible combinations`,
           `    DEVICE ${deviceName.toUpperCase()} DEPS   - Show tech tree dependencies`,
+          `    DEVICE ${deviceName.toUpperCase()} INFLUENCE - Show device influence map`,
           '',
         ],
       }
@@ -2902,9 +2903,65 @@ const deviceCommand: Command = {
       return { success: true, output: lines }
     }
 
+    // Device influence map
+    if (action === 'influence' || action === 'affects' || action === 'impact') {
+      // Find all devices that list this device as compatible
+      const influencedBy: string[] = []
+      const influences: string[] = []
+      const seen = new Set<string>()
+
+      for (const [, entry] of Object.entries(deviceMap)) {
+        if (seen.has(entry.id) || entry.id === device.id) continue
+        seen.add(entry.id)
+        if (entry.compatible.includes(device.id) || entry.compatible.includes('ALL')) {
+          influencedBy.push(`${entry.id} (${entry.name})`)
+        }
+      }
+
+      for (const cid of device.compatible) {
+        if (cid === device.id || cid === 'ALL') continue
+        const entry = Object.values(deviceMap).find(d => d.id === cid)
+        influences.push(`${cid} (${entry?.name ?? cid})`)
+      }
+
+      const lines: string[] = [
+        '',
+        `┌─ Influence: ${device.name} ${'─'.repeat(20)}`,
+        '│',
+        '│  Influences (outgoing):',
+      ]
+
+      if (influences.length > 0) {
+        for (const inf of influences) {
+          lines.push(`│    → ${inf}`)
+        }
+      } else {
+        lines.push('│    (none)')
+      }
+
+      lines.push('│', '│  Influenced by (incoming):')
+
+      if (influencedBy.length > 0) {
+        for (const inf of influencedBy) {
+          lines.push(`│    ← ${inf}`)
+        }
+      } else {
+        lines.push('│    (none)')
+      }
+
+      lines.push(
+        '│',
+        `│  Network: ${influences.length} out / ${influencedBy.length} in`,
+        `└${'─'.repeat(40)}`,
+        '',
+      )
+
+      return { success: true, output: lines }
+    }
+
     return {
       success: false,
-      error: `Unknown action: ${action}\nAvailable: TEST, REBOOT, STATUS, INFO, POWER, COMBOS, DEPS`,
+      error: `Unknown action: ${action}\nAvailable: TEST, REBOOT, STATUS, INFO, POWER, COMBOS, DEPS, INFLUENCE`,
     }
   },
 }
