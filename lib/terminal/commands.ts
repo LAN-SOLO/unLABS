@@ -2913,7 +2913,7 @@ const deviceCommand: Command = {
       for (const [, entry] of Object.entries(deviceMap)) {
         if (seen.has(entry.id) || entry.id === device.id) continue
         seen.add(entry.id)
-        if (entry.compatible.includes(device.id) || entry.compatible.includes('ALL')) {
+        if (entry.compatible.includes(device.id)) {
           influencedBy.push(`${entry.id} (${entry.name})`)
         }
       }
