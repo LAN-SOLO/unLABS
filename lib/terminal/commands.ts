@@ -2819,46 +2819,42 @@ const deviceCommand: Command = {
         .filter(([id, t]) => t.tree === treeName && t.tier > tier && id !== device.id)
         .sort((a, b) => a[1].tier - b[1].tier)
 
-      const W = 59
-      const row = (s: string) => `│  ${s}${' '.repeat(Math.max(0, W - 2 - s.length))}│`
-      const blank = `│${' '.repeat(W)}│`
-
       const lines: string[] = [
         '',
-        `┌─ Dependencies: ${device.name} ${'─'.repeat(Math.max(0, W - 18 - device.name.length))}┐`,
-        blank,
-        row(`Tech Tree:  ${treeName}`),
-        row(`Tier:       ${tier}`),
-        blank,
+        `┌─ Dependencies: ${device.name} ${'─'.repeat(20)}`,
+        '│',
+        `│  Tech Tree:  ${treeName}`,
+        `│  Tier:       ${tier}`,
+        '│',
       ]
 
       if (prereqs.length > 0) {
-        lines.push(row('Prerequisites:'))
+        lines.push('│  Prerequisites:')
         for (const [id, t] of prereqs) {
           const pName = Object.values(deviceMap).find(d => d.id === id)?.name ?? id
-          lines.push(row(`  ├── T${t.tier} ${id} (${pName})`))
+          lines.push(`│    ├── T${t.tier} ${id} (${pName})`)
         }
-        lines.push(row(`  └── T${tier} ${device.id} (${device.name}) ◀ YOU`))
+        lines.push(`│    └── T${tier} ${device.id} (${device.name}) ◀ YOU`)
       } else {
-        lines.push(row('Prerequisites: None (base tier)'))
+        lines.push('│  Prerequisites: None (base tier)')
       }
 
-      lines.push(blank)
+      lines.push('│')
 
       if (unlocks.length > 0) {
-        lines.push(row('Unlocks:'))
+        lines.push('│  Unlocks:')
         for (const [id, t] of unlocks) {
           const uName = Object.values(deviceMap).find(d => d.id === id)?.name ?? id
           const connector = id === unlocks[unlocks.length - 1][0] ? '└──' : '├──'
-          lines.push(row(`  ${connector} T${t.tier} ${id} (${uName})`))
+          lines.push(`│    ${connector} T${t.tier} ${id} (${uName})`)
         }
       } else {
-        lines.push(row('Unlocks: None (top tier in tree)'))
+        lines.push('│  Unlocks: None (top tier in tree)')
       }
 
       lines.push(
-        blank,
-        `└${'─'.repeat(W)}┘`,
+        '│',
+        `└${'─'.repeat(40)}`,
         '',
       )
 
@@ -2868,18 +2864,15 @@ const deviceCommand: Command = {
     // Device combinations / synergies
     if (action === 'combos' || action === 'combinations' || action === 'synergy') {
       const compatList = device.compatible.filter(c => c !== device.id && c !== 'ALL')
-      const CW = 59
-      const crow = (s: string) => `│  ${s}${' '.repeat(Math.max(0, CW - 2 - s.length))}│`
-      const cblank = `│${' '.repeat(CW)}│`
 
       if (compatList.length === 0) {
         return {
           success: true,
           output: [
             '',
-            `┌─ Combinations: ${device.name} ${'─'.repeat(Math.max(0, CW - 18 - device.name.length))}┐`,
-            crow('NO COMPATIBLE DEVICES FOUND'),
-            `└${'─'.repeat(CW)}┘`,
+            `┌─ Combinations: ${device.name} ${'─'.repeat(20)}`,
+            '│  NO COMPATIBLE DEVICES FOUND',
+            `└${'─'.repeat(40)}`,
             '',
           ],
         }
@@ -2887,22 +2880,22 @@ const deviceCommand: Command = {
 
       const lines: string[] = [
         '',
-        `┌─ Combinations: ${device.name} ${'─'.repeat(Math.max(0, CW - 18 - device.name.length))}┐`,
-        cblank,
+        `┌─ Combinations: ${device.name} ${'─'.repeat(20)}`,
+        '│',
       ]
 
       for (const partnerId of compatList) {
         const partnerEntry = Object.values(deviceMap).find(d => d.id === partnerId)
         const partnerName = partnerEntry?.name ?? partnerId
-        lines.push(crow(`○ ${device.id} + ${partnerId} (${partnerName})`))
+        lines.push(`│  ○ ${device.id} + ${partnerId} (${partnerName})`)
       }
 
       lines.push(
-        cblank,
-        crow(`Total: ${compatList.length} compatible device(s)`),
-        `└${'─'.repeat(CW)}┘`,
+        '│',
+        `│  Total: ${compatList.length} compatible device(s)`,
+        `└${'─'.repeat(40)}`,
         '',
-        `  Use the Combos tab in device detail for link/unlink operations.`,
+        '  Use the Combos tab in device detail for link/unlink operations.',
         '',
       )
 
