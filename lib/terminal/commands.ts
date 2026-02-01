@@ -2015,7 +2015,6 @@ const deviceCommand: Command = {
           { id: 'THM-001', name: 'Thermal Manager' },
           { id: 'BTK-001', name: 'Basic Toolkit' },
           { id: 'MSC-001', name: 'Material Scanner' },
-          { id: 'PWB-001', name: 'Portable Workbench' },
           { id: 'PWR-001', name: 'Power Management System' },
         ],
         'STORAGE': [
