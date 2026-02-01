@@ -88,6 +88,8 @@ import { QCPManagerProvider, type QCPMode } from '@/contexts/QCPManager'
 import { TLPManagerProvider, type TLPMode } from '@/contexts/TLPManager'
 import { LCTManagerProvider, type LCTMode } from '@/contexts/LCTManager'
 import { P3DManagerProvider, type P3DMode } from '@/contexts/P3DManager'
+import { SPKManagerProvider } from '@/contexts/SPKManager'
+import { DGNManagerProvider } from '@/contexts/DGNManager'
 import { ScrewButtonManagerProvider } from '@/contexts/ScrewButtonManager'
 import type { EquipmentData } from '../terminal/actions/equipment'
 
@@ -196,6 +198,8 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
     <TLPManagerProvider initialState={saved?.tlp ? { isPowered: saved.tlp.isPowered, chargeLevel: saved.tlp.chargeLevel, lastDestination: saved.tlp.lastDestination, displayMode: saved.tlp.displayMode as TLPMode | undefined } : undefined}>
     <LCTManagerProvider initialState={saved?.lct ? { isPowered: saved.lct.isPowered, laserPower: saved.lct.laserPower, precision: saved.lct.precision, displayMode: saved.lct.displayMode as LCTMode | undefined } : undefined}>
     <P3DManagerProvider initialState={saved?.p3d ? { isPowered: saved.p3d.isPowered, progress: saved.p3d.progress, layerCount: saved.p3d.layerCount, bedTemp: saved.p3d.bedTemp, displayMode: saved.p3d.displayMode as P3DMode | undefined } : undefined}>
+    <SPKManagerProvider initialState={saved?.spk ? { isPowered: saved.spk.isPowered, volume: saved.spk.volume, isMuted: saved.spk.isMuted, filters: saved.spk.filters } : undefined}>
+    <DGNManagerProvider initialState={saved?.dgn ? { isPowered: saved.dgn.isPowered, category: saved.dgn.category, scanDepth: saved.dgn.scanDepth } : undefined}>
     <ScrewButtonManagerProvider initialState={saved?.screwButtons}>
     <WindowManagerProvider className="text-white">
       {/* Top Toolbar */}
@@ -237,38 +241,30 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
         </div>
       </PanelToolbar>
 
-      {/* Left Panel - Equipment Modules */}
+      {/* Left Panel - Power, Resources & Field Ops */}
       <PanelLeft>
-        {/* Crystal Data Cache - shows real inventory data */}
         <CrystalDataCache
           crystalCount={crystals.count}
           sliceCount={crystals.totalSlices}
           totalPower={crystals.totalPower}
         />
-
-        {/* Energy Core - linked to network volatility */}
         <EnergyCore
           volatilityTier={volatility.currentTier}
           tps={volatility.tps}
         />
-
-        {/* Battery Pack - shows user balance */}
         <BatteryPack
           available={balanceData.available}
           staked={balanceData.staked}
           locked={balanceData.locked}
         />
-
-        {/* Synthesizer - linked to synthesizers tech tree */}
+        <MicrofusionReactor />
+        <AbstractumContainer amount={127} capacity={500} purity={94} />
+        <EnergyTank amount={340} capacity={1000} flowRate={12.5} />
+        <AlloyForge temperature={1450} output={3.2} isActive={true} />
+        <NanoSynthesizer particles={1247000} density={89} isProcessing={true} />
         <HandmadeSynthesizer progress={techTrees?.synthesizers} />
-
-        {/* Echo Recorder - linked to adapters tech tree */}
         <EchoRecorder progress={techTrees?.adapters} />
-
-        {/* Interpolator - linked to optics tech tree */}
         <Interpolator progress={techTrees?.optics} />
-
-        {/* Ventilation Fans - system cooling, controlled by ThermalManager */}
         <div className="flex gap-1 flex-1 min-h-0">
           <VentilationFan label="CPU" fanId="cpu" systemLoad={cpuLoad} targetTemp={35} className="flex-1" />
           <VentilationFan label="GPU" fanId="gpu" systemLoad={gpuLoad} targetTemp={40} className="flex-1" />
@@ -297,60 +293,34 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
           ))}
         </div>
 
-        {/* Main content - Terminal centered with side columns */}
-        <div className="flex gap-1 flex-1">
-          {/* LEFT COLUMN: Tech & Processing */}
-          <div className="flex flex-col gap-1 w-[140px]">
-            {/* Section: POWER */}
-            <div className="border-l-2 border-[var(--neon-cyan)]/40 pl-1">
-              <div className="font-mono text-[7px] text-[var(--neon-cyan)]/60 mb-1">POWER</div>
-              <MicrofusionReactor />
+        {/* Main content - Terminal-first layout */}
+        <div className="flex flex-col gap-1 flex-1">
+          {/* Displays row: Terminal + Quantum Analyzer + Diagnostics */}
+          <div className="flex gap-1" style={{ minHeight: '280px' }}>
+            <div className="flex-1 min-w-[400px]">
+              <TerminalModule userId={userId} username={username} balance={balance} />
             </div>
-            {/* Section: COMPUTE */}
-            <div className="border-l-2 border-[var(--neon-green)]/40 pl-1">
-              <div className="font-mono text-[7px] text-[var(--neon-green)]/60 mb-1">COMPUTE</div>
-              <AIAssistant />
-              <div className="mt-1">
-                <SupercomputerArray flops={2.4} utilization={87} isOnline={true} />
-              </div>
+            <div className="w-[280px]">
+              <QuantumAnalyzer className="h-full" />
             </div>
-            {/* Section: FIELD OPS */}
-            <div className="border-l-2 border-[var(--neon-lime,#bfff00)]/40 pl-1">
-              <div className="font-mono text-[7px] text-[var(--neon-lime,#bfff00)]/60 mb-1">FIELD OPS</div>
-              <ExplorerDrone range={2.4} battery={78} isDeployed={true} />
-              <div className="mt-1">
-                <ResourceMagnet magnetStrength={45} isActive={true} />
-              </div>
+            <div className="w-[320px]">
+              <DiagnosticsConsole className="h-full" />
             </div>
           </div>
 
-          {/* CENTER: Terminal + Quantum Analyzer + Resource Storage + Tech Tree Preview */}
-          <div className="flex flex-col gap-1 flex-1">
-            {/* Terminal, Quantum Analyzer, and Diagnostics Console */}
-            <div className="flex gap-1" style={{ minHeight: '280px' }}>
-              <div className="flex-1 min-w-[300px]">
-                <TerminalModule userId={userId} username={username} balance={balance} />
-              </div>
-              <div className="w-[280px]">
-                <QuantumAnalyzer className="h-full" />
-              </div>
-              <div className="w-[340px]">
-                <DiagnosticsConsole className="h-full" />
-              </div>
+          {/* Core Operations Row */}
+          <div className="border-t border-[var(--neon-green)]/20 pt-1">
+            <div className="font-mono text-[7px] text-white/40 mb-1 px-1">CORE OPERATIONS</div>
+            <div className="grid grid-cols-5 gap-1">
+              <AIAssistant />
+              <SupercomputerArray flops={2.4} utilization={87} isOnline={true} />
+              <ExplorerDrone range={2.4} battery={78} isDeployed={true} />
+              <ResourceMagnet magnetStrength={45} isActive={true} />
+              <AnomalyDetector />
             </div>
+          </div>
 
-            {/* Resource Storage Row */}
-            <div className="border-t border-[var(--neon-green)]/20 pt-1">
-              <div className="font-mono text-[7px] text-white/40 mb-1 px-1">RESOURCE STORAGE</div>
-              <div className="grid grid-cols-4 gap-1">
-                <AbstractumContainer amount={127} capacity={500} purity={94} />
-                <EnergyTank amount={340} capacity={1000} flowRate={12.5} />
-                <AlloyForge temperature={1450} output={3.2} isActive={true} />
-                <NanoSynthesizer particles={1247000} density={89} isProcessing={true} />
-              </div>
-            </div>
-
-            {/* System Status Row */}
+          {/* System Status Row */}
             <div className="border-t border-[var(--neon-cyan)]/20 pt-1">
               <div className="font-mono text-[7px] text-white/40 mb-1 px-1">SYSTEM STATUS</div>
               <div className="grid grid-cols-5 gap-1">
@@ -616,45 +586,30 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
               </div>
             </div>
           </div>
-
-          {/* RIGHT COLUMN: Gadgets & Fabrication */}
-          <div className="flex flex-col gap-1 w-[140px]">
-            {/* Section: SCANNING */}
-            <div className="border-r-2 border-[var(--neon-magenta,#e91e8c)]/40 pr-1">
-              <div className="font-mono text-[7px] text-[var(--neon-magenta,#e91e8c)]/60 mb-1 text-right">SCANNING</div>
-              <AnomalyDetector />
-              <div className="mt-1">
-                <QuantumCompass />
-              </div>
-            </div>
-            {/* Section: TRANSPORT */}
-            <div className="border-r-2 border-[var(--neon-blue)]/40 pr-1">
-              <div className="font-mono text-[7px] text-[var(--neon-blue)]/60 mb-1 text-right">TRANSPORT</div>
-              <TeleportPad />
-            </div>
-            {/* Section: FABRICATION */}
-            <div className="border-r-2 border-[var(--neon-red)]/40 pr-1">
-              <div className="font-mono text-[7px] text-[var(--neon-red)]/60 mb-1 text-right">FABRICATION</div>
-              <LaserCutter />
-              <div className="mt-1">
-                <Printer3D />
-              </div>
-            </div>
-          </div>
-        </div>
       </PanelMain>
 
-      {/* Right Panel - Oscilloscope + Speaker */}
+      {/* Right Panel - Displays & Scanning */}
       <PanelRight>
-        <div className="flex gap-1 h-full">
-          <Oscilloscope
-            walletAddress={`${userId.slice(0, 4)}....${userId.slice(-4)}`}
-            balance={balance}
-            frequency1={2.91}
-            frequency2={2.501}
-            className="flex-1"
-          />
-          <NarrowSpeaker className="h-full" />
+        <div className="flex flex-col gap-1 h-full">
+          {/* Top: Oscilloscope + Speaker */}
+          <div className="flex gap-1" style={{ flex: '55 1 0%' }}>
+            <Oscilloscope
+              walletAddress={`${userId.slice(0, 4)}....${userId.slice(-4)}`}
+              balance={balance}
+              frequency1={2.91}
+              frequency2={2.501}
+              className="flex-1"
+            />
+            <NarrowSpeaker className="h-full" />
+          </div>
+          {/* Bottom: Scanning & Transport */}
+          <div className="flex flex-col gap-1" style={{ flex: '45 1 0%' }}>
+            <div className="font-mono text-[7px] text-white/40 px-1">SCANNING & TRANSPORT</div>
+            <QuantumCompass />
+            <TeleportPad />
+            <LaserCutter />
+            <Printer3D />
+          </div>
         </div>
       </PanelRight>
 
@@ -669,6 +624,8 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
 
     </WindowManagerProvider>
     </ScrewButtonManagerProvider>
+    </DGNManagerProvider>
+    </SPKManagerProvider>
     </P3DManagerProvider>
     </LCTManagerProvider>
     </TLPManagerProvider>

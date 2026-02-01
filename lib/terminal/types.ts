@@ -920,6 +920,91 @@ export interface P3DDeviceActions {
   }
 }
 
+// SPK Device state type for terminal sync
+export type SPKDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+
+export interface SPKDeviceActions {
+  powerOn: () => Promise<void>
+  powerOff: () => Promise<void>
+  runTest: () => Promise<void>
+  reboot: () => Promise<void>
+  setVolume: (volume: number) => void
+  setMuted: (muted: boolean) => void
+  toggleMute: () => void
+  setFilter: (filter: 'bass' | 'mid' | 'high', enabled: boolean) => void
+  toggleFilter: (filter: 'bass' | 'mid' | 'high') => void
+  setExpanded: (expanded: boolean) => void
+  toggleExpanded: () => void
+  getState: () => {
+    deviceState: SPKDeviceState
+    statusMessage: string
+    isPowered: boolean
+    volume: number
+    isMuted: boolean
+    filters: { bass: boolean; mid: boolean; high: boolean }
+    peakLevel: number
+    testResult: 'pass' | 'fail' | null
+    isExpanded: boolean
+  }
+  getFirmware: () => {
+    version: string
+    build: string
+    checksum: string
+    features: string[]
+    securityPatch: string
+  }
+  getPowerSpecs: () => {
+    full: number
+    idle: number
+    standby: number
+    category: string
+    priority: number
+  }
+}
+
+// DGN Device state type for terminal sync
+export type DGNDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+
+export interface DGNDeviceActions {
+  powerOn: () => Promise<void>
+  powerOff: () => Promise<void>
+  runTest: () => Promise<void>
+  reboot: () => Promise<void>
+  setCategory: (cat: 'SYSTEMS' | 'DEVICES' | 'ENERGY' | 'NETWORK' | 'CRYSTALS' | 'PROCESS') => void
+  setScanDepth: (depth: number) => void
+  runDiagnostics: () => Promise<void>
+  clearAlerts: () => void
+  setExpanded: (expanded: boolean) => void
+  toggleExpanded: () => void
+  getState: () => {
+    deviceState: DGNDeviceState
+    statusMessage: string
+    isPowered: boolean
+    isExpanded: boolean
+    category: string
+    scanDepth: number
+    healthPercent: number
+    alertCount: number
+    isRunningDiag: boolean
+    diagProgress: number
+    testResult: 'pass' | 'fail' | null
+  }
+  getFirmware: () => {
+    version: string
+    build: string
+    checksum: string
+    features: string[]
+    securityPatch: string
+  }
+  getPowerSpecs: () => {
+    full: number
+    idle: number
+    standby: number
+    category: string
+    priority: number
+  }
+}
+
 // LCT Device state type for terminal sync
 export type LCTDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
 
@@ -1300,6 +1385,8 @@ export interface DataFetchers {
   tlpDevice?: TLPDeviceActions
   lctDevice?: LCTDeviceActions
   p3dDevice?: P3DDeviceActions
+  spkDevice?: SPKDeviceActions
+  dgnDevice?: DGNDeviceActions
   // Screw button actions
   screwButtons?: ScrewButtonDeviceActions
   // Filesystem and user management

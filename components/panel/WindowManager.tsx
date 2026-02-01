@@ -18,8 +18,8 @@ interface WindowManagerContextType {
 }
 
 const defaultLayout: WindowLayout = {
-  leftWidth: 150,
-  rightWidth: 520,
+  leftWidth: 200,
+  rightWidth: 420,
   toolbarHeight: 48,
   bottomHeight: 32,
 }
@@ -50,14 +50,14 @@ export function WindowManagerProvider({ children, className }: WindowManagerProv
   const setLeftWidth = useCallback((width: number) => {
     setLayout((prev) => ({
       ...prev,
-      leftWidth: Math.max(100, Math.min(250, width)),
+      leftWidth: Math.max(160, Math.min(280, width)),
     }))
   }, [])
 
   const setRightWidth = useCallback((width: number) => {
     setLayout((prev) => ({
       ...prev,
-      rightWidth: Math.max(400, Math.min(700, width)),
+      rightWidth: Math.max(350, Math.min(600, width)),
     }))
   }, [])
 

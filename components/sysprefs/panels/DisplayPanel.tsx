@@ -13,11 +13,12 @@ interface DisplayPanelProps {
   userId: string
   onDirty: (dirty: boolean) => void
   onSaveError: (msg: string) => void
+  onPreviewColors?: (colors: { primary: string; secondary: string; bg: string } | null) => void
   saveSignal: number
   resetSignal: number
 }
 
-export function DisplayPanel({ userId, onDirty, onSaveError, saveSignal, resetSignal }: DisplayPanelProps) {
+export function DisplayPanel({ userId, onDirty, onSaveError, onPreviewColors, saveSignal, resetSignal }: DisplayPanelProps) {
   const [prefs, setPrefs] = useState<DbPlayerDisplayPrefs | null>(null)
   const [original, setOriginal] = useState<DbPlayerDisplayPrefs | null>(null)
   const [themes, setThemes] = useState<DbDisplayTheme[]>([])
@@ -44,6 +45,16 @@ export function DisplayPanel({ userId, onDirty, onSaveError, saveSignal, resetSi
     if (!prefs || !original) return
     onDirty(JSON.stringify(prefs) !== JSON.stringify(original))
   }, [prefs, original, onDirty])
+
+  // Live preview colors
+  useEffect(() => {
+    if (!prefs || !onPreviewColors) return
+    onPreviewColors({
+      primary: prefs.primary_color,
+      secondary: prefs.secondary_color,
+      bg: prefs.background_color,
+    })
+  }, [prefs?.primary_color, prefs?.secondary_color, prefs?.background_color, onPreviewColors])
 
   // Save with audit logging
   useEffect(() => {

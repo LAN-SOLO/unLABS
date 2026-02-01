@@ -4,15 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { LED } from '../controls/LED'
 import { Knob } from '../controls/Knob'
-
-type DeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'offline'
-type TestPhase = 'memory' | 'systems' | 'network' | 'devices' | 'complete' | null
-
-interface DiagnosticsConsoleProps {
-  className?: string
-  onTest?: () => void
-  onReset?: () => void
-}
+import { useDGNManagerOptional } from '@/contexts/DGNManager'
 
 type DiagnosticCategory = 'SYSTEMS' | 'DEVICES' | 'ENERGY' | 'NETWORK' | 'CRYSTALS' | 'PROCESS'
 
@@ -94,40 +86,45 @@ const CATEGORY_CONFIGS: Record<DiagnosticCategory, { color: string; icon: string
   PROCESS: { color: 'var(--neon-green)', icon: '▶' },
 }
 
-export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsConsoleProps) {
-  // Device state machine
-  const [deviceState, setDeviceState] = useState<DeviceState>('booting')
-  const [testPhase, setTestPhase] = useState<TestPhase>(null)
-  const [bootProgress, setBootProgress] = useState(0)
+interface DiagnosticsConsoleProps {
+  className?: string
+  onTest?: () => void
+  onReset?: () => void
+}
 
-  // Derived states
+export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsConsoleProps) {
+  const manager = useDGNManagerOptional()
+
+  // Derive state from manager or use local fallback
+  const deviceState = manager?.deviceState ?? 'booting'
   const isPowered = deviceState === 'online' || deviceState === 'testing'
   const isBooting = deviceState === 'booting'
+  const category = manager?.category ?? 'SYSTEMS'
+  const scanDepth = manager?.scanDepth ?? 75
+  const isRunningDiag = manager?.isRunningDiag ?? false
+  const diagProgress = manager?.diagProgress ?? 0
+  const bootPhase = manager?.bootPhase
+  const shutdownPhase = manager?.shutdownPhase
+  const testPhase = manager?.testPhase
+  const testResult = manager?.testResult
 
-  // Diagnostic state
-  const [category, setCategory] = useState<DiagnosticCategory>('SYSTEMS')
-  const [isRunningDiag, setIsRunningDiag] = useState(false)
-  const [diagProgress, setDiagProgress] = useState(0)
+  // Local UI state
+  const [componentStatuses, setComponentStatuses] = useState<Record<DiagnosticCategory, ComponentStatus[]>>(LAB_SYSTEMS)
+  const [alerts, setAlerts] = useState<AlertEntry[]>([])
+  const [logOutput, setLogOutput] = useState<string[]>([])
+  const logRef = useRef<HTMLDivElement>(null)
   const [testingComponent, setTestingComponent] = useState<string | null>(null)
 
-  // Control values
-  const [scanDepth, setScanDepth] = useState(75)
+  // Power button hold state
+  const powerHoldRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [powerHoldProgress, setPowerHoldProgress] = useState(0)
+  const powerHoldStartRef = useRef<number>(0)
 
   // Company logo position (random on mount)
   const [logoPosition] = useState(() => {
     const positions = ['header-left', 'header-right', 'footer-left'] as const
     return positions[Math.floor(Math.random() * positions.length)]
   })
-
-  // Component statuses
-  const [componentStatuses, setComponentStatuses] = useState<Record<DiagnosticCategory, ComponentStatus[]>>(LAB_SYSTEMS)
-
-  // Alerts
-  const [alerts, setAlerts] = useState<AlertEntry[]>([])
-
-  // Log output
-  const [logOutput, setLogOutput] = useState<string[]>([])
-  const logRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll log
   useEffect(() => {
@@ -153,98 +150,83 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
     setAlerts(prev => [alert, ...prev].slice(0, 10))
   }, [])
 
-  // Boot sequence effect
+  // Boot log messages
   useEffect(() => {
-    if (deviceState !== 'booting') return
-
-    setBootProgress(0)
-    setLogOutput(['UNIVERSAL DIAGNOSTICS v2.0.4', ''])
-
-    let progress = 0
-    const bootInterval = setInterval(() => {
-      progress += Math.random() * 20 + 10
-      if (progress >= 100) {
-        progress = 100
-        clearInterval(bootInterval)
-        setDeviceState('online')
+    if (deviceState === 'booting') {
+      setLogOutput(['UDC v2.0.4 BOOTING', ''])
+      if (bootPhase === 'ready') {
         setLogOutput(['UDC v2.0.4 READY', 'Select category and run diagnostics.'])
       }
-      setBootProgress(progress)
-    }, 100)
-
-    return () => clearInterval(bootInterval)
-  }, [deviceState])
-
-  // Power toggle
-  const handlePowerToggle = () => {
-    if (isPowered) {
-      setDeviceState('offline')
-      setBootProgress(0)
-      setLogOutput([])
-      setAlerts([])
-      setDiagProgress(0)
-    } else {
-      setDeviceState('booting')
     }
-  }
+  }, [deviceState, bootPhase])
 
-  // System test sequence
-  const handleSystemTest = () => {
+  // Power hold handlers (hexagonal button - 600ms hold)
+  const handlePowerDown = useCallback(() => {
+    powerHoldStartRef.current = Date.now()
+    const animate = () => {
+      const elapsed = Date.now() - powerHoldStartRef.current
+      const progress = Math.min(elapsed / 600, 1)
+      setPowerHoldProgress(progress)
+      if (progress < 1) {
+        powerHoldRef.current = setTimeout(animate, 16)
+      } else {
+        // Trigger power toggle
+        if (isPowered) {
+          manager?.powerOff()
+        } else if (deviceState === 'standby' || deviceState === 'offline' as string) {
+          manager?.powerOn()
+        }
+        setPowerHoldProgress(0)
+      }
+    }
+    animate()
+  }, [isPowered, deviceState, manager])
+
+  const handlePowerUp = useCallback(() => {
+    if (powerHoldRef.current) {
+      clearTimeout(powerHoldRef.current)
+      powerHoldRef.current = null
+    }
+    setPowerHoldProgress(0)
+  }, [])
+
+  // System test via manager
+  const handleSystemTest = useCallback(() => {
     if (deviceState !== 'online') return
-    setDeviceState('testing')
     onTest?.()
+    manager?.runTest()
+    addLog('')
+    addLog('━ SYSTEM TEST ━')
+    addLog('[TEST] Memory integrity...')
+  }, [deviceState, manager, onTest, addLog])
 
-    const runTest = async () => {
-      addLog('')
-      addLog('━ SYSTEM TEST ━')
-      setTestPhase('memory')
-      addLog('[TEST] Memory integrity...')
-      await new Promise(r => setTimeout(r, 400))
-      setTestPhase('systems')
-      addLog('[TEST] Core systems...')
-      await new Promise(r => setTimeout(r, 350))
-      setTestPhase('network')
-      addLog('[TEST] Network stack...')
-      await new Promise(r => setTimeout(r, 400))
-      setTestPhase('devices')
-      addLog('[TEST] Device interfaces...')
-      await new Promise(r => setTimeout(r, 350))
-      setTestPhase('complete')
-      addLog('[PASS] All tests passed')
-      await new Promise(r => setTimeout(r, 300))
-      setTestPhase(null)
-      setDeviceState('online')
-    }
-    runTest()
-  }
+  // Log test progress
+  useEffect(() => {
+    if (testPhase === 'systems') addLog('[TEST] Core systems...')
+    if (testPhase === 'network') addLog('[TEST] Network stack...')
+    if (testPhase === 'devices') addLog('[TEST] Device interfaces...')
+    if (testPhase === 'complete') addLog('[PASS] All tests passed')
+  }, [testPhase, addLog])
 
-  // Reboot sequence
-  const handleReboot = () => {
+  // Reboot via manager
+  const handleReboot = useCallback(() => {
     onReset?.()
-    setDeviceState('rebooting')
-    setTestPhase(null)
+    manager?.reboot()
     addLog('')
     addLog('━ REBOOT ━')
+    addLog('[STOP] Services...')
+  }, [manager, onReset, addLog])
 
-    setTimeout(() => addLog('[STOP] Services...'), 100)
-    setTimeout(() => addLog('[STOP] Interfaces...'), 300)
-    setTimeout(() => {
-      setLogOutput([])
-      setAlerts([])
-      setDiagProgress(0)
-      setBootProgress(0)
-      setDeviceState('booting')
-    }, 700)
-  }
-
-  // Run diagnostics
-  const runDiagnostics = async () => {
+  // Run diagnostics via manager
+  const runDiagnostics = useCallback(async () => {
     if (deviceState !== 'online' || isRunningDiag) return
 
-    setIsRunningDiag(true)
-    setDiagProgress(0)
     addLog(`━ DIAG: ${category} ━`)
 
+    // Run manager diagnostics (updates progress in context)
+    manager?.runDiagnostics()
+
+    // Also simulate local component scanning
     const components = componentStatuses[category]
     const totalComponents = components.length
 
@@ -268,18 +250,15 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
       } else if (newStatus.status === 'critical') {
         addAlert('critical', `${component.name}: ${newStatus.detail || 'Failure'}`, category)
       }
-
-      setDiagProgress(((i + 1) / totalComponents) * 100)
     }
 
     setTestingComponent(null)
-    setIsRunningDiag(false)
 
     const results = componentStatuses[category]
     const online = results.filter(c => c.status === 'online').length
     const warnings = results.filter(c => c.status === 'warning').length
     addLog(`Done: ${online} OK, ${warnings} WARN`)
-  }
+  }, [deviceState, isRunningDiag, category, componentStatuses, scanDepth, addLog, addAlert, manager])
 
   // Simulate component test
   const simulateComponentTest = (component: ComponentStatus): Partial<ComponentStatus> => {
@@ -372,7 +351,22 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
     }
   }
 
-  const healthPercent = Math.max(0, 100 - (statusCounts.warning * 10) - (statusCounts.critical * 30))
+  const healthPercent = manager?.healthPercent ?? Math.max(0, 100 - (statusCounts.warning * 10) - (statusCounts.critical * 30))
+
+  // Hexagonal power button color logic
+  const hexPowerColor = isPowered
+    ? 'var(--neon-green)'
+    : isBooting || deviceState === 'rebooting'
+    ? 'var(--neon-amber)'
+    : deviceState === 'shutdown'
+    ? 'var(--neon-red)'
+    : '#3a3a4a'
+
+  const hexPowerGlow = isPowered
+    ? '0 0 8px var(--neon-green), 0 0 16px var(--neon-green)'
+    : isBooting || deviceState === 'rebooting'
+    ? '0 0 6px var(--neon-amber)'
+    : 'none'
 
   return (
     <div className={cn(
@@ -492,45 +486,98 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
         </div>
       </div>
 
-      {/* Header */}
+      {/* Header with hexagonal power button */}
       <div className="flex items-center justify-between px-2 py-1.5 bg-[#0a0a12] border-b border-[#2a2a3a]">
         <div className="flex items-center gap-2">
+          {/* Hexagonal flush-mount power button */}
           <button
-            onClick={handlePowerToggle}
+            onMouseDown={handlePowerDown}
+            onMouseUp={handlePowerUp}
+            onMouseLeave={handlePowerUp}
+            onTouchStart={handlePowerDown}
+            onTouchEnd={handlePowerUp}
+            disabled={deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'shutdown' || deviceState === 'testing'}
             className={cn(
-              'w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all',
-              isPowered
-                ? 'bg-[#1a3a1a] border-[var(--neon-green)] shadow-[0_0_10px_var(--neon-green)]'
-                : isBooting || deviceState === 'rebooting'
-                ? 'bg-[#2a2a1a] border-[var(--neon-amber)] animate-pulse'
-                : 'bg-[#1a1a1a] border-[#3a3a3a] hover:border-[#5a5a5a]'
+              'relative w-7 h-7 flex items-center justify-center transition-all select-none',
+              deviceState === 'booting' || deviceState === 'rebooting' || deviceState === 'shutdown' || deviceState === 'testing'
+                ? 'cursor-not-allowed opacity-70'
+                : 'cursor-pointer'
             )}
+            title="Hold 600ms to toggle power"
           >
+            {/* Hexagonal shape via SVG */}
+            <svg viewBox="0 0 28 28" className="absolute inset-0 w-full h-full">
+              <polygon
+                points="14,1 25,7.5 25,20.5 14,27 3,20.5 3,7.5"
+                fill="url(#hexGrad)"
+                stroke={hexPowerColor}
+                strokeWidth="1.2"
+                style={{
+                  filter: isPowered || isBooting || deviceState === 'rebooting'
+                    ? `drop-shadow(0 0 3px ${hexPowerColor})`
+                    : 'none',
+                }}
+              />
+              {/* Hold progress ring (fills clockwise) */}
+              {powerHoldProgress > 0 && (
+                <polygon
+                  points="14,1 25,7.5 25,20.5 14,27 3,20.5 3,7.5"
+                  fill="none"
+                  stroke="var(--neon-lime)"
+                  strokeWidth="2"
+                  strokeDasharray={`${powerHoldProgress * 78} 78`}
+                  style={{ filter: 'drop-shadow(0 0 4px var(--neon-lime))' }}
+                />
+              )}
+              <defs>
+                <radialGradient id="hexGrad" cx="40%" cy="35%">
+                  <stop offset="0%" stopColor="#3a3a4a" />
+                  <stop offset="60%" stopColor="#1a1a2a" />
+                  <stop offset="100%" stopColor="#0a0a12" />
+                </radialGradient>
+              </defs>
+            </svg>
+            {/* Power icon inside hex */}
             <svg
-              className={cn('w-3 h-3', isPowered ? 'text-[var(--neon-green)]' : 'text-[#5a5a5a]')}
-              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+              className="relative w-3 h-3 z-10"
+              viewBox="0 0 24 24" fill="none" stroke={hexPowerColor} strokeWidth="2.5"
             >
               <path d="M12 2v10M18.4 6.6a9 9 0 1 1-12.8 0" />
             </svg>
+            {/* Embedded LED ring indicator */}
+            <div
+              className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full"
+              style={{
+                backgroundColor: hexPowerColor,
+                boxShadow: isPowered ? `0 0 4px ${hexPowerColor}` : 'none',
+                opacity: isPowered ? 1 : 0.3,
+              }}
+            />
           </button>
           <div>
             <div className="font-mono text-[9px] text-[var(--neon-lime)] font-bold">UNIVERSAL DIAGNOSTICS</div>
-            <div className="font-mono text-[6px] text-white/30">System Health Monitor v2.0</div>
+            <div className="font-mono text-[6px] text-white/30">
+              {manager?.statusMessage ?? 'System Health Monitor v2.0'}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1">
           <LED on={isPowered} color="green" size="sm" />
           <LED on={isRunningDiag || deviceState === 'testing'} color="amber" size="sm" />
           <LED on={alerts.some(a => a.severity === 'critical')} color="red" size="sm" />
+          {/* Test result flash */}
+          {testResult === 'pass' && (
+            <span className="font-mono text-[5px] text-[var(--neon-green)] animate-pulse">PASS</span>
+          )}
         </div>
       </div>
 
       {/* Boot/Off Screen */}
-      {deviceState === 'offline' ? (
+      {deviceState === 'standby' || (deviceState as string) === 'offline' ? (
         <div className="flex-1 flex items-center justify-center bg-[#050508]">
           <div className="text-center">
             <div className="font-mono text-[24px] text-[#151518] font-bold">UDC</div>
-            <div className="font-mono text-[7px] text-white/10 mt-1">PRESS POWER</div>
+            <div className="font-mono text-[7px] text-white/10 mt-1">HOLD POWER</div>
           </div>
         </div>
       ) : deviceState === 'booting' || deviceState === 'rebooting' ? (
@@ -538,13 +585,41 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
           <div className="font-mono text-[9px] text-[var(--neon-lime)] mb-2">
             {deviceState === 'rebooting' ? 'REBOOTING' : 'INITIALIZING'}
           </div>
+          {bootPhase && (
+            <div className="font-mono text-[7px] text-white/50 mb-1">
+              {bootPhase.toUpperCase()}
+            </div>
+          )}
           <div className="w-32 h-2 bg-[#0a0a0a] rounded overflow-hidden border border-[#2a2a3a]">
             <div
               className="h-full bg-gradient-to-r from-[var(--neon-lime)] to-[var(--neon-green)] transition-all"
-              style={{ width: `${bootProgress}%` }}
+              style={{
+                width: bootPhase ? `${
+                  bootPhase === 'memory' ? 15 :
+                  bootPhase === 'kernel' ? 35 :
+                  bootPhase === 'interfaces' ? 55 :
+                  bootPhase === 'sensors' ? 75 :
+                  bootPhase === 'calibrate' ? 90 :
+                  100
+                }%` : '0%'
+              }}
             />
           </div>
-          <div className="font-mono text-[7px] text-white/40 mt-1">{Math.floor(bootProgress)}%</div>
+          <div className="font-mono text-[7px] text-white/40 mt-1">
+            {manager?.statusMessage ?? '...'}
+          </div>
+        </div>
+      ) : deviceState === 'shutdown' ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-3 bg-[#050508]">
+          <div className="font-mono text-[9px] text-[var(--neon-red)] mb-2">SHUTTING DOWN</div>
+          {shutdownPhase && (
+            <div className="font-mono text-[7px] text-white/50 mb-1">
+              {shutdownPhase.toUpperCase()}
+            </div>
+          )}
+          <div className="font-mono text-[7px] text-white/30 mt-1">
+            {manager?.statusMessage ?? '...'}
+          </div>
         </div>
       ) : (
         <div className="flex-1 flex flex-col p-1.5 gap-1 overflow-hidden">
@@ -553,7 +628,7 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
             {(Object.keys(CATEGORY_CONFIGS) as DiagnosticCategory[]).map((cat) => (
               <button
                 key={cat}
-                onClick={() => setCategory(cat)}
+                onClick={() => manager?.setCategory(cat)}
                 className={cn(
                   'flex-1 py-1 rounded font-mono text-[6px] transition-all',
                   category === cat
@@ -628,7 +703,7 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
                       </>
                     )}
 
-                    {/* Activity pulse - subtle background animation for online components */}
+                    {/* Activity pulse */}
                     {comp.status === 'online' && (
                       <div
                         className="absolute inset-0 pointer-events-none"
@@ -639,7 +714,7 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
                       />
                     )}
 
-                    {/* Data flow indicator - tiny animated bar at bottom */}
+                    {/* Data flow indicator */}
                     {comp.status === 'online' && (
                       <div className="absolute bottom-0 left-0 right-0 h-px overflow-hidden">
                         <div
@@ -654,7 +729,7 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
                       </div>
                     )}
 
-                    {/* Warning pulse effect */}
+                    {/* Warning pulse */}
                     {comp.status === 'warning' && (
                       <div
                         className="absolute inset-0 pointer-events-none"
@@ -665,9 +740,8 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
                       />
                     )}
 
-                    {/* Status dot with pulse */}
+                    {/* Status dot */}
                     <div className="absolute top-1 right-1">
-                      {/* Pulse ring for active components */}
                       {(comp.status === 'online' || comp.status === 'standby') && (
                         <div
                           className="absolute inset-0 rounded-full"
@@ -700,7 +774,7 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
                       />
                     )}
 
-                    {/* Interior micro visualization - activity bars */}
+                    {/* Activity bars */}
                     {comp.status !== 'offline' && (
                       <div className="absolute bottom-1 left-1.5 right-4 h-[3px] flex gap-px pointer-events-none">
                         {[...Array(5)].map((_, i) => (
@@ -719,7 +793,7 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
                       </div>
                     )}
 
-                    {/* Interior micro waveform for active components */}
+                    {/* Waveform for active */}
                     {comp.status === 'online' && (
                       <div
                         className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-3 pointer-events-none overflow-hidden"
@@ -739,7 +813,7 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
                       </div>
                     )}
 
-                    {/* Interior standby pulse rings */}
+                    {/* Standby pulse rings */}
                     {comp.status === 'standby' && (
                       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                         <div
@@ -753,7 +827,7 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
                       </div>
                     )}
 
-                    {/* Interior warning indicator - animated chevrons */}
+                    {/* Warning chevrons */}
                     {comp.status === 'warning' && (
                       <div className="absolute left-1/2 -translate-x-1/2 top-[6px] flex flex-col gap-px pointer-events-none">
                         {[0, 1].map((i) => (
@@ -774,7 +848,7 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
                       </div>
                     )}
 
-                    {/* Interior data grid pattern for critical */}
+                    {/* Critical grid */}
                     {comp.status === 'critical' && (
                       <div
                         className="absolute inset-1 pointer-events-none"
@@ -861,7 +935,7 @@ export function DiagnosticsConsole({ className, onTest, onReset }: DiagnosticsCo
               {/* Control knob */}
               <div className="bg-[#0a0a12] rounded p-1.5 border border-[#1a1a2a] flex flex-col items-center">
                 <span className="font-mono text-[5px] text-white/40 mb-0.5">DEPTH</span>
-                <Knob value={scanDepth} onChange={setScanDepth} size="sm" accentColor={currentConfig.color} />
+                <Knob value={scanDepth} onChange={(v) => manager?.setScanDepth(v)} size="sm" accentColor={currentConfig.color} />
                 <span className="font-mono text-[6px] mt-0.5" style={{ color: currentConfig.color }}>{scanDepth}%</span>
               </div>
 

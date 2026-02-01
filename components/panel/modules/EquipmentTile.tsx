@@ -403,7 +403,7 @@ export function CrystalDataCache({
         style={{
           transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
           transformOrigin: 'top center',
-          transition: 'transform 400ms cubic-bezier(0.4,0,0.2,1), opacity 350ms ease',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
           opacity: isExpanded ? 0 : 1,
           position: isExpanded ? 'absolute' : 'relative',
           pointerEvents: isExpanded ? 'none' : 'auto',
@@ -417,7 +417,7 @@ export function CrystalDataCache({
             <LED on={isLedOn} color={getLedColor()} size="sm" />
             <span className="font-mono text-[8px] text-[var(--neon-amber)] tracking-wider font-bold">CDC-001</span>
             <span className={cn(
-              'font-mono text-[6px] tracking-wide',
+              'font-mono text-[7px] tracking-wide',
               deviceState === 'online' ? 'text-[var(--neon-green)]' :
               deviceState === 'standby' ? 'text-white/40' :
               'text-[var(--neon-amber)]'
@@ -486,36 +486,36 @@ export function CrystalDataCache({
           {/* Folded info expansion */}
           <div
             style={{
-              maxHeight: showFoldedInfo ? '48px' : '0px',
+              maxHeight: showFoldedInfo ? '40px' : '0px',
               transition: 'max-height 300ms ease, opacity 300ms ease',
               opacity: showFoldedInfo ? 1 : 0,
               overflow: 'hidden',
             }}
           >
             <div className="mt-1 pt-1 border-t border-white/5 grid grid-cols-3 gap-2">
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Crystals </span>
                 <span className="text-[var(--neon-green)]">{displayValues.crystals}</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Slices </span>
                 <span className="text-[var(--neon-cyan)]">{displayValues.slices}</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Power </span>
                 <span className="text-[var(--neon-amber)]">{displayValues.power}</span>
               </div>
             </div>
             <div className="mt-0.5 grid grid-cols-3 gap-2">
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Mode </span>
                 <span className="text-white/50">{deviceState === 'testing' ? 'DIAG' : 'IDLE'}</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Draw </span>
                 <span className="text-white/50">{cdcManager?.currentDraw ?? 5}</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Tier </span>
                 <span className="text-white/50">T1</span>
               </div>
@@ -529,7 +529,7 @@ export function CrystalDataCache({
         style={{
           transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
           transformOrigin: 'top center',
-          transition: 'transform 400ms cubic-bezier(0.4,0,0.2,1), opacity 350ms ease',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
           opacity: isExpanded ? 1 : 0,
           position: isExpanded ? 'relative' : 'absolute',
           pointerEvents: isExpanded ? 'auto' : 'none',
@@ -1035,7 +1035,7 @@ export function EnergyCore({
         style={{
           transform: isExpanded ? 'rotateX(-90deg)' : 'rotateX(0deg)',
           transformOrigin: 'top center',
-          transition: 'transform 400ms cubic-bezier(0.4,0,0.2,1), opacity 350ms ease',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
           opacity: isExpanded ? 0 : 1,
           position: isExpanded ? 'absolute' : 'relative',
           pointerEvents: isExpanded ? 'none' : 'auto',
@@ -1049,7 +1049,7 @@ export function EnergyCore({
             <LED on={isLedOn} color={getLedColor()} size="sm" />
             <span className="font-mono text-[8px] text-[var(--neon-amber)] tracking-wider font-bold">UEC-001</span>
             <span className={cn(
-              'font-mono text-[6px] tracking-wide',
+              'font-mono text-[7px] tracking-wide',
               deviceState === 'online' ? 'text-[var(--neon-green)]' :
               deviceState === 'standby' ? 'text-white/40' :
               'text-[var(--neon-amber)]'
@@ -1118,36 +1118,36 @@ export function EnergyCore({
           {/* Folded info expansion */}
           <div
             style={{
-              maxHeight: showFoldedInfo ? '48px' : '0px',
+              maxHeight: showFoldedInfo ? '40px' : '0px',
               transition: 'max-height 300ms ease, opacity 300ms ease',
               opacity: showFoldedInfo ? 1 : 0,
               overflow: 'hidden',
             }}
           >
             <div className="mt-1 pt-1 border-t border-white/5 grid grid-cols-3 gap-2">
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Tier </span>
                 <span className="text-[var(--neon-amber)]">{displayValues.tier}</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">TPS </span>
                 <span className="text-[var(--neon-cyan)]">{displayValues.tps}</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Output </span>
                 <span className="text-[var(--neon-green)]">{uecManager?.energyOutput ?? 0}</span>
               </div>
             </div>
             <div className="mt-0.5 grid grid-cols-3 gap-2">
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Draw </span>
                 <span className="text-white/50">{UEC_POWER_SPECS.selfConsume}</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Field </span>
                 <span className="text-white/50">{uecManager?.fieldStability ?? 0}%</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Level </span>
                 <span className="text-white/50">{displayValues.level}%</span>
               </div>
@@ -1161,7 +1161,7 @@ export function EnergyCore({
         style={{
           transform: isExpanded ? 'translateZ(0) rotateX(0deg)' : 'translateZ(-20px) rotateX(8deg)',
           transformOrigin: 'top center',
-          transition: 'transform 400ms cubic-bezier(0.4,0,0.2,1), opacity 350ms ease',
+          transition: 'transform 600ms cubic-bezier(0.25,0.1,0.25,1), opacity 500ms ease',
           opacity: isExpanded ? 1 : 0,
           position: isExpanded ? 'relative' : 'absolute',
           pointerEvents: isExpanded ? 'auto' : 'none',
@@ -1706,7 +1706,7 @@ export function BatteryPack({
             <LED on={isLedOn} color={getLedColor()} size="sm" />
             <span className="font-mono text-[8px] text-[var(--neon-lime,#bfff00)] tracking-wider font-bold">BAT-001</span>
             <span className={cn(
-              'font-mono text-[6px] tracking-wide',
+              'font-mono text-[7px] tracking-wide',
               deviceState === 'online' ? 'text-[var(--neon-green)]' :
               deviceState === 'standby' ? 'text-white/40' :
               'text-[var(--neon-amber)]'
@@ -1775,36 +1775,36 @@ export function BatteryPack({
           {/* Folded info expansion */}
           <div
             style={{
-              maxHeight: showFoldedInfo ? '48px' : '0px',
+              maxHeight: showFoldedInfo ? '40px' : '0px',
               transition: 'max-height 400ms ease, opacity 400ms ease',
               opacity: showFoldedInfo ? 1 : 0,
               overflow: 'hidden',
             }}
           >
             <div className="mt-1 pt-1 border-t border-white/5 grid grid-cols-3 gap-2">
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Avail </span>
                 <span className="text-[var(--neon-green)]">{displayValues.available}</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Staked </span>
                 <span className="text-[var(--neon-cyan)]">{displayValues.staked || '0'}</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Charge </span>
                 <span className="text-[var(--neon-lime,#bfff00)]">{batManager?.chargePercent ?? chargePercent}%</span>
               </div>
             </div>
             <div className="mt-0.5 grid grid-cols-3 gap-2">
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Cells </span>
                 <span className="text-white/50">{batManager?.cellHealth?.length ?? 4}</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Temp </span>
                 <span className="text-white/50">{batManager?.temperature ?? 28}C</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Regen </span>
                 <span className="text-white/50">{batManager?.autoRegen ? 'ON' : 'OFF'}</span>
               </div>
@@ -2483,7 +2483,7 @@ export function HandmadeSynthesizer({
             <LED on={isLedOn} color={getLedColor()} size="sm" />
             <span className="font-mono text-[8px] text-[var(--neon-cyan)] tracking-wider font-bold">HMS-001</span>
             <span className={cn(
-              'font-mono text-[6px] tracking-wide',
+              'font-mono text-[7px] tracking-wide',
               deviceState === 'online' ? 'text-[var(--neon-green)]' :
               deviceState === 'standby' ? 'text-white/40' :
               'text-[var(--neon-amber)]'
@@ -2537,36 +2537,36 @@ export function HandmadeSynthesizer({
           {/* Folded info expansion */}
           <div
             style={{
-              maxHeight: showFoldedInfo ? '48px' : '0px',
+              maxHeight: showFoldedInfo ? '40px' : '0px',
               transition: 'max-height 400ms ease, opacity 400ms ease',
               opacity: showFoldedInfo ? 1 : 0,
               overflow: 'hidden',
             }}
           >
             <div className="mt-1 pt-1 border-t border-white/5 grid grid-cols-3 gap-2">
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Pulse </span>
                 <span className="text-[var(--neon-cyan)]">{knobValues.pulse}</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Tempo </span>
                 <span className="text-[var(--neon-amber)]">{knobValues.tempo}</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Freq </span>
                 <span className="text-[var(--neon-green)]">{knobValues.freq}</span>
               </div>
             </div>
             <div className="mt-0.5 grid grid-cols-3 gap-2">
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Wave </span>
                 <span className="text-white/50">{waveformType.slice(0, 3).toUpperCase()}</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Tier </span>
                 <span className="text-white/50">T{tier}</span>
               </div>
-              <div className="font-mono text-[5px]">
+              <div className="font-mono text-[6px]">
                 <span className="text-white/30">Osc </span>
                 <span className="text-white/50">{hmsManager?.oscillatorCount ?? 4}</span>
               </div>
@@ -3141,7 +3141,7 @@ export function EchoRecorder({
         <div className="p-2">
           <div className="flex items-center gap-1.5">
             <LED on={isLedOn} color={getLedColor()} size="sm" />
-            <span className="font-mono text-[9px] text-[var(--neon-amber)] font-medium">ECR-001</span>
+            <span className="font-mono text-[8px] text-[var(--neon-amber)] font-bold">ECR-001</span>
             <span className={cn(
               'font-mono text-[7px] ml-1',
               isPowered ? 'text-[var(--neon-green)]' : 'text-white/30'
@@ -3171,7 +3171,7 @@ export function EchoRecorder({
 
           {/* Folded info expansion */}
           <div style={{
-            maxHeight: showFoldedInfo && isPowered ? '80px' : '0px',
+            maxHeight: showFoldedInfo && isPowered ? '40px' : '0px',
             overflow: 'hidden',
             transition: 'max-height 300ms ease',
           }}>
@@ -3528,7 +3528,7 @@ export function Interpolator({
         <div className="p-2">
           <div className="flex items-center gap-1.5">
             <LED on={isLedOn} color={getLedColor()} size="sm" />
-            <span className="font-mono text-[9px] text-[var(--neon-lime,#bfff00)] font-medium">INT-001</span>
+            <span className="font-mono text-[8px] text-[var(--neon-lime,#bfff00)] font-bold">INT-001</span>
             <span className={cn(
               'font-mono text-[7px] ml-1',
               isPowered ? 'text-[var(--neon-green)]' : 'text-white/30'
@@ -3552,7 +3552,7 @@ export function Interpolator({
 
           {/* Folded info expansion */}
           <div style={{
-            maxHeight: showFoldedInfo && isPowered ? '80px' : '0px',
+            maxHeight: showFoldedInfo && isPowered ? '40px' : '0px',
             overflow: 'hidden',
             transition: 'max-height 300ms ease',
           }}>
@@ -6403,7 +6403,7 @@ export function MicrofusionReactor({
         <div className="p-2">
           <div className="flex items-center gap-1.5">
             <LED on={isLedOn} color={getLedColor()} size="sm" />
-            <span className="font-mono text-[9px] text-[var(--neon-cyan)] font-medium">MFR-001</span>
+            <span className="font-mono text-[8px] text-[var(--neon-cyan)] font-bold">MFR-001</span>
             <span className={cn(
               'font-mono text-[7px] ml-1',
               isPowered ? 'text-[var(--neon-green)]' : 'text-white/30'
@@ -6423,7 +6423,7 @@ export function MicrofusionReactor({
 
           {/* Folded info expansion */}
           <div style={{
-            maxHeight: showFoldedInfo && isPowered ? '80px' : '0px',
+            maxHeight: showFoldedInfo && isPowered ? '40px' : '0px',
             overflow: 'hidden',
             transition: 'max-height 300ms ease',
           }}>
@@ -6743,7 +6743,7 @@ export function AIAssistant({ className }: AIAssistantProps) {
           <div className="flex items-center gap-1.5">
             <NeuralPowerButton />
             <LED on={isLedOn} color={getLedColor()} size="sm" />
-            <span className="font-mono text-[9px] text-[var(--neon-green)] font-medium">AIC-001</span>
+            <span className="font-mono text-[8px] text-[var(--neon-green)] font-bold">AIC-001</span>
             <span className={cn(
               'font-mono text-[7px] ml-1',
               isPowered ? 'text-[var(--neon-green)]' : 'text-white/30'
@@ -6762,7 +6762,7 @@ export function AIAssistant({ className }: AIAssistantProps) {
 
           {/* Folded info expansion */}
           <div style={{
-            maxHeight: showFoldedInfo && isPowered ? '80px' : '0px',
+            maxHeight: showFoldedInfo && isPowered ? '40px' : '0px',
             overflow: 'hidden',
             transition: 'max-height 300ms ease',
           }}>
@@ -7070,8 +7070,8 @@ export function ExplorerDrone({
               boxShadow: !exdStandby ? `0 0 4px ${stateLedColor}` : 'none',
             }}
           />
-          <span className="font-mono text-[7px] font-bold shrink-0" style={{ color: 'var(--neon-lime, #bfff00)' }}>EXD-001</span>
-          <span className="font-mono text-[6px] shrink-0" style={{ color: stateLedColor }}>{stateLabel}</span>
+          <span className="font-mono text-[8px] font-bold shrink-0" style={{ color: 'var(--neon-lime, #bfff00)' }}>EXD-001</span>
+          <span className="font-mono text-[7px] shrink-0" style={{ color: stateLedColor }}>{stateLabel}</span>
           <div className="flex-1" />
           {!exdStandby && (
             <div className="flex gap-0.5">
@@ -7098,7 +7098,7 @@ export function ExplorerDrone({
 
         <div
           style={{
-            maxHeight: showFoldedInfo && !exdStandby ? '60px' : '0px',
+            maxHeight: showFoldedInfo && !exdStandby ? '40px' : '0px',
             overflow: 'hidden',
             transition: 'max-height 300ms ease',
           }}
@@ -7113,7 +7113,7 @@ export function ExplorerDrone({
               { label: 'Draw', value: `${Math.round(exdManager?.currentDraw ?? 40)} E/s` },
             ].map(({ label: l, value: v }) => (
               <div key={l} className="flex justify-between">
-                <span className="font-mono text-[5px] text-white/30">{l}</span>
+                <span className="font-mono text-[6px] text-white/30">{l}</span>
                 <span className="font-mono text-[6px]" style={{ color: 'var(--neon-lime, #bfff00)' }}>{v}</span>
               </div>
             ))}
@@ -8565,7 +8565,7 @@ export function Printer3D({
         {/* Folded info expansion */}
         <div
           style={{
-            maxHeight: showFoldedInfo && isPowered ? '60px' : '0px',
+            maxHeight: showFoldedInfo && isPowered ? '40px' : '0px',
             transition: 'max-height 400ms ease, opacity 300ms ease',
             opacity: showFoldedInfo && isPowered ? 1 : 0,
             overflow: 'hidden',
@@ -8906,9 +8906,9 @@ export function ExoticMatterContainment({
       }}>
         <div className="flex items-center gap-1 px-1 py-0.5">
           <LED on={isLedOn} color={getLedColor()} size="sm" className="scale-75 shrink-0" />
-          <span className="font-mono text-[5px] text-[var(--neon-pink)] shrink-0">EMC-001</span>
+          <span className="font-mono text-[6px] text-[var(--neon-pink)] font-bold shrink-0">EMC-001</span>
           <span className={cn(
-            'font-mono text-[4px] shrink-0',
+            'font-mono text-[5px] shrink-0',
             isStandby ? 'text-white/30' : 'text-[var(--neon-pink)]/70'
           )}>{stateLabel}</span>
           <div className="flex-1" />
@@ -8923,7 +8923,7 @@ export function ExoticMatterContainment({
           {!isStandby ? (
             <button
               onClick={() => setShowFoldedInfo(p => !p)}
-              className="font-mono text-[5px] text-[var(--neon-pink)]/50 hover:text-[var(--neon-pink)] transition-colors px-0.5"
+              className="font-mono text-[6px] text-[var(--neon-pink)]/50 hover:text-[var(--neon-pink)] transition-colors px-0.5"
               title={showFoldedInfo ? 'Hide info' : 'Show info'}
             >{showFoldedInfo ? '▲' : '▼'}</button>
           ) : null}
@@ -8931,17 +8931,16 @@ export function ExoticMatterContainment({
 
         {/* Folded info expansion */}
         <div style={{
-          maxHeight: showFoldedInfo && !isStandby ? '60px' : '0px',
+          maxHeight: showFoldedInfo && !isStandby ? '40px' : '0px',
           overflow: 'hidden',
           transition: 'max-height 300ms ease',
         }}>
-          <div className="px-1.5 pb-1 grid grid-cols-3 gap-x-2 gap-y-0 font-mono text-[4px]">
-            <span className="text-white/40">Units: <span className="text-[var(--neon-pink)]">{displayUnits}</span></span>
-            <span className="text-white/40">Stab: <span className="text-[var(--neon-pink)]">{displayStability}%</span></span>
-            <span className="text-white/40">Field: <span className="text-[var(--neon-pink)]">{displayField}%</span></span>
-            <span className="text-white/40">Temp: <span className="text-[var(--neon-pink)]">{displayTemp}°K</span></span>
-            <span className="text-white/40">Cont: <span className="text-[var(--neon-pink)]">{displayContained ? 'YES' : 'NO'}</span></span>
-            <span className="text-white/40">Draw: <span className="text-[var(--neon-pink)]">{displayDraw} E/s</span></span>
+          <div className="px-1.5 pb-1 font-mono text-[5px] text-[var(--neon-pink)]/60 flex gap-2 flex-wrap">
+            <span>Units: {displayUnits}</span>
+            <span>Stab: {displayStability}%</span>
+            <span>Field: {displayField}%</span>
+            <span>Temp: {displayTemp}°K</span>
+            <span>Draw: {displayDraw} E/s</span>
           </div>
         </div>
       </div>
@@ -9362,10 +9361,10 @@ export function QuantumStateMonitor({
         width: '100%', left: 0, top: 0,
       }}>
         <div className="flex items-center gap-1 px-1 py-0.5">
-          <LED on={isLedOn} color={getLedColor()} size="sm" className="scale-75 shrink-0" />
-          <span className="font-mono text-[5px] text-[var(--neon-cyan)] shrink-0">QSM-001</span>
+          <LED on={isLedOn} color={getLedColor()} size="sm" className="shrink-0 scale-75" />
+          <span className="font-mono text-[6px] text-[var(--neon-cyan)] font-bold shrink-0">QSM-001</span>
           <span className={cn(
-            'font-mono text-[4px] shrink-0',
+            'font-mono text-[5px] shrink-0',
             isStandby ? 'text-white/30' : 'text-[var(--neon-cyan)]/70'
           )}>{stateLabel}</span>
           <div className="flex-1" />
@@ -9383,7 +9382,7 @@ export function QuantumStateMonitor({
           {!isStandby ? (
             <button
               onClick={() => setShowFoldedInfo(p => !p)}
-              className="font-mono text-[5px] text-[var(--neon-cyan)]/50 hover:text-[var(--neon-cyan)] transition-colors px-0.5"
+              className="font-mono text-[6px] text-[var(--neon-cyan)]/50 hover:text-[var(--neon-cyan)] transition-colors px-0.5"
               title={showFoldedInfo ? 'Hide info' : 'Show info'}
             >{showFoldedInfo ? '▲' : '▼'}</button>
           ) : null}
@@ -9391,17 +9390,16 @@ export function QuantumStateMonitor({
 
         {/* Folded info expansion */}
         <div style={{
-          maxHeight: showFoldedInfo && !isStandby ? '60px' : '0px',
+          maxHeight: showFoldedInfo && !isStandby ? '40px' : '0px',
           overflow: 'hidden',
           transition: 'max-height 300ms ease',
         }}>
-          <div className="px-1.5 pb-1 grid grid-cols-3 gap-x-2 gap-y-0 font-mono text-[4px]">
-            <span className="text-white/40">COH: <span className="text-[var(--neon-cyan)]">{displayCoherence}%</span></span>
-            <span className="text-white/40">Qubits: <span className="text-[var(--neon-cyan)]">{displayQubits}</span></span>
-            <span className="text-white/40">Entgl: <span className="text-[var(--neon-cyan)]">{displayEntangled ? 'YES' : 'NO'}</span></span>
-            <span className="text-white/40">Err: <span className="text-[var(--neon-cyan)]">{displayError}%</span></span>
-            <span className="text-white/40">Temp: <span className="text-[var(--neon-cyan)]">{displayTemp}°K</span></span>
-            <span className="text-white/40">Draw: <span className="text-[var(--neon-cyan)]">{displayDraw} E/s</span></span>
+          <div className="px-1.5 pb-1 font-mono text-[5px] text-[var(--neon-cyan)]/60 flex gap-2 flex-wrap">
+            <span>COH: {displayCoherence}%</span>
+            <span>Qubits: {displayQubits}</span>
+            <span>Err: {displayError}%</span>
+            <span>Temp: {displayTemp}°K</span>
+            <span>Draw: {displayDraw} E/s</span>
           </div>
         </div>
       </div>
@@ -9747,17 +9745,17 @@ export function NetworkMonitor({
         zIndex: isExpanded ? 0 : 2,
         width: '100%', left: 0, top: 0,
       }}>
-        <div className="px-2 py-1.5">
+        <div className="px-1 py-0.5">
           {/* Main folded row */}
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             {/* Status LED */}
-            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{
+            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 scale-75" style={{
               backgroundColor: getStatusColor(),
               boxShadow: `0 0 4px ${getStatusColor()}`,
               animation: (deviceState === 'booting' || deviceState === 'rebooting') ? 'pulse 0.5s ease-in-out infinite' : 'none',
             }} />
-            <span className="font-mono text-[8px] text-[var(--neon-lime,#bfff00)] font-bold tracking-wide">NET-001</span>
-            <span className="font-mono text-[7px] text-white/50">{getStatusLabel()}</span>
+            <span className="font-mono text-[6px] text-[var(--neon-lime,#bfff00)] font-bold tracking-wide">NET-001</span>
+            <span className="font-mono text-[5px] text-white/50">{getStatusLabel()}</span>
             <div className="flex-1" />
 
             {/* Action buttons - only when powered */}
@@ -9782,7 +9780,7 @@ export function NetworkMonitor({
             {isPowered ? (
               <button
                 onClick={toggleFoldedInfo}
-                className="font-mono text-[7px] text-white/40 hover:text-white/70 transition-colors flex-shrink-0"
+                className="font-mono text-[6px] text-white/40 hover:text-white/70 transition-colors flex-shrink-0"
                 title={showFoldedInfo ? 'Hide info' : 'Show info'}
               >
                 {showFoldedInfo ? '▲' : '▼'}
@@ -9790,7 +9788,7 @@ export function NetworkMonitor({
             ) : (
               <button
                 onClick={() => manager?.setExpanded(true)}
-                className="font-mono text-[7px] text-white/30 hover:text-white/50 transition-colors flex-shrink-0"
+                className="font-mono text-[6px] text-white/30 hover:text-white/50 transition-colors flex-shrink-0"
                 title="Unfold"
               >
                 ▼
@@ -9804,7 +9802,7 @@ export function NetworkMonitor({
             overflow: 'hidden',
             transition: 'max-height 300ms ease',
           }}>
-            <div className="mt-1 grid grid-cols-3 gap-x-3 gap-y-0.5 font-mono text-[6px]">
+            <div className="mt-1 grid grid-cols-3 gap-x-2 gap-y-0.5 font-mono text-[5px]">
               <span className="text-white/30">BW: <span className="text-[var(--neon-lime,#bfff00)]">{displayBandwidth.toFixed(1)} Gbps</span></span>
               <span className="text-white/30">Lat: <span className="text-[var(--neon-lime,#bfff00)]">{displayLatency}ms</span></span>
               <span className="text-white/30">Link: <span className="text-[var(--neon-lime,#bfff00)]">{displayConnected ? 'UP' : 'DOWN'}</span></span>
@@ -10106,16 +10104,16 @@ export function TemperatureMonitor({
         zIndex: isExpanded ? 0 : 2,
         width: '100%', left: 0, top: 0,
       }}>
-        <div className="px-2 py-1.5">
-          <div className="flex items-center gap-1.5">
+        <div className="px-1 py-0.5">
+          <div className="flex items-center gap-1">
             {/* Status LED */}
-            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{
+            <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 scale-75" style={{
               backgroundColor: getStatusColor(),
               boxShadow: `0 0 4px ${getStatusColor()}`,
               animation: (deviceState === 'booting' || deviceState === 'rebooting') ? 'pulse 0.5s ease-in-out infinite' : 'none',
             }} />
-            <span className="font-mono text-[8px] text-[var(--neon-amber)] font-bold tracking-wide">TMP-001</span>
-            <span className="font-mono text-[7px] text-white/50">{getStatusLabel()}</span>
+            <span className="font-mono text-[6px] text-[var(--neon-amber)] font-bold tracking-wide">TMP-001</span>
+            <span className="font-mono text-[5px] text-white/50">{getStatusLabel()}</span>
             <div className="flex-1" />
 
             {isPowered && (
@@ -10138,7 +10136,7 @@ export function TemperatureMonitor({
             {isPowered ? (
               <button
                 onClick={toggleFoldedInfo}
-                className="font-mono text-[7px] text-white/40 hover:text-white/70 transition-colors flex-shrink-0"
+                className="font-mono text-[6px] text-white/40 hover:text-white/70 transition-colors flex-shrink-0"
                 title={showFoldedInfo ? 'Hide info' : 'Show info'}
               >
                 {showFoldedInfo ? '▲' : '▼'}
@@ -10146,7 +10144,7 @@ export function TemperatureMonitor({
             ) : (
               <button
                 onClick={() => manager?.setExpanded(true)}
-                className="font-mono text-[7px] text-white/30 hover:text-white/50 transition-colors flex-shrink-0"
+                className="font-mono text-[6px] text-white/30 hover:text-white/50 transition-colors flex-shrink-0"
                 title="Unfold"
               >
                 ▼
@@ -10160,7 +10158,7 @@ export function TemperatureMonitor({
             overflow: 'hidden',
             transition: 'max-height 300ms ease',
           }}>
-            <div className="mt-1 grid grid-cols-3 gap-x-3 gap-y-0.5 font-mono text-[6px]">
+            <div className="mt-1 grid grid-cols-3 gap-x-2 gap-y-0.5 font-mono text-[5px]">
               <span className="text-white/30">Temp: <span style={{ color: tempColor }}>{currentTemp.toFixed(1)}°C</span></span>
               <span className="text-white/30">Range: <span className="text-[var(--neon-amber)]">{displayMinTemp}-{displayMaxTemp}°</span></span>
               <span className="text-white/30">Status: <span className="text-[var(--neon-green)]">{statusMessage}</span></span>
@@ -10484,8 +10482,8 @@ export function SupercomputerArray({
               boxShadow: !isStandby ? `0 0 4px ${stateLedColor}` : 'none',
             }}
           />
-          <span className="font-mono text-[7px] font-bold shrink-0" style={{ color: 'var(--neon-cyan)' }}>SCA-001</span>
-          <span className="font-mono text-[6px] shrink-0" style={{ color: stateLedColor }}>{stateLabel}</span>
+          <span className="font-mono text-[8px] font-bold shrink-0" style={{ color: 'var(--neon-cyan)' }}>SCA-001</span>
+          <span className="font-mono text-[7px] shrink-0" style={{ color: stateLedColor }}>{stateLabel}</span>
           <div className="flex-1" />
           {!isStandby && (
             <div className="flex gap-0.5">
@@ -10513,7 +10511,7 @@ export function SupercomputerArray({
         {/* Folded info expansion */}
         <div
           style={{
-            maxHeight: showFoldedInfo && !isStandby ? '60px' : '0px',
+            maxHeight: showFoldedInfo && !isStandby ? '40px' : '0px',
             overflow: 'hidden',
             transition: 'max-height 300ms ease',
           }}
@@ -10528,7 +10526,7 @@ export function SupercomputerArray({
               { label: 'Draw', value: `${Math.round(scaManager?.currentDraw ?? 15)} E/s` },
             ].map(({ label: l, value: v }) => (
               <div key={l} className="flex justify-between">
-                <span className="font-mono text-[5px] text-white/30">{l}</span>
+                <span className="font-mono text-[6px] text-white/30">{l}</span>
                 <span className="font-mono text-[6px]" style={{ color: 'var(--neon-cyan)' }}>{v}</span>
               </div>
             ))}
@@ -10839,13 +10837,13 @@ export function DimensionMonitor({
         pointerEvents: isExpanded ? 'none' : 'auto',
         zIndex: isExpanded ? 0 : 2,
       }} className="w-full">
-        <div className="flex items-center gap-1.5 px-2 py-1.5">
-          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{
+        <div className="flex items-center gap-1 px-1 py-0.5">
+          <div className="w-1.5 h-1.5 rounded-full shrink-0 scale-75" style={{
             backgroundColor: getStatusColor(), boxShadow: `0 0 4px ${getStatusColor()}`,
             animation: deviceState === 'booting' || deviceState === 'rebooting' ? 'pulse 0.5s ease-in-out infinite' : 'none',
           }} />
-          <span className="font-mono text-[8px] font-bold text-[var(--neon-purple,#9d00ff)]">DIM-001</span>
-          <span className={cn('font-mono text-[7px]', isPowered ? 'text-[var(--neon-purple,#9d00ff)]/70' : 'text-white/30')}>{stateLabel}</span>
+          <span className="font-mono text-[6px] font-bold text-[var(--neon-purple,#9d00ff)]">DIM-001</span>
+          <span className={cn('font-mono text-[5px]', isPowered ? 'text-[var(--neon-purple,#9d00ff)]/70' : 'text-white/30')}>{stateLabel}</span>
           <div className="flex-1" />
           {isPowered && (<>
             <button onClick={handleTest} disabled={deviceState !== 'online'} className="group relative" title="Test">
@@ -10877,7 +10875,7 @@ export function DimensionMonitor({
           ) : <div className="w-3" />}
         </div>
         <div style={{ maxHeight: showFoldedInfo && isPowered ? '40px' : '0px', transition: 'max-height 400ms ease, opacity 300ms ease', opacity: showFoldedInfo && isPowered ? 1 : 0, overflow: 'hidden' }}>
-          <div className="px-2 pb-1.5 font-mono text-[7px] text-[var(--neon-purple,#9d00ff)]/60 flex gap-3 flex-wrap">
+          <div className="px-1.5 pb-1 font-mono text-[5px] text-[var(--neon-purple,#9d00ff)]/60 flex gap-2 flex-wrap">
             <span>Dim: D-{currentDim.toFixed(2)}</span>
             <span>Stability: {displayStability}%</span>
             <span>Rift: {(displayRiftActivity * 100).toFixed(1)}%</span>

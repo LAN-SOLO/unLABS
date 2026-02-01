@@ -179,7 +179,7 @@ html, body {
 /* Panel Layout */
 .game-panel {
   display: grid;
-  grid-template-columns: 180px minmax(400px, 1fr) 550px;
+  grid-template-columns: 200px minmax(400px, 1fr) 420px;
   grid-template-rows: auto 1fr auto auto;
   grid-template-areas:
     "toolbar toolbar toolbar"

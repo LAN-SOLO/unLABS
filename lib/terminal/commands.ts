@@ -1959,26 +1959,29 @@ const deviceCommand: Command = {
         'P3D-001': ctx.data.p3dDevice ? { on: () => ctx.data.p3dDevice!.powerOn(), off: () => ctx.data.p3dDevice!.powerOff(), isPowered: () => ctx.data.p3dDevice!.getState().isPowered } : undefined,
       }
 
-      const dName = idToName[powerId]
+      // Resolve short names (e.g. "EMC" -> "EMC-001") and full IDs
+      const resolvedId = idToName[powerId] ? powerId
+        : Object.keys(idToName).find(k => k.startsWith(powerId + '-')) ?? powerId
+      const dName = idToName[resolvedId]
       if (!dName) {
         return { success: false, error: `device not found: ${powerId}\nuse device list to see available devices.` }
       }
 
-      const ctrl = devicePowerCtrl[powerId]
+      const ctrl = devicePowerCtrl[resolvedId]
       if (!ctrl) {
-        return { success: true, output: ['', `[device] ${powerId} power control not available (no manager connected)`, ''] }
+        return { success: true, output: ['', `[device] ${resolvedId} power control not available (no manager connected)`, ''] }
       }
 
       if (powerAction === 'on') {
-        if (ctrl.isPowered()) return { success: true, output: ['', `[device] ${powerId} is already powered ON`, ''] }
+        if (ctrl.isPowered()) return { success: true, output: ['', `[device] ${resolvedId} is already powered ON`, ''] }
         await ctrl.on()
         ctx.data.saveAllDeviceState?.()
-        return { success: true, output: ['', `[device] ${dName} (${powerId}) powered ON`, ''] }
+        return { success: true, output: ['', `[device] ${dName} (${resolvedId}) powered ON`, ''] }
       } else {
-        if (!ctrl.isPowered()) return { success: true, output: ['', `[device] ${powerId} is already powered OFF`, ''] }
+        if (!ctrl.isPowered()) return { success: true, output: ['', `[device] ${resolvedId} is already powered OFF`, ''] }
         await ctrl.off()
         ctx.data.saveAllDeviceState?.()
-        return { success: true, output: ['', `[device] ${dName} (${powerId}) powered OFF`, ''] }
+        return { success: true, output: ['', `[device] ${dName} (${resolvedId}) powered OFF`, ''] }
       }
     }
 
@@ -14318,6 +14321,750 @@ const unsysprefCommand: Command = {
   },
 }
 
+// SPK-001: Narrow Speaker control command
+const spkCommand: Command = {
+  name: 'spk',
+  aliases: ['speaker', 'spk001', 'narrow-speaker'],
+  description: 'Narrow Speaker management (SPK-001)',
+  usage: 'spk [status|power|firmware|test|reset|volume|mute|filter|fold|unfold|toggle|info]',
+  execute: async (args, ctx) => {
+    const spkDevice = ctx.data.spkDevice
+    const action = args[0]?.toLowerCase()
+
+    // Get current state from device if available
+    const state = spkDevice?.getState() ?? {
+      deviceState: 'standby' as const,
+      statusMessage: '',
+      isPowered: false,
+      volume: 45,
+      isMuted: false,
+      filters: { bass: false, mid: true, high: false },
+      peakLevel: 0,
+      testResult: null,
+      isExpanded: false,
+    }
+    const firmware = spkDevice?.getFirmware() ?? {
+      version: '1.0.0',
+      build: '2024.01.20',
+      checksum: 'A3C7F1E9',
+      features: ['audio-output', 'volume-ctrl', 'freq-filter', 'level-meter', 'mute-gate', 'beam-focus'],
+      securityPatch: '2024.01.18',
+    }
+    const powerSpecs = spkDevice?.getPowerSpecs() ?? {
+      full: 3,
+      idle: 0.5,
+      standby: 0.1,
+      category: 'light',
+      priority: 3,
+    }
+
+    const currentStatus = state.deviceState
+    const isPowered = state.isPowered
+
+    // No subcommand — show usage
+    if (!action) {
+      ctx.addOutput('')
+      ctx.addOutput('  ╔══════════════════════════════════════╗')
+      ctx.addOutput('  ║   SPK-001 · NARROW SPEAKER           ║')
+      ctx.addOutput('  ╚══════════════════════════════════════╝')
+      ctx.addOutput('')
+      ctx.addOutput('  Usage: spk <command> [options]')
+      ctx.addOutput('')
+      ctx.addOutput('  Commands:')
+      ctx.addOutput('    status          Show speaker status')
+      ctx.addOutput('    power <on|off>  Toggle device power')
+      ctx.addOutput('    firmware        View firmware info')
+      ctx.addOutput('    firmware update Check for updates')
+      ctx.addOutput('    test            Run diagnostics')
+      ctx.addOutput('    reset           Reboot speaker')
+      ctx.addOutput('    volume <0-100>  Set volume level')
+      ctx.addOutput('    mute [on|off]   Toggle mute')
+      ctx.addOutput('    filter <b|m|h> <on|off>  Toggle freq filter')
+      ctx.addOutput('    fold / unfold   Collapse/expand UI')
+      ctx.addOutput('    info            Full documentation')
+      ctx.addOutput('')
+      return { success: true }
+    }
+
+    // STATUS
+    if (action === 'status' || action === 'stat' || action === 's') {
+      const stateSymbol = currentStatus === 'online' ? '●' : currentStatus === 'standby' ? '○' : '◐'
+      const stateColor = currentStatus === 'online' ? 'ONLINE' : currentStatus === 'standby' ? 'STANDBY' : currentStatus.toUpperCase()
+      const muteStr = state.isMuted ? 'MUTED' : 'ACTIVE'
+      const filterStr = [
+        state.filters.bass ? 'BASS' : null,
+        state.filters.mid ? 'MID' : null,
+        state.filters.high ? 'HIGH' : null,
+      ].filter(Boolean).join('+') || 'NONE'
+
+      ctx.addOutput('')
+      ctx.addOutput('  ┌─────────────────────────────────┐')
+      ctx.addOutput('  │  SPK-001 · NARROW SPEAKER        │')
+      ctx.addOutput('  ├─────────────────────────────────┤')
+      ctx.addOutput(`  │  State:    ${stateSymbol} ${stateColor.padEnd(20)}│`)
+      ctx.addOutput(`  │  Volume:   ${String(state.volume).padEnd(3)}%                   │`)
+      ctx.addOutput(`  │  Output:   ${muteStr.padEnd(20)}│`)
+      ctx.addOutput(`  │  Filters:  ${filterStr.padEnd(20)}│`)
+      ctx.addOutput(`  │  Peak:     ${String(Math.round(state.peakLevel)).padEnd(3)}                    │`)
+      ctx.addOutput(`  │  Power:    ${(isPowered ? powerSpecs.idle + ' E/s' : powerSpecs.standby + ' E/s').padEnd(20)}│`)
+      ctx.addOutput(`  │  FW:       v${firmware.version.padEnd(18)}│`)
+      ctx.addOutput('  └─────────────────────────────────┘')
+      ctx.addOutput('')
+      return { success: true }
+    }
+
+    // POWER
+    if (action === 'power' || action === 'pwr' || action === 'p') {
+      const sub = args[1]?.toLowerCase()
+      if (!sub) {
+        ctx.addOutput(`  SPK-001 power state: ${isPowered ? 'ON' : 'OFF'}`)
+        ctx.addOutput('  Usage: spk power <on|off>')
+        return { success: true }
+      }
+      if (sub === 'on' || sub === 'boot' || sub === 'start') {
+        if (currentStatus !== 'standby') {
+          ctx.addOutput(`  [WARN] SPK-001 is ${currentStatus}, cannot power on.`)
+          return { success: false }
+        }
+        ctx.addOutput('  SPK-001: Initiating boot sequence...')
+        await spkDevice?.powerOn()
+        ctx.addOutput('  ┌──────────────────────────────┐')
+        ctx.addOutput('  │  SPK-001 BOOT SEQUENCE        │')
+        ctx.addOutput('  ├──────────────────────────────┤')
+        ctx.addOutput('  │  [✓] Driver init              │')
+        ctx.addOutput('  │  [✓] Amplifier warmup         │')
+        ctx.addOutput('  │  [✓] DAC calibrate            │')
+        ctx.addOutput('  │  [✓] Freq calibrate           │')
+        ctx.addOutput('  │  [✓] Output test              │')
+        ctx.addOutput('  │  [✓] SPEAKER ONLINE           │')
+        ctx.addOutput('  └──────────────────────────────┘')
+        return { success: true }
+      }
+      if (sub === 'off' || sub === 'shutdown' || sub === 'stop') {
+        if (currentStatus !== 'online') {
+          ctx.addOutput(`  [WARN] SPK-001 is ${currentStatus}, cannot power off.`)
+          return { success: false }
+        }
+        ctx.addOutput('  SPK-001: Initiating shutdown...')
+        await spkDevice?.powerOff()
+        ctx.addOutput('  ┌──────────────────────────────┐')
+        ctx.addOutput('  │  SPK-001 SHUTDOWN              │')
+        ctx.addOutput('  ├──────────────────────────────┤')
+        ctx.addOutput('  │  [✓] Output muted             │')
+        ctx.addOutput('  │  [✓] Amp drained              │')
+        ctx.addOutput('  │  [✓] Driver off               │')
+        ctx.addOutput('  │  [○] SPEAKER STANDBY           │')
+        ctx.addOutput('  └──────────────────────────────┘')
+        return { success: true }
+      }
+      ctx.addOutput('  Usage: spk power <on|off>')
+      return { success: false }
+    }
+
+    // FIRMWARE
+    if (action === 'firmware' || action === 'fw' || action === 'f') {
+      const sub = args[1]?.toLowerCase()
+      if (sub === 'update' || sub === 'upgrade') {
+        ctx.addOutput('')
+        ctx.addOutput('  Checking for SPK-001 firmware updates...')
+        ctx.addOutput(`  Current: v${firmware.version} (${firmware.build})`)
+        ctx.addOutput('  Latest:  v1.0.0 (2024.01.20)')
+        ctx.addOutput('')
+        ctx.addOutput('  ✓ Firmware is up to date.')
+        ctx.addOutput('')
+        return { success: true }
+      }
+      ctx.addOutput('')
+      ctx.addOutput('  ┌─────────────────────────────────┐')
+      ctx.addOutput('  │  SPK-001 FIRMWARE                 │')
+      ctx.addOutput('  ├─────────────────────────────────┤')
+      ctx.addOutput(`  │  Version:  v${firmware.version.padEnd(19)}│`)
+      ctx.addOutput(`  │  Build:    ${firmware.build.padEnd(21)}│`)
+      ctx.addOutput(`  │  Checksum: ${firmware.checksum.padEnd(21)}│`)
+      ctx.addOutput(`  │  Patch:    ${firmware.securityPatch.padEnd(21)}│`)
+      ctx.addOutput('  ├─────────────────────────────────┤')
+      ctx.addOutput('  │  Features:                        │')
+      firmware.features.forEach(f => {
+        ctx.addOutput(`  │    • ${f.padEnd(27)}│`)
+      })
+      ctx.addOutput('  └─────────────────────────────────┘')
+      ctx.addOutput('')
+      return { success: true }
+    }
+
+    // TEST
+    if (action === 'test' || action === 'diag' || action === 'diagnostics') {
+      if (currentStatus !== 'online') {
+        ctx.addOutput('  [ERR] SPK-001 must be ONLINE to run diagnostics.')
+        return { success: false }
+      }
+      ctx.addOutput('')
+      ctx.addOutput('  SPK-001: Running diagnostics...')
+      await spkDevice?.runTest()
+      ctx.addOutput('  ┌──────────────────────────────┐')
+      ctx.addOutput('  │  SPK-001 DIAGNOSTICS          │')
+      ctx.addOutput('  ├──────────────────────────────┤')
+      ctx.addOutput('  │  [✓] Driver test              │')
+      ctx.addOutput('  │  [✓] Amplifier check          │')
+      ctx.addOutput('  │  [✓] DAC verify               │')
+      ctx.addOutput('  │  [✓] Filter test              │')
+      ctx.addOutput('  │  [✓] Output check             │')
+      ctx.addOutput('  │  [✓] ALL TESTS PASSED         │')
+      ctx.addOutput('  └──────────────────────────────┘')
+      ctx.addOutput('')
+      return { success: true }
+    }
+
+    // VOLUME
+    if (action === 'volume' || action === 'vol' || action === 'v') {
+      const value = args[1]
+      if (!value) {
+        ctx.addOutput(`  SPK-001 volume: ${state.volume}%`)
+        ctx.addOutput('  Usage: spk volume <0-100>')
+        return { success: true }
+      }
+      const num = parseInt(value, 10)
+      if (isNaN(num) || num < 0 || num > 100) {
+        ctx.addOutput('  [ERR] Volume must be 0-100.')
+        return { success: false }
+      }
+      if (currentStatus !== 'online') {
+        ctx.addOutput('  [ERR] SPK-001 must be ONLINE to adjust volume.')
+        return { success: false }
+      }
+      spkDevice?.setVolume(num)
+      const bar = '█'.repeat(Math.round(num / 5)) + '░'.repeat(20 - Math.round(num / 5))
+      ctx.addOutput(`  SPK-001 volume: ${num}%  [${bar}]`)
+      return { success: true }
+    }
+
+    // MUTE
+    if (action === 'mute' || action === 'm') {
+      const sub = args[1]?.toLowerCase()
+      if (currentStatus !== 'online') {
+        ctx.addOutput('  [ERR] SPK-001 must be ONLINE to toggle mute.')
+        return { success: false }
+      }
+      if (sub === 'on' || sub === 'true' || sub === '1') {
+        spkDevice?.setMuted(true)
+        ctx.addOutput('  SPK-001: Output MUTED')
+        return { success: true }
+      }
+      if (sub === 'off' || sub === 'false' || sub === '0') {
+        spkDevice?.setMuted(false)
+        ctx.addOutput('  SPK-001: Output UNMUTED')
+        return { success: true }
+      }
+      // Toggle
+      spkDevice?.toggleMute()
+      ctx.addOutput(`  SPK-001: Output ${state.isMuted ? 'UNMUTED' : 'MUTED'}`)
+      return { success: true }
+    }
+
+    // FILTER
+    if (action === 'filter' || action === 'flt' || action === 'eq') {
+      const band = args[1]?.toLowerCase()
+      const sub = args[2]?.toLowerCase()
+      if (!band) {
+        const filterStr = [
+          `BASS: ${state.filters.bass ? 'ON' : 'OFF'}`,
+          `MID: ${state.filters.mid ? 'ON' : 'OFF'}`,
+          `HIGH: ${state.filters.high ? 'ON' : 'OFF'}`,
+        ].join('  ')
+        ctx.addOutput(`  SPK-001 filters: ${filterStr}`)
+        ctx.addOutput('  Usage: spk filter <b|m|h> [on|off]')
+        return { success: true }
+      }
+      if (currentStatus !== 'online') {
+        ctx.addOutput('  [ERR] SPK-001 must be ONLINE to adjust filters.')
+        return { success: false }
+      }
+      const filterMap: Record<string, 'bass' | 'mid' | 'high'> = {
+        b: 'bass', bass: 'bass',
+        m: 'mid', mid: 'mid',
+        h: 'high', high: 'high',
+      }
+      const filter = filterMap[band]
+      if (!filter) {
+        ctx.addOutput('  [ERR] Unknown filter. Use: b (bass), m (mid), h (high)')
+        return { success: false }
+      }
+      if (sub === 'on' || sub === 'true' || sub === '1') {
+        spkDevice?.setFilter(filter, true)
+        ctx.addOutput(`  SPK-001: ${filter.toUpperCase()} filter ON`)
+      } else if (sub === 'off' || sub === 'false' || sub === '0') {
+        spkDevice?.setFilter(filter, false)
+        ctx.addOutput(`  SPK-001: ${filter.toUpperCase()} filter OFF`)
+      } else {
+        spkDevice?.toggleFilter(filter)
+        ctx.addOutput(`  SPK-001: ${filter.toUpperCase()} filter ${state.filters[filter] ? 'OFF' : 'ON'}`)
+      }
+      return { success: true }
+    }
+
+    // RESET / REBOOT
+    if (action === 'reset' || action === 'reboot') {
+      if (currentStatus === 'standby' || currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'shutdown') {
+        ctx.addOutput(`  [WARN] SPK-001 is ${currentStatus}, cannot reboot.`)
+        return { success: false }
+      }
+      ctx.addOutput('  SPK-001: Initiating reboot...')
+      await spkDevice?.reboot()
+      ctx.addOutput('  ✓ SPK-001 rebooted successfully.')
+      return { success: true }
+    }
+
+    // FOLD
+    if (action === 'fold') {
+      spkDevice?.setExpanded(false)
+      ctx.addOutput('  SPK-001: UI collapsed')
+      return { success: true }
+    }
+
+    // UNFOLD
+    if (action === 'unfold') {
+      spkDevice?.setExpanded(true)
+      ctx.addOutput('  SPK-001: UI expanded')
+      return { success: true }
+    }
+
+    // TOGGLE
+    if (action === 'toggle') {
+      spkDevice?.toggleExpanded()
+      ctx.addOutput('  SPK-001: UI toggled')
+      return { success: true }
+    }
+
+    // INFO / DOCS
+    if (action === 'info' || action === 'docs' || action === 'documentation') {
+      ctx.addOutput('')
+      ctx.addOutput('  ╔══════════════════════════════════════════════╗')
+      ctx.addOutput('  ║       SPK-001 · NARROW SPEAKER               ║')
+      ctx.addOutput('  ║       Audio Output Device                     ║')
+      ctx.addOutput('  ╚══════════════════════════════════════════════╝')
+      ctx.addOutput('')
+      ctx.addOutput('  Type:      Focused Audio Output')
+      ctx.addOutput('  Category:  Light Consumer')
+      ctx.addOutput('  Priority:  P3 (Medium)')
+      ctx.addOutput('  Tech Tree: Audio Tier 1')
+      ctx.addOutput('')
+      ctx.addOutput('  ── Audio Specifications ──────────────────────')
+      ctx.addOutput('  Frequency:   40 Hz – 18 kHz')
+      ctx.addOutput('  Power:       50W peak')
+      ctx.addOutput('  Beam Angle:  30°')
+      ctx.addOutput('  Impedance:   8Ω')
+      ctx.addOutput('  Sensitivity: 89 dB/W/m')
+      ctx.addOutput('')
+      ctx.addOutput('  ── Power Consumption ─────────────────────────')
+      ctx.addOutput(`  Full Load:   ${powerSpecs.full} E/s`)
+      ctx.addOutput(`  Idle:        ${powerSpecs.idle} E/s`)
+      ctx.addOutput(`  Standby:     ${powerSpecs.standby} E/s`)
+      ctx.addOutput('')
+      ctx.addOutput('  ── Controls ─────────────────────────────────')
+      ctx.addOutput('  Volume:  0-100% slider')
+      ctx.addOutput('  Mute:    Output gate toggle')
+      ctx.addOutput('  Filters: Bass (B), Mid (M), High (H)')
+      ctx.addOutput('')
+      ctx.addOutput('  ── Compatible Devices ────────────────────────')
+      ctx.addOutput('  OSC-001  Oscilloscope    Waveform Display')
+      ctx.addOutput('  HMS-001  Synthesizer     Audio Source')
+      ctx.addOutput('  ECR-001  Echo Recorder   Signal Feed')
+      ctx.addOutput('')
+      ctx.addOutput('  ── Firmware ──────────────────────────────────')
+      ctx.addOutput(`  Version:  v${firmware.version}`)
+      ctx.addOutput(`  Build:    ${firmware.build}`)
+      ctx.addOutput(`  Checksum: ${firmware.checksum}`)
+      ctx.addOutput(`  Patch:    ${firmware.securityPatch}`)
+      ctx.addOutput('')
+      ctx.addOutput('  For full docs: cat /usr/share/doc/devices/spk001.md')
+      ctx.addOutput('')
+      return { success: true }
+    }
+
+    return {
+      success: false,
+      error: `unknown spk command: ${action}\n\ntype spk for available commands.`,
+    }
+  },
+}
+
+const dgnCommand: Command = {
+  name: 'dgn',
+  aliases: ['diag', 'dgn001', 'diagnostics-console'],
+  description: 'Diagnostics Console management (DGN-001)',
+  usage: 'dgn [status|power|firmware|test|reset|scan|category|depth|alerts|health|fold|unfold|toggle|info]',
+  execute: async (args, ctx) => {
+    const dgnDevice = ctx.data.dgnDevice
+    const action = args[0]?.toLowerCase()
+
+    const state = dgnDevice?.getState() ?? {
+      deviceState: 'standby' as const,
+      statusMessage: '',
+      isPowered: false,
+      isExpanded: false,
+      category: 'SYSTEMS',
+      scanDepth: 75,
+      healthPercent: 100,
+      alertCount: 0,
+      isRunningDiag: false,
+      diagProgress: 0,
+      testResult: null,
+    }
+    const firmware = dgnDevice?.getFirmware() ?? {
+      version: '2.0.4',
+      build: '2024.02.15',
+      checksum: 'D9F3B2A7',
+      features: ['system-diag', 'component-scan', 'health-monitor', 'alert-system', 'log-output', 'multi-category'],
+      securityPatch: '2024.02.10',
+    }
+    const powerSpecs = dgnDevice?.getPowerSpecs() ?? {
+      full: 3,
+      idle: 1,
+      standby: 0.25,
+      category: 'light',
+      priority: 2,
+    }
+
+    const currentStatus = state.deviceState
+    const isPowered = state.isPowered
+
+    if (!action) {
+      ctx.addOutput('')
+      ctx.addOutput('  ╔══════════════════════════════════════╗')
+      ctx.addOutput('  ║   DGN-001 · DIAGNOSTICS CONSOLE      ║')
+      ctx.addOutput('  ╚══════════════════════════════════════╝')
+      ctx.addOutput('')
+      ctx.addOutput('  Usage: dgn <command> [options]')
+      ctx.addOutput('')
+      ctx.addOutput('  Commands:')
+      ctx.addOutput('    status            Show console status')
+      ctx.addOutput('    power <on|off>    Toggle device power')
+      ctx.addOutput('    firmware          View firmware info')
+      ctx.addOutput('    firmware update   Check for updates')
+      ctx.addOutput('    test              Run system test')
+      ctx.addOutput('    reset             Reboot console')
+      ctx.addOutput('    scan [category]   Run diagnostics scan')
+      ctx.addOutput('    category <cat>    Switch category')
+      ctx.addOutput('    depth <0-100>     Set scan depth')
+      ctx.addOutput('    alerts            View alerts')
+      ctx.addOutput('    alerts clear      Clear all alerts')
+      ctx.addOutput('    health            Health summary')
+      ctx.addOutput('    fold / unfold     Collapse/expand UI')
+      ctx.addOutput('    info              Full documentation')
+      ctx.addOutput('')
+      return { success: true }
+    }
+
+    // STATUS
+    if (action === 'status' || action === 'stat' || action === 's') {
+      const stateSymbol = currentStatus === 'online' ? '●' : currentStatus === 'standby' ? '○' : '◐'
+      const stateColor = currentStatus === 'online' ? 'ONLINE' : currentStatus === 'standby' ? 'STANDBY' : currentStatus.toUpperCase()
+
+      ctx.addOutput('')
+      ctx.addOutput('  ┌─────────────────────────────────┐')
+      ctx.addOutput('  │  DGN-001 · DIAGNOSTICS CONSOLE   │')
+      ctx.addOutput('  ├─────────────────────────────────┤')
+      ctx.addOutput(`  │  State:    ${stateSymbol} ${stateColor.padEnd(20)}│`)
+      ctx.addOutput(`  │  Category: ${state.category.padEnd(21)}│`)
+      ctx.addOutput(`  │  Depth:    ${String(state.scanDepth).padEnd(3)}%                   │`)
+      ctx.addOutput(`  │  Health:   ${String(state.healthPercent).padEnd(3)}%                   │`)
+      ctx.addOutput(`  │  Alerts:   ${String(state.alertCount).padEnd(21)}│`)
+      ctx.addOutput(`  │  Power:    ${(isPowered ? powerSpecs.idle + ' E/s' : powerSpecs.standby + ' E/s').padEnd(20)}│`)
+      ctx.addOutput(`  │  FW:       v${firmware.version.padEnd(18)}│`)
+      ctx.addOutput('  └─────────────────────────────────┘')
+      ctx.addOutput('')
+      return { success: true }
+    }
+
+    // POWER
+    if (action === 'power' || action === 'pwr' || action === 'p') {
+      const sub = args[1]?.toLowerCase()
+      if (!sub) {
+        ctx.addOutput(`  DGN-001 power state: ${isPowered ? 'ON' : 'OFF'}`)
+        ctx.addOutput('  Usage: dgn power <on|off>')
+        return { success: true }
+      }
+      if (sub === 'on' || sub === 'boot' || sub === 'start') {
+        if (currentStatus !== 'standby') {
+          ctx.addOutput(`  [WARN] DGN-001 is ${currentStatus}, cannot power on.`)
+          return { success: false }
+        }
+        ctx.addOutput('  DGN-001: Initiating boot sequence...')
+        await dgnDevice?.powerOn()
+        ctx.addOutput('  ┌──────────────────────────────┐')
+        ctx.addOutput('  │  DGN-001 BOOT SEQUENCE        │')
+        ctx.addOutput('  ├──────────────────────────────┤')
+        ctx.addOutput('  │  [✓] Memory check             │')
+        ctx.addOutput('  │  [✓] Kernel init              │')
+        ctx.addOutput('  │  [✓] Interface scan           │')
+        ctx.addOutput('  │  [✓] Sensor calibrate         │')
+        ctx.addOutput('  │  [✓] System calibrate         │')
+        ctx.addOutput('  │  [✓] CONSOLE ONLINE           │')
+        ctx.addOutput('  └──────────────────────────────┘')
+        return { success: true }
+      }
+      if (sub === 'off' || sub === 'shutdown' || sub === 'stop') {
+        if (currentStatus !== 'online') {
+          ctx.addOutput(`  [WARN] DGN-001 is ${currentStatus}, cannot power off.`)
+          return { success: false }
+        }
+        ctx.addOutput('  DGN-001: Initiating shutdown...')
+        await dgnDevice?.powerOff()
+        ctx.addOutput('  ┌──────────────────────────────┐')
+        ctx.addOutput('  │  DGN-001 SHUTDOWN              │')
+        ctx.addOutput('  ├──────────────────────────────┤')
+        ctx.addOutput('  │  [✓] Log flushed              │')
+        ctx.addOutput('  │  [✓] Sensors stopped          │')
+        ctx.addOutput('  │  [✓] Power down               │')
+        ctx.addOutput('  │  [○] CONSOLE STANDBY           │')
+        ctx.addOutput('  └──────────────────────────────┘')
+        return { success: true }
+      }
+      ctx.addOutput('  Usage: dgn power <on|off>')
+      return { success: false }
+    }
+
+    // FIRMWARE
+    if (action === 'firmware' || action === 'fw' || action === 'f') {
+      const sub = args[1]?.toLowerCase()
+      if (sub === 'update' || sub === 'upgrade') {
+        ctx.addOutput('')
+        ctx.addOutput('  Checking for DGN-001 firmware updates...')
+        ctx.addOutput(`  Current: v${firmware.version} (${firmware.build})`)
+        ctx.addOutput('  Latest:  v2.0.4 (2024.02.15)')
+        ctx.addOutput('')
+        ctx.addOutput('  ✓ Firmware is up to date.')
+        ctx.addOutput('')
+        return { success: true }
+      }
+      ctx.addOutput('')
+      ctx.addOutput('  ┌─────────────────────────────────┐')
+      ctx.addOutput('  │  DGN-001 FIRMWARE                 │')
+      ctx.addOutput('  ├─────────────────────────────────┤')
+      ctx.addOutput(`  │  Version:  v${firmware.version.padEnd(19)}│`)
+      ctx.addOutput(`  │  Build:    ${firmware.build.padEnd(21)}│`)
+      ctx.addOutput(`  │  Checksum: ${firmware.checksum.padEnd(21)}│`)
+      ctx.addOutput(`  │  Patch:    ${firmware.securityPatch.padEnd(21)}│`)
+      ctx.addOutput('  ├─────────────────────────────────┤')
+      ctx.addOutput('  │  Features:                        │')
+      firmware.features.forEach(f => {
+        ctx.addOutput(`  │    • ${f.padEnd(27)}│`)
+      })
+      ctx.addOutput('  └─────────────────────────────────┘')
+      ctx.addOutput('')
+      return { success: true }
+    }
+
+    // TEST
+    if (action === 'test') {
+      if (currentStatus !== 'online') {
+        ctx.addOutput('  [ERR] DGN-001 must be ONLINE to run system test.')
+        return { success: false }
+      }
+      ctx.addOutput('')
+      ctx.addOutput('  DGN-001: Running system test...')
+      await dgnDevice?.runTest()
+      ctx.addOutput('  ┌──────────────────────────────┐')
+      ctx.addOutput('  │  DGN-001 SYSTEM TEST          │')
+      ctx.addOutput('  ├──────────────────────────────┤')
+      ctx.addOutput('  │  [✓] Memory integrity         │')
+      ctx.addOutput('  │  [✓] Core systems             │')
+      ctx.addOutput('  │  [✓] Network stack            │')
+      ctx.addOutput('  │  [✓] Device interfaces        │')
+      ctx.addOutput('  │  [✓] ALL TESTS PASSED         │')
+      ctx.addOutput('  └──────────────────────────────┘')
+      ctx.addOutput('')
+      return { success: true }
+    }
+
+    // SCAN (run diagnostics)
+    if (action === 'scan' || action === 'run') {
+      if (currentStatus !== 'online') {
+        ctx.addOutput('  [ERR] DGN-001 must be ONLINE to run diagnostics.')
+        return { success: false }
+      }
+      if (state.isRunningDiag) {
+        ctx.addOutput('  [WARN] Diagnostics already running.')
+        return { success: false }
+      }
+      const cat = args[1]?.toUpperCase()
+      const validCats = ['SYSTEMS', 'DEVICES', 'ENERGY', 'NETWORK', 'CRYSTALS', 'PROCESS']
+      if (cat && validCats.includes(cat)) {
+        dgnDevice?.setCategory(cat as 'SYSTEMS' | 'DEVICES' | 'ENERGY' | 'NETWORK' | 'CRYSTALS' | 'PROCESS')
+      }
+      ctx.addOutput(`  DGN-001: Running diagnostics on ${cat && validCats.includes(cat) ? cat : state.category}...`)
+      await dgnDevice?.runDiagnostics()
+      const newState = dgnDevice?.getState()
+      ctx.addOutput(`  ✓ Scan complete. Health: ${newState?.healthPercent ?? state.healthPercent}%  Alerts: ${newState?.alertCount ?? state.alertCount}`)
+      return { success: true }
+    }
+
+    // CATEGORY
+    if (action === 'category' || action === 'cat') {
+      const cat = args[1]?.toUpperCase()
+      const validCats = ['SYSTEMS', 'DEVICES', 'ENERGY', 'NETWORK', 'CRYSTALS', 'PROCESS']
+      if (!cat) {
+        ctx.addOutput(`  DGN-001 category: ${state.category}`)
+        ctx.addOutput(`  Available: ${validCats.join(', ')}`)
+        return { success: true }
+      }
+      if (!validCats.includes(cat)) {
+        ctx.addOutput(`  [ERR] Unknown category: ${cat}`)
+        ctx.addOutput(`  Available: ${validCats.join(', ')}`)
+        return { success: false }
+      }
+      if (currentStatus !== 'online') {
+        ctx.addOutput('  [ERR] DGN-001 must be ONLINE to switch category.')
+        return { success: false }
+      }
+      dgnDevice?.setCategory(cat as 'SYSTEMS' | 'DEVICES' | 'ENERGY' | 'NETWORK' | 'CRYSTALS' | 'PROCESS')
+      ctx.addOutput(`  DGN-001: Category set to ${cat}`)
+      return { success: true }
+    }
+
+    // DEPTH
+    if (action === 'depth') {
+      const value = args[1]
+      if (!value) {
+        ctx.addOutput(`  DGN-001 scan depth: ${state.scanDepth}%`)
+        ctx.addOutput('  Usage: dgn depth <0-100>')
+        return { success: true }
+      }
+      const num = parseInt(value, 10)
+      if (isNaN(num) || num < 0 || num > 100) {
+        ctx.addOutput('  [ERR] Depth must be 0-100.')
+        return { success: false }
+      }
+      if (currentStatus !== 'online') {
+        ctx.addOutput('  [ERR] DGN-001 must be ONLINE to adjust depth.')
+        return { success: false }
+      }
+      dgnDevice?.setScanDepth(num)
+      const bar = '█'.repeat(Math.round(num / 5)) + '░'.repeat(20 - Math.round(num / 5))
+      ctx.addOutput(`  DGN-001 scan depth: ${num}%  [${bar}]`)
+      return { success: true }
+    }
+
+    // ALERTS
+    if (action === 'alerts' || action === 'alert') {
+      const sub = args[1]?.toLowerCase()
+      if (sub === 'clear' || sub === 'flush') {
+        dgnDevice?.clearAlerts()
+        ctx.addOutput('  DGN-001: Alerts cleared.')
+        return { success: true }
+      }
+      ctx.addOutput(`  DGN-001 alerts: ${state.alertCount}`)
+      if (state.alertCount === 0) {
+        ctx.addOutput('  No active alerts.')
+      }
+      return { success: true }
+    }
+
+    // HEALTH
+    if (action === 'health' || action === 'h') {
+      const hp = state.healthPercent
+      const bar = '█'.repeat(Math.round(hp / 5)) + '░'.repeat(20 - Math.round(hp / 5))
+      const label = hp >= 80 ? 'GOOD' : hp >= 50 ? 'DEGRADED' : hp >= 20 ? 'WARNING' : 'CRITICAL'
+      ctx.addOutput('')
+      ctx.addOutput('  ┌──────────────────────────────┐')
+      ctx.addOutput('  │  DGN-001 SYSTEM HEALTH        │')
+      ctx.addOutput('  ├──────────────────────────────┤')
+      ctx.addOutput(`  │  Health:  ${hp}% ${label.padEnd(16)}│`)
+      ctx.addOutput(`  │  [${bar}]  │`)
+      ctx.addOutput(`  │  Alerts:  ${String(state.alertCount).padEnd(20)}│`)
+      ctx.addOutput(`  │  Depth:   ${String(state.scanDepth).padEnd(3)}%                  │`)
+      ctx.addOutput('  └──────────────────────────────┘')
+      ctx.addOutput('')
+      return { success: true }
+    }
+
+    // RESET / REBOOT
+    if (action === 'reset' || action === 'reboot') {
+      if (currentStatus === 'standby' || currentStatus === 'booting' || currentStatus === 'rebooting' || currentStatus === 'shutdown') {
+        ctx.addOutput(`  [WARN] DGN-001 is ${currentStatus}, cannot reboot.`)
+        return { success: false }
+      }
+      ctx.addOutput('  DGN-001: Initiating reboot...')
+      await dgnDevice?.reboot()
+      ctx.addOutput('  ✓ DGN-001 rebooted successfully.')
+      return { success: true }
+    }
+
+    // FOLD
+    if (action === 'fold') {
+      dgnDevice?.setExpanded(false)
+      ctx.addOutput('  DGN-001: UI collapsed')
+      return { success: true }
+    }
+
+    // UNFOLD
+    if (action === 'unfold') {
+      dgnDevice?.setExpanded(true)
+      ctx.addOutput('  DGN-001: UI expanded')
+      return { success: true }
+    }
+
+    // TOGGLE
+    if (action === 'toggle') {
+      dgnDevice?.toggleExpanded()
+      ctx.addOutput('  DGN-001: UI toggled')
+      return { success: true }
+    }
+
+    // INFO / DOCS
+    if (action === 'info' || action === 'docs' || action === 'documentation') {
+      ctx.addOutput('')
+      ctx.addOutput('  ╔══════════════════════════════════════════════╗')
+      ctx.addOutput('  ║       DGN-001 · DIAGNOSTICS CONSOLE          ║')
+      ctx.addOutput('  ║       System Health Monitor v2.0              ║')
+      ctx.addOutput('  ╚══════════════════════════════════════════════╝')
+      ctx.addOutput('')
+      ctx.addOutput('  Type:      Universal Diagnostics')
+      ctx.addOutput('  Category:  Light Consumer')
+      ctx.addOutput('  Priority:  P2 (High)')
+      ctx.addOutput('  Tech Tree: Systems Tier 2')
+      ctx.addOutput('')
+      ctx.addOutput('  ── Diagnostic Categories ─────────────────────')
+      ctx.addOutput('  ⬡ SYSTEMS    Core OS, kernel, cache, compute')
+      ctx.addOutput('  ⚙ DEVICES    Reactor, core, battery, forge')
+      ctx.addOutput('  ⚡ ENERGY     Power input/output, grid, fuel')
+      ctx.addOutput('  ◎ NETWORK    Blockchain, RPC, comm, security')
+      ctx.addOutput('  ◇ CRYSTALS   Assembly, scanner, stabilizer')
+      ctx.addOutput('  ▶ PROCESS    Research, mining, automation')
+      ctx.addOutput('')
+      ctx.addOutput('  ── Power Consumption ─────────────────────────')
+      ctx.addOutput(`  Full Load:   ${powerSpecs.full} E/s`)
+      ctx.addOutput(`  Idle:        ${powerSpecs.idle} E/s`)
+      ctx.addOutput(`  Standby:     ${powerSpecs.standby} E/s`)
+      ctx.addOutput('')
+      ctx.addOutput('  ── Controls ─────────────────────────────────')
+      ctx.addOutput('  Scan Depth:  0-100% (analysis thoroughness)')
+      ctx.addOutput('  Categories:  6 diagnostic domains')
+      ctx.addOutput('  Alerts:      Real-time warning system')
+      ctx.addOutput('')
+      ctx.addOutput('  ── Compatible Devices ────────────────────────')
+      ctx.addOutput('  MFR-001  Microfusion     Power Source')
+      ctx.addOutput('  CDC-001  Data Cache       System Data')
+      ctx.addOutput('  QAN-001  Quantum Analyzer Analysis')
+      ctx.addOutput('')
+      ctx.addOutput('  ── Firmware ──────────────────────────────────')
+      ctx.addOutput(`  Version:  v${firmware.version}`)
+      ctx.addOutput(`  Build:    ${firmware.build}`)
+      ctx.addOutput(`  Checksum: ${firmware.checksum}`)
+      ctx.addOutput(`  Patch:    ${firmware.securityPatch}`)
+      ctx.addOutput('')
+      ctx.addOutput('  For full docs: cat /usr/share/doc/devices/dgn001.md')
+      ctx.addOutput('')
+      return { success: true }
+    }
+
+    return {
+      success: false,
+      error: `unknown dgn command: ${action}\n\ntype dgn for available commands.`,
+    }
+  },
+}
+
 // Command registry
 export const commands: Command[] = [
   helpCommand,
@@ -14385,6 +15132,8 @@ export const commands: Command[] = [
   tlpCommand,
   lctCommand,
   p3dCommand,
+  spkCommand,
+  dgnCommand,
   themeCommand,
   screwstatCommand,
   nodesyncCommand,

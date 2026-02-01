@@ -1,63 +1,192 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { cn } from '@/lib/utils'
 import { LED } from '../controls/LED'
+import { useSPKManagerOptional } from '@/contexts/SPKManager'
 
 interface NarrowSpeakerProps {
   className?: string
 }
 
 export function NarrowSpeaker({ className }: NarrowSpeakerProps) {
-  const [isOn, setIsOn] = useState(true)
-  const [volume, setVolume] = useState(45)
-  const [isMuted, setIsMuted] = useState(false)
-  const [filters, setFilters] = useState({
-    bass: false,
-    mid: true,
-    high: false,
-  })
-  const [audioLevel, setAudioLevel] = useState<number[]>([0, 0, 0, 0, 0, 0, 0, 0])
+  const spk = useSPKManagerOptional()
 
-  // Simulate audio level visualization
-  useEffect(() => {
-    if (!isOn || isMuted) {
-      setAudioLevel([0, 0, 0, 0, 0, 0, 0, 0])
-      return
-    }
+  // Local fallback state (when manager not available)
+  const [localIsOn, setLocalIsOn] = useState(true)
+  const [localVolume, setLocalVolume] = useState(45)
+  const [localIsMuted, setLocalIsMuted] = useState(false)
+  const [localFilters, setLocalFilters] = useState({ bass: false, mid: true, high: false })
 
-    const interval = setInterval(() => {
-      setAudioLevel(
-        Array.from({ length: 8 }, () =>
-          Math.random() * (volume / 100) * 100
-        )
-      )
-    }, 100)
+  // Power button hold state for the tiny rocker switch
+  const [powerHeld, setPowerHeld] = useState(false)
+  const [powerTimer, setPowerTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
 
-    return () => clearInterval(interval)
-  }, [isOn, isMuted, volume])
-
-  const toggleFilter = (filter: keyof typeof filters) => {
-    setFilters(prev => ({ ...prev, [filter]: !prev[filter] }))
-  }
+  // Use manager state if available, otherwise local
+  const isOn = spk ? (spk.deviceState === 'online') : localIsOn
+  const isBooting = spk ? (spk.deviceState === 'booting') : false
+  const isShuttingDown = spk ? (spk.deviceState === 'shutdown') : false
+  const isTesting = spk ? (spk.deviceState === 'testing') : false
+  const isRebooting = spk ? (spk.deviceState === 'rebooting') : false
+  const volume = spk?.volume ?? localVolume
+  const isMuted = spk?.isMuted ?? localIsMuted
+  const filters = spk?.filters ?? localFilters
+  const audioLevel = spk?.audioLevel ?? [0, 0, 0, 0, 0, 0, 0, 0]
+  const statusMessage = spk?.statusMessage ?? ''
+  const isPowered = spk?.isPowered ?? localIsOn
+  const testResult = spk?.testResult ?? null
+  const bootPhase = spk?.bootPhase ?? null
+  const shutdownPhase = spk?.shutdownPhase ?? null
 
   const effectiveVolume = isMuted ? 0 : volume
+
+  // Power rocker switch — hold 600ms to toggle
+  const handlePowerDown = useCallback(() => {
+    setPowerHeld(true)
+    const timer = setTimeout(() => {
+      if (spk) {
+        if (spk.deviceState === 'online') {
+          spk.powerOff()
+        } else if (spk.deviceState === 'standby') {
+          spk.powerOn()
+        }
+      } else {
+        setLocalIsOn(prev => !prev)
+      }
+      setPowerHeld(false)
+    }, 600)
+    setPowerTimer(timer)
+  }, [spk])
+
+  const handlePowerUp = useCallback(() => {
+    setPowerHeld(false)
+    if (powerTimer) {
+      clearTimeout(powerTimer)
+      setPowerTimer(null)
+    }
+  }, [powerTimer])
+
+  const handleVolumeChange = useCallback((v: number) => {
+    if (spk) {
+      spk.setVolume(v)
+    } else {
+      setLocalVolume(v)
+    }
+  }, [spk])
+
+  const handleMuteToggle = useCallback(() => {
+    if (spk) {
+      spk.toggleMute()
+    } else {
+      setLocalIsMuted(prev => !prev)
+    }
+  }, [spk])
+
+  const handleFilterToggle = useCallback((filter: 'bass' | 'mid' | 'high') => {
+    if (spk) {
+      spk.toggleFilter(filter)
+    } else {
+      setLocalFilters(prev => ({ ...prev, [filter]: !prev[filter] }))
+    }
+  }, [spk])
+
+  // LED color based on device state
+  const getLedColor = (): 'green' | 'amber' | 'red' | 'cyan' => {
+    if (isBooting || isRebooting) return 'cyan'
+    if (isTesting) return 'amber'
+    if (isShuttingDown) return 'red'
+    if (isOn) return 'green'
+    return 'red'
+  }
+
+  const isBusy = isBooting || isShuttingDown || isRebooting || isTesting
 
   return (
     <div className={cn(
       'w-12 shrink-0 bg-gradient-to-b from-[#1a1a1a] to-[#0a0a0a] rounded border border-[#2a2a3a] flex flex-col p-1 gap-1',
       className
     )}>
-      {/* Header with power LED */}
+      {/* Header with power rocker switch */}
       <div className="flex items-center justify-between px-0.5">
         <span className="font-mono text-[5px] text-white/40">SPK</span>
-        <button onClick={() => setIsOn(!isOn)}>
-          <LED on={isOn} color={isOn ? 'green' : 'red'} size="sm" />
+
+        {/* Tiny rocker power switch — hold to toggle */}
+        <button
+          onPointerDown={handlePowerDown}
+          onPointerUp={handlePowerUp}
+          onPointerLeave={handlePowerUp}
+          disabled={isBusy}
+          className={cn(
+            'relative w-[14px] h-[8px] rounded-[2px] transition-all duration-200 border',
+            'focus:outline-none',
+            isPowered
+              ? 'bg-gradient-to-b from-[#2a3a2a] to-[#1a2a1a] border-[var(--neon-green)]/40'
+              : 'bg-gradient-to-b from-[#3a2a2a] to-[#2a1a1a] border-white/20',
+            powerHeld && 'scale-95 brightness-125',
+            isBusy && 'opacity-50'
+          )}
+          title={isPowered ? 'Hold to power off' : 'Hold to power on'}
+        >
+          {/* Rocker indicator nub */}
+          <div
+            className={cn(
+              'absolute top-[1px] w-[5px] h-[4px] rounded-[1px] transition-all duration-300',
+              isPowered
+                ? 'right-[1px] bg-[var(--neon-green)] shadow-[0_0_4px_var(--neon-green)]'
+                : 'left-[1px] bg-white/30'
+            )}
+          />
+          {/* Tiny power LED dot */}
+          <div
+            className={cn(
+              'absolute -bottom-[3px] left-1/2 -translate-x-1/2 w-[3px] h-[3px] rounded-full transition-all duration-300',
+              isPowered
+                ? 'bg-[var(--neon-green)] shadow-[0_0_6px_var(--neon-green)]'
+                : 'bg-white/10'
+            )}
+          />
         </button>
       </div>
 
+      {/* Status indicator (shows during boot/shutdown/test) */}
+      {isBusy && (
+        <div className="px-0.5">
+          <div className="font-mono text-[4px] text-center truncate" style={{
+            color: isBooting || isRebooting ? 'var(--neon-cyan)' : isTesting ? 'var(--neon-amber)' : 'var(--neon-red)',
+          }}>
+            {bootPhase || shutdownPhase || (isTesting ? 'TEST' : isRebooting ? 'REBT' : '...')}
+          </div>
+          {/* Tiny progress bar */}
+          <div className="h-[2px] bg-[#0a0a0a] rounded overflow-hidden mt-0.5">
+            <div
+              className="h-full transition-all duration-200"
+              style={{
+                width: isBooting ? `${((['driver', 'amplifier', 'dac', 'calibrate', 'output', 'ready'].indexOf(bootPhase ?? 'ready') + 1) / 6) * 100}%` :
+                       isShuttingDown ? `${((['mute', 'drain', 'driver-off'].indexOf(shutdownPhase ?? 'driver-off') + 1) / 3) * 100}%` :
+                       '50%',
+                background: isBooting || isRebooting ? 'var(--neon-cyan)' : isTesting ? 'var(--neon-amber)' : 'var(--neon-red)',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Test result flash */}
+      {testResult && (
+        <div className={cn(
+          'font-mono text-[5px] text-center py-0.5 rounded',
+          testResult === 'pass' ? 'bg-[var(--neon-green)]/20 text-[var(--neon-green)]' : 'bg-[var(--neon-red)]/20 text-[var(--neon-red)]'
+        )}>
+          {testResult === 'pass' ? 'PASS' : 'FAIL'}
+        </div>
+      )}
+
       {/* Speaker grille with level meters */}
-      <div className="flex-1 min-h-[60px] bg-[#0a0a0a] rounded border border-[#1a1a2a] overflow-hidden relative">
+      <div className={cn(
+        'flex-1 min-h-[60px] bg-[#0a0a0a] rounded border overflow-hidden relative transition-all duration-500',
+        isOn ? 'border-[#1a1a2a]' : 'border-[#1a1a1a]',
+        !isPowered && 'opacity-40'
+      )}>
         {/* Grille pattern */}
         <div className="absolute inset-0 opacity-30"
           style={{
@@ -88,6 +217,13 @@ export function NarrowSpeaker({ className }: NarrowSpeakerProps) {
             </div>
           ))}
         </div>
+
+        {/* Standby overlay */}
+        {!isPowered && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="font-mono text-[6px] text-white/20">OFF</span>
+          </div>
+        )}
       </div>
 
       {/* Volume control */}
@@ -111,24 +247,28 @@ export function NarrowSpeaker({ className }: NarrowSpeakerProps) {
               min="0"
               max="100"
               value={volume}
-              onChange={(e) => setVolume(Number(e.target.value))}
+              onChange={(e) => handleVolumeChange(Number(e.target.value))}
               disabled={!isOn}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             />
           </div>
         </div>
-        <span className="font-mono text-[6px] text-[var(--neon-green)]">{volume}</span>
+        <span className={cn(
+          'font-mono text-[6px] transition-colors',
+          isOn ? 'text-[var(--neon-green)]' : 'text-white/20'
+        )}>{volume}</span>
       </div>
 
       {/* Mute button */}
       <button
-        onClick={() => setIsMuted(!isMuted)}
+        onClick={handleMuteToggle}
         disabled={!isOn}
         className={cn(
           'w-full py-0.5 rounded font-mono text-[5px] transition-all',
           isMuted
             ? 'bg-[var(--neon-red)]/30 text-[var(--neon-red)] border border-[var(--neon-red)]/50'
-            : 'bg-[#1a1a1a] text-white/40 border border-[#2a2a3a] hover:text-white/60'
+            : 'bg-[#1a1a1a] text-white/40 border border-[#2a2a3a] hover:text-white/60',
+          !isOn && 'opacity-40 pointer-events-none'
         )}
       >
         {isMuted ? 'MUTE' : 'M'}
@@ -143,13 +283,14 @@ export function NarrowSpeaker({ className }: NarrowSpeakerProps) {
         ].map((filter) => (
           <button
             key={filter.key}
-            onClick={() => toggleFilter(filter.key)}
+            onClick={() => handleFilterToggle(filter.key)}
             disabled={!isOn}
             className={cn(
               'flex-1 py-0.5 rounded font-mono text-[5px] transition-all',
               filters[filter.key]
                 ? 'font-bold'
-                : 'bg-[#1a1a1a] text-white/30 border border-[#2a2a3a]'
+                : 'bg-[#1a1a1a] text-white/30 border border-[#2a2a3a]',
+              !isOn && 'opacity-40 pointer-events-none'
             )}
             style={{
               backgroundColor: filters[filter.key] ? `${filter.color}30` : undefined,

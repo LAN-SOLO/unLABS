@@ -79,7 +79,7 @@ export function Dropdown({ options, value, onChange, label, disabled, focused }:
         </span>
       </div>
       {open && (
-        <div className="absolute left-[18ch] top-full z-50 border border-current bg-[var(--bg-void,#0A0A0A)] min-w-[28ch]">
+        <div className="absolute left-[18ch] top-full z-50 border border-current min-w-[28ch]" style={{ backgroundColor: '#0A0A0A' }}>
           {options.map((opt, i) => (
             <div
               key={opt.value}

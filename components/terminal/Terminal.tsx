@@ -39,9 +39,11 @@ import { useQCPManagerOptional } from '@/contexts/QCPManager'
 import { useTLPManagerOptional } from '@/contexts/TLPManager'
 import { useLCTManagerOptional } from '@/contexts/LCTManager'
 import { useP3DManagerOptional } from '@/contexts/P3DManager'
+import { useSPKManagerOptional } from '@/contexts/SPKManager'
+import { useDGNManagerOptional } from '@/contexts/DGNManager'
 import { useScrewButtonManagerOptional } from '@/contexts/ScrewButtonManager'
 import { useSystemPowerOptional } from '@/contexts/SystemPowerManager'
-import type { CDCDeviceActions, UECDeviceActions, BATDeviceActions, HMSDeviceActions, ECRDeviceActions, IPLDeviceActions, MFRDeviceActions, AICDeviceActions, VNTDeviceActions, SCADeviceActions, EXDDeviceActions, QSMDeviceActions, EMCDeviceActions, QUADeviceActions, PWBDeviceActions, BTKDeviceActions, RMGDeviceActions, MSCDeviceActions, NETDeviceActions, TMPDeviceActions, DIMDeviceActions, CPUDeviceActions, CLKDeviceActions, MEMDeviceActions, ANDDeviceActions, QCPDeviceActions, TLPDeviceActions, LCTDeviceActions, P3DDeviceActions, ScrewButtonDeviceActions, ThemeActions } from '@/lib/terminal/types'
+import type { CDCDeviceActions, UECDeviceActions, BATDeviceActions, HMSDeviceActions, ECRDeviceActions, IPLDeviceActions, MFRDeviceActions, AICDeviceActions, VNTDeviceActions, SCADeviceActions, EXDDeviceActions, QSMDeviceActions, EMCDeviceActions, QUADeviceActions, PWBDeviceActions, BTKDeviceActions, RMGDeviceActions, MSCDeviceActions, NETDeviceActions, TMPDeviceActions, DIMDeviceActions, CPUDeviceActions, CLKDeviceActions, MEMDeviceActions, ANDDeviceActions, QCPDeviceActions, TLPDeviceActions, LCTDeviceActions, P3DDeviceActions, SPKDeviceActions, DGNDeviceActions, ScrewButtonDeviceActions, ThemeActions } from '@/lib/terminal/types'
 
 interface TerminalProps {
   userId: string
@@ -82,6 +84,8 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   const tlpManager = useTLPManagerOptional()
   const lctManager = useLCTManagerOptional()
   const p3dManager = useP3DManagerOptional()
+  const spkManager = useSPKManagerOptional()
+  const dgnManager = useDGNManagerOptional()
   const screwButtonManager = useScrewButtonManagerOptional()
   const systemPowerManager = useSystemPowerOptional()
 
@@ -270,6 +274,10 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
 
   const p3dManagerRef = useRef(p3dManager)
   p3dManagerRef.current = p3dManager
+  const spkManagerRef = useRef(spkManager)
+  spkManagerRef.current = spkManager
+  const dgnManagerRef = useRef(dgnManager)
+  dgnManagerRef.current = dgnManager
 
   const screwButtonManagerRef = useRef(screwButtonManager)
   screwButtonManagerRef.current = screwButtonManager
@@ -1585,6 +1593,90 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p3dManager !== undefined])
 
+  const spkDeviceActions: SPKDeviceActions | undefined = useMemo(() => {
+    if (!spkManager) return undefined
+    return {
+      powerOn: () => spkManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => spkManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => spkManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => spkManagerRef.current?.reboot() ?? Promise.resolve(),
+      setVolume: (volume: number) => spkManagerRef.current?.setVolume(volume),
+      setMuted: (muted: boolean) => spkManagerRef.current?.setMuted(muted),
+      toggleMute: () => spkManagerRef.current?.toggleMute(),
+      setFilter: (filter: 'bass' | 'mid' | 'high', enabled: boolean) => spkManagerRef.current?.setFilter(filter, enabled),
+      toggleFilter: (filter: 'bass' | 'mid' | 'high') => spkManagerRef.current?.toggleFilter(filter),
+      setExpanded: (expanded: boolean) => spkManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => spkManagerRef.current?.toggleExpanded(),
+      getState: () => {
+        const m = spkManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? '',
+          isPowered: m?.isPowered ?? false,
+          volume: m?.volume ?? 45,
+          isMuted: m?.isMuted ?? false,
+          filters: m?.filters ?? { bass: false, mid: true, high: false },
+          peakLevel: m?.peakLevel ?? 0,
+          testResult: m?.testResult ?? null,
+          isExpanded: m?.isExpanded ?? false,
+        }
+      },
+      getFirmware: () => spkManagerRef.current?.firmware ?? {
+        version: '1.0.0',
+        build: '2024.01.20',
+        checksum: 'A3C7F1E9',
+        features: ['audio-output', 'volume-ctrl', 'freq-filter', 'level-meter', 'mute-gate', 'beam-focus'],
+        securityPatch: '2024.01.18',
+      },
+      getPowerSpecs: () => spkManagerRef.current?.powerSpecs ?? {
+        full: 3,
+        idle: 0.5,
+        standby: 0.1,
+        category: 'light',
+        priority: 3,
+      },
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spkManager !== undefined])
+
+  const dgnDeviceActions: DGNDeviceActions | undefined = useMemo(() => {
+    if (!dgnManager) return undefined
+    return {
+      powerOn: () => dgnManagerRef.current?.powerOn() ?? Promise.resolve(),
+      powerOff: () => dgnManagerRef.current?.powerOff() ?? Promise.resolve(),
+      runTest: () => dgnManagerRef.current?.runTest() ?? Promise.resolve(),
+      reboot: () => dgnManagerRef.current?.reboot() ?? Promise.resolve(),
+      setCategory: (cat: 'SYSTEMS' | 'DEVICES' | 'ENERGY' | 'NETWORK' | 'CRYSTALS' | 'PROCESS') => dgnManagerRef.current?.setCategory(cat),
+      setScanDepth: (depth: number) => dgnManagerRef.current?.setScanDepth(depth),
+      runDiagnostics: () => dgnManagerRef.current?.runDiagnostics() ?? Promise.resolve(),
+      clearAlerts: () => dgnManagerRef.current?.clearAlerts(),
+      setExpanded: (expanded: boolean) => dgnManagerRef.current?.setExpanded(expanded),
+      toggleExpanded: () => dgnManagerRef.current?.toggleExpanded(),
+      getState: () => {
+        const m = dgnManagerRef.current
+        return {
+          deviceState: m?.deviceState ?? 'standby',
+          statusMessage: m?.statusMessage ?? 'Offline',
+          isPowered: m?.isPowered ?? false,
+          isExpanded: m?.isExpanded ?? true,
+          category: m?.category ?? 'SYSTEMS',
+          scanDepth: m?.scanDepth ?? 75,
+          healthPercent: m?.healthPercent ?? 100,
+          alertCount: m?.alertCount ?? 0,
+          isRunningDiag: m?.isRunningDiag ?? false,
+          diagProgress: m?.diagProgress ?? 0,
+          testResult: m?.testResult ?? null,
+        }
+      },
+      getFirmware: () => dgnManagerRef.current?.firmware ?? {
+        version: '0.0.0', build: '0000.00.00', checksum: '00000000', features: [], securityPatch: '0000.00.00',
+      },
+      getPowerSpecs: () => dgnManagerRef.current?.powerSpecs ?? {
+        full: 3, idle: 1, standby: 0.25, category: 'light', priority: 2,
+      },
+    }
+  }, [dgnManager !== undefined])
+
   // Build theme actions from props - use refs for stable reference
   const themeIndexRef = useRef(themeIndex)
   themeIndexRef.current = themeIndex
@@ -1664,6 +1756,8 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     tlpDeviceActions,
     lctDeviceActions,
     p3dDeviceActions,
+    spkDeviceActions,
+    dgnDeviceActions,
     screwButtonDeviceActions,
     filesystemActions,
     userActions,

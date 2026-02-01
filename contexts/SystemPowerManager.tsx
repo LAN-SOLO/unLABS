@@ -40,6 +40,20 @@ export function SystemPowerManagerProvider({ children, onShutdownComplete, onReb
     }
   }, [])
 
+  // Flush all _unOS caches so no stale data persists across power cycles
+  const flushCaches = useCallback((keepCommandHistory: boolean) => {
+    try {
+      if (keepCommandHistory) {
+        const cmdHistory = localStorage.getItem('unlabs_cmd_history')
+        localStorage.clear()
+        if (cmdHistory) localStorage.setItem('unlabs_cmd_history', cmdHistory)
+      } else {
+        localStorage.clear()
+      }
+      sessionStorage.clear()
+    } catch { /* ignore in SSR */ }
+  }, [])
+
   const executeShutdown = useCallback(() => {
     clearTimer()
     setSystemState('shutting-down')
@@ -47,11 +61,12 @@ export function SystemPowerManagerProvider({ children, onShutdownComplete, onReb
     setCountdownAction(null)
     setPowerScope(scopeRef.current)
     saveDeviceState?.()
+    flushCaches(false)
     // Transition to 'off' after CRT animation
     setTimeout(() => {
       setSystemState('off')
     }, 1400)
-  }, [clearTimer, saveDeviceState])
+  }, [clearTimer, saveDeviceState, flushCaches])
 
   const executeReboot = useCallback(() => {
     clearTimer()
@@ -60,11 +75,12 @@ export function SystemPowerManagerProvider({ children, onShutdownComplete, onReb
     setCountdownAction(null)
     setPowerScope(scopeRef.current)
     saveDeviceState?.()
+    flushCaches(true)
     // Transition to booting after CRT animation
     setTimeout(() => {
       setSystemState('booting')
     }, 1200)
-  }, [clearTimer, saveDeviceState])
+  }, [clearTimer, saveDeviceState, flushCaches])
 
   const startCountdown = useCallback((seconds: number, action: PowerAction) => {
     clearTimer()

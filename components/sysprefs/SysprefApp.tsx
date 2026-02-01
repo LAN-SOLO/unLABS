@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { SysprefHeader } from './SysprefHeader'
 import { SysprefSidebar } from './SysprefSidebar'
 import { SysprefFooter } from './SysprefFooter'
@@ -29,6 +29,7 @@ export function SysprefApp({ userId, username, initialArea, onExit }: SysprefApp
   const [resetSignal, setResetSignal] = useState(0)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [confirmQuit, setConfirmQuit] = useState(false)
+  const [previewColors, setPreviewColors] = useState<{ primary: string; secondary: string; bg: string } | null>(null)
   const panelRef = useRef<HTMLElement>(null)
 
   const handleSave = useCallback(() => {
@@ -128,6 +129,7 @@ export function SysprefApp({ userId, username, initialArea, onExit }: SysprefApp
             userId={userId}
             onDirty={setHasUnsavedChanges}
             onSaveError={onSaveError}
+            onPreviewColors={setPreviewColors}
             saveSignal={saveSignal}
             resetSignal={resetSignal}
           />
@@ -167,8 +169,25 @@ export function SysprefApp({ userId, username, initialArea, onExit }: SysprefApp
     }
   }
 
+  // Apply preview colors as inline CSS variable overrides
+  const rootStyle = useMemo(() => {
+    if (!previewColors) return undefined
+    return {
+      '--crt-green': previewColors.primary,
+      '--crt-phosphor': previewColors.secondary,
+      '--bg-void': previewColors.bg,
+      color: previewColors.primary,
+      backgroundColor: previewColors.bg,
+    } as React.CSSProperties
+  }, [previewColors])
+
+  // Clear preview when leaving display panel
+  useEffect(() => {
+    if (currentArea !== 'display') setPreviewColors(null)
+  }, [currentArea])
+
   return (
-    <div className="flex flex-col h-full bg-[var(--bg-void,#0A0A0A)] text-[var(--crt-green,#00FF41)] font-mono text-sm">
+    <div className="flex flex-col h-full bg-[var(--bg-void,#0A0A0A)] text-[var(--crt-green,#00FF41)] font-mono text-sm" style={rootStyle}>
       <SysprefHeader hasUnsavedChanges={hasUnsavedChanges} />
 
       {confirmQuit && (

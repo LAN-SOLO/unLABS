@@ -14,12 +14,12 @@ CREATE TABLE IF NOT EXISTS player_display_prefs (
   player_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE UNIQUE,
 
   -- Theme Settings
-  theme VARCHAR(20) NOT NULL DEFAULT 'green' CHECK (
-    theme IN ('green', 'amber', 'cyan', 'white', 'red', 'purple', 'custom')
+  theme VARCHAR(20) NOT NULL DEFAULT 'phosphor' CHECK (
+    theme IN ('phosphor', 'amber', 'cyan', 'hotpink', 'iceblue', 'lime', 'violet', 'red', 'white', 'solar', 'acid', 'bloodmoon', 'void', 'rust', 'plasma', 'toxic', 'ghost', 'coral', 'matrix', 'glitch', 'custom')
   ),
-  primary_color VARCHAR(7) NOT NULL DEFAULT '#00FF41',
-  secondary_color VARCHAR(7) NOT NULL DEFAULT '#33FF33',
-  background_color VARCHAR(7) NOT NULL DEFAULT '#0A0A0A',
+  primary_color VARCHAR(7) NOT NULL DEFAULT '#33ff33',
+  secondary_color VARCHAR(7) NOT NULL DEFAULT '#66ff66',
+  background_color VARCHAR(7) NOT NULL DEFAULT '#0a0f0a',
 
   -- CRT Effects
   effect_scanlines BOOLEAN NOT NULL DEFAULT TRUE,
@@ -246,7 +246,7 @@ CREATE TABLE IF NOT EXISTS system_config_cache (
   hostname VARCHAR(50) NOT NULL DEFAULT '_unLAB',
 
   ntp_enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  ntp_servers TEXT[] NOT NULL DEFAULT ARRAY['time.unstablelabs.io', 'pool.ntp.org'],
+  ntp_servers TEXT[] NOT NULL DEFAULT ARRAY['time.nist.gov', 'time.google.com', 'pool.ntp.org'],
   ntp_interval_seconds INTEGER NOT NULL DEFAULT 3600,
   last_ntp_sync TIMESTAMPTZ,
 
@@ -358,12 +358,26 @@ CREATE TABLE IF NOT EXISTS display_themes (
 
 INSERT INTO display_themes (id, name, primary_color, secondary_color, background_color, description, is_default, sort_order)
 VALUES
-  ('green', 'Phosphor Green', '#00FF41', '#33FF33', '#0A0A0A', 'Classic CRT phosphor green', TRUE, 1),
-  ('amber', 'Amber Gold', '#FFAA00', '#FFD700', '#0A0A0A', 'Warm amber terminal', FALSE, 2),
-  ('cyan', 'Cool Cyan', '#00FFFF', '#66FFFF', '#0A0A0A', 'Futuristic cyan', FALSE, 3),
-  ('white', 'Matrix White', '#FFFFFF', '#CCCCCC', '#000000', 'High contrast white', FALSE, 4),
-  ('red', 'Warning Red', '#FF3300', '#FF6666', '#0A0A0A', 'Alert red theme', FALSE, 5),
-  ('purple', 'Quantum Purple', '#9D00FF', '#CC66FF', '#0A0A0A', 'Exotic quantum purple', FALSE, 6)
+  ('phosphor',   'Phosphor Green',  '#33ff33', '#66ff66', '#0a0f0a', 'Classic CRT phosphor green', TRUE, 1),
+  ('amber',      'Amber Gold',      '#ffaa00', '#ffd700', '#0f0d08', 'Warm amber terminal', FALSE, 2),
+  ('cyan',       'Cool Cyan',       '#00ffff', '#66ffff', '#080f0f', 'Futuristic cyan', FALSE, 3),
+  ('hotpink',    'Hot Pink',        '#ff3399', '#ff66bb', '#0f080c', 'Bold hot pink', FALSE, 4),
+  ('iceblue',    'Ice Blue',        '#66aaff', '#99ccff', '#080a0f', 'Cool ice blue', FALSE, 5),
+  ('lime',       'Lime',            '#aaff00', '#ccff66', '#0c0f08', 'Bright lime green', FALSE, 6),
+  ('violet',     'Violet',          '#aa66ff', '#cc99ff', '#0c080f', 'Soft violet', FALSE, 7),
+  ('red',        'Warning Red',     '#ff3333', '#ff6666', '#0f0808', 'Alert red theme', FALSE, 8),
+  ('white',      'Matrix White',    '#cccccc', '#ffffff', '#0a0a0a', 'High contrast white', FALSE, 9),
+  ('solar',      'Solar',           '#ff8800', '#ffaa44', '#0f0c08', 'Warm solar orange', FALSE, 10),
+  ('acid',       'Acid',            '#39ff14', '#66ff44', '#0d0f04', 'Vivid acid green', FALSE, 11),
+  ('bloodmoon',  'Bloodmoon',       '#cc0033', '#ee3366', '#10050a', 'Dark crimson blood moon', FALSE, 12),
+  ('void',       'Void',            '#4400aa', '#7733cc', '#06040c', 'Deep void purple', FALSE, 13),
+  ('rust',       'Rust',            '#b85c2a', '#cc8855', '#0e0a06', 'Weathered rust', FALSE, 14),
+  ('plasma',     'Plasma',          '#ff00ff', '#ff66ff', '#0f040f', 'Electric plasma magenta', FALSE, 15),
+  ('toxic',      'Toxic',           '#ccff00', '#ddff66', '#0c0e04', 'Toxic yellow-green', FALSE, 16),
+  ('ghost',      'Ghost',           '#556677', '#889999', '#070808', 'Faded ghost grey', FALSE, 17),
+  ('coral',      'Coral',           '#ff6f61', '#ff9988', '#0f0908', 'Warm coral', FALSE, 18),
+  ('matrix',     'Matrix',          '#003b00', '#006600', '#010400', 'Dark matrix green', FALSE, 19),
+  ('glitch',     'Glitch',          '#fe01b1', '#ff66cc', '#0e020c', 'Glitchy neon pink', FALSE, 20)
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================================

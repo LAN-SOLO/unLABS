@@ -400,7 +400,7 @@ export function QuantumAnalyzer({ className, onTest, onReset }: QuantumAnalyzerP
       }}>
         <div className="flex items-center gap-2 px-3 py-2">
           <LED on={isPowered || isBooting} color={getLedColor()} size="sm" />
-          <span className="font-mono text-[10px] text-[var(--neon-cyan)] font-bold shrink-0">QUA-001</span>
+          <span className="font-mono text-[8px] text-[var(--neon-cyan)] font-bold shrink-0">QUA-001</span>
           <span className={cn(
             'font-mono text-[8px] shrink-0',
             isStandby || deviceState === 'offline' ? 'text-white/30' : 'text-[var(--neon-cyan)]/70'

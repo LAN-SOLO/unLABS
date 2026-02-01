@@ -36,6 +36,8 @@ export interface PanelSaveData {
     tlp?: { isPowered: boolean; chargeLevel?: number; lastDestination?: string; displayMode?: string; isExpanded?: boolean }
     lct?: { isPowered: boolean; laserPower?: number; precision?: number; displayMode?: string; isExpanded?: boolean }
     p3d?: { isPowered: boolean; progress?: number; layerCount?: number; bedTemp?: number; displayMode?: string; isExpanded?: boolean }
+    spk?: { isPowered: boolean; volume?: number; isMuted?: boolean; filters?: { bass: boolean; mid: boolean; high: boolean }; isExpanded?: boolean }
+    dgn?: { isPowered: boolean; category?: string; scanDepth?: number; isExpanded?: boolean }
     screwButtons?: { [key: string]: { unlocked: boolean; active: boolean; totalActiveTime: number } }
   }
 }
