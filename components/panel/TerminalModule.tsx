@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import { Terminal } from '@/components/terminal'
 import { ScrewButton } from '@/components/panel/ScrewButton'
 import { useScrewButtonManagerOptional } from '@/contexts/ScrewButtonManager'
+import { useSystemPowerOptional } from '@/contexts/SystemPowerManager'
 
 // CRT color themes
 const CRT_THEMES = [
@@ -192,6 +193,236 @@ function StatusTicker() {
   )
 }
 
+
+const OS_BOOT_LINES = [
+  { text: '_unOS v4.2.1 (quantum-core 5.15.0)', delay: 250, type: 'header' },
+  { text: 'Copyright (c) UnstableLabs', delay: 150, type: 'header' },
+  { text: '', delay: 200, type: 'blank' },
+  { text: '[  OK  ] Starting quantum kernel', delay: 180, type: 'ok' },
+  { text: '[  OK  ] Mounting /dev/crystal_cache', delay: 140, type: 'ok' },
+  { text: '[  OK  ] Loading terminal drivers', delay: 160, type: 'ok' },
+  { text: '[  OK  ] Starting network subsystem', delay: 130, type: 'ok' },
+  { text: '[  OK  ] Initializing display adapter', delay: 150, type: 'ok' },
+  { text: '[  OK  ] Starting shell interface', delay: 170, type: 'ok' },
+  { text: '', delay: 150, type: 'blank' },
+  { text: 'System ready. Welcome back, operator.', delay: 300, type: 'ready' },
+] as const
+
+function OsBootSequence({
+  theme,
+  onComplete,
+}: {
+  theme: typeof CRT_THEMES[number]
+  onComplete: () => void
+}) {
+  const [phase, setPhase] = useState<'logo' | 'lines' | 'fade'>('logo')
+  const [logoVisible, setLogoVisible] = useState(false)
+  const [visibleLines, setVisibleLines] = useState<number>(0)
+  const [fading, setFading] = useState(false)
+  const onCompleteRef = useRef(onComplete)
+  onCompleteRef.current = onComplete
+
+  useEffect(() => {
+    const timeouts: ReturnType<typeof setTimeout>[] = []
+
+    // Phase 1: Logo fade in
+    timeouts.push(setTimeout(() => setLogoVisible(true), 100))
+
+    // Phase 2: Switch to boot lines
+    timeouts.push(setTimeout(() => setPhase('lines'), 1400))
+
+    // Phase 2: Type out boot lines
+    let d = 1500
+    OS_BOOT_LINES.forEach((line, i) => {
+      d += line.delay
+      timeouts.push(setTimeout(() => setVisibleLines(i + 1), d))
+    })
+
+    // Phase 3: Fade out
+    d += 400
+    timeouts.push(setTimeout(() => { setPhase('fade'); setFading(true) }, d))
+
+    // Complete
+    d += 500
+    timeouts.push(setTimeout(() => onCompleteRef.current(), d))
+
+    return () => timeouts.forEach(t => clearTimeout(t))
+  }, [])
+
+  return (
+    <div
+      className="absolute inset-0 z-40 rounded bg-black overflow-hidden"
+      style={{
+        opacity: fading ? 0 : 1,
+        transition: 'opacity 500ms ease-out',
+      }}
+    >
+      {/* Logo phase */}
+      {phase === 'logo' && (
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center gap-2"
+          style={{
+            opacity: logoVisible ? 1 : 0,
+            transition: 'opacity 600ms ease-in',
+          }}
+        >
+          {/* _unOS text logo */}
+          <div className="font-mono text-[22px] font-bold tracking-wider" style={{
+            color: theme.fg,
+            textShadow: `0 0 12px rgba(${theme.glow}, 0.7), 0 0 24px rgba(${theme.glow}, 0.4), 0 0 48px rgba(${theme.glow}, 0.2)`,
+          }}>
+            _unOS
+          </div>
+          {/* Version */}
+          <div className="font-mono text-[9px] tracking-[0.15em]" style={{ color: `${theme.fg}88` }}>
+            v4.2.1 &middot; quantum-core
+          </div>
+          {/* Subtitle */}
+          <div className="font-mono text-[7px] tracking-[0.25em] mt-1" style={{ color: `${theme.fg}55` }}>
+            UNSTABLE LABORATORIES
+          </div>
+          {/* Loading bar */}
+          <div className="mt-3 w-24 h-[2px] rounded overflow-hidden" style={{ background: `${theme.fg}22` }}>
+            <div
+              className="h-full rounded"
+              style={{
+                background: theme.fg,
+                boxShadow: `0 0 6px rgba(${theme.glow}, 0.5)`,
+                animation: 'os-boot-bar 1.2s ease-in-out forwards',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Boot lines phase */}
+      {(phase === 'lines' || phase === 'fade') && (
+        <div className="p-3 font-mono text-[9px] leading-[13px] overflow-hidden">
+          {OS_BOOT_LINES.slice(0, visibleLines).map((line, i) => (
+            <div
+              key={i}
+              style={{
+                color: line.type === 'header'
+                  ? `${theme.fg}cc`
+                  : line.type === 'ok'
+                    ? theme.fg
+                    : line.type === 'ready'
+                      ? theme.fg
+                      : 'transparent',
+                textShadow: line.type === 'ok'
+                  ? `0 0 4px rgba(${theme.glow}, 0.3)`
+                  : line.type === 'ready'
+                    ? `0 0 8px rgba(${theme.glow}, 0.5)`
+                    : 'none',
+              }}
+            >
+              {line.text || '\u00A0'}
+            </div>
+          ))}
+          {!fading && visibleLines > 0 && (
+            <span
+              className="inline-block w-[6px] h-[10px] mt-0.5"
+              style={{
+                backgroundColor: theme.fg,
+                animation: 'blink 1s step-end infinite',
+              }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Scanline overlay */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.06) 0px, rgba(0,0,0,0.06) 1px, transparent 1px, transparent 2px)',
+        }}
+      />
+    </div>
+  )
+}
+
+// Power menu positioned relative to root container
+function PowerMenu({
+  onReboot,
+  onShutdown,
+  onCancel,
+  btnRef,
+  rootRef,
+}: {
+  onReboot: () => void
+  onShutdown: () => void
+  onCancel: () => void
+  btnRef: React.RefObject<HTMLButtonElement | null>
+  rootRef: React.RefObject<HTMLDivElement | null>
+}) {
+  const [pos, setPos] = useState<{ left: number; bottom: number } | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const btn = btnRef.current
+    const root = rootRef.current
+    if (!btn || !root) return
+    const br = btn.getBoundingClientRect()
+    const rr = root.getBoundingClientRect()
+    setPos({
+      left: br.left - rr.left + br.width / 2,
+      bottom: rr.bottom - br.top + 4,
+    })
+  }, [btnRef, rootRef])
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node) && !btnRef.current?.contains(e.target as Node)) {
+        onCancel()
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [onCancel, btnRef])
+
+  if (!pos) return null
+
+  return (
+    <div
+      ref={menuRef}
+      className="absolute z-[100] flex flex-col gap-0.5 p-1.5 rounded-md border border-white/15"
+      style={{
+        left: pos.left,
+        bottom: pos.bottom,
+        transform: 'translateX(-50%)',
+        background: '#1a1e24',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.95), 0 0 0 1px rgba(255,255,255,0.08)',
+        minWidth: '150px',
+      }}
+    >
+      <button
+        className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-white/15 transition-colors text-left cursor-pointer"
+        onMouseDown={(e) => { e.stopPropagation(); onReboot() }}
+      >
+        <span className="font-mono text-xs text-[var(--neon-amber)]">&#8635;</span>
+        <span className="font-mono text-[11px] text-white/90 whitespace-nowrap">Reboot _unOS</span>
+      </button>
+      <button
+        className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-white/15 transition-colors text-left cursor-pointer"
+        onMouseDown={(e) => { e.stopPropagation(); onShutdown() }}
+      >
+        <span className="font-mono text-xs text-[var(--neon-red)]">&#9211;</span>
+        <span className="font-mono text-[11px] text-white/90 whitespace-nowrap">Shutdown _unOS</span>
+      </button>
+      <div className="border-t border-white/10 my-0.5" />
+      <button
+        className="flex items-center gap-2 px-3 py-1.5 rounded hover:bg-white/15 transition-colors text-left cursor-pointer"
+        onMouseDown={(e) => { e.stopPropagation(); onCancel() }}
+      >
+        <span className="font-mono text-xs text-white/40">&#10005;</span>
+        <span className="font-mono text-[11px] text-white/50">Cancel</span>
+      </button>
+    </div>
+  )
+}
+
 export function TerminalModule({
   userId,
   username,
@@ -199,6 +430,44 @@ export function TerminalModule({
   className,
 }: TerminalModuleProps) {
   const screwManager = useScrewButtonManagerOptional()
+  const systemPower = useSystemPowerOptional()
+
+  const screenRef = useRef<HTMLDivElement>(null)
+
+  const [powerMenuOpen, setPowerMenuOpen] = useState(false)
+  const pwrBtnRef = useRef<HTMLButtonElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  // Track os power cycle with a simple flag
+  const [inOsCycle, setInOsCycle] = useState(false)
+  const state = systemPower?.systemState ?? 'running'
+  const scope = systemPower?.powerScope
+
+  // Enter os cycle when os-scoped action starts
+  useEffect(() => {
+    if (scope === 'os' && (state === 'shutting-down' || state === 'rebooting')) {
+      setInOsCycle(true)
+      setPowerMenuOpen(false)
+    }
+  }, [scope, state])
+
+  // Exit os cycle when back to running
+  useEffect(() => {
+    if (state === 'running' && inOsCycle) {
+      setInOsCycle(false)
+    }
+  }, [state, inOsCycle])
+
+  // Derive visual states directly from systemState + inOsCycle flag
+  const osCrtActive = inOsCycle && (state === 'shutting-down' || state === 'rebooting')
+  const osOff = inOsCycle && state === 'off'
+  const osBooting = inOsCycle && state === 'booting'
+
+  const handleBootComplete = useCallback(() => {
+    setInOsCycle(false)
+    systemPower?.finishBoot()
+  }, [systemPower])
+
   const [time, setTime] = useState<string>('--:--:--')
   const [powerLed, setPowerLed] = useState(true)
   const [themeIndex, setThemeIndex] = useState(0)
@@ -238,6 +507,7 @@ export function TerminalModule({
 
   return (
     <div
+      ref={rootRef}
       className={cn('relative', className)}
       style={{
         width: '640px',
@@ -372,7 +642,11 @@ export function TerminalModule({
           >
             {/* SCREEN GLASS - Curved CRT effect */}
             <div
-              className="relative w-full h-full rounded overflow-hidden transition-colors duration-500"
+              ref={screenRef}
+              className={cn(
+                "relative w-full h-full rounded overflow-hidden transition-colors duration-500",
+                osCrtActive && "os-crt-shutting-down"
+              )}
               style={{
                 background: theme.screen,
                 boxShadow: `
@@ -474,6 +748,21 @@ export function TerminalModule({
                 </div>
               </div>
             </div>
+
+            {/* OS off overlay */}
+            {osOff && (
+              <div className="absolute inset-0 z-40 rounded bg-black flex items-center justify-center">
+                <span className="font-mono text-[10px] text-white/20 animate-pulse">_unOS offline</span>
+              </div>
+            )}
+
+            {/* OS boot sequence */}
+            {osBooting && (
+              <OsBootSequence
+                theme={theme}
+                onComplete={handleBootComplete}
+              />
+            )}
           </div>
         </div>
 
@@ -505,6 +794,53 @@ export function TerminalModule({
               <div className="bg-[#3a3e44] px-2 py-0.5 rounded border border-[#33373d]">
                 <span className="font-mono text-[6px] text-[#8a8e94]">MODEL: UDT-9000</span>
               </div>
+            </div>
+            {/* Terminal Power Button + Menu */}
+            <div className="relative flex flex-col items-center">
+              <button
+                ref={pwrBtnRef}
+                onClick={() => {
+                  if (osCrtActive) return
+                  if (!systemPower) return
+                  if (osOff) {
+                    systemPower.powerOn('os')
+                  } else if (systemPower.systemState === 'running' || systemPower.systemState === 'countdown') {
+                    setPowerMenuOpen(prev => !prev)
+                  }
+                }}
+                className="w-6 h-6 rounded-full flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+                style={{
+                  background: 'radial-gradient(circle at 40% 35%, #3a3e44 0%, #2a2e34 40%, #1a1e24 80%, #0a0e14 100%)',
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.8), inset 0 -1px 1px rgba(255,255,255,0.05), 0 1px 2px rgba(0,0,0,0.6), 0 0 0 1px #33373d',
+                }}
+                title={osOff ? 'Boot _unOS' : 'Power'}
+              >
+                <div className="relative w-3 h-3">
+                  <div
+                    className="absolute inset-0 rounded-full"
+                    style={(() => {
+                      const c = osOff ? '#555960' : osCrtActive ? '#ff3333' : osBooting ? '#33ff33' : '#8a8e94'
+                      return {
+                        borderWidth: '1.5px',
+                        borderStyle: 'solid' as const,
+                        borderTopColor: 'transparent',
+                        borderRightColor: c,
+                        borderBottomColor: c,
+                        borderLeftColor: c,
+                        boxShadow: osCrtActive ? '0 0 4px rgba(255,51,51,0.5)' : osBooting ? '0 0 4px rgba(51,255,51,0.5)' : 'none',
+                      }
+                    })()}
+                  />
+                  <div
+                    className="absolute left-1/2 top-0 -translate-x-1/2 w-[1.5px] h-[5px] rounded-full"
+                    style={{
+                      background: osOff ? '#555960' : osCrtActive ? '#ff3333' : osBooting ? '#33ff33' : '#8a8e94',
+                      boxShadow: osCrtActive ? '0 0 4px rgba(255,51,51,0.5)' : osBooting ? '0 0 4px rgba(51,255,51,0.5)' : 'none',
+                    }}
+                  />
+                </div>
+              </button>
+              <span className="font-mono text-[4px] text-[#8a8e94] mt-0.5">PWR</span>
             </div>
           </div>
 
@@ -564,6 +900,17 @@ export function TerminalModule({
 
         {/* Corner screws removed - top and bottom bezels have inline screws */}
       </div>
+
+      {/* Power menu popup — rendered outside overflow-hidden bezel */}
+      {powerMenuOpen && (
+        <PowerMenu
+          onReboot={() => { systemPower?.rebootNow('os'); setPowerMenuOpen(false) }}
+          onShutdown={() => { systemPower?.shutdownNow('os'); setPowerMenuOpen(false) }}
+          onCancel={() => setPowerMenuOpen(false)}
+          btnRef={pwrBtnRef}
+          rootRef={rootRef}
+        />
+      )}
 
       {/* CSS for scanline animation */}
       <style jsx>{`

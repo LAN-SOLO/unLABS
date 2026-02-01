@@ -123,7 +123,7 @@ export function WindowManagerProvider({ children, className }: WindowManagerProv
     <WindowManagerContext.Provider value={{ layout, setLeftWidth, setRightWidth, isResizing }}>
       <div
         ref={containerRef}
-        className={cn('relative', isResizing && 'select-none cursor-col-resize', className)}
+        className={cn('relative overflow-hidden', isResizing && 'select-none cursor-col-resize', className)}
         style={gridStyle}
       >
         {children}

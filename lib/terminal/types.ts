@@ -1307,6 +1307,15 @@ export interface DataFetchers {
   userActions?: UserActions
   // Theme management
   themeActions?: ThemeActions
+  // System power control
+  systemPower?: {
+    scheduleShutdown: (seconds: number, scope?: 'os' | 'system') => void
+    scheduleReboot: (seconds: number, scope?: 'os' | 'system') => void
+    shutdownNow: (scope?: 'os' | 'system') => void
+    rebootNow: (scope?: 'os' | 'system') => void
+    cancelCountdown: () => void
+    getState: () => { systemState: string; countdownSeconds: number | null; countdownAction: string | null; powerScope: string | null }
+  }
 }
 
 export interface CommandContext {

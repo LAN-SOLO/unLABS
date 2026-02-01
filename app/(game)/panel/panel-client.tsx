@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   PanelToolbar,
@@ -15,7 +15,6 @@ import { TerminalModule } from '@/components/panel/TerminalModule'
 import { Oscilloscope } from '@/components/panel/displays/Oscilloscope'
 import { QuantumAnalyzer } from '@/components/panel/displays/QuantumAnalyzer'
 import { DiagnosticsConsole } from '@/components/panel/displays/DiagnosticsConsole'
-import { Knob, PushButton, LED, LEDBar } from '@/components/panel/controls'
 import {
   CrystalDataCache,
   EnergyCore,
@@ -48,9 +47,12 @@ import {
   CpuMonitor,
   LabClock,
   MemoryMonitor,
-  VoltMeter,
 } from '@/components/panel/modules/EquipmentTile'
 import { ResourceBar } from '@/components/panel/modules/ResourceBar'
+import { PowerButton } from '@/components/panel/modules/PowerButton'
+import { CRTShutdownEffect } from '@/components/panel/effects/CRTShutdownEffect'
+import { BootSequence } from '@/components/panel/effects/BootSequence'
+import { SystemPowerManagerProvider, useSystemPowerInternal } from '@/contexts/SystemPowerManager'
 import { VentilationFan } from '@/components/panel/modules/VentilationFan'
 import { NarrowSpeaker } from '@/components/panel/modules/NarrowSpeaker'
 import { loadPanelState } from '@/lib/panel/panelState'
@@ -79,7 +81,7 @@ import { NETManagerProvider } from '@/contexts/NETManager'
 import { TMPManagerProvider } from '@/contexts/TMPManager'
 import { DIMManagerProvider } from '@/contexts/DIMManager'
 import { CPUManagerProvider } from '@/contexts/CPUManager'
-import { CLKManagerProvider, type CLKMode } from '@/contexts/CLKManager'
+import { CLKManagerProvider, useCLKManagerOptional, type CLKMode } from '@/contexts/CLKManager'
 import { MEMManagerProvider, type MEMMode } from '@/contexts/MEMManager'
 import { ANDManagerProvider, type ANDMode } from '@/contexts/ANDManager'
 import { QCPManagerProvider, type QCPMode } from '@/contexts/QCPManager'
@@ -104,10 +106,6 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
   }
   const saved = savedStateRef.current?.devices
   const [hasAccess, setHasAccess] = useState(false)
-  const [isSystemOn, setIsSystemOn] = useState(false)
-  const [isLaserOn, setIsLaserOn] = useState(false)
-  const [isActivated, setIsActivated] = useState(false)
-  const [isRunning, setIsRunning] = useState(true)
 
   // Simulated system loads for ventilation fans
   const [cpuLoad, setCpuLoad] = useState(45)
@@ -138,6 +136,11 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
     }
   }, [router])
 
+  const handleShutdownComplete = useCallback(() => {
+    sessionStorage.removeItem('panel_access')
+    router.replace('/terminal')
+  }, [router])
+
   // Show nothing while checking access
   if (!hasAccess) {
     return (
@@ -156,6 +159,12 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
   const volatility = equipmentData?.volatility ?? { currentTier: 1, tps: 1000, network: 'unknown' }
 
   return (
+    <SystemPowerManagerProvider
+      onShutdownComplete={handleShutdownComplete}
+      saveDeviceState={() => {
+        // saveAllDeviceState is wired via the terminal — trigger from context
+      }}
+    >
     <PowerManagerProvider>
     <ThermalManagerProvider>
     <CDCManagerProvider initialState={saved?.cdc}>
@@ -191,130 +200,38 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
     <WindowManagerProvider className="text-white">
       {/* Top Toolbar */}
       <PanelToolbar>
-        <div className="flex items-center gap-3 flex-1">
-          {/* Dev Controller button */}
-          <button className="px-2 py-1 bg-[var(--panel-surface-light)] border border-[var(--neon-amber)]/30 rounded text-[10px] font-mono text-[var(--neon-amber)]">
-            DEV Controller
-          </button>
-
-          {/* Control modules */}
-          <div className="flex items-center gap-2 bg-[var(--panel-surface-light)] px-2 py-1 rounded border border-white/10">
-            <LED on={isSystemOn} color="green" size="sm" />
-            <span className="font-mono text-[10px] text-white/60">OUTPUT</span>
-            <span className="font-mono text-sm text-[var(--neon-amber)]">i2.5</span>
-          </div>
-
-          <div className="flex items-center gap-2 bg-[var(--panel-surface-light)] px-2 py-1 rounded border border-white/10">
-            <span className="font-mono text-[10px] text-white/60">FREQUENCY</span>
-            <span className="font-mono text-sm text-[var(--neon-cyan)]">42.3</span>
-          </div>
-
-          {/* Execute button */}
-          <button
-            onClick={() => setIsSystemOn(!isSystemOn)}
-            className={`px-3 py-1 rounded font-mono text-[10px] transition-all ${
-              isSystemOn
-                ? 'bg-[var(--neon-green)] text-black'
-                : 'bg-[var(--neon-amber)] text-black'
-            }`}
-          >
-            EXECUTE
-          </button>
-
-          {/* Input controls */}
-          <div className="flex items-center gap-2 bg-[var(--panel-surface-light)] px-2 py-1 rounded border border-white/10">
-            <span className="font-mono text-[9px] text-white/40">INPUT</span>
-            <LED on={true} color="cyan" size="sm" />
-            <span className="font-mono text-[9px] text-white/40">CH2</span>
-            <LED on={false} color="cyan" size="sm" />
-          </div>
-
-          {/* Run/Reset buttons */}
-          <div className="flex gap-1">
-            <button
-              onClick={() => setIsRunning(true)}
-              className={`px-2 py-0.5 rounded text-[9px] font-mono transition-all ${
-                isRunning
-                  ? 'bg-[var(--neon-cyan)] text-black shadow-[0_0_8px_var(--neon-cyan)]'
-                  : 'bg-[var(--neon-cyan)]/20 border border-[var(--neon-cyan)]/30 text-[var(--neon-cyan)]'
-              }`}
-            >
-              RUN
-            </button>
-            <button
-              onClick={() => setIsRunning(false)}
-              className={`px-2 py-0.5 rounded text-[9px] font-mono transition-all ${
-                !isRunning
-                  ? 'bg-white/20 text-white'
-                  : 'bg-white/5 border border-white/10 text-white/50 hover:bg-white/10'
-              }`}
-            >
-              RESET
-            </button>
-          </div>
-
-          {/* Voltage display - connected to power management */}
-          {/* Voltage display - connected to power management context */}
-          <VoltMeter />
-
-          {/* Mode indicators */}
-          <div className="flex gap-1">
-            <LED on={isLaserOn} color="red" size="sm" />
-            <LED on={isRunning} color="amber" size="sm" />
-            <LED on={isSystemOn && isActivated} color="green" size="sm" />
-          </div>
-
-          {/* Laser button */}
-          <button
-            onClick={() => setIsLaserOn(!isLaserOn)}
-            className={`px-2 py-1 rounded text-[10px] font-mono transition-all ${
-              isLaserOn
-                ? 'bg-[var(--neon-red)] text-black shadow-[0_0_10px_var(--neon-red)]'
-                : 'bg-[var(--neon-red)]/20 border border-[var(--neon-red)]/30 text-[var(--neon-red)] hover:bg-[var(--neon-red)]/30'
-            }`}
-          >
-            LASER
-          </button>
-
-          {/* Activate */}
-          <button
-            onClick={() => setIsActivated(!isActivated)}
-            className={`px-3 py-1 rounded font-mono text-[10px] transition-all ${
-              isActivated
-                ? 'bg-[var(--neon-green)] text-black shadow-[0_0_10px_var(--neon-green)]'
-                : 'bg-[var(--neon-green)]/70 text-black hover:bg-[var(--neon-green)]'
-            }`}
-          >
-            {isActivated ? 'ACTIVE' : 'ACTIVATE'}
-          </button>
-        </div>
-
-        {/* Right side controls */}
-        <div className="flex items-center gap-2">
-          <Knob value={50} onChange={() => {}} size="sm" />
-          <div className="flex items-center gap-1">
-            <span className="font-mono text-[9px] text-white/40">BOOST</span>
-            <LED on={true} color="amber" size="sm" />
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="font-mono text-[9px] text-white/40">SHIELD</span>
-            <LED on={false} color="cyan" size="sm" />
-          </div>
-          <Knob value={30} onChange={() => {}} size="sm" />
-          <div className="flex gap-0.5">
-            <span className="font-mono text-[9px] text-white/40">MODE</span>
-            <span className="font-mono text-[9px] text-white/40">SPD</span>
-          </div>
-        </div>
-
-        {/* Tiles */}
-        <div className="flex gap-1 ml-4">
-          {['TILE 20', 'TILE 21', 'TILE 22', 'Wallet'].map((label) => (
+        {/* Tools */}
+        <div className="flex items-center gap-1">
+          {['TOOL 1', 'TOOL 2', 'TOOL 3', 'TOOL 4', 'TOOL 5', 'TOOL 6'].map((label) => (
             <div
               key={label}
-              className="w-16 h-8 bg-[var(--panel-surface-light)] border border-white/10 rounded flex items-center justify-center"
+              className="h-7 px-2 bg-[var(--panel-surface-light)] border border-white/10 rounded flex items-center justify-center"
             >
-              <span className="font-mono text-[8px] text-white/40">{label}</span>
+              <span className="font-mono text-[8px] text-white/30">{label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Buttons */}
+        <div className="flex items-center gap-1">
+          {['BTN 1', 'BTN 2', 'BTN 3', 'BTN 4'].map((label) => (
+            <div
+              key={label}
+              className="h-7 px-2 bg-[var(--panel-surface-light)] border border-white/10 rounded flex items-center justify-center"
+            >
+              <span className="font-mono text-[8px] text-white/30">{label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Applications */}
+        <div className="flex items-center gap-1">
+          {['APP 1', 'APP 2', 'APP 3', 'APP 4'].map((label) => (
+            <div
+              key={label}
+              className="h-7 px-2 bg-[var(--panel-surface-light)] border border-white/10 rounded flex items-center justify-center"
+            >
+              <span className="font-mono text-[8px] text-white/30">{label}</span>
             </div>
           ))}
         </div>
@@ -741,10 +658,14 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
         </div>
       </PanelRight>
 
-      {/* Bottom Resource Bar */}
+      {/* Bottom Resource Bar + Power Button */}
       <PanelBottom>
         <ResourceBar />
+        <PowerButton />
       </PanelBottom>
+
+      {/* System Power Effects */}
+      <SystemPowerEffects />
 
     </WindowManagerProvider>
     </ScrewButtonManagerProvider>
@@ -779,5 +700,108 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
     </CDCManagerProvider>
     </ThermalManagerProvider>
     </PowerManagerProvider>
+    </SystemPowerManagerProvider>
+  )
+}
+
+/** Inner component that reads SystemPower context for CRT/boot effects + CLK-001 sync */
+function SystemPowerEffects() {
+  const { systemState, countdownSeconds, countdownAction, onShutdownComplete, finishBoot } = useSystemPowerInternal()
+  const clk = useCLKManagerOptional()
+
+  // Sync system power countdown → CLK-001: power on, unfold, set countdown mode
+  const clkSyncedRef = useRef(false)
+  const clkBootDoneRef = useRef(false)
+
+  // Step 1: Power on CLK-001 when countdown starts
+  useEffect(() => {
+    if (!clk) return
+    if (systemState === 'countdown' && countdownSeconds !== null && !clkSyncedRef.current) {
+      clkSyncedRef.current = true
+      clkBootDoneRef.current = false
+      if (!clk.isPowered) {
+        clk.powerOn()
+      }
+      clk.setExpanded(true)
+    }
+    if (systemState !== 'countdown' && clkSyncedRef.current) {
+      clkSyncedRef.current = false
+      clkBootDoneRef.current = false
+      clk.setCountdownRunning(false)
+      // Return CLK-001 to standby after countdown action executes
+      if (clk.isPowered && clk.deviceState === 'online') {
+        clk.powerOff()
+      }
+    }
+  // Only react to systemState transitions, not every tick
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [systemState])
+
+  // Step 2: Once CLK-001 is online, set mode and sync time every second
+  useEffect(() => {
+    if (!clk || !clkSyncedRef.current) return
+    if (systemState !== 'countdown' || countdownSeconds === null) return
+
+    // Wait for CLK to be online before setting mode
+    if (clk.deviceState !== 'online') return
+
+    if (!clkBootDoneRef.current) {
+      clkBootDoneRef.current = true
+      clk.setMode('countdown')
+    }
+
+    // Sync the countdown value from SystemPowerManager (it drives the countdown)
+    clk.setCountdownTime(countdownSeconds)
+    // Don't start CLK's own countdown — we set the value externally each tick
+    // But set running=true so the display shows "RUNNING"
+    if (!clk.countdownRunning) {
+      clk.setCountdownRunning(true)
+    }
+  }, [systemState, countdownSeconds, clk])
+
+  const { powerScope } = useSystemPowerInternal()
+
+  // Only handle 'system' scope effects here — 'os' scope is handled inside TerminalModule
+  const isSystemScope = powerScope === 'system'
+  const holdCRTBlack = isSystemScope && (systemState === 'rebooting' || systemState === 'booting')
+
+  const handleCRTComplete = useCallback(() => {
+    // 'system' scope: shutdown → off is handled by SystemPowerManager timeout
+    // 'system' scope: reboot → holdBlack keeps screen black until boot
+  }, [])
+
+  const handleBootComplete = useCallback(() => {
+    finishBoot()
+  }, [finishBoot])
+
+  const crtActive = isSystemScope && (systemState === 'shutting-down' || systemState === 'rebooting')
+  const isOff = systemState === 'off'
+
+  // For 'system' scope shutdown: navigate away after CRT
+  useEffect(() => {
+    if (powerScope === 'system' && systemState === 'off') {
+      onShutdownComplete?.()
+    }
+  }, [powerScope, systemState, onShutdownComplete])
+
+  return (
+    <>
+      {isSystemScope && (
+        <CRTShutdownEffect
+          active={crtActive}
+          onComplete={handleCRTComplete}
+          holdBlack={holdCRTBlack}
+        />
+      )}
+      {isSystemScope && (
+        <BootSequence
+          active={systemState === 'booting'}
+          onComplete={handleBootComplete}
+        />
+      )}
+      {isOff && isSystemScope && (
+        <div className="fixed inset-0 z-[9999] bg-black" />
+      )}
+    </>
   )
 }

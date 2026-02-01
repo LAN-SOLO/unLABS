@@ -1,4 +1,5 @@
 import type { Command, CommandContext, CommandResult } from './types'
+import { parseTimeArg, formatCountdown } from '@/lib/power/timeParser'
 
 // Simple text banner - no fancy ASCII art to avoid font issues
 const ASCII_LOGO = `
@@ -1085,7 +1086,7 @@ const unsystemctlCommand: Command = {
     if (!command) {
       return {
         success: false,
-        error: 'usage: unsystemctl <command> [flags]\n\navailable commands:\n  reboot         - reboot the system\n  shutdown       - shutdown panel and return to terminal\n  status         - show system status\n  daemon-reload  - reload system daemon configuration\n\nflags:\n  -now      - execute immediately',
+        error: 'usage: unsystemctl <command> [flags]\n\navailable commands:\n  reboot         - reboot _unOS and terminal\n  shutdown       - shutdown _unOS and return to terminal\n  status         - show system status\n  daemon-reload  - reload system daemon configuration\n\nflags:\n  -now       execute immediately\n  -XhYmZs   schedule (e.g. -30m, -1h30m, -90s)\n  -cancel    cancel scheduled action\n\nFor full system power control: unsystem',
       }
     }
 
@@ -1107,43 +1108,66 @@ const unsystemctlCommand: Command = {
     }
 
     if (command === 'reboot') {
-      if (!flags.includes('-now')) {
+      if (flags.includes('-cancel')) {
+        if (ctx.data.systemPower) {
+          const state = ctx.data.systemPower.getState()
+          if (state.countdownAction === 'reboot' && state.systemState === 'countdown' && state.powerScope === 'os') {
+            ctx.data.systemPower.cancelCountdown()
+            return { success: true, output: ['', '[systemd] Scheduled reboot cancelled.', ''] }
+          }
+          return { success: true, output: ['', '[systemd] No _unOS reboot scheduled.', ''] }
+        }
+        return { success: false, error: 'System power control not available.' }
+      }
+
+      const timeFlag = args.slice(1).find(a => a.startsWith('-'))
+      if (!timeFlag) {
         return {
           success: false,
-          error: 'Reboot requires -now flag for immediate execution.\nUsage: unsystemctl reboot -now',
+          error: 'Reboot requires a time flag.\nUsage: unsystemctl reboot -now | -XhYmZs | -cancel',
         }
       }
 
-      // Reboot sequence ends with panel restart
-      const rebootWithPanelRestart = [
-        ...REBOOT_SEQUENCE.slice(0, -2), // Remove last 2 lines
-        '',
-        '┌─────────────────────────────────────────────────────────────┐',
-        '│                   PANEL AUTO-RESTART                        │',
-        '└─────────────────────────────────────────────────────────────┘',
-        '',
-        '[INIT] Restarting panel subsystem...........',
-        '[INIT] Loading equipment drivers............',
-        '[INIT] Calibrating oscilloscope.............',
-        '[INIT] Connecting to network................',
-        '',
-        '╔═══════════════════════════════════════════════════════════════╗',
-        '║  REBOOT COMPLETE | PANEL RESTORED                            ║',
-        '║  All systems operational | Resuming session                  ║',
-        '╚═══════════════════════════════════════════════════════════════╝',
-        '',
-        '> Returning to panel interface...',
-        '',
-      ]
+      const parsed = parseTimeArg(timeFlag)
+      if (parsed.error) {
+        return { success: false, error: `[PWR] ${parsed.error}` }
+      }
 
-      // Save device state before reboot
+      if (parsed.seconds === 0 && ctx.data.systemPower) {
+        ctx.data.saveAllDeviceState?.()
+        ctx.data.systemPower.rebootNow('os')
+        return {
+          success: true,
+          output: ['', '[systemd] Initiating _unOS reboot...', ''],
+        }
+      }
+
+      if (ctx.data.systemPower && parsed.seconds > 0) {
+        ctx.data.systemPower.scheduleReboot(parsed.seconds, 'os')
+        const timeStr = formatCountdown(parsed.seconds)
+        const output = ['', `[systemd] _unOS reboot scheduled in ${timeStr}.`]
+        if (parsed.wasAdjusted) output.push('[systemd] Warning: adjusted to minimum 10 seconds.')
+        output.push('')
+        return { success: true, output }
+      }
+
+      // Fallback: no system power context
       ctx.data.saveAllDeviceState?.()
-
       return {
         success: true,
-        output: rebootWithPanelRestart,
-        refresh: true, // Force page refresh for authentic reboot experience
-        // Panel access is preserved so user stays logged in
+        output: [
+          '',
+          '┌─────────────────────────────────────────────────────────────┐',
+          '│                   PANEL AUTO-RESTART                        │',
+          '└─────────────────────────────────────────────────────────────┘',
+          '',
+          '[INIT] Restarting panel subsystem...........',
+          '[INIT] Loading equipment drivers............',
+          '',
+          '> Returning to panel interface...',
+          '',
+        ],
+        refresh: true,
       }
     }
 
@@ -1174,53 +1198,61 @@ const unsystemctlCommand: Command = {
     }
 
     if (command === 'shutdown') {
-      if (!flags.includes('-now')) {
+      if (flags.includes('-cancel')) {
+        if (ctx.data.systemPower) {
+          const state = ctx.data.systemPower.getState()
+          if (state.countdownAction === 'shutdown' && state.systemState === 'countdown' && state.powerScope === 'os') {
+            ctx.data.systemPower.cancelCountdown()
+            return { success: true, output: ['', '[systemd] Scheduled shutdown cancelled.', ''] }
+          }
+          return { success: true, output: ['', '[systemd] No _unOS shutdown scheduled.', ''] }
+        }
+        return { success: false, error: 'System power control not available.' }
+      }
+
+      const timeFlag = args.slice(1).find(a => a.startsWith('-'))
+      if (!timeFlag) {
         return {
           success: false,
-          error: 'Shutdown requires -now flag.\nUsage: unsystemctl shutdown -now',
+          error: 'Shutdown requires a time flag.\nUsage: unsystemctl shutdown -now | -XhYmZs | -cancel',
         }
       }
 
-      const output = [
-        '',
-        '╔═══════════════════════════════════════════════════════════════╗',
-        '║                    PANEL SHUTDOWN                             ║',
-        '╚═══════════════════════════════════════════════════════════════╝',
-        '',
-        '┌─────────────────────────────────────────────────────────────┐',
-        '│                   SHUTDOWN SEQUENCE                         │',
-        '└─────────────────────────────────────────────────────────────┘',
-        '',
-        '[STOP] Terminating panel processes.......... OK',
-        '[STOP] Closing display subsystem............ OK',
-        '[STOP] Releasing equipment drivers.......... OK',
-        '[STOP] Saving panel state................... OK',
-        '',
-        '┌─────────────────────────────────────────────────────────────┐',
-        '│                   SYSTEM CHECK                              │',
-        '└─────────────────────────────────────────────────────────────┘',
-        '',
-        '[CHECK] Memory Released............. 2.4 GB   [  OK  ]',
-        '[CHECK] GPU Resources............... Freed    [  OK  ]',
-        '[CHECK] Audio Subsystem............. Stopped  [  OK  ]',
-        '[CHECK] Network Connections......... Closed   [  OK  ]',
-        '',
-        '[UNMOUNT] /dev/oscilloscope................. OK',
-        '[UNMOUNT] /dev/equipment.................... OK',
-        '[UNMOUNT] /dev/crystal_cache................ OK',
-        '',
-        '╔═══════════════════════════════════════════════════════════════╗',
-        '║  PANEL MODULE OFFLINE | RETURNING TO TERMINAL                ║',
-        '╚═══════════════════════════════════════════════════════════════╝',
-        '',
-        '> Panel shutdown complete. Returning to terminal...',
-        '',
-      ]
+      const parsed = parseTimeArg(timeFlag)
+      if (parsed.error) {
+        return { success: false, error: `[PWR] ${parsed.error}` }
+      }
 
-      // Save device state before shutdown
+      if (parsed.seconds === 0 && ctx.data.systemPower) {
+        ctx.data.saveAllDeviceState?.()
+        ctx.data.systemPower.shutdownNow('os')
+        return {
+          success: true,
+          output: ['', '[systemd] Initiating _unOS shutdown...', ''],
+        }
+      }
+
+      if (ctx.data.systemPower && parsed.seconds > 0) {
+        ctx.data.systemPower.scheduleShutdown(parsed.seconds, 'os')
+        const timeStr = formatCountdown(parsed.seconds)
+        const output = ['', `[systemd] _unOS shutdown scheduled in ${timeStr}.`]
+        if (parsed.wasAdjusted) output.push('[systemd] Warning: adjusted to minimum 10 seconds.')
+        output.push('')
+        return { success: true, output }
+      }
+
+      // Fallback: no system power context
       ctx.data.saveAllDeviceState?.()
-
-      return { success: true, output, navigate: '/terminal', clearPanelAccess: true }
+      return {
+        success: true,
+        output: [
+          '',
+          '[systemd] Panel shutdown complete. Returning to terminal...',
+          '',
+        ],
+        navigate: '/terminal',
+        clearPanelAccess: true,
+      }
     }
 
     return {
@@ -1232,7 +1264,7 @@ const unsystemctlCommand: Command = {
 
 const killCommand: Command = {
   name: 'kill',
-  aliases: ['stop', 'shutdown'],
+  aliases: ['stop'],
   description: 'Shut down a subsystem module',
   usage: 'kill <module> <mode> [flags]',
   execute: async (args, ctx) => {
@@ -13294,6 +13326,247 @@ const p3dCommand: Command = {
   },
 }
 
+// Full system power control (CRT shutdown/boot effects)
+const unsystemCommand: Command = {
+  name: 'unsystem',
+  description: 'Full system shutdown or reboot with power effects',
+  usage: 'unsystem <shutdown|reboot> [-now | -XhYmZs | -cancel]',
+  execute: async (args, ctx) => {
+    const command = args[0]?.toLowerCase()
+    const flag = args[1]
+
+    if (!command) {
+      return {
+        success: false,
+        error: 'usage: unsystem <command> [flags]\n\ncommands:\n  shutdown    full system shutdown (CRT power-off)\n  reboot      full system reboot (CRT off + boot sequence)\n  status      system power state\n\nflags:\n  -now       execute immediately\n  -XhYmZs   schedule (e.g. -30m, -1h30m, -90s)\n  -cancel    cancel scheduled action',
+      }
+    }
+
+    if (command === 'status') {
+      if (!ctx.data.systemPower) {
+        return { success: true, output: ['', '[unsystem] System power: RUNNING', ''] }
+      }
+      const state = ctx.data.systemPower.getState()
+      const output = [
+        '',
+        '┌─────────────────────────────────────────────────────────────┐',
+        '│                    SYSTEM POWER STATE                       │',
+        '└─────────────────────────────────────────────────────────────┘',
+        '',
+        `  State:     ${state.systemState.toUpperCase()}`,
+      ]
+      if (state.systemState === 'countdown' && state.countdownSeconds !== null) {
+        output.push(`  Action:    ${(state.countdownAction ?? 'unknown').toUpperCase()}`)
+        output.push(`  Remaining: ${formatCountdown(state.countdownSeconds)}`)
+      }
+      output.push('')
+      return { success: true, output }
+    }
+
+    if (command === 'shutdown') {
+      if (!flag) {
+        return {
+          success: false,
+          error: 'usage: unsystem shutdown -now | -XhYmZs | -cancel',
+        }
+      }
+
+      if (flag === '-cancel' || flag === 'cancel') {
+        if (ctx.data.systemPower) {
+          const state = ctx.data.systemPower.getState()
+          if (state.systemState === 'countdown' && state.countdownAction === 'shutdown') {
+            ctx.data.systemPower.cancelCountdown()
+            return { success: true, output: ['', '[unsystem] Scheduled shutdown cancelled.', ''] }
+          }
+          return { success: true, output: ['', '[unsystem] No shutdown scheduled.', ''] }
+        }
+        return { success: false, error: 'System power control not available.' }
+      }
+
+      const parsed = parseTimeArg(flag)
+      if (parsed.error) {
+        return { success: false, error: `[PWR-${parsed.errorCode}] ${parsed.error}` }
+      }
+
+      if (!ctx.data.systemPower) {
+        return { success: false, error: 'System power control not available. Are you in the panel?' }
+      }
+
+      if (parsed.seconds === 0) {
+        ctx.data.saveAllDeviceState?.()
+        ctx.data.systemPower.shutdownNow()
+        return { success: true, output: ['', '[unsystem] Initiating full system shutdown...', ''] }
+      }
+
+      ctx.data.systemPower.scheduleShutdown(parsed.seconds)
+      const timeStr = formatCountdown(parsed.seconds)
+      const output = ['', `[unsystem] System shutdown scheduled in ${timeStr}.`]
+      if (parsed.wasAdjusted) output.push('[unsystem] Warning: time adjusted to minimum 10 seconds.')
+      output.push('')
+      return { success: true, output }
+    }
+
+    if (command === 'reboot') {
+      if (!flag) {
+        return {
+          success: false,
+          error: 'usage: unsystem reboot -now | -XhYmZs | -cancel',
+        }
+      }
+
+      if (flag === '-cancel' || flag === 'cancel') {
+        if (ctx.data.systemPower) {
+          const state = ctx.data.systemPower.getState()
+          if (state.systemState === 'countdown' && state.countdownAction === 'reboot') {
+            ctx.data.systemPower.cancelCountdown()
+            return { success: true, output: ['', '[unsystem] Scheduled reboot cancelled.', ''] }
+          }
+          return { success: true, output: ['', '[unsystem] No reboot scheduled.', ''] }
+        }
+        return { success: false, error: 'System power control not available.' }
+      }
+
+      const parsed = parseTimeArg(flag)
+      if (parsed.error) {
+        return { success: false, error: `[PWR-${parsed.errorCode}] ${parsed.error}` }
+      }
+
+      if (!ctx.data.systemPower) {
+        return { success: false, error: 'System power control not available. Are you in the panel?' }
+      }
+
+      if (parsed.seconds === 0) {
+        ctx.data.saveAllDeviceState?.()
+        ctx.data.systemPower.rebootNow()
+        return { success: true, output: ['', '[unsystem] Initiating full system reboot...', ''] }
+      }
+
+      ctx.data.systemPower.scheduleReboot(parsed.seconds)
+      const timeStr = formatCountdown(parsed.seconds)
+      const output = ['', `[unsystem] System reboot scheduled in ${timeStr}.`]
+      if (parsed.wasAdjusted) output.push('[unsystem] Warning: time adjusted to minimum 10 seconds.')
+      output.push('')
+      return { success: true, output }
+    }
+
+    return {
+      success: false,
+      error: `Unknown command: ${command}\nAvailable: shutdown, reboot, status`,
+    }
+  },
+}
+
+// Standalone shutdown command
+const shutdownCommand: Command = {
+  name: 'shutdown',
+  description: 'Schedule or execute system shutdown',
+  usage: 'shutdown -now | -XhYmZs | -cancel',
+  execute: async (args, ctx) => {
+    const flag = args[0]
+
+    if (!flag) {
+      return {
+        success: false,
+        error: 'usage: shutdown -now | -XhYmZs | -cancel\n\nexamples:\n  shutdown -now        immediate shutdown\n  shutdown -30m        shutdown in 30 minutes\n  shutdown -1h30m      shutdown in 1 hour 30 min\n  shutdown -cancel     cancel scheduled shutdown',
+      }
+    }
+
+    if (flag === '-cancel' || flag === 'cancel') {
+      if (ctx.data.systemPower) {
+        const state = ctx.data.systemPower.getState()
+        if (state.systemState === 'countdown' && state.countdownAction === 'shutdown') {
+          ctx.data.systemPower.cancelCountdown()
+          return { success: true, output: ['', '[power] Scheduled shutdown cancelled.', ''] }
+        }
+        return { success: true, output: ['', '[power] No shutdown scheduled.', ''] }
+      }
+      return { success: false, error: 'System power control not available.' }
+    }
+
+    const parsed = parseTimeArg(flag)
+    if (parsed.error) {
+      return { success: false, error: `[PWR-${parsed.errorCode}] ${parsed.error}` }
+    }
+
+    if (!ctx.data.systemPower) {
+      // Fallback for terminal-only (no panel)
+      ctx.data.saveAllDeviceState?.()
+      return {
+        success: true,
+        output: ['', '[power] Shutdown initiated. Returning to terminal...', ''],
+        navigate: '/terminal',
+        clearPanelAccess: true,
+      }
+    }
+
+    if (parsed.seconds === 0) {
+      ctx.data.saveAllDeviceState?.()
+      ctx.data.systemPower.shutdownNow()
+      return { success: true, output: ['', '[power] Initiating system shutdown...', ''] }
+    }
+
+    ctx.data.systemPower.scheduleShutdown(parsed.seconds)
+    const timeStr = formatCountdown(parsed.seconds)
+    const output = ['', `[power] Shutdown scheduled in ${timeStr}.`]
+    if (parsed.wasAdjusted) output.push('[power] Warning: time adjusted to minimum 10 seconds.')
+    output.push('')
+    return { success: true, output }
+  },
+}
+
+// Standalone reboot command
+const rebootCommand: Command = {
+  name: 'reboot',
+  description: 'Schedule or execute system reboot',
+  usage: 'reboot -now | -XhYmZs | -cancel',
+  execute: async (args, ctx) => {
+    const flag = args[0]
+
+    if (!flag) {
+      return {
+        success: false,
+        error: 'usage: reboot -now | -XhYmZs | -cancel\n\nexamples:\n  reboot -now          immediate reboot\n  reboot -30s          reboot in 30 seconds\n  reboot -2h           reboot in 2 hours\n  reboot -cancel       cancel scheduled reboot',
+      }
+    }
+
+    if (flag === '-cancel' || flag === 'cancel') {
+      if (ctx.data.systemPower) {
+        const state = ctx.data.systemPower.getState()
+        if (state.systemState === 'countdown' && state.countdownAction === 'reboot') {
+          ctx.data.systemPower.cancelCountdown()
+          return { success: true, output: ['', '[power] Scheduled reboot cancelled.', ''] }
+        }
+        return { success: true, output: ['', '[power] No reboot scheduled.', ''] }
+      }
+      return { success: false, error: 'System power control not available.' }
+    }
+
+    const parsed = parseTimeArg(flag)
+    if (parsed.error) {
+      return { success: false, error: `[PWR-${parsed.errorCode}] ${parsed.error}` }
+    }
+
+    if (!ctx.data.systemPower) {
+      // Fallback
+      ctx.data.saveAllDeviceState?.()
+      return { success: true, output: ['', '[power] Reboot initiated...', ''], refresh: true }
+    }
+
+    if (parsed.seconds === 0) {
+      ctx.data.saveAllDeviceState?.()
+      ctx.data.systemPower.rebootNow()
+      return { success: true, output: ['', '[power] Initiating system reboot...', ''] }
+    }
+
+    ctx.data.systemPower.scheduleReboot(parsed.seconds)
+    const timeStr = formatCountdown(parsed.seconds)
+    const output = ['', `[power] Reboot scheduled in ${timeStr}.`]
+    if (parsed.wasAdjusted) output.push('[power] Warning: time adjusted to minimum 10 seconds.')
+    output.push('')
+    return { success: true, output }
+  },
+}
+
 // Command registry
 export const commands: Command[] = [
   helpCommand,
@@ -13382,6 +13655,9 @@ export const commands: Command[] = [
   ungitCommand,
   unmcCommand,
   unmceditCommand,
+  unsystemCommand,
+  shutdownCommand,
+  rebootCommand,
 ]
 
 // Find command by name or alias

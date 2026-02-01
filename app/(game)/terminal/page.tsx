@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { logout } from '@/app/(auth)/actions'
 import { Terminal } from '@/components/terminal'
+import { TerminalPowerWrapper } from './terminal-power-wrapper'
 
 interface ProfileData {
   username: string | null
@@ -115,7 +116,7 @@ export default async function TerminalPage() {
 
           {/* Terminal content */}
           <div className="flex-1 bg-black/95 p-4 overflow-hidden">
-            <Terminal
+            <TerminalPowerWrapper
               userId={user.id}
               username={username}
               balance={availableBalance}

@@ -39,6 +39,7 @@ import { useTLPManagerOptional } from '@/contexts/TLPManager'
 import { useLCTManagerOptional } from '@/contexts/LCTManager'
 import { useP3DManagerOptional } from '@/contexts/P3DManager'
 import { useScrewButtonManagerOptional } from '@/contexts/ScrewButtonManager'
+import { useSystemPowerOptional } from '@/contexts/SystemPowerManager'
 import type { CDCDeviceActions, UECDeviceActions, BATDeviceActions, HMSDeviceActions, ECRDeviceActions, IPLDeviceActions, MFRDeviceActions, AICDeviceActions, VNTDeviceActions, SCADeviceActions, EXDDeviceActions, QSMDeviceActions, EMCDeviceActions, QUADeviceActions, PWBDeviceActions, BTKDeviceActions, RMGDeviceActions, MSCDeviceActions, NETDeviceActions, TMPDeviceActions, DIMDeviceActions, CPUDeviceActions, CLKDeviceActions, MEMDeviceActions, ANDDeviceActions, QCPDeviceActions, TLPDeviceActions, LCTDeviceActions, P3DDeviceActions, ScrewButtonDeviceActions, ThemeActions } from '@/lib/terminal/types'
 
 interface TerminalProps {
@@ -81,6 +82,7 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   const lctManager = useLCTManagerOptional()
   const p3dManager = useP3DManagerOptional()
   const screwButtonManager = useScrewButtonManagerOptional()
+  const systemPowerManager = useSystemPowerOptional()
 
   // Initialize VirtualFS and UserManager (persisted via refs, restored from localStorage)
   const fsRef = useRef<VirtualFS | null>(null)
@@ -1611,6 +1613,23 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [themes !== undefined, themeIndex !== undefined, setThemeIndex !== undefined])
 
+  const systemPowerActions = useMemo(() => {
+    if (!systemPowerManager) return undefined
+    return {
+      scheduleShutdown: systemPowerManager.scheduleShutdown,
+      scheduleReboot: systemPowerManager.scheduleReboot,
+      shutdownNow: systemPowerManager.shutdownNow,
+      rebootNow: systemPowerManager.rebootNow,
+      cancelCountdown: systemPowerManager.cancelCountdown,
+      getState: () => ({
+        systemState: systemPowerManager.systemState,
+        countdownSeconds: systemPowerManager.countdownSeconds,
+        countdownAction: systemPowerManager.countdownAction,
+        powerScope: systemPowerManager.powerScope,
+      }),
+    }
+  }, [systemPowerManager])
+
   const { lines, isTyping, processCommand, navigateHistory, prompt, passwordMode, appMode, appModeData, exitAppMode } = useTerminal({
     userId,
     username,
@@ -1648,6 +1667,7 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     filesystemActions,
     userActions,
     themeActions,
+    systemPowerActions,
   })
 
   const handleAutocomplete = useCallback((input: string): string[] => {

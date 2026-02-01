@@ -11657,6 +11657,39 @@ export function LabClock({ className }: { className?: string }) {
     return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
   }
 
+  // Countdown timer color/weight tiers
+  const getCountdownStyle = (seconds: number) => {
+    if (seconds <= 5) return { numColor: '#ff1a1a', colonColor: '#ff1a1a', weight: 700, flash: true }
+    if (seconds <= 10) return { numColor: '#ef4444', colonColor: '#ff1a1a', weight: 700, flash: false }
+    if (seconds <= 30) return { numColor: '#ef4444', colonColor: '#eab308', weight: 700, flash: false }
+    if (seconds <= 120) return { numColor: '#eab308', colonColor: '#22c55e', weight: 400, flash: false }
+    return { numColor: '#22c55e', colonColor: '#0d9488', weight: 300, flash: false }
+  }
+
+  const renderCountdownDisplay = (seconds: number) => {
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    const s = seconds % 60
+    const style = getCountdownStyle(seconds)
+    const nums = [
+      h.toString().padStart(2, '0'),
+      m.toString().padStart(2, '0'),
+      s.toString().padStart(2, '0'),
+    ]
+    return (
+      <span
+        className="font-mono text-[16px] tabular-nums tracking-wider"
+        style={{ fontWeight: style.weight, animation: style.flash ? 'blink 0.5s steps(1) infinite' : undefined }}
+      >
+        <span style={{ color: style.numColor, textShadow: `0 0 8px ${style.numColor}66` }}>{nums[0]}</span>
+        <span style={{ color: style.colonColor }}>:</span>
+        <span style={{ color: style.numColor, textShadow: `0 0 8px ${style.numColor}66` }}>{nums[1]}</span>
+        <span style={{ color: style.colonColor }}>:</span>
+        <span style={{ color: style.numColor, textShadow: `0 0 8px ${style.numColor}66` }}>{nums[2]}</span>
+      </span>
+    )
+  }
+
   const getDisplayContent = () => {
     if (!isActive) return { main: '--:--:--', sub: 'OFFLINE', label: 'TIME' }
 
@@ -11839,15 +11872,19 @@ export function LabClock({ className }: { className?: string }) {
 
         {/* Main time display */}
         <div className="absolute inset-0 flex items-center justify-center">
-          <span
-            className="font-mono text-[16px] tabular-nums tracking-wider"
-            style={{
-              color: isActive ? 'var(--neon-green)' : 'white/30',
-              textShadow: isActive ? '0 0 10px var(--neon-green), 0 0 20px var(--neon-green)' : 'none',
-            }}
-          >
-            {display.main}
-          </span>
+          {displayMode === 'countdown' && isActive && countdownRunning ? (
+            renderCountdownDisplay(countdownTime)
+          ) : (
+            <span
+              className="font-mono text-[16px] tabular-nums tracking-wider"
+              style={{
+                color: isActive ? 'var(--neon-green)' : 'white/30',
+                textShadow: isActive ? '0 0 10px var(--neon-green), 0 0 20px var(--neon-green)' : 'none',
+              }}
+            >
+              {display.main}
+            </span>
+          )}
         </div>
 
         {/* Sub label */}

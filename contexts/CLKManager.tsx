@@ -56,6 +56,8 @@ interface CLKManagerContextType extends CLKState {
   resetStopwatch: () => void
   toggleCountdown: () => void
   resetCountdown: () => void
+  setCountdownTime: (seconds: number) => void
+  setCountdownRunning: (running: boolean) => void
   isExpanded: boolean
   toggleExpanded: () => void
   setExpanded: (expanded: boolean) => void
@@ -303,6 +305,8 @@ export function CLKManagerProvider({ children, initialState }: CLKManagerProvide
     resetStopwatch,
     toggleCountdown,
     resetCountdown,
+    setCountdownTime,
+    setCountdownRunning,
     isExpanded,
     toggleExpanded,
     setExpanded: setIsExpanded,

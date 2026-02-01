@@ -57,9 +57,17 @@ interface UseTerminalProps {
   filesystemActions?: FilesystemActions
   userActions?: UserActions
   themeActions?: ThemeActions
+  systemPowerActions?: {
+    scheduleShutdown: (seconds: number, scope?: 'os' | 'system') => void
+    scheduleReboot: (seconds: number, scope?: 'os' | 'system') => void
+    shutdownNow: (scope?: 'os' | 'system') => void
+    rebootNow: (scope?: 'os' | 'system') => void
+    cancelCountdown: () => void
+    getState: () => { systemState: string; countdownSeconds: number | null; countdownAction: string | null; powerScope: string | null }
+  }
 }
 
-export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, rmgDeviceActions, mscDeviceActions, netDeviceActions, tmpDeviceActions, dimDeviceActions, cpuDeviceActions, clkDeviceActions, memDeviceActions, andDeviceActions, qcpDeviceActions, tlpDeviceActions, lctDeviceActions, p3dDeviceActions, screwButtonDeviceActions, filesystemActions, userActions, themeActions }: UseTerminalProps) {
+export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, rmgDeviceActions, mscDeviceActions, netDeviceActions, tmpDeviceActions, dimDeviceActions, cpuDeviceActions, clkDeviceActions, memDeviceActions, andDeviceActions, qcpDeviceActions, tlpDeviceActions, lctDeviceActions, p3dDeviceActions, screwButtonDeviceActions, filesystemActions, userActions, themeActions, systemPowerActions }: UseTerminalProps) {
   const router = useRouter()
   const [state, setState] = useState<TerminalState>(() => {
     let savedHistory: string[] = []
@@ -362,7 +370,8 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
     filesystemActions,
     userActions,
     themeActions,
-  }), [cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, rmgDeviceActions, mscDeviceActions, netDeviceActions, tmpDeviceActions, dimDeviceActions, cpuDeviceActions, clkDeviceActions, andDeviceActions, qcpDeviceActions, tlpDeviceActions, lctDeviceActions, p3dDeviceActions, screwButtonDeviceActions, saveAllDeviceState, filesystemActions, userActions, themeActions])
+    systemPower: systemPowerActions,
+  }), [cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, rmgDeviceActions, mscDeviceActions, netDeviceActions, tmpDeviceActions, dimDeviceActions, cpuDeviceActions, clkDeviceActions, andDeviceActions, qcpDeviceActions, tlpDeviceActions, lctDeviceActions, p3dDeviceActions, screwButtonDeviceActions, saveAllDeviceState, filesystemActions, userActions, themeActions, systemPowerActions])
 
   // Initialize with welcome message
   useEffect(() => {
