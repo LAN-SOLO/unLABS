@@ -7,14 +7,17 @@ import { SysprefFooter } from './SysprefFooter'
 import { AboutPanel } from './panels/AboutPanel'
 import { DisplayPanel } from './panels/DisplayPanel'
 import { SoundPanel } from './panels/SoundPanel'
+import { NetworkPanel } from './panels/NetworkPanel'
+import { UserPanel } from './panels/UserPanel'
 import type { SysprefArea } from './SysprefSidebar'
 
 interface SysprefAppProps {
   userId: string
+  username?: string | null
   onExit: () => void
 }
 
-export function SysprefApp({ userId, onExit }: SysprefAppProps) {
+export function SysprefApp({ userId, username, onExit }: SysprefAppProps) {
   const [currentArea, setCurrentArea] = useState<SysprefArea>('about')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -94,9 +97,16 @@ export function SysprefApp({ userId, onExit }: SysprefAppProps) {
           />
         )
       case 'network':
-        return <PlaceholderPanel name="Network" />
+        return (
+          <NetworkPanel
+            userId={userId}
+            onDirty={setHasUnsavedChanges}
+            saveSignal={saveSignal}
+            resetSignal={resetSignal}
+          />
+        )
       case 'user':
-        return <PlaceholderPanel name="User" />
+        return <UserPanel userId={userId} username={username ?? null} />
       case 'datetime':
         return <PlaceholderPanel name="Date & Time" />
     }
