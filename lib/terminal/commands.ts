@@ -2268,6 +2268,13 @@ const deviceCommand: Command = {
         desc: 'Tier 2 high-precision laser tool for cutting and shaping materials.\nEnables crafting of advanced components and fine-tolerance work.\nUse LCT command for device management.',
         compatible: ['UEC-001', 'MFR-001', 'INT-001', 'CDC-001'],
       },
+      'lct': {
+        name: 'Precision Laser',
+        id: 'LCT-001',
+        version: '2.1.0',
+        desc: 'Tier 2 high-precision laser tool for cutting and shaping materials.\nEnables crafting of advanced components and fine-tolerance work.\nUse LCT command for device management.',
+        compatible: ['UEC-001', 'MFR-001', 'INT-001', 'CDC-001'],
+      },
       'cutter': {
         name: 'Precision Laser',
         id: 'LCT-001',
@@ -2436,6 +2443,168 @@ const deviceCommand: Command = {
         desc: 'Comprehensive power monitoring panel with integrated VoltMeter.\nShows generation, consumption, load percentage, and battery status.\nReal-time power balance visualization with status indicators.\nConnects to all power devices for centralized monitoring.',
         compatible: ['PWR-001', 'VLT-001', 'UEC-001', 'MFR-001', 'BAT-001', 'ALL'],
       },
+      // Short-ID aliases (device_id prefix lowercase)
+      'cdc': {
+        name: 'Crystal Data Cache',
+        id: 'CDC-001',
+        version: '1.4.2',
+        desc: 'Crystalline data storage for research archives (Tech Tier 1).\nUse CDC command for device management.',
+        compatible: ['UEC-001', 'BAT-001', 'HMS-001', 'AIC-001', 'SCA-001'],
+      },
+      'uec': {
+        name: 'Unstable Energy Core',
+        id: 'UEC-001',
+        version: '2.0.1',
+        desc: 'Primary power generation via blockchain volatility monitoring.\nUse UEC command for device management.',
+        compatible: ['CDC-001', 'BAT-001', 'QAN-001', 'HMS-001', 'MFR-001'],
+      },
+      'bat': {
+        name: 'Portable Battery Pack',
+        id: 'BAT-001',
+        version: '1.8.0',
+        desc: 'Energy storage device with 4-cell array and auto-regeneration.\nUse BAT command for device management.',
+        compatible: ['UEC-001', 'CDC-001', 'EXD-001'],
+      },
+      'hms': {
+        name: 'Handmade Synthesizer',
+        id: 'HMS-001',
+        version: '3.2.1',
+        desc: 'Enables slice synthesis and trait manipulation.\nUse HMS command for device management.',
+        compatible: ['CDC-001', 'INT-001'],
+      },
+      'ecr': {
+        name: 'Echo Recorder',
+        id: 'ECR-001',
+        version: '1.1.0',
+        desc: 'Records and replays trait patterns for analysis.\nUse ECR command for device management.',
+        compatible: ['HMS-001', 'OSC-001'],
+      },
+      'int': {
+        name: 'Interpolator',
+        id: 'INT-001',
+        version: '2.5.3',
+        desc: 'Interpolates trait values for precision targeting.\nUse IPL command for device management.',
+        compatible: ['HMS-001', 'OSC-001'],
+      },
+      'ipl': {
+        name: 'Interpolator',
+        id: 'INT-001',
+        version: '2.5.3',
+        desc: 'Interpolates trait values for precision targeting.\nUse IPL command for device management.',
+        compatible: ['HMS-001', 'OSC-001'],
+      },
+      'mfr': {
+        name: 'Microfusion Reactor',
+        id: 'MFR-001',
+        version: '2.3.0',
+        desc: 'Tier 2 power generation via plasma microfusion.\nUse MFR command for device management.',
+        compatible: ['UEC-001', 'BAT-001', 'QAN-001'],
+      },
+      'aic': {
+        name: 'AI Assistant Core',
+        id: 'AIC-001',
+        version: '2.4.0',
+        desc: 'Semi-sentient AI for lab automation and optimization.\nUse AIC command for device management.',
+        compatible: ['MFR-001', 'CDC-001', 'QAN-001', 'DGN-001'],
+      },
+      'sca': {
+        name: 'Supercomputer Array',
+        id: 'SCA-001',
+        version: '5.2.0',
+        desc: 'High-performance computing cluster for heavy calculations.\nUse SCA command for device management.',
+        compatible: ['AIC-001', 'CDC-001', 'QAN-001', 'MFR-001'],
+      },
+      'exd': {
+        name: 'Explorer Drone',
+        id: 'EXD-001',
+        version: '3.1.2',
+        desc: 'Remote-controlled drone for field exploration and resource collection.\nUse EXD command for device management.',
+        compatible: ['AIC-001', 'QAN-001', 'CDC-001'],
+      },
+      'rmg': {
+        name: 'Resource Magnet',
+        id: 'RMG-001',
+        version: '1.2.0',
+        desc: 'Handheld device that passively pulls in stray Abstractum fragments.\nUse RMG command for device management.',
+        compatible: ['BAT-001', 'QAN-001', 'UEC-001'],
+      },
+      'atk': {
+        name: 'Abstractum Tank',
+        id: 'ATK-001',
+        version: '2.1.0',
+        desc: 'Primary storage vessel for raw Abstractum resource.\nUse ATK command for device management.',
+        compatible: ['RMG-001', 'CDC-001', 'UEC-001', 'MFR-001'],
+      },
+      'emc': {
+        name: 'Exotic Matter Containment',
+        id: 'EMC-001',
+        version: '4.0.1',
+        desc: 'Containment field for exotic matter particles.\nUse EMC command for device management.',
+        compatible: ['MFR-001', 'QAN-001', 'DGN-001'],
+      },
+      'vnt': {
+        name: 'Ventilation System',
+        id: 'VNT-001',
+        version: '1.0.0',
+        desc: 'Dual-fan cooling system for CPU and GPU.\nUse VNT command for device management.',
+        compatible: ['DGN-001'],
+      },
+      'spk': {
+        name: 'Narrow Speaker',
+        id: 'SPK-001',
+        version: '1.0.0',
+        desc: 'Audio output with volume and filter controls.\nUse SPK command for device management.',
+        compatible: ['OSC-001'],
+      },
+      'osc': {
+        name: 'Oscilloscope Array',
+        id: 'OSC-001',
+        version: '4.6.0',
+        desc: 'Dual-channel waveform display (OZSC-460).\nUse OSC command for device management.',
+        compatible: ['QAN-001', 'ECR-001', 'INT-001'],
+      },
+      'qan': {
+        name: 'Quantum Analyzer',
+        id: 'QAN-001',
+        version: '3.7.2',
+        desc: 'Universal Problem Solver with 6 analysis modes.\nUse QAN command for device management.',
+        compatible: ['OSC-001', 'UEC-001', 'QSM-001', 'DIM-001'],
+      },
+      'dgn': {
+        name: 'Diagnostics Console',
+        id: 'DGN-001',
+        version: '2.0.4',
+        desc: 'Universal system diagnostics and health monitoring.\nUse DGN command for device management.',
+        compatible: ['ALL'],
+      },
+      'p3d': {
+        name: '3D Fabricator',
+        id: 'P3D-001',
+        version: '3.2.1',
+        desc: 'Tier 2 fabricator for complex parts.\nUse P3D command for device management.',
+        compatible: ['LCT-001', 'CDC-001', 'AIC-001', 'HMS-001'],
+      },
+      'and': {
+        name: 'Anomaly Detector',
+        id: 'AND-001',
+        version: '2.3.0',
+        desc: 'Halo Plane anomaly scanner and signal analyzer.\nUse AND command for device management.',
+        compatible: ['QSM-001', 'DIM-001', 'EMC-001', 'QAN-001'],
+      },
+      'qcp': {
+        name: 'Quantum Compass',
+        id: 'QCP-001',
+        version: '1.5.0',
+        desc: 'Quantum-entangled anomaly direction finder.\nUse QCP command for device management.',
+        compatible: ['AND-001', 'DIM-001', 'QSM-001', 'EMC-001'],
+      },
+      'tlp': {
+        name: 'Teleport Pad',
+        id: 'TLP-001',
+        version: '2.2.0',
+        desc: 'Quantum transport pad for inter-lab teleportation.\nUse TLP command for device management.',
+        compatible: ['UEC-001', 'MFR-001', 'DIM-001', 'QSM-001'],
+      },
     }
 
     const device = deviceMap[deviceName]
@@ -2470,6 +2639,7 @@ const deviceCommand: Command = {
           `    DEVICE ${deviceName.toUpperCase()} TEST   - Run diagnostics`,
           `    DEVICE ${deviceName.toUpperCase()} REBOOT - Reboot device`,
           `    DEVICE ${deviceName.toUpperCase()} STATUS - Show current status`,
+          `    DEVICE ${deviceName.toUpperCase()} COMBOS - Show compatible combinations`,
           '',
         ],
       }
@@ -2609,9 +2779,51 @@ const deviceCommand: Command = {
       }
     }
 
+    // Device combinations / synergies
+    if (action === 'combos' || action === 'combinations' || action === 'synergy') {
+      const compatList = device.compatible.filter(c => c !== device.id && c !== 'ALL')
+      if (compatList.length === 0) {
+        return {
+          success: true,
+          output: [
+            '',
+            `┌─ Combinations: ${device.name} ${'─'.repeat(Math.max(0, 42 - device.name.length))}┐`,
+            `│  NO COMPATIBLE DEVICES FOUND${' '.repeat(30)}│`,
+            `└${'─'.repeat(59)}┘`,
+            '',
+          ],
+        }
+      }
+
+      const lines: string[] = [
+        '',
+        `┌─ Combinations: ${device.name} ${'─'.repeat(Math.max(0, 42 - device.name.length))}┐`,
+        `│${' '.repeat(59)}│`,
+      ]
+
+      for (const partnerId of compatList) {
+        // Look up partner name from deviceMap values
+        const partnerEntry = Object.values(deviceMap).find(d => d.id === partnerId)
+        const partnerName = partnerEntry?.name ?? partnerId
+        const symbol = '○'
+        lines.push(`│  ${symbol} ${device.id} + ${partnerId} (${partnerName})${' '.repeat(Math.max(0, 55 - device.id.length - partnerId.length - partnerName.length - 8))}│`)
+      }
+
+      lines.push(
+        `│${' '.repeat(59)}│`,
+        `│  Total: ${compatList.length} compatible device(s)${' '.repeat(Math.max(0, 34 - String(compatList.length).length))}│`,
+        `└${'─'.repeat(59)}┘`,
+        '',
+        `  Use the Combos tab in device detail for link/unlink operations.`,
+        '',
+      )
+
+      return { success: true, output: lines }
+    }
+
     return {
       success: false,
-      error: `Unknown action: ${action}\nAvailable: TEST, REBOOT, STATUS, INFO, POWER`,
+      error: `Unknown action: ${action}\nAvailable: TEST, REBOOT, STATUS, INFO, POWER, COMBOS`,
     }
   },
 }
