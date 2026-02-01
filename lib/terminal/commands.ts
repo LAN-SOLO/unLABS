@@ -14274,6 +14274,21 @@ const rebootCommand: Command = {
   },
 }
 
+// System Preferences TUI
+const unsysprefCommand: Command = {
+  name: 'unsyspref',
+  aliases: ['syspref', 'preferences', 'prefs'],
+  description: 'Open _unOS System Preferences',
+  usage: 'unsyspref',
+  execute: async () => {
+    return {
+      success: true,
+      output: ['[unsyspref] Launching System Preferences...'],
+      appMode: 'syspref',
+    }
+  },
+}
+
 // Command registry
 export const commands: Command[] = [
   helpCommand,
@@ -14365,6 +14380,7 @@ export const commands: Command[] = [
   unsystemCommand,
   shutdownCommand,
   rebootCommand,
+  unsysprefCommand,
 ]
 
 // Find command by name or alias

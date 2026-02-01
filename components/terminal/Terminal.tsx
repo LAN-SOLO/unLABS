@@ -9,6 +9,7 @@ import { useTerminal } from '@/hooks/useTerminal'
 import { TerminalOutput } from './TerminalOutput'
 import { TerminalInput } from './TerminalInput'
 import { MidnightCommander } from './MidnightCommander'
+import { SysprefApp } from '@/components/sysprefs/SysprefApp'
 import { useCDCManagerOptional } from '@/contexts/CDCManager'
 import { useUECManagerOptional } from '@/contexts/UECManager'
 import { useBATManagerOptional } from '@/contexts/BATManager'
@@ -1729,6 +1730,14 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     return (
       <div className="flex flex-col h-full">
         <MidnightCommander filesystemActions={filesystemActions} onExit={exitAppMode} initialEditFile={appMode === 'mcedit' ? appModeData?.editFile : undefined} />
+      </div>
+    )
+  }
+
+  if (appMode === 'syspref') {
+    return (
+      <div className="flex flex-col h-full">
+        <SysprefApp userId={userId} onExit={exitAppMode} />
       </div>
     )
   }
