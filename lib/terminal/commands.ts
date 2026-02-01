@@ -2642,6 +2642,7 @@ const deviceCommand: Command = {
           `    DEVICE ${deviceName.toUpperCase()} COMBOS - Show compatible combinations`,
           `    DEVICE ${deviceName.toUpperCase()} DEPS   - Show tech tree dependencies`,
           `    DEVICE ${deviceName.toUpperCase()} INFLUENCE - Show device influence map`,
+          `    DEVICE ${deviceName.toUpperCase()} TWEAKS - Show available tweaks`,
           '',
         ],
       }
@@ -2959,9 +2960,81 @@ const deviceCommand: Command = {
       return { success: true, output: lines }
     }
 
+    // Device tweaks
+    if (action === 'tweak' || action === 'tweaks' || action === 'config' || action === 'settings') {
+      // Static tweak definitions by device category
+      const defaultTweaks: Record<string, { id: string; name: string; type: string; default: string }[]> = {
+        generator: [
+          { id: 'power_mode', name: 'Power Mode', type: 'radio', default: 'balanced' },
+          { id: 'output_limit', name: 'Output Limit', type: 'slider', default: '100%' },
+          { id: 'auto_scale', name: 'Auto Scale', type: 'toggle', default: 'ON' },
+          { id: 'priority', name: 'Consumer Priority', type: 'priority_list', default: '(device order)' },
+        ],
+        heavy: [
+          { id: 'power_mode', name: 'Power Mode', type: 'radio', default: 'balanced' },
+          { id: 'clock_speed', name: 'Clock Speed', type: 'slider', default: '80%' },
+          { id: 'auto_standby', name: 'Auto Standby', type: 'toggle', default: 'ON' },
+          { id: 'thermal_limit', name: 'Thermal Limit', type: 'slider', default: '85°C' },
+        ],
+        medium: [
+          { id: 'power_mode', name: 'Power Mode', type: 'radio', default: 'balanced' },
+          { id: 'refresh_rate', name: 'Refresh Rate', type: 'slider', default: '60Hz' },
+          { id: 'auto_standby', name: 'Auto Standby', type: 'toggle', default: 'ON' },
+          { id: 'data_logging', name: 'Data Logging', type: 'toggle', default: 'OFF' },
+        ],
+        light: [
+          { id: 'power_mode', name: 'Power Mode', type: 'radio', default: 'eco' },
+          { id: 'brightness', name: 'Brightness', type: 'slider', default: '70%' },
+          { id: 'sleep_timer', name: 'Sleep Timer', type: 'toggle', default: 'ON' },
+        ],
+        storage: [
+          { id: 'power_mode', name: 'Power Mode', type: 'radio', default: 'balanced' },
+          { id: 'charge_rate', name: 'Charge Rate', type: 'slider', default: '80%' },
+          { id: 'overflow_protect', name: 'Overflow Protect', type: 'toggle', default: 'ON' },
+          { id: 'auto_discharge', name: 'Auto Discharge', type: 'toggle', default: 'OFF' },
+        ],
+      }
+
+      // Determine category from techTreeMap
+      const categoryMap: Record<string, string> = {
+        'UEC-001': 'generator', 'MFR-001': 'generator',
+        'SCA-001': 'heavy', 'AIC-001': 'heavy', 'EMC-001': 'heavy', 'TLP-001': 'heavy',
+        'BAT-001': 'storage', 'ATK-001': 'storage',
+        'SPK-001': 'light', 'CLK-001': 'light', 'VLT-001': 'light', 'PWD-001': 'light', 'NET-001': 'light',
+      }
+      const category = categoryMap[device.id] ?? 'medium'
+      const tweaks = defaultTweaks[category] ?? defaultTweaks['medium']
+
+      const typeIcon: Record<string, string> = {
+        radio: '◉', toggle: '☐', slider: '▸', priority_list: '≡',
+      }
+
+      const lines: string[] = [
+        '',
+        `┌─ Tweaks: ${device.name} ${'─'.repeat(20)}`,
+        '│',
+        `│  Category: ${category.toUpperCase()}`,
+        '│',
+      ]
+
+      for (const t of tweaks) {
+        const icon = typeIcon[t.type] ?? '·'
+        lines.push(`│  ${icon} ${t.name.padEnd(20)} [${t.type}]  default: ${t.default}`)
+      }
+
+      lines.push(
+        '│',
+        '│  Use the Tweaks tab in device detail to modify settings.',
+        `└${'─'.repeat(40)}`,
+        '',
+      )
+
+      return { success: true, output: lines }
+    }
+
     return {
       success: false,
-      error: `Unknown action: ${action}\nAvailable: TEST, REBOOT, STATUS, INFO, POWER, COMBOS, DEPS, INFLUENCE`,
+      error: `Unknown action: ${action}\nAvailable: TEST, REBOOT, STATUS, INFO, POWER, COMBOS, DEPS, INFLUENCE, TWEAKS`,
     }
   },
 }
