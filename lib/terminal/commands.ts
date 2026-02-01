@@ -1970,6 +1970,88 @@ const deviceCommand: Command = {
       return { success: true, output: lines }
     }
 
+    // Group devices by category
+    if (deviceName === 'group' || deviceName === 'groups' || deviceName === 'categories') {
+      const filter = action?.toLowerCase() // optional category filter
+
+      const groups: Record<string, { id: string; name: string }[]> = {
+        'GENERATOR': [
+          { id: 'UEC-001', name: 'Unstable Energy Core' },
+          { id: 'MFR-001', name: 'Microfusion Reactor' },
+        ],
+        'HEAVY': [
+          { id: 'SCA-001', name: 'Supercomputer Array' },
+          { id: 'AIC-001', name: 'AI Assistant Core' },
+          { id: 'EMC-001', name: 'Exotic Matter Containment' },
+          { id: 'TLP-001', name: 'Teleport Pad' },
+        ],
+        'MEDIUM': [
+          { id: 'CDC-001', name: 'Crystal Data Cache' },
+          { id: 'HMS-001', name: 'Handmade Synthesizer' },
+          { id: 'QAN-001', name: 'Quantum Analyzer' },
+          { id: 'OSC-001', name: 'Oscilloscope Array' },
+          { id: 'INT-001', name: 'Interpolator' },
+          { id: 'ECR-001', name: 'Echo Recorder' },
+          { id: 'EXD-001', name: 'Explorer Drone' },
+          { id: 'DGN-001', name: 'Diagnostics Console' },
+          { id: 'P3D-001', name: '3D Fabricator' },
+          { id: 'LCT-001', name: 'Precision Laser' },
+          { id: 'QSM-001', name: 'Quantum State Monitor' },
+          { id: 'AND-001', name: 'Anomaly Detector' },
+          { id: 'QCP-001', name: 'Quantum Compass' },
+          { id: 'DIM-001', name: 'Dimension Monitor' },
+          { id: 'RMG-001', name: 'Resource Magnet' },
+        ],
+        'LIGHT': [
+          { id: 'SPK-001', name: 'Narrow Speaker' },
+          { id: 'CLK-001', name: 'Lab Clock' },
+          { id: 'VLT-001', name: 'Volt Meter Display' },
+          { id: 'PWD-001', name: 'Power Display Panel' },
+          { id: 'NET-001', name: 'Network Monitor' },
+          { id: 'TMP-001', name: 'Temperature Monitor' },
+          { id: 'CPU-001', name: 'CPU Monitor' },
+          { id: 'MEM-001', name: 'Memory Monitor' },
+          { id: 'VNT-001', name: 'Ventilation System' },
+          { id: 'THM-001', name: 'Thermal Manager' },
+          { id: 'BTK-001', name: 'Basic Toolkit' },
+          { id: 'MSC-001', name: 'Material Scanner' },
+          { id: 'PWB-001', name: 'Portable Workbench' },
+          { id: 'PWR-001', name: 'Power Management System' },
+        ],
+        'STORAGE': [
+          { id: 'BAT-001', name: 'Portable Battery Pack' },
+          { id: 'ATK-001', name: 'Abstractum Tank' },
+        ],
+      }
+
+      const lines: string[] = [
+        '',
+        `┌─ Device Groups ${'─'.repeat(20)}`,
+      ]
+
+      for (const [cat, devs] of Object.entries(groups)) {
+        if (filter && cat.toLowerCase() !== filter) continue
+        lines.push('│', `│  ${cat} (${devs.length})`)
+        for (const d of devs) {
+          lines.push(`│    · ${d.id}  ${d.name}`)
+        }
+      }
+
+      const total = Object.values(groups).reduce((s, g) => s + g.length, 0)
+      lines.push(
+        '│',
+        `│  Total: ${total} devices in ${Object.keys(groups).length} categories`,
+        `└${'─'.repeat(40)}`,
+        '',
+      )
+
+      if (filter) {
+        lines.push(`  Filter: ${filter.toUpperCase()}. Omit filter to see all.`, '')
+      }
+
+      return { success: true, output: lines }
+    }
+
     // Link / unlink devices
     if (deviceName === 'link' || deviceName === 'unlink') {
       const isLink = deviceName === 'link'
