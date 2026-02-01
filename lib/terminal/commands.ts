@@ -1970,6 +1970,67 @@ const deviceCommand: Command = {
       return { success: true, output: lines }
     }
 
+    // Link / unlink devices
+    if (deviceName === 'link' || deviceName === 'unlink') {
+      const isLink = deviceName === 'link'
+      const dev1 = action?.toUpperCase()
+      const dev2 = args[2]?.toUpperCase()
+
+      if (!dev1 || !dev2) {
+        return { success: false, error: `usage: device ${deviceName} <device1> <device2>\nexample: device ${deviceName} LCT UEC` }
+      }
+
+      // Resolve short IDs to full device IDs
+      const resolve = (s: string) => {
+        if (s.includes('-')) return s
+        return `${s}-001`
+      }
+      const id1 = resolve(dev1)
+      const id2 = resolve(dev2)
+
+      ctx.setTyping(true)
+      await new Promise(resolve => setTimeout(resolve, 800))
+      ctx.setTyping(false)
+
+      if (isLink) {
+        return {
+          success: true,
+          output: [
+            '',
+            `┌─ Link Devices ${'─'.repeat(20)}`,
+            '│',
+            `│  ${id1} ←→ ${id2}`,
+            '│',
+            `│  [SYNC]  Handshake............. OK`,
+            `│  [AUTH]  Pairing............... OK`,
+            `│  [LINK]  Synergy active........ OK`,
+            '│',
+            `│  Devices linked successfully.`,
+            `└${'─'.repeat(40)}`,
+            '',
+          ],
+        }
+      } else {
+        return {
+          success: true,
+          output: [
+            '',
+            `┌─ Unlink Devices ${'─'.repeat(20)}`,
+            '│',
+            `│  ${id1} ─✕─ ${id2}`,
+            '│',
+            `│  [STOP]  Synergy halted........ OK`,
+            `│  [DISC]  Disconnecting......... OK`,
+            `│  [DONE]  Link removed.......... OK`,
+            '│',
+            `│  Devices unlinked successfully.`,
+            `└${'─'.repeat(40)}`,
+            '',
+          ],
+        }
+      }
+    }
+
     // Device-specific commands
     const deviceMap: Record<string, { name: string; id: string; version: string; desc: string; compatible: string[] }> = {
       'cache': {
