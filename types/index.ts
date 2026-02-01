@@ -1,6 +1,9 @@
 // Database types
 export * from './database'
 
+// Device Manager types
+export * from './devices'
+
 // Game constants
 export const CRYSTAL_COLORS = [
   'infrared',

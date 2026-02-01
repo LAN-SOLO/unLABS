@@ -35,6 +35,12 @@ export type TransactionType =
   | 'unstake'
   | 'trade'
 
+export type DeviceCategory = 'generator' | 'heavy' | 'medium' | 'light' | 'storage'
+
+export type DeviceState = 'online' | 'standby' | 'offline' | 'error' | 'upgrading'
+
+export type TweakType = 'radio' | 'toggle' | 'slider' | 'priority_list'
+
 // =================================
 // DATABASE INTERFACE
 // =================================
@@ -348,6 +354,201 @@ export interface Database {
           captured_at?: string
         }
       }
+      devices: {
+        Row: {
+          device_id: string
+          name: string
+          version: string
+          category: DeviceCategory
+          tech_tree: string
+          tier: number
+          power_full: number
+          power_idle: number
+          power_standby: number
+          description: string | null
+          capabilities: string[]
+        }
+        Insert: {
+          device_id: string
+          name: string
+          version: string
+          category: DeviceCategory
+          tech_tree: string
+          tier: number
+          power_full: number
+          power_idle: number
+          power_standby: number
+          description?: string | null
+          capabilities?: string[]
+        }
+        Update: {
+          device_id?: string
+          name?: string
+          version?: string
+          category?: DeviceCategory
+          tech_tree?: string
+          tier?: number
+          power_full?: number
+          power_idle?: number
+          power_standby?: number
+          description?: string | null
+          capabilities?: string[]
+        }
+      }
+      device_state: {
+        Row: {
+          device_id: string
+          state: DeviceState
+          health: number
+          load: number
+          uptime_seconds: number
+          power_current: number
+          temperature: number
+          last_updated: string
+        }
+        Insert: {
+          device_id: string
+          state?: DeviceState
+          health?: number
+          load?: number
+          uptime_seconds?: number
+          power_current?: number
+          temperature?: number
+          last_updated?: string
+        }
+        Update: {
+          device_id?: string
+          state?: DeviceState
+          health?: number
+          load?: number
+          uptime_seconds?: number
+          power_current?: number
+          temperature?: number
+          last_updated?: string
+        }
+      }
+      device_dependencies: {
+        Row: {
+          id: number
+          device_id: string
+          tech_tree: string
+          tier: number
+          item_name: string
+          is_cross_tree: boolean
+        }
+        Insert: {
+          id?: number
+          device_id: string
+          tech_tree: string
+          tier: number
+          item_name: string
+          is_cross_tree?: boolean
+        }
+        Update: {
+          id?: number
+          device_id?: string
+          tech_tree?: string
+          tier?: number
+          item_name?: string
+          is_cross_tree?: boolean
+        }
+      }
+      device_combinations: {
+        Row: {
+          combo_id: number
+          primary_device: string
+          secondary_device: string
+          combo_name: string
+          effect_description: string | null
+          combined_power: number | null
+          requirement_tree: string | null
+          requirement_item: string | null
+        }
+        Insert: {
+          combo_id?: number
+          primary_device: string
+          secondary_device: string
+          combo_name: string
+          effect_description?: string | null
+          combined_power?: number | null
+          requirement_tree?: string | null
+          requirement_item?: string | null
+        }
+        Update: {
+          combo_id?: number
+          primary_device?: string
+          secondary_device?: string
+          combo_name?: string
+          effect_description?: string | null
+          combined_power?: number | null
+          requirement_tree?: string | null
+          requirement_item?: string | null
+        }
+      }
+      device_tweaks: {
+        Row: {
+          tweak_id: number
+          device_id: string
+          setting_id: string
+          setting_name: string
+          setting_type: TweakType
+          default_value: string | null
+          power_impact: number | null
+          description: string | null
+          options: Record<string, unknown> | null
+        }
+        Insert: {
+          tweak_id?: number
+          device_id: string
+          setting_id: string
+          setting_name: string
+          setting_type: TweakType
+          default_value?: string | null
+          power_impact?: number | null
+          description?: string | null
+          options?: Record<string, unknown> | null
+        }
+        Update: {
+          tweak_id?: number
+          device_id?: string
+          setting_id?: string
+          setting_name?: string
+          setting_type?: TweakType
+          default_value?: string | null
+          power_impact?: number | null
+          description?: string | null
+          options?: Record<string, unknown> | null
+        }
+      }
+      player_device_state: {
+        Row: {
+          player_id: string
+          device_id: string
+          unlocked: boolean
+          unlock_date: string | null
+          current_state: DeviceState
+          tweak_settings: Record<string, unknown>
+          active_links: string[] | null
+        }
+        Insert: {
+          player_id: string
+          device_id: string
+          unlocked?: boolean
+          unlock_date?: string | null
+          current_state?: DeviceState
+          tweak_settings?: Record<string, unknown>
+          active_links?: string[] | null
+        }
+        Update: {
+          player_id?: string
+          device_id?: string
+          unlocked?: boolean
+          unlock_date?: string | null
+          current_state?: DeviceState
+          tweak_settings?: Record<string, unknown>
+          active_links?: string[] | null
+        }
+      }
     }
     Views: {
       [_ in never]: never
@@ -362,6 +563,9 @@ export interface Database {
       crystal_state: CrystalState
       crystal_era: CrystalEra
       transaction_type: TransactionType
+      device_category: DeviceCategory
+      device_state: DeviceState
+      tweak_type: TweakType
     }
   }
 }
@@ -389,6 +593,12 @@ export type Balance = Tables<'balances'>
 export type Transaction = Tables<'transactions'>
 export type CommandHistory = Tables<'command_history'>
 export type VolatilitySnapshot = Tables<'volatility_snapshots'>
+export type DbDevice = Tables<'devices'>
+export type DbDeviceState = Tables<'device_state'>
+export type DbDeviceDependency = Tables<'device_dependencies'>
+export type DbDeviceCombination = Tables<'device_combinations'>
+export type DbDeviceTweak = Tables<'device_tweaks'>
+export type DbPlayerDeviceState = Tables<'player_device_state'>
 
 // Joined types
 export type CrystalWithSlices = Crystal & {
