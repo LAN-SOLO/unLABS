@@ -5,21 +5,23 @@ import { SectionBox } from '../controls/SectionBox'
 import { Toggle } from '../controls/Toggle'
 import { Slider } from '../controls/Slider'
 import { Dropdown } from '../controls/Dropdown'
-import { getSoundPrefs, updateSoundPrefs, getSoundProfiles } from '@/lib/api/sysprefs'
+import { getSoundPrefs, updateSoundPrefs, getSoundProfiles, logPrefChange } from '@/lib/api/sysprefs'
 import type { DbPlayerSoundPrefs, DbSoundProfile } from '@/types/database'
 
 interface SoundPanelProps {
   userId: string
   onDirty: (dirty: boolean) => void
+  onSaveError: (msg: string) => void
   saveSignal: number
   resetSignal: number
 }
 
-export function SoundPanel({ userId, onDirty, saveSignal, resetSignal }: SoundPanelProps) {
+export function SoundPanel({ userId, onDirty, onSaveError, saveSignal, resetSignal }: SoundPanelProps) {
   const [prefs, setPrefs] = useState<DbPlayerSoundPrefs | null>(null)
   const [original, setOriginal] = useState<DbPlayerSoundPrefs | null>(null)
   const [profiles, setProfiles] = useState<DbSoundProfile[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -29,7 +31,9 @@ export function SoundPanel({ userId, onDirty, saveSignal, resetSignal }: SoundPa
       setPrefs(p)
       setOriginal(p)
       setProfiles(pr)
-    }).catch(() => {}).finally(() => setLoading(false))
+    }).catch((err) => {
+      setLoadError(err instanceof Error ? err.message : 'Failed to load sound preferences')
+    }).finally(() => setLoading(false))
   }, [userId])
 
   useEffect(() => {
@@ -38,11 +42,23 @@ export function SoundPanel({ userId, onDirty, saveSignal, resetSignal }: SoundPa
   }, [prefs, original, onDirty])
 
   useEffect(() => {
-    if (saveSignal === 0 || !prefs) return
+    if (saveSignal === 0 || !prefs || !original) return
     const { id, player_id, created_at, updated_at, ...updates } = prefs
     updateSoundPrefs(userId, updates)
-      .then((saved) => { setPrefs(saved); setOriginal(saved) })
-      .catch(() => {})
+      .then((saved) => {
+        const changedKeys = Object.keys(updates) as (keyof typeof updates)[]
+        for (const key of changedKeys) {
+          const oldVal = String(original[key as keyof DbPlayerSoundPrefs] ?? '')
+          const newVal = String(prefs[key as keyof DbPlayerSoundPrefs] ?? '')
+          if (oldVal !== newVal) {
+            logPrefChange(userId, 'sound', key, oldVal, newVal, userId).catch(() => {})
+          }
+        }
+        setPrefs(saved); setOriginal(saved)
+      })
+      .catch((err) => {
+        onSaveError(err instanceof Error ? err.message : 'Failed to save sound preferences')
+      })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveSignal])
 
@@ -57,7 +73,8 @@ export function SoundPanel({ userId, onDirty, saveSignal, resetSignal }: SoundPa
   }, [])
 
   if (loading) return <div className="p-2">Loading sound preferences...</div>
-  if (!prefs) return <div className="p-2 text-red-400">Failed to load sound preferences</div>
+  if (loadError) return <div className="p-2 text-[var(--state-error,#FF3300)]">Error: {loadError}</div>
+  if (!prefs) return <div className="p-2 text-[var(--state-error,#FF3300)]">Failed to load sound preferences</div>
 
   const profileOptions = profiles.map(p => ({ value: p.id, label: `${p.name} — ${p.description ?? ''}` }))
 

@@ -6,24 +6,25 @@ import { Toggle } from '../controls/Toggle'
 import { Slider } from '../controls/Slider'
 import { RadioGroup } from '../controls/RadioGroup'
 import { Dropdown } from '../controls/Dropdown'
-import { getDisplayPrefs, updateDisplayPrefs, getThemes, getFonts } from '@/lib/api/sysprefs'
+import { getDisplayPrefs, updateDisplayPrefs, getThemes, getFonts, logPrefChange } from '@/lib/api/sysprefs'
 import type { DbPlayerDisplayPrefs, DbDisplayTheme, DbDisplayFont } from '@/types/database'
 
 interface DisplayPanelProps {
   userId: string
   onDirty: (dirty: boolean) => void
+  onSaveError: (msg: string) => void
   saveSignal: number
   resetSignal: number
 }
 
-export function DisplayPanel({ userId, onDirty, saveSignal, resetSignal }: DisplayPanelProps) {
+export function DisplayPanel({ userId, onDirty, onSaveError, saveSignal, resetSignal }: DisplayPanelProps) {
   const [prefs, setPrefs] = useState<DbPlayerDisplayPrefs | null>(null)
   const [original, setOriginal] = useState<DbPlayerDisplayPrefs | null>(null)
   const [themes, setThemes] = useState<DbDisplayTheme[]>([])
   const [fonts, setFonts] = useState<DbDisplayFont[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
-  // Load data
   useEffect(() => {
     Promise.all([
       getDisplayPrefs(userId),
@@ -34,30 +35,40 @@ export function DisplayPanel({ userId, onDirty, saveSignal, resetSignal }: Displ
       setOriginal(p)
       setThemes(t)
       setFonts(f)
-    }).catch(() => {}).finally(() => setLoading(false))
+    }).catch((err) => {
+      setLoadError(err instanceof Error ? err.message : 'Failed to load display preferences')
+    }).finally(() => setLoading(false))
   }, [userId])
 
-  // Detect dirty
   useEffect(() => {
     if (!prefs || !original) return
-    const dirty = JSON.stringify(prefs) !== JSON.stringify(original)
-    onDirty(dirty)
+    onDirty(JSON.stringify(prefs) !== JSON.stringify(original))
   }, [prefs, original, onDirty])
 
-  // Save handler
+  // Save with audit logging
   useEffect(() => {
-    if (saveSignal === 0 || !prefs) return
+    if (saveSignal === 0 || !prefs || !original) return
     const { id, player_id, created_at, updated_at, ...updates } = prefs
     updateDisplayPrefs(userId, updates)
       .then((saved) => {
+        // Audit log changed fields
+        const changedKeys = Object.keys(updates) as (keyof typeof updates)[]
+        for (const key of changedKeys) {
+          const oldVal = String(original[key as keyof DbPlayerDisplayPrefs] ?? '')
+          const newVal = String(prefs[key as keyof DbPlayerDisplayPrefs] ?? '')
+          if (oldVal !== newVal) {
+            logPrefChange(userId, 'display', key, oldVal, newVal, userId).catch(() => {})
+          }
+        }
         setPrefs(saved)
         setOriginal(saved)
       })
-      .catch(() => {})
+      .catch((err) => {
+        onSaveError(err instanceof Error ? err.message : 'Failed to save display preferences')
+      })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveSignal])
 
-  // Reset handler
   useEffect(() => {
     if (resetSignal === 0 || !original) return
     setPrefs(original)
@@ -69,7 +80,8 @@ export function DisplayPanel({ userId, onDirty, saveSignal, resetSignal }: Displ
   }, [])
 
   if (loading) return <div className="p-2">Loading display preferences...</div>
-  if (!prefs) return <div className="p-2 text-red-400">Failed to load display preferences</div>
+  if (loadError) return <div className="p-2 text-[var(--state-error,#FF3300)]">Error: {loadError}</div>
+  if (!prefs) return <div className="p-2 text-[var(--state-error,#FF3300)]">Failed to load display preferences</div>
 
   const themeOptions = themes.map(t => ({
     value: t.id,
@@ -81,9 +93,9 @@ export function DisplayPanel({ userId, onDirty, saveSignal, resetSignal }: Displ
   const fontOptions = fonts.map(f => ({ value: f.name, label: `${f.name} (${f.style})` }))
 
   const cursorOptions = [
-    { value: 'block', label: 'Block █' },
+    { value: 'block', label: 'Block \u2588' },
     { value: 'underline', label: 'Underline _' },
-    { value: 'bar', label: 'Bar │' },
+    { value: 'bar', label: 'Bar \u2502' },
   ]
 
   const promptOptions = [
@@ -102,7 +114,6 @@ export function DisplayPanel({ userId, onDirty, saveSignal, resetSignal }: Displ
           value={prefs.theme}
           onChange={(v) => {
             update('theme', v)
-            // Apply theme colors from preset
             const theme = themes.find(t => t.id === v)
             if (theme) {
               update('primary_color', theme.primary_color)
@@ -158,7 +169,7 @@ function ColorRow({ label, value, onChange }: { label: string; value: string; on
   return (
     <div className="flex items-center gap-2">
       <span className="min-w-[12ch]">{label}:</span>
-      <span style={{ color: value }}>██</span>
+      <span style={{ color: value }}>{'\u2588\u2588'}</span>
       <input
         type="text"
         value={value}

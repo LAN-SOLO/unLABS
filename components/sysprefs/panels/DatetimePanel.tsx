@@ -4,12 +4,13 @@ import { useEffect, useState, useCallback } from 'react'
 import { SectionBox } from '../controls/SectionBox'
 import { Toggle } from '../controls/Toggle'
 import { Dropdown } from '../controls/Dropdown'
-import { getDatetimePrefs, updateDatetimePrefs, getSystemConfig } from '@/lib/api/sysprefs'
+import { getDatetimePrefs, updateDatetimePrefs, getSystemConfig, logPrefChange } from '@/lib/api/sysprefs'
 import type { DbPlayerDatetimePrefs, DbSystemConfigCache } from '@/types/database'
 
 interface DatetimePanelProps {
   userId: string
   onDirty: (dirty: boolean) => void
+  onSaveError: (msg: string) => void
   saveSignal: number
   resetSignal: number
 }
@@ -47,11 +48,12 @@ const weekStartOptions = [
   { value: 'sunday', label: 'Sunday' },
 ]
 
-export function DatetimePanel({ userId, onDirty, saveSignal, resetSignal }: DatetimePanelProps) {
+export function DatetimePanel({ userId, onDirty, onSaveError, saveSignal, resetSignal }: DatetimePanelProps) {
   const [prefs, setPrefs] = useState<DbPlayerDatetimePrefs | null>(null)
   const [original, setOriginal] = useState<DbPlayerDatetimePrefs | null>(null)
   const [sysConfig, setSysConfig] = useState<DbSystemConfigCache | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [now, setNow] = useState(new Date())
 
   useEffect(() => {
@@ -62,10 +64,11 @@ export function DatetimePanel({ userId, onDirty, saveSignal, resetSignal }: Date
       setPrefs(p)
       setOriginal(p)
       setSysConfig(sc)
-    }).catch(() => {}).finally(() => setLoading(false))
+    }).catch((err) => {
+      setLoadError(err instanceof Error ? err.message : 'Failed to load datetime preferences')
+    }).finally(() => setLoading(false))
   }, [userId])
 
-  // Live clock
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(interval)
@@ -77,11 +80,23 @@ export function DatetimePanel({ userId, onDirty, saveSignal, resetSignal }: Date
   }, [prefs, original, onDirty])
 
   useEffect(() => {
-    if (saveSignal === 0 || !prefs) return
+    if (saveSignal === 0 || !prefs || !original) return
     const { id, player_id, created_at, updated_at, ...updates } = prefs
     updateDatetimePrefs(userId, updates)
-      .then((saved) => { setPrefs(saved); setOriginal(saved) })
-      .catch(() => {})
+      .then((saved) => {
+        const changedKeys = Object.keys(updates) as (keyof typeof updates)[]
+        for (const key of changedKeys) {
+          const oldVal = String(original[key as keyof DbPlayerDatetimePrefs] ?? '')
+          const newVal = String(prefs[key as keyof DbPlayerDatetimePrefs] ?? '')
+          if (oldVal !== newVal) {
+            logPrefChange(userId, 'datetime', key, oldVal, newVal, userId).catch(() => {})
+          }
+        }
+        setPrefs(saved); setOriginal(saved)
+      })
+      .catch((err) => {
+        onSaveError(err instanceof Error ? err.message : 'Failed to save datetime preferences')
+      })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveSignal])
 
@@ -96,7 +111,8 @@ export function DatetimePanel({ userId, onDirty, saveSignal, resetSignal }: Date
   }, [])
 
   if (loading) return <div className="p-2">Loading datetime preferences...</div>
-  if (!prefs) return <div className="p-2 text-red-400">Failed to load datetime preferences</div>
+  if (loadError) return <div className="p-2 text-[var(--state-error,#FF3300)]">Error: {loadError}</div>
+  if (!prefs) return <div className="p-2 text-[var(--state-error,#FF3300)]">Failed to load datetime preferences</div>
 
   // Format current time based on preferences
   const formatTime = () => {

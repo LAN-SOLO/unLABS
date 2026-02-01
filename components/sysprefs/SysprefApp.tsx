@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { SysprefHeader } from './SysprefHeader'
 import { SysprefSidebar } from './SysprefSidebar'
 import { SysprefFooter } from './SysprefFooter'
@@ -11,6 +11,8 @@ import { NetworkPanel } from './panels/NetworkPanel'
 import { UserPanel } from './panels/UserPanel'
 import { DatetimePanel } from './panels/DatetimePanel'
 import type { SysprefArea } from './SysprefSidebar'
+
+const AREAS: SysprefArea[] = ['about', 'display', 'sound', 'network', 'user', 'datetime']
 
 interface SysprefAppProps {
   userId: string
@@ -25,11 +27,14 @@ export function SysprefApp({ userId, username, initialArea, onExit }: SysprefApp
   const [saving, setSaving] = useState(false)
   const [saveSignal, setSaveSignal] = useState(0)
   const [resetSignal, setResetSignal] = useState(0)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [confirmQuit, setConfirmQuit] = useState(false)
+  const panelRef = useRef<HTMLElement>(null)
 
   const handleSave = useCallback(() => {
     setSaving(true)
+    setSaveError(null)
     setSaveSignal(s => s + 1)
-    // Panels react to saveSignal and persist. We just show a brief saving state.
     setTimeout(() => {
       setSaving(false)
       setHasUnsavedChanges(false)
@@ -39,16 +44,32 @@ export function SysprefApp({ userId, username, initialArea, onExit }: SysprefApp
   const handleReset = useCallback(() => {
     setResetSignal(s => s + 1)
     setHasUnsavedChanges(false)
+    setSaveError(null)
   }, [])
 
   const handleQuit = useCallback(() => {
+    if (hasUnsavedChanges && !confirmQuit) {
+      setConfirmQuit(true)
+      return
+    }
     onExit()
-  }, [onExit])
+  }, [onExit, hasUnsavedChanges, confirmQuit])
+
+  // Reset confirm quit when changes are saved or area changes
+  useEffect(() => {
+    setConfirmQuit(false)
+  }, [hasUnsavedChanges, currentArea])
+
+  // Clear save error after 3s
+  useEffect(() => {
+    if (!saveError) return
+    const t = setTimeout(() => setSaveError(null), 3000)
+    return () => clearTimeout(t)
+  }, [saveError])
 
   // Global keyboard shortcuts
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      // Don't capture when typing in inputs
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
 
       if (e.key === 'q' || e.key === 'Q') {
@@ -62,19 +83,40 @@ export function SysprefApp({ userId, username, initialArea, onExit }: SysprefApp
         handleReset()
       } else if (e.key === 'Escape') {
         e.preventDefault()
-        handleQuit()
-      } else if (e.key >= '1' && e.key <= '6') {
-        const areas: SysprefArea[] = ['about', 'display', 'sound', 'network', 'user', 'datetime']
-        const idx = parseInt(e.key) - 1
-        if (idx < areas.length) {
-          setCurrentArea(areas[idx])
+        if (confirmQuit) {
+          setConfirmQuit(false)
+        } else {
+          handleQuit()
         }
+      } else if (e.key === 'y' && confirmQuit) {
+        e.preventDefault()
+        onExit()
+      } else if (e.key === 'n' && confirmQuit) {
+        e.preventDefault()
+        setConfirmQuit(false)
+      } else if (e.key >= '1' && e.key <= '6') {
+        const idx = parseInt(e.key) - 1
+        if (idx < AREAS.length) {
+          setCurrentArea(AREAS[idx])
+        }
+      } else if (e.key === 'Tab' && !e.shiftKey) {
+        // Tab into panel content
+        e.preventDefault()
+        const firstFocusable = panelRef.current?.querySelector<HTMLElement>(
+          '[tabindex="0"], [role="switch"], [role="slider"], [role="combobox"], [role="radio"], input'
+        )
+        firstFocusable?.focus()
       }
     }
 
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [handleQuit, handleSave, handleReset])
+  }, [handleQuit, handleSave, handleReset, confirmQuit, onExit])
+
+  const onSaveError = useCallback((msg: string) => {
+    setSaveError(msg)
+    setSaving(false)
+  }, [])
 
   const renderPanel = () => {
     switch (currentArea) {
@@ -85,6 +127,7 @@ export function SysprefApp({ userId, username, initialArea, onExit }: SysprefApp
           <DisplayPanel
             userId={userId}
             onDirty={setHasUnsavedChanges}
+            onSaveError={onSaveError}
             saveSignal={saveSignal}
             resetSignal={resetSignal}
           />
@@ -94,6 +137,7 @@ export function SysprefApp({ userId, username, initialArea, onExit }: SysprefApp
           <SoundPanel
             userId={userId}
             onDirty={setHasUnsavedChanges}
+            onSaveError={onSaveError}
             saveSignal={saveSignal}
             resetSignal={resetSignal}
           />
@@ -103,6 +147,7 @@ export function SysprefApp({ userId, username, initialArea, onExit }: SysprefApp
           <NetworkPanel
             userId={userId}
             onDirty={setHasUnsavedChanges}
+            onSaveError={onSaveError}
             saveSignal={saveSignal}
             resetSignal={resetSignal}
           />
@@ -114,6 +159,7 @@ export function SysprefApp({ userId, username, initialArea, onExit }: SysprefApp
           <DatetimePanel
             userId={userId}
             onDirty={setHasUnsavedChanges}
+            onSaveError={onSaveError}
             saveSignal={saveSignal}
             resetSignal={resetSignal}
           />
@@ -124,9 +170,22 @@ export function SysprefApp({ userId, username, initialArea, onExit }: SysprefApp
   return (
     <div className="flex flex-col h-full bg-[var(--bg-void,#0A0A0A)] text-[var(--crt-green,#00FF41)] font-mono text-sm">
       <SysprefHeader hasUnsavedChanges={hasUnsavedChanges} />
+
+      {confirmQuit && (
+        <div className="px-3 py-1 bg-[rgba(255,51,0,0.1)] border-b border-[var(--state-error,#FF3300)] text-[var(--state-error,#FF3300)] text-center">
+          Unsaved changes will be lost. Quit anyway? [Y]es / [N]o
+        </div>
+      )}
+
+      {saveError && (
+        <div className="px-3 py-1 bg-[rgba(255,51,0,0.1)] border-b border-[var(--state-error,#FF3300)] text-[var(--state-error,#FF3300)] text-center">
+          Save failed: {saveError}
+        </div>
+      )}
+
       <div className="flex flex-1 overflow-hidden">
         <SysprefSidebar currentArea={currentArea} onAreaChange={setCurrentArea} />
-        <main className="flex-1 p-2 overflow-y-auto" role="main" aria-label={`${currentArea} settings`}>
+        <main ref={panelRef} className="flex-1 p-2 overflow-y-auto" role="main" aria-label={`${currentArea} settings`}>
           {renderPanel()}
         </main>
       </div>
@@ -140,4 +199,3 @@ export function SysprefApp({ userId, username, initialArea, onExit }: SysprefApp
     </div>
   )
 }
-

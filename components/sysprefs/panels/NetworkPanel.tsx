@@ -5,22 +5,24 @@ import { SectionBox } from '../controls/SectionBox'
 import { Toggle } from '../controls/Toggle'
 import { Slider } from '../controls/Slider'
 import { Dropdown } from '../controls/Dropdown'
-import { getNetworkPrefs, updateNetworkPrefs, getSystemConfig, getSecurityPolicies } from '@/lib/api/sysprefs'
+import { getNetworkPrefs, updateNetworkPrefs, getSystemConfig, getSecurityPolicies, logPrefChange } from '@/lib/api/sysprefs'
 import type { DbPlayerNetworkPrefs, DbSystemConfigCache, DbUserSecurityPolicies } from '@/types/database'
 
 interface NetworkPanelProps {
   userId: string
   onDirty: (dirty: boolean) => void
+  onSaveError: (msg: string) => void
   saveSignal: number
   resetSignal: number
 }
 
-export function NetworkPanel({ userId, onDirty, saveSignal, resetSignal }: NetworkPanelProps) {
+export function NetworkPanel({ userId, onDirty, onSaveError, saveSignal, resetSignal }: NetworkPanelProps) {
   const [prefs, setPrefs] = useState<DbPlayerNetworkPrefs | null>(null)
   const [original, setOriginal] = useState<DbPlayerNetworkPrefs | null>(null)
   const [sysConfig, setSysConfig] = useState<DbSystemConfigCache | null>(null)
   const [secPolicy, setSecPolicy] = useState<DbUserSecurityPolicies | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([
@@ -32,7 +34,9 @@ export function NetworkPanel({ userId, onDirty, saveSignal, resetSignal }: Netwo
       setOriginal(p)
       setSysConfig(sc)
       setSecPolicy(sp)
-    }).catch(() => {}).finally(() => setLoading(false))
+    }).catch((err) => {
+      setLoadError(err instanceof Error ? err.message : 'Failed to load network preferences')
+    }).finally(() => setLoading(false))
   }, [userId])
 
   useEffect(() => {
@@ -41,11 +45,23 @@ export function NetworkPanel({ userId, onDirty, saveSignal, resetSignal }: Netwo
   }, [prefs, original, onDirty])
 
   useEffect(() => {
-    if (saveSignal === 0 || !prefs) return
+    if (saveSignal === 0 || !prefs || !original) return
     const { id, player_id, created_at, updated_at, ...updates } = prefs
     updateNetworkPrefs(userId, updates)
-      .then((saved) => { setPrefs(saved); setOriginal(saved) })
-      .catch(() => {})
+      .then((saved) => {
+        const changedKeys = Object.keys(updates) as (keyof typeof updates)[]
+        for (const key of changedKeys) {
+          const oldVal = String(original[key as keyof DbPlayerNetworkPrefs] ?? '')
+          const newVal = String(prefs[key as keyof DbPlayerNetworkPrefs] ?? '')
+          if (oldVal !== newVal) {
+            logPrefChange(userId, 'network', key, oldVal, newVal, userId).catch(() => {})
+          }
+        }
+        setPrefs(saved); setOriginal(saved)
+      })
+      .catch((err) => {
+        onSaveError(err instanceof Error ? err.message : 'Failed to save network preferences')
+      })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveSignal])
 
@@ -60,7 +76,8 @@ export function NetworkPanel({ userId, onDirty, saveSignal, resetSignal }: Netwo
   }, [])
 
   if (loading) return <div className="p-2">Loading network preferences...</div>
-  if (!prefs) return <div className="p-2 text-red-400">Failed to load network preferences</div>
+  if (loadError) return <div className="p-2 text-[var(--state-error,#FF3300)]">Error: {loadError}</div>
+  if (!prefs) return <div className="p-2 text-[var(--state-error,#FF3300)]">Failed to load network preferences</div>
 
   const regionOptions = [
     { value: 'auto', label: 'Auto-detect' },
