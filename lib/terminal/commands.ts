@@ -2825,7 +2825,7 @@ const deviceCommand: Command = {
 
       const lines: string[] = [
         '',
-        `┌─ Dependencies: ${device.name} ${'─'.repeat(Math.max(0, W - 17 - device.name.length))}┐`,
+        `┌─ Dependencies: ${device.name} ${'─'.repeat(Math.max(0, W - 18 - device.name.length))}┐`,
         blank,
         row(`Tech Tree:  ${treeName}`),
         row(`Tier:       ${tier}`),
@@ -2877,7 +2877,7 @@ const deviceCommand: Command = {
           success: true,
           output: [
             '',
-            `┌─ Combinations: ${device.name} ${'─'.repeat(Math.max(0, CW - 17 - device.name.length))}┐`,
+            `┌─ Combinations: ${device.name} ${'─'.repeat(Math.max(0, CW - 18 - device.name.length))}┐`,
             crow('NO COMPATIBLE DEVICES FOUND'),
             `└${'─'.repeat(CW)}┘`,
             '',
@@ -2887,7 +2887,7 @@ const deviceCommand: Command = {
 
       const lines: string[] = [
         '',
-        `┌─ Combinations: ${device.name} ${'─'.repeat(Math.max(0, CW - 17 - device.name.length))}┐`,
+        `┌─ Combinations: ${device.name} ${'─'.repeat(Math.max(0, CW - 18 - device.name.length))}┐`,
         cblank,
       ]
 
