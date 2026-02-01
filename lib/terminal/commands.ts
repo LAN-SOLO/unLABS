@@ -1923,6 +1923,53 @@ const deviceCommand: Command = {
       }
     }
 
+    // Global status overview
+    if (deviceName === 'status') {
+      const statuses = ['ONLINE', 'ONLINE', 'STANDBY', 'ONLINE', 'OFFLINE', 'ONLINE']
+      const devices = [
+        { id: 'UEC-001', name: 'Unstable Energy Core', cat: 'GEN' },
+        { id: 'CDC-001', name: 'Crystal Data Cache', cat: 'MED' },
+        { id: 'BAT-001', name: 'Portable Battery Pack', cat: 'STO' },
+        { id: 'MFR-001', name: 'Microfusion Reactor', cat: 'GEN' },
+        { id: 'HMS-001', name: 'Handmade Synthesizer', cat: 'MED' },
+        { id: 'QAN-001', name: 'Quantum Analyzer', cat: 'MED' },
+      ]
+
+      // Check context for actual device power states
+      const getStatus = (id: string) => {
+        const ctxMap: Record<string, (() => boolean) | undefined> = {
+          'CDC-001': ctx.data.cdcDevice ? () => ctx.data.cdcDevice!.getState().isPowered : undefined,
+          'UEC-001': ctx.data.uecDevice ? () => ctx.data.uecDevice!.getState().isPowered : undefined,
+        }
+        const check = ctxMap[id]
+        if (check) return check() ? 'ONLINE' : 'OFFLINE'
+        return statuses[Math.floor(Math.random() * statuses.length)]
+      }
+
+      const lines: string[] = [
+        '',
+        `┌─ Device Status Overview ${'─'.repeat(20)}`,
+        '│',
+        '│  ID        NAME                     CAT   STATE',
+        '│  ─────────────────────────────────────────────────',
+      ]
+
+      for (const d of devices) {
+        const st = getStatus(d.id)
+        const stColor = st === 'ONLINE' ? '●' : st === 'STANDBY' ? '○' : '·'
+        lines.push(`│  ${d.id}   ${d.name.padEnd(25)}${d.cat}   ${stColor} ${st}`)
+      }
+
+      lines.push(
+        '│',
+        '│  Use DEVICE <name> STATUS for individual device details.',
+        `└${'─'.repeat(40)}`,
+        '',
+      )
+
+      return { success: true, output: lines }
+    }
+
     // Device-specific commands
     const deviceMap: Record<string, { name: string; id: string; version: string; desc: string; compatible: string[] }> = {
       'cache': {
