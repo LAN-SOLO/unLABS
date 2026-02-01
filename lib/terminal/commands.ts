@@ -3075,9 +3075,49 @@ const deviceCommand: Command = {
       return { success: true, output: lines }
     }
 
+    // Device monitor (live-style snapshot)
+    if (action === 'monitor' || action === 'mon' || action === 'watch') {
+      const health = (75 + Math.random() * 25).toFixed(1)
+      const load = (Math.random() * 100).toFixed(1)
+      const temp = (25 + Math.random() * 40).toFixed(1)
+      const uptime = `${Math.floor(Math.random() * 72)}h ${Math.floor(Math.random() * 60)}m`
+      const power = device.compatible.length > 3 ? (10 + Math.random() * 30).toFixed(1) : (2 + Math.random() * 15).toFixed(1)
+
+      const bar = (pct: number, len: number = 20) => {
+        const filled = Math.round((pct / 100) * len)
+        return '█'.repeat(filled) + '░'.repeat(len - filled)
+      }
+
+      const healthN = parseFloat(health)
+      const loadN = parseFloat(load)
+      const tempN = parseFloat(temp)
+      const tempWarn = tempN > 55 ? ' ⚠' : ''
+
+      const lines: string[] = [
+        '',
+        `┌─ Monitor: ${device.name} (${device.id}) ${'─'.repeat(15)}`,
+        '│',
+        `│  Health:      [${bar(healthN)}] ${health}%`,
+        `│  Load:        [${bar(loadN)}] ${load}%`,
+        `│  Temperature: [${bar(tempN / 0.85)}] ${temp}°C${tempWarn}`,
+        `│  Power Draw:  ${power} E/s`,
+        `│  Uptime:      ${uptime}`,
+        '│',
+        `│  Status:      ● ONLINE`,
+        `│  Version:     ${device.version}`,
+        '│',
+        '│  Note: This is a point-in-time snapshot.',
+        '│  Use device panels for real-time monitoring.',
+        `└${'─'.repeat(40)}`,
+        '',
+      ]
+
+      return { success: true, output: lines }
+    }
+
     return {
       success: false,
-      error: `Unknown action: ${action}\nAvailable: TEST, REBOOT, STATUS, INFO, POWER, COMBOS, DEPS, INFLUENCE, TWEAKS`,
+      error: `Unknown action: ${action}\nAvailable: INFO, STATUS, TEST, REBOOT, POWER, DEPS, COMBOS, INFLUENCE, TWEAKS, MONITOR`,
     }
   },
 }
