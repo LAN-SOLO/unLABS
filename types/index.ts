@@ -4,6 +4,9 @@ export * from './database'
 // Device Manager types
 export * from './devices'
 
+// System Preferences types
+export * from './sysprefs'
+
 // Game constants
 export const CRYSTAL_COLORS = [
   'infrared',
