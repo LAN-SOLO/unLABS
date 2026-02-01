@@ -20,10 +20,27 @@ export function TerminalOutput({ lines, isTyping }: TerminalOutputProps) {
     isUserScrolledUp.current = distanceFromBottom > 30
   }, [])
 
+  // Reset scroll lock when new lines are added (user submitted a command)
+  const prevLineCount = useRef(lines.length)
+  useEffect(() => {
+    if (lines.length > prevLineCount.current) {
+      // New output arrived — check if an input line was just added
+      const newLines = lines.slice(prevLineCount.current)
+      if (newLines.some(l => l.type === 'input')) {
+        isUserScrolledUp.current = false
+      }
+    }
+    prevLineCount.current = lines.length
+  }, [lines])
+
   // Auto-scroll to bottom only if user hasn't scrolled up
   useEffect(() => {
     if (containerRef.current && !isUserScrolledUp.current) {
-      containerRef.current.scrollTop = containerRef.current.scrollHeight
+      requestAnimationFrame(() => {
+        if (containerRef.current) {
+          containerRef.current.scrollTop = containerRef.current.scrollHeight
+        }
+      })
     }
   }, [lines, isTyping])
 
