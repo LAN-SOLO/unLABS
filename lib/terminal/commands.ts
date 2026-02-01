@@ -190,6 +190,7 @@ const helpCommand: Command = {
       '|  balance   - check _unSC token balance                     |',
       '|  research  - view tech tree progress                       |',
       '|  scan      - scan for volatility data                      |',
+      '|  res       - manage resource containers                     |',
       '+------------------------------------------------------------+',
       '|                     filesystem                              |',
       '+------------------------------------------------------------+',
@@ -1615,6 +1616,10 @@ const deviceCommand: Command = {
           '        Control device power state by device ID.',
           '        Example: undev power CDC-001 on',
           '',
+          '    power off all | power on all',
+          '        Bulk power off or on ALL registered devices.',
+          '        Example: undev power off all',
+          '',
           '    <device-name> deps',
           '        Show tech tree dependencies: prerequisites and',
           '        what this device unlocks. Also: dependencies, tree.',
@@ -1892,16 +1897,12 @@ const deviceCommand: Command = {
       }
     }
 
-    // Handle "device power <id> <on|off>" syntax
+    // Handle "device power <id|all> <on|off>" syntax
     if (deviceName === 'power' && action) {
       const powerId = action.toUpperCase()
       const powerAction = args[2]?.toLowerCase()
 
-      if (!powerAction || (powerAction !== 'on' && powerAction !== 'off')) {
-        return { success: false, error: 'usage: device power <device-id> <on|off>\nexample: device power UEC-001 on' }
-      }
-
-      // Build a temporary device lookup to find the name
+      // Build device lookup maps used by both single and bulk power
       const idToName: Record<string, string> = {
         'CDC-001': 'Crystal Data Cache', 'UEC-001': 'Unstable Energy Core',
         'BAT-001': 'Battery Pack', 'HMS-001': 'Handmade Synthesizer',
@@ -1910,21 +1911,15 @@ const deviceCommand: Command = {
         'SCA-001': 'Supercomputer Array', 'EXD-001': 'Explorer Drone',
         'EMC-001': 'Exotic Matter Contain.', 'VNT-001': 'Ventilation System',
         'QAN-001': 'Quantum Analyzer', 'QSM-001': 'Quantum State Monitor',
-        'PWB-001': 'Portable Workbench',
-        'BTK-001': 'Basic Toolkit',
-        'RMG-001': 'Resource Magnet',
-        'MSC-001': 'Material Scanner',
-        'NET-001': 'Network Monitor',
-        'TMP-001': 'Temperature Monitor',
-        'DIM-001': 'Dimension Monitor',
-        'CPU-001': 'CPU Monitor',
-        'CLK-001': 'Lab Clock',
-        'MEM-001': 'Memory Monitor',
-        'AND-001': 'Anomaly Detector',
-        'QCP-001': 'Quantum Compass',
-        'TLP-001': 'Teleport Pad',
-        'LCT-001': 'Precision Laser',
-        'P3D-001': '3D Fabricator',
+        'PWB-001': 'Portable Workbench', 'BTK-001': 'Basic Toolkit',
+        'RMG-001': 'Resource Magnet', 'MSC-001': 'Material Scanner',
+        'NET-001': 'Network Monitor', 'TMP-001': 'Temperature Monitor',
+        'DIM-001': 'Dimension Monitor', 'CPU-001': 'CPU Monitor',
+        'CLK-001': 'Lab Clock', 'MEM-001': 'Memory Monitor',
+        'AND-001': 'Anomaly Detector', 'QCP-001': 'Quantum Compass',
+        'TLP-001': 'Teleport Pad', 'LCT-001': 'Precision Laser',
+        'P3D-001': '3D Fabricator', 'SPK-001': 'Narrow Speaker',
+        'DGN-001': 'Diagnostics Console',
       }
 
       const devicePowerCtrl: Record<string, { on: () => Promise<void>; off: () => Promise<void>; isPowered: () => boolean } | undefined> = {
@@ -1957,6 +1952,65 @@ const deviceCommand: Command = {
         'TLP-001': ctx.data.tlpDevice ? { on: () => ctx.data.tlpDevice!.powerOn(), off: () => ctx.data.tlpDevice!.powerOff(), isPowered: () => ctx.data.tlpDevice!.getState().isPowered } : undefined,
         'LCT-001': ctx.data.lctDevice ? { on: () => ctx.data.lctDevice!.powerOn(), off: () => ctx.data.lctDevice!.powerOff(), isPowered: () => ctx.data.lctDevice!.getState().isPowered } : undefined,
         'P3D-001': ctx.data.p3dDevice ? { on: () => ctx.data.p3dDevice!.powerOn(), off: () => ctx.data.p3dDevice!.powerOff(), isPowered: () => ctx.data.p3dDevice!.getState().isPowered } : undefined,
+        'SPK-001': ctx.data.spkDevice ? { on: () => ctx.data.spkDevice!.powerOn(), off: () => ctx.data.spkDevice!.powerOff(), isPowered: () => ctx.data.spkDevice!.getState().isPowered } : undefined,
+        'DGN-001': ctx.data.dgnDevice ? { on: () => ctx.data.dgnDevice!.powerOn(), off: () => ctx.data.dgnDevice!.powerOff(), isPowered: () => ctx.data.dgnDevice!.getState().isPowered } : undefined,
+      }
+
+      // Handle "undev power off all" / "undev power on all" / "undev power all off"
+      const allArg = powerId === 'ALL' || args[2]?.toUpperCase() === 'ALL'
+      const bulkAction = powerId === 'ALL' ? powerAction
+        : powerId === 'OFF' || powerId === 'ON' ? powerId.toLowerCase()
+        : null
+
+      if (allArg && bulkAction && (bulkAction === 'on' || bulkAction === 'off')) {
+        const lines: string[] = [
+          '',
+          `┌─────────────────────────────────────────────────┐`,
+          `│          BULK POWER ${bulkAction.toUpperCase()} — ALL DEVICES            │`,
+          `└─────────────────────────────────────────────────┘`,
+          '',
+        ]
+
+        let affected = 0
+        let skipped = 0
+
+        for (const [id, name] of Object.entries(idToName)) {
+          const ctrl = devicePowerCtrl[id]
+          if (!ctrl) {
+            lines.push(`  ${id}  ${name.padEnd(24)} — no manager`)
+            skipped++
+            continue
+          }
+          const powered = ctrl.isPowered()
+          if (bulkAction === 'off' && !powered) {
+            lines.push(`  ${id}  ${name.padEnd(24)} — already OFF`)
+            skipped++
+            continue
+          }
+          if (bulkAction === 'on' && powered) {
+            lines.push(`  ${id}  ${name.padEnd(24)} — already ON`)
+            skipped++
+            continue
+          }
+          if (bulkAction === 'off') {
+            await ctrl.off()
+            lines.push(`  ${id}  ${name.padEnd(24)} — powered OFF`)
+          } else {
+            await ctrl.on()
+            lines.push(`  ${id}  ${name.padEnd(24)} — powered ON`)
+          }
+          affected++
+        }
+
+        ctx.data.saveAllDeviceState?.()
+        lines.push('')
+        lines.push(`  ${affected} device(s) powered ${bulkAction.toUpperCase()}, ${skipped} skipped`)
+        lines.push('')
+        return { success: true, output: lines }
+      }
+
+      if (!powerAction || (powerAction !== 'on' && powerAction !== 'off')) {
+        return { success: false, error: 'usage: undev power <device-id|all> <on|off>\nexample: undev power UEC-001 on\n         undev power off all' }
       }
 
       // Resolve short names (e.g. "EMC" -> "EMC-001") and full IDs
@@ -15065,6 +15119,135 @@ const dgnCommand: Command = {
   },
 }
 
+// ==================================================
+// RES - Resource Container Management
+// ==================================================
+import type { ResourceManagerActions } from '@/contexts/ResourceManager'
+import { RESOURCE_CONTAINERS, TIER_LABELS, getContainerDef } from '@/types/resources'
+
+const resCommand: Command = {
+  name: 'res',
+  aliases: ['resources'],
+  description: 'Manage resource containers',
+  usage: 'res [list|info <ID>|tiers|unlock <ID>|upgrade <ID>]',
+  execute: async (args, ctx) => {
+    const rm = ctx.data.resourceManager
+    if (!rm) {
+      return { success: false, error: 'Resource Manager not available. Use from panel terminal.' }
+    }
+
+    const sub = args[0]?.toLowerCase()
+
+    // Default: show unlocked containers summary
+    if (!sub || sub === 'status') {
+      const unlocked = rm.getUnlockedContainers()
+      if (unlocked.length === 0) {
+        return { success: true, output: ['No unlocked containers.'] }
+      }
+      const lines = [
+        '',
+        '┌──────────┬────────────────────┬──────────────┬──────────┐',
+        '│ ID       │ Name               │ Amount/Cap   │ Flow     │',
+        '├──────────┼────────────────────┼──────────────┼──────────┤',
+      ]
+      for (const [id, cs] of unlocked) {
+        const def = getContainerDef(id)
+        if (!def) continue
+        const name = def.name.padEnd(18)
+        const amt = `${Math.floor(cs.amount)}/${cs.capacity}`.padEnd(12)
+        const flow = cs.flowRate > 0 ? `+${cs.flowRate.toFixed(1)}/s` : '—'
+        lines.push(`│ ${id.padEnd(8)} │ ${name} │ ${amt} │ ${flow.padEnd(8)} │`)
+      }
+      lines.push('└──────────┴────────────────────┴──────────────┴──────────┘')
+      lines.push('')
+      return { success: true, output: lines }
+    }
+
+    if (sub === 'list') {
+      const lines = [
+        '',
+        '┌──────────┬────────────────────┬──────┬──────────────┬──────────┐',
+        '│ ID       │ Name               │ Tier │ Amount/Cap   │ Status   │',
+        '├──────────┼────────────────────┼──────┼──────────────┼──────────┤',
+      ]
+      for (const def of RESOURCE_CONTAINERS) {
+        const cs = rm.getContainer(def.id)
+        const name = def.name.padEnd(18)
+        const tier = `T${def.tier}`.padEnd(4)
+        if (!cs || !cs.isUnlocked) {
+          lines.push(`│ ${def.id.padEnd(8)} │ ${name} │ ${tier} │ ${'—'.padEnd(12)} │ ${'LOCKED'.padEnd(8)} │`)
+        } else {
+          const amt = `${Math.floor(cs.amount)}/${cs.capacity}`.padEnd(12)
+          lines.push(`│ ${def.id.padEnd(8)} │ ${name} │ ${tier} │ ${amt} │ ${'ONLINE'.padEnd(8)} │`)
+        }
+      }
+      lines.push('└──────────┴────────────────────┴──────┴──────────────┴──────────┘')
+      lines.push('')
+      return { success: true, output: lines }
+    }
+
+    if (sub === 'info') {
+      const id = args[1]?.toUpperCase()
+      if (!id) return { success: false, error: 'Usage: res info <CONTAINER-ID>' }
+      const def = getContainerDef(id)
+      if (!def) return { success: false, error: `Unknown container: ${id}` }
+      const cs = rm.getContainer(id)
+      const lines = [
+        '',
+        `  Container: ${def.name} [${def.id}]`,
+        `  Resource:  ${def.resourceType}`,
+        `  Tier:      ${def.tier} (${TIER_LABELS[def.tier] ?? '?'})`,
+        `  Capacity:  ${cs?.capacity ?? def.capacity}`,
+        `  Amount:    ${cs ? Math.floor(cs.amount) : '—'}`,
+        `  Flow Rate: ${cs && cs.flowRate > 0 ? `+${cs.flowRate.toFixed(1)}/s` : 'None'}`,
+        `  Status:    ${cs?.isUnlocked ? 'UNLOCKED' : 'LOCKED'}`,
+        `  Upgrades:  ${def.upgradesTo ?? 'None'}`,
+        '',
+      ]
+      return { success: true, output: lines }
+    }
+
+    if (sub === 'tiers') {
+      const lines = ['']
+      for (let t = 0; t <= 5; t++) {
+        const defs = RESOURCE_CONTAINERS.filter(d => d.tier === t)
+        if (defs.length === 0) continue
+        let totalAmt = 0, totalCap = 0, unlocked = 0
+        for (const d of defs) {
+          const cs = rm.getContainer(d.id)
+          if (cs?.isUnlocked) { totalAmt += cs.amount; totalCap += cs.capacity; unlocked++ }
+        }
+        lines.push(`  T${t} ${TIER_LABELS[t] ?? '?'}: ${unlocked}/${defs.length} unlocked | ${Math.floor(totalAmt)}/${totalCap} stored`)
+      }
+      lines.push('')
+      return { success: true, output: lines }
+    }
+
+    if (sub === 'unlock') {
+      const id = args[1]?.toUpperCase()
+      if (!id) return { success: false, error: 'Usage: res unlock <CONTAINER-ID>' }
+      const def = getContainerDef(id)
+      if (!def) return { success: false, error: `Unknown container: ${id}` }
+      const ok = rm.unlockContainer(id)
+      if (!ok) return { success: false, error: `Container ${id} is already unlocked or cannot be unlocked.` }
+      return { success: true, output: [`Container ${def.name} [${id}] unlocked.`] }
+    }
+
+    if (sub === 'upgrade') {
+      const id = args[1]?.toUpperCase()
+      if (!id) return { success: false, error: 'Usage: res upgrade <CONTAINER-ID>' }
+      const def = getContainerDef(id)
+      if (!def) return { success: false, error: `Unknown container: ${id}` }
+      const ok = rm.upgradeContainer(id)
+      if (!ok) return { success: false, error: `Cannot upgrade ${id}.` }
+      const cs = rm.getContainer(id)
+      return { success: true, output: [`Container ${def.name} [${id}] upgraded. New capacity: ${cs?.capacity ?? '?'}`] }
+    }
+
+    return { success: false, error: `Unknown subcommand: ${sub}\nUsage: res [list|info <ID>|tiers|unlock <ID>|upgrade <ID>]` }
+  },
+}
+
 // Command registry
 export const commands: Command[] = [
   helpCommand,
@@ -15159,6 +15342,7 @@ export const commands: Command[] = [
   shutdownCommand,
   rebootCommand,
   unsysprefCommand,
+  resCommand,
 ]
 
 // Find command by name or alias

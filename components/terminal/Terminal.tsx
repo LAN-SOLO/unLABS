@@ -42,6 +42,7 @@ import { useP3DManagerOptional } from '@/contexts/P3DManager'
 import { useSPKManagerOptional } from '@/contexts/SPKManager'
 import { useDGNManagerOptional } from '@/contexts/DGNManager'
 import { useScrewButtonManagerOptional } from '@/contexts/ScrewButtonManager'
+import { useResourceManagerOptional } from '@/contexts/ResourceManager'
 import { useSystemPowerOptional } from '@/contexts/SystemPowerManager'
 import type { CDCDeviceActions, UECDeviceActions, BATDeviceActions, HMSDeviceActions, ECRDeviceActions, IPLDeviceActions, MFRDeviceActions, AICDeviceActions, VNTDeviceActions, SCADeviceActions, EXDDeviceActions, QSMDeviceActions, EMCDeviceActions, QUADeviceActions, PWBDeviceActions, BTKDeviceActions, RMGDeviceActions, MSCDeviceActions, NETDeviceActions, TMPDeviceActions, DIMDeviceActions, CPUDeviceActions, CLKDeviceActions, MEMDeviceActions, ANDDeviceActions, QCPDeviceActions, TLPDeviceActions, LCTDeviceActions, P3DDeviceActions, SPKDeviceActions, DGNDeviceActions, ScrewButtonDeviceActions, ThemeActions } from '@/lib/terminal/types'
 
@@ -87,6 +88,7 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   const spkManager = useSPKManagerOptional()
   const dgnManager = useDGNManagerOptional()
   const screwButtonManager = useScrewButtonManagerOptional()
+  const resourceManager = useResourceManagerOptional()
   const systemPowerManager = useSystemPowerOptional()
 
   // Initialize VirtualFS and UserManager (persisted via refs, restored from localStorage)
@@ -1759,6 +1761,7 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     spkDeviceActions,
     dgnDeviceActions,
     screwButtonDeviceActions,
+    resourceManagerActions: resourceManager ?? undefined,
     filesystemActions,
     userActions,
     themeActions,

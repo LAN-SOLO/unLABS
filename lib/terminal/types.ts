@@ -1392,6 +1392,8 @@ export interface DataFetchers {
   // Filesystem and user management
   filesystemActions?: FilesystemActions
   userActions?: UserActions
+  // Resource container management
+  resourceManager?: import('@/contexts/ResourceManager').ResourceManagerActions
   // Theme management
   themeActions?: ThemeActions
   // System power control

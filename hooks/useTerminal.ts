@@ -56,6 +56,7 @@ interface UseTerminalProps {
   spkDeviceActions?: SPKDeviceActions
   dgnDeviceActions?: DGNDeviceActions
   screwButtonDeviceActions?: ScrewButtonDeviceActions
+  resourceManagerActions?: import('@/contexts/ResourceManager').ResourceManagerActions
   filesystemActions?: FilesystemActions
   userActions?: UserActions
   themeActions?: ThemeActions
@@ -69,7 +70,7 @@ interface UseTerminalProps {
   }
 }
 
-export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, rmgDeviceActions, mscDeviceActions, netDeviceActions, tmpDeviceActions, dimDeviceActions, cpuDeviceActions, clkDeviceActions, memDeviceActions, andDeviceActions, qcpDeviceActions, tlpDeviceActions, lctDeviceActions, p3dDeviceActions, spkDeviceActions, dgnDeviceActions, screwButtonDeviceActions, filesystemActions, userActions, themeActions, systemPowerActions }: UseTerminalProps) {
+export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, rmgDeviceActions, mscDeviceActions, netDeviceActions, tmpDeviceActions, dimDeviceActions, cpuDeviceActions, clkDeviceActions, memDeviceActions, andDeviceActions, qcpDeviceActions, tlpDeviceActions, lctDeviceActions, p3dDeviceActions, spkDeviceActions, dgnDeviceActions, screwButtonDeviceActions, resourceManagerActions, filesystemActions, userActions, themeActions, systemPowerActions }: UseTerminalProps) {
   const router = useRouter()
   const [state, setState] = useState<TerminalState>(() => {
     let savedHistory: string[] = []
@@ -190,6 +191,7 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
       timestamp: Date.now(),
       filesystem: filesystemActions?.toJSON(),
       users: userActions?.toJSON(),
+      resources: resourceManagerActions?.toSaveData(),
       devices: {
         cdc: { isPowered: cdcState?.isPowered ?? true, isExpanded: cdcState?.isExpanded ?? true },
         uec: { isPowered: uecState?.isPowered ?? true, isExpanded: uecState?.isExpanded ?? true },
@@ -384,11 +386,12 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
     spkDevice: spkDeviceActions,
     dgnDevice: dgnDeviceActions,
     screwButtons: screwButtonDeviceActions,
+    resourceManager: resourceManagerActions,
     filesystemActions,
     userActions,
     themeActions,
     systemPower: systemPowerActions,
-  }), [cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, rmgDeviceActions, mscDeviceActions, netDeviceActions, tmpDeviceActions, dimDeviceActions, cpuDeviceActions, clkDeviceActions, andDeviceActions, qcpDeviceActions, tlpDeviceActions, lctDeviceActions, p3dDeviceActions, spkDeviceActions, dgnDeviceActions, screwButtonDeviceActions, saveAllDeviceState, filesystemActions, userActions, themeActions, systemPowerActions])
+  }), [cdcDeviceActions, uecDeviceActions, batDeviceActions, hmsDeviceActions, ecrDeviceActions, iplDeviceActions, mfrDeviceActions, aicDeviceActions, vntDeviceActions, scaDeviceActions, exdDeviceActions, qsmDeviceActions, emcDeviceActions, quaDeviceActions, pwbDeviceActions, btkDeviceActions, rmgDeviceActions, mscDeviceActions, netDeviceActions, tmpDeviceActions, dimDeviceActions, cpuDeviceActions, clkDeviceActions, andDeviceActions, qcpDeviceActions, tlpDeviceActions, lctDeviceActions, p3dDeviceActions, spkDeviceActions, dgnDeviceActions, screwButtonDeviceActions, resourceManagerActions, saveAllDeviceState, filesystemActions, userActions, themeActions, systemPowerActions])
 
   // Initialize with welcome message
   useEffect(() => {

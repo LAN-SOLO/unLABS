@@ -6,6 +6,7 @@ export interface PanelSaveData {
   filesystem?: string
   users?: string
   themeIndex?: number
+  resources?: { [id: string]: { amount: number; isUnlocked: boolean } }
   devices: {
     cdc: { isPowered: boolean; isExpanded?: boolean }
     uec: { isPowered: boolean; isExpanded?: boolean }

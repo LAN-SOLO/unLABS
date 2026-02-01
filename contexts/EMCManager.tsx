@@ -187,9 +187,10 @@ export function EMCManagerProvider({ children, initialState }: EMCManagerProvide
   }, [deviceState, runBootSequence])
 
   const powerOff = useCallback(async () => {
-    if (deviceState !== 'online') return
+    if (deviceState !== 'online' && deviceState !== 'testing') return
     setIsPowered(false)
     await runShutdownSequence()
+    setIsExpanded(false)
   }, [deviceState, runShutdownSequence])
 
   const runTest = useCallback(async () => {

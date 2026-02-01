@@ -27,10 +27,6 @@ import {
   ResourceMagnet,
   QuantumCompass,
   PortableWorkbench,
-  AbstractumContainer,
-  EnergyTank,
-  AlloyForge,
-  NanoSynthesizer,
   MicrofusionReactor,
   AIAssistant,
   ExplorerDrone,
@@ -91,6 +87,8 @@ import { P3DManagerProvider, type P3DMode } from '@/contexts/P3DManager'
 import { SPKManagerProvider } from '@/contexts/SPKManager'
 import { DGNManagerProvider } from '@/contexts/DGNManager'
 import { ScrewButtonManagerProvider } from '@/contexts/ScrewButtonManager'
+import { ResourceManagerProvider, useResourceManagerOptional } from '@/contexts/ResourceManager'
+import { ResourceGrid } from '@/components/panel/modules/ResourceGrid'
 import type { EquipmentData } from '../terminal/actions/equipment'
 
 interface PanelClientProps {
@@ -201,6 +199,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
     <SPKManagerProvider initialState={saved?.spk ? { isPowered: saved.spk.isPowered, volume: saved.spk.volume, isMuted: saved.spk.isMuted, filters: saved.spk.filters } : undefined}>
     <DGNManagerProvider initialState={saved?.dgn ? { isPowered: saved.dgn.isPowered, category: saved.dgn.category, scanDepth: saved.dgn.scanDepth } : undefined}>
     <ScrewButtonManagerProvider initialState={saved?.screwButtons}>
+    <ResourceManagerProvider initialState={savedStateRef.current?.resources}>
     <WindowManagerProvider className="text-white">
       {/* Top Toolbar */}
       <PanelToolbar>
@@ -258,10 +257,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
           locked={balanceData.locked}
         />
         <MicrofusionReactor />
-        <AbstractumContainer amount={127} capacity={500} purity={94} />
-        <EnergyTank amount={340} capacity={1000} flowRate={12.5} />
-        <AlloyForge temperature={1450} output={3.2} isActive={true} />
-        <NanoSynthesizer particles={1247000} density={89} isProcessing={true} />
+        <ResourceGrid />
         <HandmadeSynthesizer progress={techTrees?.synthesizers} />
         <EchoRecorder progress={techTrees?.adapters} />
         <Interpolator progress={techTrees?.optics} />
@@ -274,24 +270,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
       {/* Main Area - Terminal + Organized Modules */}
       <PanelMain>
         {/* Top resource bars */}
-        <div className="grid grid-cols-4 gap-1 mb-1">
-          {[
-            { name: 'Abstractum', label: 'RES-1', value: 0.48, color: 'var(--neon-green)' },
-            { name: 'Energy', label: 'RES-2', value: 0.68, color: 'var(--neon-cyan)' },
-            { name: 'Alloys', label: 'RES-3', value: 0.25, color: 'var(--neon-amber)' },
-            { name: 'Nano', label: 'RES-4', value: 0.15, color: 'var(--neon-purple)' },
-          ].map((res) => (
-            <PanelFrame key={res.label} variant="default" className="p-1.5">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[9px] text-white/80">{res.name}</span>
-                <span className="font-mono text-[8px] text-white/40">{res.label}</span>
-              </div>
-              <div className="h-1.5 bg-black/50 rounded overflow-hidden mt-1">
-                <div className="h-full transition-all" style={{ width: `${res.value * 100}%`, background: res.color }} />
-              </div>
-            </PanelFrame>
-          ))}
-        </div>
+        <TopResourceBars />
 
         {/* Main content - Terminal-first layout */}
         <div className="flex flex-col gap-1 flex-1">
@@ -345,244 +324,112 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
               </div>
             </div>
 
-            {/* Tech Tree Preview - Enhanced with displays, LEDs, switches */}
-            <div className="border-t border-white/10 pt-1 flex-1 flex flex-col">
-              <div className="flex items-center justify-between mb-1 px-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[7px] text-white/40">TECH TREE · TIER 3-5 PREVIEW</span>
+            {/* Tech Tree Preview - All 12 Trees */}
+            <div className="border-t border-white/10 pt-1 flex-1 flex flex-col min-h-0">
+              <div className="flex items-center justify-between mb-0.5 px-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono text-[6px] text-white/40 tracking-wider">RESEARCH TREES</span>
                   <div className="flex gap-0.5">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-green)] animate-pulse" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-amber)]" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-red)]/30" />
+                    <div className="w-1 h-1 rounded-full bg-[var(--neon-green)] animate-pulse" />
+                    <div className="w-1 h-1 rounded-full bg-[var(--neon-amber)]" />
+                    <div className="w-1 h-1 rounded-full bg-white/15" />
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="font-mono text-[5px] text-white/30">SCAN</span>
-                  <div className="w-8 h-1.5 bg-[#0a1a0a] rounded overflow-hidden">
-                    <div className="h-full bg-[var(--neon-cyan)] animate-pulse" style={{ width: '60%' }} />
-                  </div>
-                </div>
+                <span className="font-mono text-[5px] text-white/25">3/12 ACTIVE</span>
               </div>
-              <div className="grid grid-cols-4 gap-x-2 gap-y-0.5 flex-1">
-                {/* TOOLS Column */}
-                <div className="flex flex-col gap-0.5">
-                  <div className="flex items-center justify-between border-b border-[var(--neon-amber)]/20 pb-0.5">
-                    <span className="font-mono text-[6px] text-[var(--neon-amber)]/60">TOOLS</span>
-                    <div className="flex gap-0.5">
-                      <div className="w-1 h-1 rounded-full bg-[var(--neon-amber)]" />
-                      <div className="w-1 h-1 rounded-full bg-[var(--neon-amber)]/30" />
+
+              {/* Gameplay Trees - 2 rows x 4 cols */}
+              <div className="grid grid-cols-4 gap-[3px] mb-[3px]">
+                {([
+                  { name: 'Tech',    icon: '⚡', tier: 2, progress: 78, color: '#00e5ff', status: 'active' },
+                  { name: 'Tools',   icon: '⚒',  tier: 1, progress: 45, color: '#ffb300', status: 'active' },
+                  { name: 'Gadgets', icon: '◈', tier: 1, progress: 22, color: '#b388ff', status: 'active' },
+                  { name: 'Science', icon: '◎', tier: 2, progress: 91, color: '#69f0ae', status: 'active' },
+                  { name: 'Refine',  icon: '⬡', tier: 1, progress: 10, color: '#ff6e40', status: 'idle' },
+                  { name: 'Combo',   icon: '⊕', tier: 0, progress: 0,  color: '#ffd740', status: 'locked' },
+                  { name: 'Music',   icon: '♫', tier: 1, progress: 33, color: '#ea80fc', status: 'idle' },
+                  { name: 'Art',     icon: '✦', tier: 0, progress: 0,  color: '#ff80ab', status: 'locked' },
+                ] as const).map(t => {
+                  const isLocked = t.status === 'locked'
+                  const isActive = t.status === 'active'
+                  return (
+                    <div key={t.name} className="relative overflow-hidden rounded-[2px]" style={{
+                      background: 'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.2) 100%)',
+                      border: `0.5px solid ${isLocked ? 'rgba(255,255,255,0.06)' : isActive ? t.color + '30' : 'rgba(255,255,255,0.08)'}`,
+                    }}>
+                      <div className="flex items-center gap-1 px-1 py-[3px]">
+                        <span className="text-[9px] leading-none" style={{ color: isLocked ? 'rgba(255,255,255,0.15)' : t.color, filter: isActive ? `drop-shadow(0 0 3px ${t.color})` : 'none' }}>{t.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono text-[7px] text-white/70 truncate">{t.name}</span>
+                            <span className="font-mono text-[6px] shrink-0" style={{ color: isLocked ? 'rgba(255,255,255,0.2)' : t.color + 'aa' }}>
+                              {isLocked ? '—' : `T${t.tier}`}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1 mt-[2px]">
+                            <div className="flex-1 h-[2px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                              <div className="h-full rounded-full transition-all" style={{
+                                width: `${t.progress}%`,
+                                background: isLocked ? 'transparent' : t.color,
+                                boxShadow: isActive ? `0 0 4px ${t.color}` : 'none',
+                              }} />
+                            </div>
+                            {isLocked && <span className="font-mono text-[5px] text-white/20">LOCK</span>}
+                            {!isLocked && <span className="font-mono text-[5px]" style={{ color: t.color + '80' }}>{t.progress}%</span>}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  {[
-                    { name: 'Drone Swarm', tier: 3, color: 'lime', icon: '◈', progress: 45, status: 'QUEUE', power: 120 },
-                    { name: 'Nano Assembler', tier: 3, color: 'purple', icon: '◉', progress: 12, status: 'LOCK', power: 80 },
-                    { name: 'Resonance Forge', tier: 3, color: 'orange', icon: '◎', progress: 0, status: 'LOCK', power: 200 },
-                    { name: 'World Forge', tier: 5, color: 'blue', icon: '◐', progress: 0, status: 'T5-REQ', power: 999 },
-                  ].map((item, idx) => (
-                    <PanelFrame key={item.name} variant="default" className="p-1.5 relative overflow-hidden flex-1 flex flex-col justify-center">
-                      {/* Mini display background */}
-                      <div className="absolute top-0 right-0 w-10 h-full bg-gradient-to-l from-black/40 to-transparent" />
-                      <div className="flex items-center gap-1.5">
-                        {/* Status LED */}
-                        <div className="flex flex-col items-center gap-1">
-                          <div className={`w-2 h-2 rounded-full ${item.progress > 0 ? 'bg-[var(--neon-green)] shadow-[0_0_6px_var(--neon-green)]' : 'bg-white/20'}`} />
-                          <span className={`text-[14px] ${item.progress > 0 ? `text-[var(--neon-${item.color})]` : 'text-white/30'}`}>{item.icon}</span>
-                        </div>
+                  )
+                })}
+              </div>
+
+              {/* Trait Trees - 1 row x 4 cols, highlighted */}
+              <div className="grid grid-cols-4 gap-[3px]">
+                {([
+                  { name: 'Devices',      icon: '⚙', tier: 1, maxV: 1, cap: 'Vol ≤1',  color: '#4fc3f7', progress: 60 },
+                  { name: 'Optics',       icon: '◉', tier: 1, maxV: 0, cap: '≤Orange', color: '#ce93d8', progress: 40 },
+                  { name: 'Adapters',     icon: '⇌', tier: 0, maxV: 0, cap: 'View',    color: '#81c784', progress: 0 },
+                  { name: 'Synthesizers', icon: '⬢', tier: 1, maxV: 0, cap: 'Basic',   color: '#ffab91', progress: 25 },
+                ] as const).map(t => {
+                  const isLocked = t.tier === 0
+                  return (
+                    <div key={t.name} className="relative overflow-hidden rounded-[2px]" style={{
+                      background: `linear-gradient(180deg, ${t.color}08 0%, rgba(0,0,0,0.25) 100%)`,
+                      border: `0.5px solid ${isLocked ? 'rgba(255,255,255,0.06)' : t.color + '35'}`,
+                    }}>
+                      <div className="flex items-center gap-1 px-1 py-[3px]">
+                        <span className="text-[9px] leading-none" style={{ color: isLocked ? 'rgba(255,255,255,0.15)' : t.color, filter: !isLocked ? `drop-shadow(0 0 2px ${t.color})` : 'none' }}>{t.icon}</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between">
-                            <div className="font-mono text-[8px] text-white/80 truncate">{item.name}</div>
-                            {/* Mini 7-segment display */}
-                            <div className="bg-[#0a0a0a] px-1 py-0.5 rounded border border-[var(--neon-green)]/20">
-                              <span className="font-mono text-[7px] text-[var(--neon-green)]">{item.power}</span>
-                            </div>
+                            <span className="font-mono text-[7px] text-white/70 truncate">{t.name}</span>
+                            <span className="font-mono text-[5px] px-[3px] rounded-[1px] shrink-0" style={{
+                              color: isLocked ? 'rgba(255,255,255,0.25)' : t.color,
+                              background: isLocked ? 'transparent' : t.color + '15',
+                              border: isLocked ? 'none' : `0.5px solid ${t.color}25`,
+                            }}>{isLocked ? '—' : t.cap}</span>
                           </div>
-                          <div className="flex items-center gap-1 mt-1">
-                            <span className="font-mono text-[6px] text-white/30">T{item.tier}</span>
-                            {/* Progress bar */}
-                            <div className="flex-1 h-1.5 bg-[#1a1a1a] rounded overflow-hidden">
-                              <div
-                                className="h-full transition-all"
-                                style={{
-                                  width: `${item.progress}%`,
-                                  background: item.progress > 0 ? `var(--neon-${item.color})` : 'transparent'
-                                }}
-                              />
+                          <div className="flex items-center gap-1 mt-[2px]">
+                            {/* 5-segment tier meter */}
+                            <div className="flex gap-[1px]">
+                              {[1,2,3,4,5].map(i => (
+                                <div key={i} className="h-[3px] rounded-[0.5px]" style={{
+                                  width: '4px',
+                                  background: i <= t.tier ? t.color : 'rgba(255,255,255,0.06)',
+                                  boxShadow: i <= t.tier ? `0 0 3px ${t.color}` : 'none',
+                                }} />
+                              ))}
                             </div>
-                            {/* Status badge */}
-                            <span className={`font-mono text-[6px] px-1 rounded ${
-                              item.status === 'QUEUE' ? 'bg-[var(--neon-amber)]/20 text-[var(--neon-amber)]' :
-                              item.status === 'LOCK' ? 'bg-white/10 text-white/40' :
-                              'bg-[var(--neon-red)]/20 text-[var(--neon-red)]'
-                            }`}>{item.status}</span>
+                            <div className="flex-1" />
+                            <span className="font-mono text-[5px]" style={{ color: isLocked ? 'rgba(255,255,255,0.2)' : t.color + '80' }}>
+                              {isLocked ? 'LOCK' : `T${t.tier}`}
+                            </span>
                           </div>
                         </div>
                       </div>
-                    </PanelFrame>
-                  ))}
-                </div>
-                {/* TECH Column */}
-                <div className="flex flex-col gap-0.5">
-                  <div className="flex items-center justify-between border-b border-[var(--neon-cyan)]/20 pb-0.5">
-                    <span className="font-mono text-[6px] text-[var(--neon-cyan)]/60">TECH</span>
-                    <div className="font-mono text-[6px] text-[var(--neon-cyan)]/40">4/12</div>
-                  </div>
-                  {[
-                    { name: 'Holo Sim-Deck', tier: 3, color: 'cyan', icon: '▣', cpu: 67, mem: 45, online: true },
-                    { name: 'Crypto Co-Proc', tier: 3, color: 'green', icon: '▤', cpu: 89, mem: 72, online: true },
-                    { name: 'Sentient AI', tier: 4, color: 'green', icon: '▥', cpu: 0, mem: 0, online: false },
-                    { name: 'Singularity', tier: 5, color: 'pink', icon: '●', cpu: 0, mem: 0, online: false },
-                  ].map((item) => (
-                    <PanelFrame key={item.name} variant="teal" className="p-1.5 flex-1 flex flex-col justify-center">
-                      <div className="flex items-center gap-1.5">
-                        {/* Connection indicator */}
-                        <div className="flex flex-col items-center gap-1">
-                          <div className={`w-2 h-2 rounded-sm ${item.online ? 'bg-[var(--neon-cyan)] shadow-[0_0_6px_var(--neon-cyan)]' : 'bg-white/10'}`} />
-                          <span className={`text-[14px] ${item.online ? `text-[var(--neon-${item.color})]` : 'text-white/20'}`}>{item.icon}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <div className="font-mono text-[8px] text-white/80 truncate">{item.name}</div>
-                            {/* Online/Offline switch visual */}
-                            <div className={`w-5 h-2.5 rounded-full relative ${item.online ? 'bg-[var(--neon-green)]/30' : 'bg-white/10'}`}>
-                              <div className={`absolute top-0.5 w-1.5 h-1.5 rounded-full bg-white transition-all ${item.online ? 'left-3' : 'left-0.5'}`} />
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1 mt-1">
-                            <span className="font-mono text-[6px] text-white/30">T{item.tier}</span>
-                            {/* CPU/MEM mini meters */}
-                            {item.online && (
-                              <>
-                                <div className="flex items-center gap-0.5">
-                                  <span className="font-mono text-[5px] text-[var(--neon-cyan)]/60">CPU</span>
-                                  <div className="w-8 h-1.5 bg-[#0a1a1a] rounded overflow-hidden">
-                                    <div className="h-full bg-[var(--neon-cyan)]" style={{ width: `${item.cpu}%` }} />
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-0.5">
-                                  <span className="font-mono text-[5px] text-[var(--neon-green)]/60">MEM</span>
-                                  <div className="w-8 h-1.5 bg-[#0a1a1a] rounded overflow-hidden">
-                                    <div className="h-full bg-[var(--neon-green)]" style={{ width: `${item.mem}%` }} />
-                                  </div>
-                                </div>
-                              </>
-                            )}
-                            {!item.online && <span className="font-mono text-[6px] text-white/20">OFFLINE</span>}
-                          </div>
-                        </div>
-                      </div>
-                    </PanelFrame>
-                  ))}
-                </div>
-                {/* GADGETS Column */}
-                <div className="flex flex-col gap-0.5">
-                  <div className="flex items-center justify-between border-b border-[var(--neon-purple,#9d00ff)]/20 pb-0.5">
-                    <span className="font-mono text-[6px] text-[var(--neon-purple,#9d00ff)]/60">GADGETS</span>
-                    <div className="flex gap-px">
-                      {[1,2,3,4].map(i => (
-                        <div key={i} className={`w-1.5 h-2.5 ${i <= 2 ? 'bg-[var(--neon-purple,#9d00ff)]' : 'bg-white/10'}`} />
-                      ))}
                     </div>
-                  </div>
-                  {[
-                    { name: 'Containment', tier: 3, color: 'green', icon: '◻', charge: 87, temp: 23, stable: true },
-                    { name: 'Phase Shifter', tier: 3, color: 'cyan', icon: '◇', charge: 45, temp: 67, stable: true },
-                    { name: 'Gravity Inv', tier: 4, color: 'blue', icon: '◆', charge: 0, temp: 0, stable: false },
-                    { name: 'Temporal Watch', tier: 5, color: 'amber', icon: '◈', charge: 0, temp: 0, stable: false },
-                  ].map((item) => (
-                    <PanelFrame key={item.name} variant="default" className="p-1.5 flex-1 flex flex-col justify-center">
-                      <div className="flex items-center gap-1.5">
-                        {/* Multi-LED status */}
-                        <div className="flex flex-col items-center gap-1">
-                          <div className="flex gap-0.5">
-                            <div className={`w-1.5 h-1.5 rounded-full ${item.stable ? 'bg-[var(--neon-green)] shadow-[0_0_4px_var(--neon-green)]' : 'bg-white/10'}`} />
-                            <div className={`w-1.5 h-1.5 rounded-full ${item.charge > 50 ? 'bg-[var(--neon-amber)] shadow-[0_0_4px_var(--neon-amber)]' : 'bg-white/10'}`} />
-                          </div>
-                          <span className={`text-[14px] ${item.stable ? `text-[var(--neon-${item.color})]` : 'text-white/20'}`}>{item.icon}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <div className="font-mono text-[8px] text-white/80 truncate">{item.name}</div>
-                            {/* Charge display */}
-                            {item.stable && (
-                              <div className="bg-[#0a0a0a] px-1 py-0.5 rounded border border-white/10">
-                                <span className="font-mono text-[7px] text-[var(--neon-green)]">{item.charge}%</span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1 mt-1">
-                            <span className="font-mono text-[6px] text-white/30">T{item.tier}</span>
-                            {item.stable ? (
-                              <>
-                                {/* Battery indicator */}
-                                <div className="flex gap-0.5">
-                                  {[1,2,3,4,5].map(i => (
-                                    <div key={i} className={`w-1.5 h-2 ${i <= Math.ceil(item.charge/20) ? 'bg-[var(--neon-green)]' : 'bg-white/10'}`} />
-                                  ))}
-                                </div>
-                                {/* Temp */}
-                                <span className="font-mono text-[6px] text-[var(--neon-amber)]">{item.temp}°C</span>
-                              </>
-                            ) : (
-                              <span className="font-mono text-[6px] text-[var(--neon-red)]/50">⚠ LOCKED</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </PanelFrame>
-                  ))}
-                </div>
-                {/* ADVANCED Column */}
-                <div className="flex flex-col gap-0.5">
-                  <div className="flex items-center justify-between border-b border-[var(--neon-red)]/20 pb-0.5">
-                    <span className="font-mono text-[6px] text-[var(--neon-red)]/60">ADVANCED</span>
-                    <span className="font-mono text-[6px] text-[var(--neon-red)]/30 animate-pulse">◉ T4+</span>
-                  </div>
-                  {[
-                    { name: 'Transmutation', tier: 4, color: 'orange', icon: '⟳', flux: 234, eta: '2:45', active: true },
-                    { name: 'Dim Excavator', tier: 4, color: 'purple', icon: '⬡', flux: 0, eta: '--:--', active: false },
-                    { name: 'Omni-Fab', tier: 5, color: 'amber', icon: '✦', flux: 0, eta: '--:--', active: false },
-                    { name: 'Genesis Dev', tier: 5, color: 'green', icon: '✧', flux: 0, eta: '--:--', active: false },
-                  ].map((item) => (
-                    <PanelFrame key={item.name} variant="military" className="p-1.5 flex-1 flex flex-col justify-center">
-                      <div className="flex items-center gap-1.5">
-                        {/* Rotating/static icon */}
-                        <div className="flex flex-col items-center gap-1">
-                          <div className={`w-2 h-2 ${item.active ? 'bg-[var(--neon-orange)] shadow-[0_0_6px_var(--neon-orange)] animate-pulse' : 'bg-white/10'}`} style={{ clipPath: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)' }} />
-                          <span className={`text-[14px] ${item.active ? `text-[var(--neon-${item.color})]` : 'text-white/20'} ${item.active && item.icon === '⟳' ? 'animate-spin' : ''}`} style={{ animationDuration: '3s' }}>{item.icon}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <div className="font-mono text-[8px] text-white/80 truncate">{item.name}</div>
-                            {/* ETA display */}
-                            <div className={`bg-[#0a0a0a] px-1 py-0.5 rounded ${item.active ? 'border border-[var(--neon-amber)]/30' : ''}`}>
-                              <span className={`font-mono text-[7px] ${item.active ? 'text-[var(--neon-amber)]' : 'text-white/20'}`}>{item.eta}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1 mt-1">
-                            <span className="font-mono text-[6px] text-white/30">T{item.tier}</span>
-                            {item.active ? (
-                              <>
-                                {/* Flux meter */}
-                                <div className="flex items-center gap-0.5">
-                                  <span className="font-mono text-[5px] text-[var(--neon-orange)]">FLUX</span>
-                                  <span className="font-mono text-[6px] text-[var(--neon-orange)]">{item.flux}</span>
-                                </div>
-                                {/* Activity dots */}
-                                <div className="flex gap-0.5">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-green)]" style={{ animationName: 'pulse', animationDuration: '2s', animationTimingFunction: 'cubic-bezier(0.4, 0, 0.6, 1)', animationIterationCount: 'infinite', animationDelay: '0ms' }} />
-                                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-green)]" style={{ animationName: 'pulse', animationDuration: '2s', animationTimingFunction: 'cubic-bezier(0.4, 0, 0.6, 1)', animationIterationCount: 'infinite', animationDelay: '200ms' }} />
-                                  <div className="w-1.5 h-1.5 rounded-full bg-[var(--neon-green)]" style={{ animationName: 'pulse', animationDuration: '2s', animationTimingFunction: 'cubic-bezier(0.4, 0, 0.6, 1)', animationIterationCount: 'infinite', animationDelay: '400ms' }} />
-                                </div>
-                              </>
-                            ) : (
-                              <span className="font-mono text-[6px] text-[var(--neon-red)]/40">⚡ REQ: {item.tier >= 5 ? 'EXOTIC' : 'NANO'}</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </PanelFrame>
-                  ))}
-                </div>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -615,7 +462,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
 
       {/* Bottom Resource Bar + Power Button */}
       <PanelBottom>
-        <ResourceBar />
+        <BottomResourceBar />
         <PowerButton />
       </PanelBottom>
 
@@ -623,6 +470,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
       <SystemPowerEffects />
 
     </WindowManagerProvider>
+    </ResourceManagerProvider>
     </ScrewButtonManagerProvider>
     </DGNManagerProvider>
     </SPKManagerProvider>
@@ -659,6 +507,67 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
     </PowerManagerProvider>
     </SystemPowerManagerProvider>
   )
+}
+
+/** Top resource summary bars - reads live data from ResourceManager */
+function TopResourceBars() {
+  const rm = useResourceManagerOptional()
+  const [, setTick] = useState(0)
+
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 3000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const bars = [
+    { name: 'Abstractum', label: 'RES-1', color: 'var(--neon-green)', type: 'Abstractum' },
+    { name: 'Energy', label: 'RES-2', color: 'var(--neon-cyan)', type: 'Energy' },
+    { name: 'Alloys', label: 'RES-3', color: 'var(--neon-amber)', type: 'Base Alloy' },
+    { name: 'Nano', label: 'RES-4', color: '#b388ff', type: 'Nanomaterial' },
+  ]
+
+  return (
+    <div className="grid grid-cols-4 gap-1 mb-1">
+      {bars.map((res) => {
+        const agg = rm?.getAggregated(res.type) ?? { amount: 0, capacity: 1 }
+        const pct = agg.capacity > 0 ? (agg.amount / agg.capacity) : 0
+        return (
+          <PanelFrame key={res.label} variant="default" className="p-1.5">
+            <div className="flex items-center justify-between">
+              <span className="font-mono text-[9px] text-white/80">{res.name}</span>
+              <span className="font-mono text-[8px] text-white/40">{Math.floor(agg.amount)}/{agg.capacity}</span>
+            </div>
+            <div className="h-1.5 bg-black/50 rounded overflow-hidden mt-1">
+              <div className="h-full transition-all duration-500" style={{ width: `${pct * 100}%`, background: res.color }} />
+            </div>
+          </PanelFrame>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Bottom resource bar - shows first 12 unlocked containers */
+function BottomResourceBar() {
+  const rm = useResourceManagerOptional()
+  const [, setTick] = useState(0)
+
+  useEffect(() => {
+    const interval = setInterval(() => setTick(t => t + 1), 3000)
+    return () => clearInterval(interval)
+  }, [])
+
+  if (!rm) return <ResourceBar />
+
+  const unlocked = rm.getUnlockedContainers().slice(0, 12)
+  const resources = unlocked.map(([id, cs]) => ({
+    id,
+    label: id,
+    value: cs.amount,
+    max: cs.capacity,
+  }))
+
+  return <ResourceBar resources={resources.length > 0 ? resources : undefined} />
 }
 
 /** Inner component that reads SystemPower context for CRT/boot effects + CLK-001 sync */
