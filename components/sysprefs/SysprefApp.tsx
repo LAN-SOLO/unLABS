@@ -6,6 +6,7 @@ import { SysprefSidebar } from './SysprefSidebar'
 import { SysprefFooter } from './SysprefFooter'
 import { AboutPanel } from './panels/AboutPanel'
 import { DisplayPanel } from './panels/DisplayPanel'
+import { SoundPanel } from './panels/SoundPanel'
 import type { SysprefArea } from './SysprefSidebar'
 
 interface SysprefAppProps {
@@ -84,7 +85,14 @@ export function SysprefApp({ userId, onExit }: SysprefAppProps) {
           />
         )
       case 'sound':
-        return <PlaceholderPanel name="Sound" />
+        return (
+          <SoundPanel
+            userId={userId}
+            onDirty={setHasUnsavedChanges}
+            saveSignal={saveSignal}
+            resetSignal={resetSignal}
+          />
+        )
       case 'network':
         return <PlaceholderPanel name="Network" />
       case 'user':
