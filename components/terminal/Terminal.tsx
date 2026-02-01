@@ -1737,7 +1737,7 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   if (appMode === 'syspref') {
     return (
       <div className="flex flex-col h-full">
-        <SysprefApp userId={userId} username={username} onExit={exitAppMode} />
+        <SysprefApp userId={userId} username={username} initialArea={appModeData?.area as 'about' | 'display' | 'sound' | 'network' | 'user' | 'datetime' | undefined} onExit={exitAppMode} />
       </div>
     )
   }

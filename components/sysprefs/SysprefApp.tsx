@@ -9,16 +9,18 @@ import { DisplayPanel } from './panels/DisplayPanel'
 import { SoundPanel } from './panels/SoundPanel'
 import { NetworkPanel } from './panels/NetworkPanel'
 import { UserPanel } from './panels/UserPanel'
+import { DatetimePanel } from './panels/DatetimePanel'
 import type { SysprefArea } from './SysprefSidebar'
 
 interface SysprefAppProps {
   userId: string
   username?: string | null
+  initialArea?: SysprefArea
   onExit: () => void
 }
 
-export function SysprefApp({ userId, username, onExit }: SysprefAppProps) {
-  const [currentArea, setCurrentArea] = useState<SysprefArea>('about')
+export function SysprefApp({ userId, username, initialArea, onExit }: SysprefAppProps) {
+  const [currentArea, setCurrentArea] = useState<SysprefArea>(initialArea ?? 'about')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveSignal, setSaveSignal] = useState(0)
@@ -108,7 +110,14 @@ export function SysprefApp({ userId, username, onExit }: SysprefAppProps) {
       case 'user':
         return <UserPanel userId={userId} username={username ?? null} />
       case 'datetime':
-        return <PlaceholderPanel name="Date & Time" />
+        return (
+          <DatetimePanel
+            userId={userId}
+            onDirty={setHasUnsavedChanges}
+            saveSignal={saveSignal}
+            resetSignal={resetSignal}
+          />
+        )
     }
   }
 
@@ -132,13 +141,3 @@ export function SysprefApp({ userId, username, onExit }: SysprefAppProps) {
   )
 }
 
-function PlaceholderPanel({ name }: { name: string }) {
-  return (
-    <div className="p-4 text-[var(--state-offline,#666)]">
-      <div className="border border-current p-4 text-center">
-        <div className="text-lg mb-2">{name} Preferences</div>
-        <div>Coming in a future phase...</div>
-      </div>
-    </div>
-  )
-}

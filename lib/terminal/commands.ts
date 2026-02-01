@@ -14277,14 +14277,43 @@ const rebootCommand: Command = {
 // System Preferences TUI
 const unsysprefCommand: Command = {
   name: 'unsyspref',
-  aliases: ['syspref', 'preferences', 'prefs'],
+  aliases: ['syspref', 'preferences', 'prefs', 'settings'],
   description: 'Open _unOS System Preferences',
-  usage: 'unsyspref',
-  execute: async () => {
+  usage: 'unsyspref [area] [--show]  |  areas: about, display, sound, network, user, datetime',
+  execute: async (args) => {
+    const validAreas = ['about', 'display', 'sound', 'network', 'user', 'datetime']
+    const showFlag = args.includes('--show') || args.includes('-s')
+    const areaArg = args.find(a => !a.startsWith('-'))
+
+    if (areaArg && !validAreas.includes(areaArg.toLowerCase())) {
+      return {
+        success: false,
+        error: `[unsyspref] Unknown area: ${areaArg}. Valid areas: ${validAreas.join(', ')}`,
+      }
+    }
+
+    if (showFlag) {
+      const area = areaArg?.toLowerCase() ?? 'all'
+      return {
+        success: true,
+        output: [
+          '',
+          `[unsyspref] Current preferences (${area}):`,
+          '  Use the interactive TUI to view and modify preferences.',
+          `  Run: unsyspref ${area !== 'all' ? area : ''}`,
+          '',
+        ],
+      }
+    }
+
+    const appModeData: Record<string, string> = {}
+    if (areaArg) appModeData.area = areaArg.toLowerCase()
+
     return {
       success: true,
-      output: ['[unsyspref] Launching System Preferences...'],
+      output: [`[unsyspref] Launching System Preferences${areaArg ? ` (${areaArg})` : ''}...`],
       appMode: 'syspref',
+      appModeData: Object.keys(appModeData).length > 0 ? appModeData : undefined,
     }
   },
 }
