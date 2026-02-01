@@ -2819,42 +2819,46 @@ const deviceCommand: Command = {
         .filter(([id, t]) => t.tree === treeName && t.tier > tier && id !== device.id)
         .sort((a, b) => a[1].tier - b[1].tier)
 
+      const W = 59
+      const row = (s: string) => `│  ${s}${' '.repeat(Math.max(0, W - 2 - s.length))}│`
+      const blank = `│${' '.repeat(W)}│`
+
       const lines: string[] = [
         '',
-        `┌─ Dependencies: ${device.name} ${'─'.repeat(Math.max(0, 42 - device.name.length))}┐`,
-        `│${' '.repeat(59)}│`,
-        `│  Tech Tree:  ${treeName.padEnd(44)}│`,
-        `│  Tier:       ${String(tier).padEnd(44)}│`,
-        `│${' '.repeat(59)}│`,
+        `┌─ Dependencies: ${device.name} ${'─'.repeat(Math.max(0, W - 17 - device.name.length))}┐`,
+        blank,
+        row(`Tech Tree:  ${treeName}`),
+        row(`Tier:       ${tier}`),
+        blank,
       ]
 
       if (prereqs.length > 0) {
-        lines.push(`│  Prerequisites:${' '.repeat(43)}│`)
+        lines.push(row('Prerequisites:'))
         for (const [id, t] of prereqs) {
           const pName = Object.values(deviceMap).find(d => d.id === id)?.name ?? id
-          lines.push(`│    ├── T${t.tier} ${id} (${pName})${' '.repeat(Math.max(0, 42 - id.length - pName.length - 5))}│`)
+          lines.push(row(`  ├── T${t.tier} ${id} (${pName})`))
         }
-        lines.push(`│    └── T${tier} ${device.id} (${device.name}) ◀ YOU${' '.repeat(Math.max(0, 35 - device.id.length - device.name.length - 5))}│`)
+        lines.push(row(`  └── T${tier} ${device.id} (${device.name}) ◀ YOU`))
       } else {
-        lines.push(`│  Prerequisites: None (base tier)${' '.repeat(26)}│`)
+        lines.push(row('Prerequisites: None (base tier)'))
       }
 
-      lines.push(`│${' '.repeat(59)}│`)
+      lines.push(blank)
 
       if (unlocks.length > 0) {
-        lines.push(`│  Unlocks:${' '.repeat(49)}│`)
+        lines.push(row('Unlocks:'))
         for (const [id, t] of unlocks) {
           const uName = Object.values(deviceMap).find(d => d.id === id)?.name ?? id
           const connector = id === unlocks[unlocks.length - 1][0] ? '└──' : '├──'
-          lines.push(`│    ${connector} T${t.tier} ${id} (${uName})${' '.repeat(Math.max(0, 42 - id.length - uName.length - 5))}│`)
+          lines.push(row(`  ${connector} T${t.tier} ${id} (${uName})`))
         }
       } else {
-        lines.push(`│  Unlocks: None (top tier in tree)${' '.repeat(25)}│`)
+        lines.push(row('Unlocks: None (top tier in tree)'))
       }
 
       lines.push(
-        `│${' '.repeat(59)}│`,
-        `└${'─'.repeat(59)}┘`,
+        blank,
+        `└${'─'.repeat(W)}┘`,
         '',
       )
 
@@ -2864,14 +2868,18 @@ const deviceCommand: Command = {
     // Device combinations / synergies
     if (action === 'combos' || action === 'combinations' || action === 'synergy') {
       const compatList = device.compatible.filter(c => c !== device.id && c !== 'ALL')
+      const CW = 59
+      const crow = (s: string) => `│  ${s}${' '.repeat(Math.max(0, CW - 2 - s.length))}│`
+      const cblank = `│${' '.repeat(CW)}│`
+
       if (compatList.length === 0) {
         return {
           success: true,
           output: [
             '',
-            `┌─ Combinations: ${device.name} ${'─'.repeat(Math.max(0, 42 - device.name.length))}┐`,
-            `│  NO COMPATIBLE DEVICES FOUND${' '.repeat(30)}│`,
-            `└${'─'.repeat(59)}┘`,
+            `┌─ Combinations: ${device.name} ${'─'.repeat(Math.max(0, CW - 17 - device.name.length))}┐`,
+            crow('NO COMPATIBLE DEVICES FOUND'),
+            `└${'─'.repeat(CW)}┘`,
             '',
           ],
         }
@@ -2879,22 +2887,20 @@ const deviceCommand: Command = {
 
       const lines: string[] = [
         '',
-        `┌─ Combinations: ${device.name} ${'─'.repeat(Math.max(0, 42 - device.name.length))}┐`,
-        `│${' '.repeat(59)}│`,
+        `┌─ Combinations: ${device.name} ${'─'.repeat(Math.max(0, CW - 17 - device.name.length))}┐`,
+        cblank,
       ]
 
       for (const partnerId of compatList) {
-        // Look up partner name from deviceMap values
         const partnerEntry = Object.values(deviceMap).find(d => d.id === partnerId)
         const partnerName = partnerEntry?.name ?? partnerId
-        const symbol = '○'
-        lines.push(`│  ${symbol} ${device.id} + ${partnerId} (${partnerName})${' '.repeat(Math.max(0, 55 - device.id.length - partnerId.length - partnerName.length - 8))}│`)
+        lines.push(crow(`○ ${device.id} + ${partnerId} (${partnerName})`))
       }
 
       lines.push(
-        `│${' '.repeat(59)}│`,
-        `│  Total: ${compatList.length} compatible device(s)${' '.repeat(Math.max(0, 34 - String(compatList.length).length))}│`,
-        `└${'─'.repeat(59)}┘`,
+        cblank,
+        crow(`Total: ${compatList.length} compatible device(s)`),
+        `└${'─'.repeat(CW)}┘`,
         '',
         `  Use the Combos tab in device detail for link/unlink operations.`,
         '',
