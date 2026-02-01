@@ -2640,6 +2640,7 @@ const deviceCommand: Command = {
           `    DEVICE ${deviceName.toUpperCase()} REBOOT - Reboot device`,
           `    DEVICE ${deviceName.toUpperCase()} STATUS - Show current status`,
           `    DEVICE ${deviceName.toUpperCase()} COMBOS - Show compatible combinations`,
+          `    DEVICE ${deviceName.toUpperCase()} DEPS   - Show tech tree dependencies`,
           '',
         ],
       }
@@ -2779,6 +2780,87 @@ const deviceCommand: Command = {
       }
     }
 
+    // Device dependencies
+    if (action === 'deps' || action === 'dependencies' || action === 'tree') {
+      // Static tech tree data from device spec
+      const techTreeMap: Record<string, { tree: string; tier: number }> = {
+        'CDC-001': { tree: 'Tech', tier: 1 }, 'UEC-001': { tree: 'Tech', tier: 1 },
+        'BAT-001': { tree: 'Tech', tier: 2 }, 'HMS-001': { tree: 'Synthesizers', tier: 1 },
+        'ECR-001': { tree: 'Adapters', tier: 1 }, 'INT-001': { tree: 'Optics', tier: 1 },
+        'MFR-001': { tree: 'Tech', tier: 2 }, 'AIC-001': { tree: 'Tech', tier: 3 },
+        'SCA-001': { tree: 'Tech', tier: 4 }, 'EXD-001': { tree: 'Exploration', tier: 2 },
+        'RMG-001': { tree: 'Economy', tier: 1 }, 'ATK-001': { tree: 'Economy', tier: 1 },
+        'EMC-001': { tree: 'Science', tier: 3 }, 'VNT-001': { tree: 'Infrastructure', tier: 1 },
+        'SPK-001': { tree: 'Audio', tier: 1 }, 'OSC-001': { tree: 'Audio', tier: 2 },
+        'QAN-001': { tree: 'Science', tier: 2 }, 'QSM-001': { tree: 'Quantum', tier: 2 },
+        'NET-001': { tree: 'Infrastructure', tier: 1 }, 'TMP-001': { tree: 'Infrastructure', tier: 1 },
+        'DIM-001': { tree: 'Quantum', tier: 3 }, 'CPU-001': { tree: 'Infrastructure', tier: 1 },
+        'CLK-001': { tree: 'Infrastructure', tier: 1 }, 'MEM-001': { tree: 'Infrastructure', tier: 1 },
+        'AND-001': { tree: 'Science', tier: 2 }, 'QCP-001': { tree: 'Exploration', tier: 2 },
+        'TLP-001': { tree: 'Quantum', tier: 4 }, 'DGN-001': { tree: 'Tech', tier: 2 },
+        'P3D-001': { tree: 'Fabrication', tier: 2 }, 'LCT-001': { tree: 'Fabrication', tier: 2 },
+        'THM-001': { tree: 'Infrastructure', tier: 1 }, 'BTK-001': { tree: 'Tools', tier: 1 },
+        'MSC-001': { tree: 'Tools', tier: 1 }, 'PWB-001': { tree: 'Tools', tier: 1 },
+        'PWR-001': { tree: 'Infrastructure', tier: 1 }, 'VLT-001': { tree: 'Infrastructure', tier: 1 },
+        'PWD-001': { tree: 'Infrastructure', tier: 1 },
+      }
+
+      const info = techTreeMap[device.id]
+      const treeName = info?.tree ?? 'Unknown'
+      const tier = info?.tier ?? 1
+
+      // Build prerequisite chain (lower tiers in same tree)
+      const prereqs = Object.entries(techTreeMap)
+        .filter(([id, t]) => t.tree === treeName && t.tier < tier && id !== device.id)
+        .sort((a, b) => a[1].tier - b[1].tier)
+
+      // Find what this device unlocks (higher tiers in same tree)
+      const unlocks = Object.entries(techTreeMap)
+        .filter(([id, t]) => t.tree === treeName && t.tier > tier && id !== device.id)
+        .sort((a, b) => a[1].tier - b[1].tier)
+
+      const lines: string[] = [
+        '',
+        `┌─ Dependencies: ${device.name} ${'─'.repeat(Math.max(0, 42 - device.name.length))}┐`,
+        `│${' '.repeat(59)}│`,
+        `│  Tech Tree:  ${treeName.padEnd(44)}│`,
+        `│  Tier:       ${String(tier).padEnd(44)}│`,
+        `│${' '.repeat(59)}│`,
+      ]
+
+      if (prereqs.length > 0) {
+        lines.push(`│  Prerequisites:${' '.repeat(43)}│`)
+        for (const [id, t] of prereqs) {
+          const pName = Object.values(deviceMap).find(d => d.id === id)?.name ?? id
+          lines.push(`│    ├── T${t.tier} ${id} (${pName})${' '.repeat(Math.max(0, 42 - id.length - pName.length - 5))}│`)
+        }
+        lines.push(`│    └── T${tier} ${device.id} (${device.name}) ◀ YOU${' '.repeat(Math.max(0, 35 - device.id.length - device.name.length - 5))}│`)
+      } else {
+        lines.push(`│  Prerequisites: None (base tier)${' '.repeat(26)}│`)
+      }
+
+      lines.push(`│${' '.repeat(59)}│`)
+
+      if (unlocks.length > 0) {
+        lines.push(`│  Unlocks:${' '.repeat(49)}│`)
+        for (const [id, t] of unlocks) {
+          const uName = Object.values(deviceMap).find(d => d.id === id)?.name ?? id
+          const connector = id === unlocks[unlocks.length - 1][0] ? '└──' : '├──'
+          lines.push(`│    ${connector} T${t.tier} ${id} (${uName})${' '.repeat(Math.max(0, 42 - id.length - uName.length - 5))}│`)
+        }
+      } else {
+        lines.push(`│  Unlocks: None (top tier in tree)${' '.repeat(25)}│`)
+      }
+
+      lines.push(
+        `│${' '.repeat(59)}│`,
+        `└${'─'.repeat(59)}┘`,
+        '',
+      )
+
+      return { success: true, output: lines }
+    }
+
     // Device combinations / synergies
     if (action === 'combos' || action === 'combinations' || action === 'synergy') {
       const compatList = device.compatible.filter(c => c !== device.id && c !== 'ALL')
@@ -2823,7 +2905,7 @@ const deviceCommand: Command = {
 
     return {
       success: false,
-      error: `Unknown action: ${action}\nAvailable: TEST, REBOOT, STATUS, INFO, POWER, COMBOS`,
+      error: `Unknown action: ${action}\nAvailable: TEST, REBOOT, STATUS, INFO, POWER, COMBOS, DEPS`,
     }
   },
 }
