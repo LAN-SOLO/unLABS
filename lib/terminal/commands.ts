@@ -2623,7 +2623,7 @@ const deviceCommand: Command = {
         output: [
           '',
           `┌─────────────────────────────────────────────────────────────┐`,
-          `│  DEVICE: ${device.name.padEnd(47)} │`,
+          `│  DEVICE: ${device.name.padEnd(50)}│`,
           `└─────────────────────────────────────────────────────────────┘`,
           '',
           `  ID:           ${device.id}`,
@@ -2704,7 +2704,7 @@ const deviceCommand: Command = {
         output: [
           '',
           `┌─────────────────────────────────────────────────────────────┐`,
-          `│  STATUS: ${device.name.padEnd(47)} │`,
+          `│  STATUS: ${device.name.padEnd(50)}│`,
           `└─────────────────────────────────────────────────────────────┘`,
           '',
           `  Device ID:     ${device.id}`,
