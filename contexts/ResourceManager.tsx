@@ -8,6 +8,7 @@ import {
   type ContainerState,
   type ResourceContainerDef,
 } from '@/types/resources'
+import { fetchPlayerResources, syncResourceState } from '@/app/(game)/terminal/actions/resources'
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -188,7 +189,6 @@ export function ResourceManagerProvider({ children, initialState }: ResourceMana
     if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
     syncTimerRef.current = setTimeout(async () => {
       try {
-        const { syncResourceState } = await import('@/app/(game)/terminal/actions/resources')
         const data = buildSaveData(stateRef.current)
         await syncResourceState(data)
       } catch {
@@ -270,7 +270,6 @@ export function ResourceManagerProvider({ children, initialState }: ResourceMana
     let cancelled = false
     ;(async () => {
       try {
-        const { fetchPlayerResources } = await import('@/app/(game)/terminal/actions/resources')
         const dbData = await fetchPlayerResources()
         if (!cancelled && dbData && Object.keys(dbData).length > 0) {
           dispatch({ type: 'HYDRATE', data: dbData })
