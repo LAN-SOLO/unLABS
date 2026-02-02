@@ -120,7 +120,7 @@ export function DisplayPanel({ userId, onDirty, onSaveError, onPreviewColors, sa
     <div className="overflow-y-auto space-y-1">
       <SectionBox title="COLOR THEME">
         <RadioGroup
-          label="Theme"
+          label=""
           options={themeOptions}
           value={prefs.theme}
           onChange={(v) => {
@@ -134,7 +134,7 @@ export function DisplayPanel({ userId, onDirty, onSaveError, onPreviewColors, sa
           }}
         />
         {prefs.theme === 'custom' && (
-          <div className="mt-1 pl-4 space-y-0.5">
+          <div className="mt-2 pl-4 space-y-1">
             <ColorRow label="Primary" value={prefs.primary_color} onChange={(v) => update('primary_color', v)} />
             <ColorRow label="Secondary" value={prefs.secondary_color} onChange={(v) => update('secondary_color', v)} />
             <ColorRow label="Background" value={prefs.background_color} onChange={(v) => update('background_color', v)} />
@@ -180,11 +180,22 @@ function ColorRow({ label, value, onChange }: { label: string; value: string; on
   return (
     <div className="flex items-center gap-2">
       <span className="min-w-[12ch]">{label}:</span>
-      <span style={{ color: value }}>{'\u2588\u2588'}</span>
+      <label className="relative cursor-pointer" title={`Pick ${label.toLowerCase()} color`}>
+        <span style={{ color: value }}>{'\u2588\u2588'}</span>
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value.toUpperCase())}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+      </label>
       <input
         type="text"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => {
+          const v = e.target.value
+          if (v.match(/^#[0-9A-Fa-f]{0,6}$/)) onChange(v.toUpperCase())
+        }}
         className="bg-transparent border border-current px-1 w-[9ch] font-mono text-inherit"
         maxLength={7}
       />

@@ -48,11 +48,12 @@ export function Slider({ value, min, max, step = 1, onChange, label, showPercent
       aria-valuemax={max}
       aria-label={label}
     >
-      <span className="whitespace-nowrap min-w-[16ch]">{label}:</span>
+      <span className="whitespace-nowrap inline-block w-[18ch] text-right">{label}:</span>
       <span className={focused ? 'text-[var(--neon-amber,#FFAA00)]' : ''}>
-        {focused && '▸'}[{bar}] {display}
-        {focused && '◂'}
+        {focused && '▸'}[{bar}]
       </span>
+      <span className="inline-block w-[6ch]">{display}</span>
+      {focused && <span className="text-[var(--neon-amber,#FFAA00)]">◂</span>}
     </div>
   )
 }

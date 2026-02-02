@@ -73,7 +73,7 @@ export function Dropdown({ options, value, onChange, label, disabled, focused }:
         aria-expanded={open}
         aria-label={label}
       >
-        <span className="whitespace-nowrap min-w-[16ch]">{label}:</span>
+        <span className="whitespace-nowrap inline-block w-[18ch] text-right">{label}:</span>
         <span className={focused ? 'text-[var(--neon-amber,#FFAA00)]' : ''}>
           [{selectedLabel.padEnd(24)}{open ? '▲' : '▼'}]
         </span>

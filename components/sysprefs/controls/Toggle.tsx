@@ -31,11 +31,11 @@ export function Toggle({ value, onChange, label, description, disabled, focused 
       aria-checked={value}
       aria-label={label}
     >
-      <span className="whitespace-nowrap min-w-[16ch]">{label}:</span>
+      <span className="whitespace-nowrap inline-block w-[18ch] text-right">{label}:</span>
       <span className={focused ? 'text-[var(--neon-amber,#FFAA00)]' : ''}>
-        {focused && '▸'}[{indicator}] {state}
-        {focused && '◂'}
+        {focused && '▸'}[{indicator}]
       </span>
+      <span className="inline-block w-[4ch]">{state}</span>
       {description && <span className="text-[var(--state-offline,#666)] text-xs ml-2">({description})</span>}
     </div>
   )

@@ -18,7 +18,7 @@ interface RadioGroupProps {
 export function RadioGroup({ options, value, onChange, label, disabled, focusedIndex }: RadioGroupProps) {
   return (
     <div role="radiogroup" aria-label={label}>
-      <div className="mb-1 font-bold">{label}:</div>
+      {label && <div className="mb-1 font-bold">{label}:</div>}
       {options.map((option, i) => {
         const selected = value === option.value
         const isFocused = focusedIndex === i
