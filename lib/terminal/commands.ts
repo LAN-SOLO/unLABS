@@ -15123,13 +15123,13 @@ const dgnCommand: Command = {
 // RES - Resource Container Management
 // ==================================================
 import type { ResourceManagerActions } from '@/contexts/ResourceManager'
-import { RESOURCE_CONTAINERS, TIER_LABELS, getContainerDef } from '@/types/resources'
+import { RESOURCE_CONTAINERS, TIER_LABELS, getContainerDef, UPGRADE_MULTIPLIERS, MAX_UPGRADE_LEVEL, RESOURCE_DISPLAY_MAP } from '@/types/resources'
 
 const resCommand: Command = {
   name: 'res',
   aliases: ['resources'],
   description: 'Manage resource containers',
-  usage: 'res [list|info <ID>|tiers|unlock <ID>|upgrade <ID>]',
+  usage: 'res [list|info <ID>|tiers|unlock <ID>|upgrade <ID>|recipes|produce <RECIPE>|queue|bootstrap]',
   execute: async (args, ctx) => {
     const rm = ctx.data.resourceManager
     if (!rm) {
@@ -15146,9 +15146,9 @@ const resCommand: Command = {
       }
       const lines = [
         '',
-        '┌──────────┬────────────────────┬──────────────┬──────────┐',
-        '│ ID       │ Name               │ Amount/Cap   │ Flow     │',
-        '├──────────┼────────────────────┼──────────────┼──────────┤',
+        '┌──────────┬────────────────────┬──────────────┬──────────┬─────┐',
+        '│ ID       │ Name               │ Amount/Cap   │ Flow     │ Lvl │',
+        '├──────────┼────────────────────┼──────────────┼──────────┼─────┤',
       ]
       for (const [id, cs] of unlocked) {
         const def = getContainerDef(id)
@@ -15156,9 +15156,10 @@ const resCommand: Command = {
         const name = def.name.padEnd(18)
         const amt = `${Math.floor(cs.amount)}/${cs.capacity}`.padEnd(12)
         const flow = cs.flowRate > 0 ? `+${cs.flowRate.toFixed(1)}/s` : '—'
-        lines.push(`│ ${id.padEnd(8)} │ ${name} │ ${amt} │ ${flow.padEnd(8)} │`)
+        const lvl = `${cs.upgradeLevel}`.padEnd(3)
+        lines.push(`│ ${id.padEnd(8)} │ ${name} │ ${amt} │ ${flow.padEnd(8)} │ ${lvl} │`)
       }
-      lines.push('└──────────┴────────────────────┴──────────────┴──────────┘')
+      lines.push('└──────────┴────────────────────┴──────────────┴──────────┴─────┘')
       lines.push('')
       return { success: true, output: lines }
     }
@@ -15166,22 +15167,23 @@ const resCommand: Command = {
     if (sub === 'list') {
       const lines = [
         '',
-        '┌──────────┬────────────────────┬──────┬──────────────┬──────────┐',
-        '│ ID       │ Name               │ Tier │ Amount/Cap   │ Status   │',
-        '├──────────┼────────────────────┼──────┼──────────────┼──────────┤',
+        '┌──────────┬────────────────────┬──────┬──────────────┬──────────┬─────┐',
+        '│ ID       │ Name               │ Tier │ Amount/Cap   │ Status   │ Lvl │',
+        '├──────────┼────────────────────┼──────┼──────────────┼──────────┼─────┤',
       ]
       for (const def of RESOURCE_CONTAINERS) {
         const cs = rm.getContainer(def.id)
         const name = def.name.padEnd(18)
         const tier = `T${def.tier}`.padEnd(4)
         if (!cs || !cs.isUnlocked) {
-          lines.push(`│ ${def.id.padEnd(8)} │ ${name} │ ${tier} │ ${'—'.padEnd(12)} │ ${'LOCKED'.padEnd(8)} │`)
+          lines.push(`│ ${def.id.padEnd(8)} │ ${name} │ ${tier} │ ${'—'.padEnd(12)} │ ${'LOCKED'.padEnd(8)} │ ${'—'.padEnd(3)} │`)
         } else {
           const amt = `${Math.floor(cs.amount)}/${cs.capacity}`.padEnd(12)
-          lines.push(`│ ${def.id.padEnd(8)} │ ${name} │ ${tier} │ ${amt} │ ${'ONLINE'.padEnd(8)} │`)
+          const lvl = `${cs.upgradeLevel}`.padEnd(3)
+          lines.push(`│ ${def.id.padEnd(8)} │ ${name} │ ${tier} │ ${amt} │ ${'ONLINE'.padEnd(8)} │ ${lvl} │`)
         }
       }
-      lines.push('└──────────┴────────────────────┴──────┴──────────────┴──────────┘')
+      lines.push('└──────────┴────────────────────┴──────┴──────────────┴──────────┴─────┘')
       lines.push('')
       return { success: true, output: lines }
     }
@@ -15192,16 +15194,24 @@ const resCommand: Command = {
       const def = getContainerDef(id)
       if (!def) return { success: false, error: `Unknown container: ${id}` }
       const cs = rm.getContainer(id)
+      const upgradeLevel = cs?.upgradeLevel ?? 0
+      const baseCap = def.capacity
+      const effCap = cs?.capacity ?? baseCap
+      const nextMulti = upgradeLevel < MAX_UPGRADE_LEVEL ? `${UPGRADE_MULTIPLIERS[upgradeLevel + 1]}x` : 'MAX'
       const lines = [
         '',
-        `  Container: ${def.name} [${def.id}]`,
-        `  Resource:  ${def.resourceType}`,
-        `  Tier:      ${def.tier} (${TIER_LABELS[def.tier] ?? '?'})`,
-        `  Capacity:  ${cs?.capacity ?? def.capacity}`,
-        `  Amount:    ${cs ? Math.floor(cs.amount) : '—'}`,
-        `  Flow Rate: ${cs && cs.flowRate > 0 ? `+${cs.flowRate.toFixed(1)}/s` : 'None'}`,
-        `  Status:    ${cs?.isUnlocked ? 'UNLOCKED' : 'LOCKED'}`,
-        `  Upgrades:  ${def.upgradesTo ?? 'None'}`,
+        `  Container:      ${def.name} [${def.id}]`,
+        `  Resource:       ${def.resourceType}`,
+        `  Tier:           ${def.tier} (${TIER_LABELS[def.tier] ?? '?'})`,
+        `  Base Capacity:  ${baseCap}`,
+        `  Upgrade Level:  ${upgradeLevel}/${MAX_UPGRADE_LEVEL} (${UPGRADE_MULTIPLIERS[upgradeLevel]}x multiplier)`,
+        `  Eff. Capacity:  ${effCap}`,
+        `  Next Upgrade:   ${nextMulti}${upgradeLevel < MAX_UPGRADE_LEVEL ? ` → ${baseCap * UPGRADE_MULTIPLIERS[upgradeLevel + 1]}` : ''}`,
+        `  Amount:         ${cs ? Math.floor(cs.amount) : '—'}`,
+        `  Flow Rate:      ${cs && cs.flowRate > 0 ? `+${cs.flowRate.toFixed(1)}/s` : 'None'}`,
+        `  Status:         ${cs?.isUnlocked ? 'UNLOCKED' : 'LOCKED'}`,
+        `  Upgrade Mat.:   ${def.upgradeMaterial ?? 'None'}`,
+        `  Upgrades To:    ${def.upgradesTo ?? 'None'}`,
         '',
       ]
       return { success: true, output: lines }
@@ -15238,14 +15248,139 @@ const resCommand: Command = {
       if (!id) return { success: false, error: 'Usage: res upgrade <CONTAINER-ID>' }
       const def = getContainerDef(id)
       if (!def) return { success: false, error: `Unknown container: ${id}` }
+      const csBefore = rm.getContainer(id)
+      if (!csBefore) return { success: false, error: `Container ${id} not found.` }
+      if (csBefore.upgradeLevel >= MAX_UPGRADE_LEVEL) {
+        return { success: false, error: `Container ${id} is already at max upgrade level (${MAX_UPGRADE_LEVEL}).` }
+      }
+      const prevLevel = csBefore.upgradeLevel
       const ok = rm.upgradeContainer(id)
       if (!ok) return { success: false, error: `Cannot upgrade ${id}.` }
-      const cs = rm.getContainer(id)
-      return { success: true, output: [`Container ${def.name} [${id}] upgraded. New capacity: ${cs?.capacity ?? '?'}`] }
+      const csAfter = rm.getContainer(id)
+      const newLevel = csAfter?.upgradeLevel ?? prevLevel + 1
+      return {
+        success: true,
+        output: [
+          `Container ${def.name} [${id}] upgraded to level ${newLevel}.`,
+          `  Multiplier: ${UPGRADE_MULTIPLIERS[prevLevel]}x → ${UPGRADE_MULTIPLIERS[newLevel]}x`,
+          `  Capacity:   ${def.capacity * UPGRADE_MULTIPLIERS[prevLevel]} → ${csAfter?.capacity ?? '?'}`,
+        ],
+      }
     }
 
-    return { success: false, error: `Unknown subcommand: ${sub}\nUsage: res [list|info <ID>|tiers|unlock <ID>|upgrade <ID>]` }
+    if (sub === 'recipes') {
+      try {
+        const { fetchProductionRecipes } = await import('@/app/(game)/terminal/actions/resources')
+        const recipes = await fetchProductionRecipes()
+        if (recipes.length === 0) {
+          return { success: true, output: ['No production recipes found.'] }
+        }
+        const lines = [
+          '',
+          '┌────────────────────────────┬──────┬──────────────────┬────────┬──────────┐',
+          '│ Recipe ID                  │ Tier │ Output           │ Time   │ E/s      │',
+          '├────────────────────────────┼──────┼──────────────────┼────────┼──────────┤',
+        ]
+        for (const r of recipes) {
+          const rid = r.recipeId.padEnd(26)
+          const tier = `T${r.tier}`.padEnd(4)
+          const output = (RESOURCE_DISPLAY_MAP[r.outputResource] ?? r.outputResource).padEnd(16)
+          const time = formatTime(r.productionTimeSeconds).padEnd(6)
+          const energy = `${r.energyDraw}`.padEnd(8)
+          lines.push(`│ ${rid} │ ${tier} │ ${output} │ ${time} │ ${energy} │`)
+        }
+        lines.push('└────────────────────────────┴──────┴──────────────────┴────────┴──────────┘')
+        lines.push('')
+        lines.push('  Use: res produce <recipe-id> to queue production')
+        lines.push('')
+        return { success: true, output: lines }
+      } catch {
+        return { success: false, error: 'Failed to fetch production recipes.' }
+      }
+    }
+
+    if (sub === 'produce') {
+      const recipeId = args[1]
+      if (!recipeId) return { success: false, error: 'Usage: res produce <recipe-id>' }
+      try {
+        const { startProduction } = await import('@/app/(game)/terminal/actions/resources')
+        const result = await startProduction(recipeId, 'terminal')
+        if (!result.success) return { success: false, error: result.error ?? 'Production failed.' }
+        return { success: true, output: [`Production queued: ${recipeId}`] }
+      } catch {
+        return { success: false, error: 'Failed to start production.' }
+      }
+    }
+
+    if (sub === 'queue') {
+      try {
+        const { fetchProductionQueue } = await import('@/app/(game)/terminal/actions/resources')
+        const jobs = await fetchProductionQueue()
+        if (jobs.length === 0) {
+          return { success: true, output: ['No active production jobs.'] }
+        }
+        const lines = ['', '  Active Production Queue:', '']
+        for (const job of jobs) {
+          const remaining = job.completesAt
+            ? Math.max(0, Math.floor((new Date(job.completesAt).getTime() - Date.now()) / 1000))
+            : 0
+          const output = RESOURCE_DISPLAY_MAP[job.outputResource] ?? job.outputResource
+          lines.push(`  [${job.status.toUpperCase()}] ${job.recipeId} → ${output} (${formatTime(remaining)} remaining)`)
+          lines.push(`    ID: ${job.queueId}`)
+        }
+        lines.push('')
+        lines.push('  Use: res cancel <queue-id> to cancel a job')
+        lines.push('')
+        return { success: true, output: lines }
+      } catch {
+        return { success: false, error: 'Failed to fetch production queue.' }
+      }
+    }
+
+    if (sub === 'cancel') {
+      const queueId = args[1]
+      if (!queueId) return { success: false, error: 'Usage: res cancel <queue-id>' }
+      try {
+        const { cancelProduction } = await import('@/app/(game)/terminal/actions/resources')
+        const ok = await cancelProduction(queueId)
+        if (!ok) return { success: false, error: 'Failed to cancel production job.' }
+        return { success: true, output: [`Production job ${queueId} cancelled.`] }
+      } catch {
+        return { success: false, error: 'Failed to cancel production.' }
+      }
+    }
+
+    if (sub === 'bootstrap') {
+      try {
+        const { fetchBootstrapState } = await import('@/app/(game)/terminal/actions/resources')
+        const state = await fetchBootstrapState()
+        if (!state) {
+          return { success: true, output: ['No bootstrap state found. Cold start not yet initiated.'] }
+        }
+        const phaseNames = ['Discovery', 'Bootstrap', 'Ignition', 'Foundation', 'Expansion', 'Autonomy']
+        const lines = [
+          '',
+          '  Cold Start Status:',
+          `  Phase:               ${state.coldStartPhase}/5 (${phaseNames[state.coldStartPhase] ?? '?'})`,
+          `  Seep Collector:      ${state.seepCollectorActive ? 'ACTIVE' : 'INACTIVE'}`,
+          `  Residual Cell:       ${state.residualCellDischarged ? 'DISCHARGED' : 'CHARGED'}`,
+          `  Full OS Restored:    ${state.fullOsRestored ? 'YES' : 'NO'}`,
+          '',
+        ]
+        return { success: true, output: lines }
+      } catch {
+        return { success: false, error: 'Failed to fetch bootstrap state.' }
+      }
+    }
+
+    return { success: false, error: `Unknown subcommand: ${sub}\nUsage: res [list|info <ID>|tiers|unlock <ID>|upgrade <ID>|recipes|produce <RECIPE>|queue|cancel <ID>|bootstrap]` }
   },
+}
+
+function formatTime(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
+  return `${Math.floor(seconds / 3600)}h${Math.floor((seconds % 3600) / 60)}m`
 }
 
 // Command registry

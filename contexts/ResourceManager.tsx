@@ -1,7 +1,13 @@
 'use client'
 
 import { createContext, useContext, useReducer, useEffect, useCallback, useRef } from 'react'
-import { RESOURCE_CONTAINERS, type ContainerState, type ResourceContainerDef } from '@/types/resources'
+import {
+  RESOURCE_CONTAINERS,
+  MAX_UPGRADE_LEVEL,
+  getEffectiveCapacity,
+  type ContainerState,
+  type ResourceContainerDef,
+} from '@/types/resources'
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -16,10 +22,11 @@ export interface ResourceManagerActions {
   setFlowRate: (id: string, rate: number) => void
   getAggregated: (resourceType: string) => { amount: number; capacity: number }
   toSaveData: () => ResourceSaveData
+  hydrate: (data: ResourceSaveData) => void
 }
 
 export type ResourceSaveData = {
-  [id: string]: { amount: number; isUnlocked: boolean }
+  [id: string]: { amount: number; isUnlocked: boolean; upgradeLevel?: number }
 }
 
 interface ResourceState {
@@ -29,10 +36,11 @@ interface ResourceState {
 type ResourceAction =
   | { type: 'TICK' }
   | { type: 'UNLOCK'; id: string }
-  | { type: 'UPGRADE'; id: string; newCapacity: number }
+  | { type: 'UPGRADE'; id: string }
   | { type: 'ADD'; id: string; amount: number }
   | { type: 'REMOVE'; id: string; amount: number }
   | { type: 'SET_FLOW'; id: string; rate: number }
+  | { type: 'HYDRATE'; data: ResourceSaveData }
 
 // ── Initial state builder ──────────────────────────────────
 
@@ -41,12 +49,14 @@ function buildInitialState(saved?: ResourceSaveData): ResourceState {
 
   for (const def of RESOURCE_CONTAINERS) {
     const savedEntry = saved?.[def.id]
+    const upgradeLevel = savedEntry?.upgradeLevel ?? 0
     containers.set(def.id, {
       amount: savedEntry?.amount ?? 0,
-      capacity: def.capacity,
+      capacity: getEffectiveCapacity(def.capacity, upgradeLevel),
       flowRate: def.tier === 0 ? getDefaultFlowRate(def) : 0,
       isUnlocked: savedEntry?.isUnlocked ?? def.tier === 0,
       isActive: savedEntry?.isUnlocked ?? def.tier === 0,
+      upgradeLevel,
     })
   }
 
@@ -86,9 +96,13 @@ function resourceReducer(state: ResourceState, action: ResourceAction): Resource
 
     case 'UPGRADE': {
       const cs = state.containers.get(action.id)
-      if (!cs) return state
+      if (!cs || cs.upgradeLevel >= MAX_UPGRADE_LEVEL) return state
+      const def = RESOURCE_CONTAINERS.find(d => d.id === action.id)
+      if (!def) return state
+      const newLevel = cs.upgradeLevel + 1
+      const newCapacity = getEffectiveCapacity(def.capacity, newLevel)
       const next = new Map(state.containers)
-      next.set(action.id, { ...cs, capacity: action.newCapacity })
+      next.set(action.id, { ...cs, upgradeLevel: newLevel, capacity: newCapacity })
       return { containers: next }
     }
 
@@ -114,6 +128,10 @@ function resourceReducer(state: ResourceState, action: ResourceAction): Resource
       const next = new Map(state.containers)
       next.set(action.id, { ...cs, flowRate: action.rate })
       return { containers: next }
+    }
+
+    case 'HYDRATE': {
+      return buildInitialState(action.data)
     }
 
     default:
@@ -147,6 +165,9 @@ export function ResourceManagerProvider({ children, initialState }: ResourceMana
   const stateRef = useRef(state)
   stateRef.current = state
 
+  // Debounced DB sync timer
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // Tick every 3 seconds
   useEffect(() => {
     const interval = setInterval(() => {
@@ -154,6 +175,27 @@ export function ResourceManagerProvider({ children, initialState }: ResourceMana
     }, 3000)
     return () => clearInterval(interval)
   }, [])
+
+  // Cleanup sync timer on unmount
+  useEffect(() => {
+    return () => {
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
+    }
+  }, [])
+
+  // Schedule a debounced DB sync (fire-and-forget, 5s debounce)
+  const scheduleSyncRef = useRef(() => {
+    if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
+    syncTimerRef.current = setTimeout(async () => {
+      try {
+        const { syncResourceState } = await import('@/app/(game)/terminal/actions/resources')
+        const data = buildSaveData(stateRef.current)
+        await syncResourceState(data)
+      } catch {
+        // Silent fail — localStorage is the fallback
+      }
+    }, 5000)
+  })
 
   const getContainer = useCallback((id: string) => stateRef.current.containers.get(id), [])
 
@@ -171,24 +213,28 @@ export function ResourceManagerProvider({ children, initialState }: ResourceMana
     const cs = stateRef.current.containers.get(id)
     if (!cs || cs.isUnlocked) return false
     dispatch({ type: 'UNLOCK', id })
+    scheduleSyncRef.current()
     return true
   }, [])
 
   const upgradeContainer = useCallback((id: string) => {
     const cs = stateRef.current.containers.get(id)
-    if (!cs) return false
-    dispatch({ type: 'UPGRADE', id, newCapacity: Math.floor(cs.capacity * 1.5) })
+    if (!cs || cs.upgradeLevel >= MAX_UPGRADE_LEVEL) return false
+    dispatch({ type: 'UPGRADE', id })
+    scheduleSyncRef.current()
     return true
   }, [])
 
   const addResource = useCallback((id: string, amount: number) => {
     dispatch({ type: 'ADD', id, amount })
+    scheduleSyncRef.current()
   }, [])
 
   const removeResource = useCallback((id: string, amount: number) => {
     const cs = stateRef.current.containers.get(id)
     if (!cs || cs.amount < amount) return false
     dispatch({ type: 'REMOVE', id, amount })
+    scheduleSyncRef.current()
     return true
   }, [])
 
@@ -212,11 +258,28 @@ export function ResourceManagerProvider({ children, initialState }: ResourceMana
   }, [])
 
   const toSaveData = useCallback((): ResourceSaveData => {
-    const data: ResourceSaveData = {}
-    for (const [id, cs] of stateRef.current.containers) {
-      data[id] = { amount: cs.amount, isUnlocked: cs.isUnlocked }
-    }
-    return data
+    return buildSaveData(stateRef.current)
+  }, [])
+
+  const hydrate = useCallback((data: ResourceSaveData) => {
+    dispatch({ type: 'HYDRATE', data })
+  }, [])
+
+  // On mount: try to load from DB
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { fetchPlayerResources } = await import('@/app/(game)/terminal/actions/resources')
+        const dbData = await fetchPlayerResources()
+        if (!cancelled && dbData && Object.keys(dbData).length > 0) {
+          dispatch({ type: 'HYDRATE', data: dbData })
+        }
+      } catch {
+        // DB unavailable — use localStorage fallback (already loaded via initialState)
+      }
+    })()
+    return () => { cancelled = true }
   }, [])
 
   const actions: ResourceManagerActions = {
@@ -230,6 +293,7 @@ export function ResourceManagerProvider({ children, initialState }: ResourceMana
     setFlowRate,
     getAggregated,
     toSaveData,
+    hydrate,
   }
 
   return (
@@ -237,4 +301,12 @@ export function ResourceManagerProvider({ children, initialState }: ResourceMana
       {children}
     </ResourceManagerContext.Provider>
   )
+}
+
+function buildSaveData(state: ResourceState): ResourceSaveData {
+  const data: ResourceSaveData = {}
+  for (const [id, cs] of state.containers) {
+    data[id] = { amount: cs.amount, isUnlocked: cs.isUnlocked, upgradeLevel: cs.upgradeLevel }
+  }
+  return data
 }
