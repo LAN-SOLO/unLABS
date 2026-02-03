@@ -1,0 +1,171 @@
+'use server'
+
+import { createClient } from '@/lib/supabase/server'
+import type { AppRegistryEntry, PlayerAppView, LaunchSource } from '@/types/unapp'
+
+// Helper: the new tables aren't in generated Supabase types yet,
+// so we cast to `any` for .from() calls on unapp tables.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function db(): Promise<any> {
+  return await createClient()
+}
+
+export async function fetchAppRegistry(): Promise<AppRegistryEntry[]> {
+  const supabase = await db()
+  const { data, error } = await supabase
+    .from('unapp_registry')
+    .select('*')
+    .eq('is_active', true)
+    .order('category')
+    .order('name')
+
+  if (error) {
+    console.error('fetchAppRegistry error:', error)
+    return []
+  }
+  return (data ?? []) as AppRegistryEntry[]
+}
+
+export async function fetchPlayerApps(): Promise<PlayerAppView[]> {
+  const supabase = await db()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { data, error } = await supabase.rpc('get_player_apps', {
+    p_player_id: user.id,
+  })
+
+  if (error) {
+    console.error('fetchPlayerApps error:', error)
+    return []
+  }
+  return (data ?? []) as PlayerAppView[]
+}
+
+export async function installApp(appId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await db()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  const { data: app, error: appErr } = await supabase
+    .from('unapp_registry')
+    .select('version')
+    .eq('app_id', appId)
+    .single()
+
+  if (appErr || !app) return { success: false, error: `App ${appId} not found in registry` }
+
+  const { error } = await supabase
+    .from('player_apps')
+    .insert({
+      player_id: user.id,
+      app_id: appId,
+      installed_version: app.version,
+      state: 'installed',
+    })
+
+  if (error) {
+    if (error.code === '23505') return { success: false, error: `App ${appId} is already installed` }
+    return { success: false, error: error.message }
+  }
+  return { success: true }
+}
+
+export async function removeApp(appId: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = await db()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Not authenticated' }
+
+  const { error } = await supabase
+    .from('player_apps')
+    .delete()
+    .eq('player_id', user.id)
+    .eq('app_id', appId)
+
+  if (error) return { success: false, error: error.message }
+  return { success: true }
+}
+
+export async function toggleFavorite(appId: string): Promise<boolean> {
+  const supabase = await db()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return false
+
+  const { data: current } = await supabase
+    .from('player_apps')
+    .select('is_favorite')
+    .eq('player_id', user.id)
+    .eq('app_id', appId)
+    .single()
+
+  if (!current) return false
+
+  const newVal = !current.is_favorite
+  await supabase
+    .from('player_apps')
+    .update({ is_favorite: newVal })
+    .eq('player_id', user.id)
+    .eq('app_id', appId)
+
+  return newVal
+}
+
+export async function recordAppLaunch(appId: string, source: LaunchSource): Promise<void> {
+  const supabase = await db()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const { data: current } = await supabase
+    .from('player_apps')
+    .select('total_launches')
+    .eq('player_id', user.id)
+    .eq('app_id', appId)
+    .single()
+
+  const newCount = ((current?.total_launches as number) ?? 0) + 1
+
+  await supabase
+    .from('player_apps')
+    .update({
+      last_launched_at: new Date().toISOString(),
+      total_launches: newCount,
+    })
+    .eq('player_id', user.id)
+    .eq('app_id', appId)
+
+  await supabase
+    .from('unapp_usage_log')
+    .insert({
+      player_id: user.id,
+      app_id: appId,
+      launch_source: source,
+    })
+}
+
+export async function fetchAppInfo(appId: string): Promise<AppRegistryEntry | null> {
+  const supabase = await db()
+  const { data, error } = await supabase
+    .from('unapp_registry')
+    .select('*')
+    .eq('app_id', appId)
+    .single()
+
+  if (error) return null
+  return data as AppRegistryEntry
+}
+
+export async function searchApps(term: string): Promise<AppRegistryEntry[]> {
+  const supabase = await db()
+  const { data, error } = await supabase
+    .from('unapp_registry')
+    .select('*')
+    .eq('is_active', true)
+    .or(`name.ilike.%${term}%,description.ilike.%${term}%,app_id.ilike.%${term}%`)
+    .order('name')
+
+  if (error) {
+    console.error('searchApps error:', error)
+    return []
+  }
+  return (data ?? []) as AppRegistryEntry[]
+}

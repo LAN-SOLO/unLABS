@@ -1256,6 +1256,51 @@ const unsystemctlCommand: Command = {
       }
     }
 
+    if (command === 'unman' || command === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'UNSYSTEMCTL(1)        UnstableLabs Manual        UNSYSTEMCTL(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    unsystemctl — _unOS service and daemon management',
+          '',
+          'SYNOPSIS',
+          '    unsystemctl [status|reboot|shutdown|daemon-reload]',
+          '',
+          'DESCRIPTION',
+          '    The unsystemctl utility provides management and control of',
+          '    the System Control subsystem. Use subcommands below to',
+          '    interact with the system.',
+          '',
+          '    Aliases: systemctl, sysctl',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show all service statuses',
+          '    reboot               Reboot the system',
+          '    shutdown             Shut down the system',
+          '    daemon-reload        Reload service configurations',
+          '    unman                Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    shutdown(1), reboot(1), dgn(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0          UNSYSTEMCTL(1)',
+          '',
+        ],
+      }
+    }
+
     return {
       success: false,
       error: `Unknown command: ${command}\nAvailable: reboot, shutdown, status, daemon-reload`,
@@ -1426,55 +1471,67 @@ const deviceCommand: Command = {
 
     // List all devices
     if (!deviceName || deviceName === 'list') {
+      // Fetch installed apps to show APP column
+      let installedAppIds: Set<string> = new Set()
+      try {
+        const { fetchPlayerApps } = await import('@/app/(game)/terminal/actions/unapp')
+        const apps = await fetchPlayerApps()
+        installedAppIds = new Set(apps.map(a => a.app_id))
+      } catch { /* continue without app data */ }
+
+      const appCol = (id: string) => installedAppIds.has(id) ? '[✓]' : '[○]'
+
       return {
         success: true,
         output: [
           '',
-          '┌─────────────────────────────────────────────────────────────┐',
-          '│                    DEVICE REGISTRY                          │',
-          '└─────────────────────────────────────────────────────────────┘',
+          '┌─────────────────────────────────────────────────────────────────┐',
+          '│                    DEVICE REGISTRY                              │',
+          '└─────────────────────────────────────────────────────────────────┘',
           '',
-          '  ID        DEVICE                  VERSION   TIER  STATUS    ',
-          '  ────────  ──────────────────────  ────────  ────  ──────────',
-          '  P3D-001   3D Fabricator           v3.2.1    T2    ONLINE    ',
-          '  ATK-001   Abstractum Tank         v2.1.0    T1    ONLINE    ',
-          '  AIC-001   AI Assistant Core       v2.4.0    T3    ONLINE    ',
-          '  AND-001   Anomaly Detector        v2.3.0    T2    ONLINE    ',
-          '  BAT-001   Battery Pack            v1.8.0    T1    ONLINE    ',
-          '  BTK-001   Basic Toolkit           v1.2.0    T1    ONLINE    ',
-          '  CPU-001   CPU Monitor             v3.2.1    T1    ONLINE    ',
-          '  CDC-001   Crystal Data Cache      v1.4.2    T1    ONLINE    ',
-          '  DGN-001   Diagnostics Console     v2.0.4    T2    ONLINE    ',
-          '  DIM-001   Dimension Monitor       v1.0.0    T2    ONLINE    ',
-          '  ECR-001   Echo Recorder           v1.1.0    T1    ONLINE    ',
-          '  EMC-001   Exotic Matter Contain.  v4.0.1    T3    ONLINE    ',
-          '  EXD-001   Explorer Drone          v3.1.2    T2    ONLINE    ',
-          '  HMS-001   Handmade Synthesizer    v3.2.1    T2    ONLINE    ',
-          '  INT-001   Interpolator            v2.5.3    T2    ONLINE    ',
-          '  CLK-001   Lab Clock               v2.4.0    T1    ONLINE    ',
-          '  MSC-001   Material Scanner        v1.3.0    T1    ONLINE    ',
-          '  MEM-001   Memory Monitor          v3.1.0    T1    ONLINE    ',
-          '  MFR-001   Microfusion Reactor     v2.3.0    T3    ONLINE    ',
-          '  SPK-001   Narrow Speaker          v1.0.0    T1    ONLINE    ',
-          '  NET-001   Network Monitor         v2.1.0    T1    ONLINE    ',
-          '  OSC-001   Oscilloscope Array      v4.6.0    T2    ONLINE    ',
-          '  PWB-001   Portable Workbench      v1.1.0    T1    ONLINE    ',
-          '  PWD-001   Power Display Panel     v1.0.0    T1    ONLINE    ',
-          '  PWR-001   Power Management Sys.   v1.0.0    T1    ONLINE    ',
-          '  LCT-001   Precision Laser         v2.1.0    T2    ONLINE    ',
-          `  QAN-001   Quantum Analyzer        v3.7.2    T3    ${ctx.data.quaDevice?.getState().isPowered ? 'ONLINE' : 'STANDBY'}   `,
-          '  QCP-001   Quantum Compass         v1.5.0    T2    ONLINE    ',
-          '  QSM-001   Quantum State Monitor   v1.2.0    T3    ONLINE    ',
-          '  RMG-001   Resource Magnet         v1.2.0    T1    ONLINE    ',
-          '  SCA-001   Supercomputer Array     v5.2.0    T3    ONLINE    ',
-          '  TLP-001   Teleport Pad            v2.2.0    T3    ONLINE    ',
-          '  TMP-001   Temperature Monitor     v1.0.0    T1    ONLINE    ',
-          '  THM-001   Thermal Manager         v1.0.0    T1    ONLINE    ',
-          '  UEC-001   Unstable Energy Core    v2.0.1    T2    ONLINE    ',
-          '  VNT-001   Ventilation System      v1.0.0    T1    ONLINE    ',
-          '  VLT-001   Volt Meter Display      v1.0.0    T1    ONLINE    ',
+          '  ID        DEVICE                  VERSION   TIER  STATUS      APP',
+          '  ────────  ──────────────────────  ────────  ────  ──────────  ───',
+          `  P3D-001   3D Fabricator           v3.2.1    T2    ONLINE      ${appCol('P3D-001')}`,
+          `  ATK-001   Abstractum Tank         v2.1.0    T1    ONLINE      ${appCol('ATK-001')}`,
+          `  AIC-001   AI Assistant Core       v2.4.0    T3    ONLINE      ${appCol('AIC-001')}`,
+          `  AND-001   Anomaly Detector        v2.3.0    T2    ONLINE      ${appCol('AND-001')}`,
+          `  BAT-001   Battery Pack            v1.8.0    T1    ONLINE      ${appCol('BAT-001')}`,
+          `  BTK-001   Basic Toolkit           v1.2.0    T1    ONLINE      ${appCol('BTK-001')}`,
+          `  CPU-001   CPU Monitor             v3.2.1    T1    ONLINE      ${appCol('CPU-001')}`,
+          `  CDC-001   Crystal Data Cache      v1.4.2    T1    ONLINE      ${appCol('CDC-001')}`,
+          `  DGN-001   Diagnostics Console     v2.0.4    T2    ONLINE      ${appCol('DGN-001')}`,
+          `  DIM-001   Dimension Monitor       v1.0.0    T2    ONLINE      ${appCol('DIM-001')}`,
+          `  ECR-001   Echo Recorder           v1.1.0    T1    ONLINE      ${appCol('ECR-001')}`,
+          `  EMC-001   Exotic Matter Contain.  v4.0.1    T3    ONLINE      ${appCol('EMC-001')}`,
+          `  EXD-001   Explorer Drone          v3.1.2    T2    ONLINE      ${appCol('EXD-001')}`,
+          `  HMS-001   Handmade Synthesizer    v3.2.1    T2    ONLINE      ${appCol('HMS-001')}`,
+          `  INT-001   Interpolator            v2.5.3    T2    ONLINE      ${appCol('INT-001')}`,
+          `  CLK-001   Lab Clock               v2.4.0    T1    ONLINE      ${appCol('CLK-001')}`,
+          `  MSC-001   Material Scanner        v1.3.0    T1    ONLINE      ${appCol('MSC-001')}`,
+          `  MEM-001   Memory Monitor          v3.1.0    T1    ONLINE      ${appCol('MEM-001')}`,
+          `  MFR-001   Microfusion Reactor     v2.3.0    T3    ONLINE      ${appCol('MFR-001')}`,
+          `  SPK-001   Narrow Speaker          v1.0.0    T1    ONLINE      ${appCol('SPK-001')}`,
+          `  NET-001   Network Monitor         v2.1.0    T1    ONLINE      ${appCol('NET-001')}`,
+          `  OSC-001   Oscilloscope Array      v4.6.0    T2    ONLINE      ${appCol('OSC-001')}`,
+          `  PWB-001   Portable Workbench      v1.1.0    T1    ONLINE      ${appCol('PWB-001')}`,
+          `  PWD-001   Power Display Panel     v1.0.0    T1    ONLINE      ${appCol('PWD-001')}`,
+          `  PWR-001   Power Management Sys.   v1.0.0    T1    ONLINE      ${appCol('PWR-001')}`,
+          `  LCT-001   Precision Laser         v2.1.0    T2    ONLINE      ${appCol('LCT-001')}`,
+          `  QAN-001   Quantum Analyzer        v3.7.2    T3    ${ctx.data.quaDevice?.getState().isPowered ? 'ONLINE' : 'STANDBY'}      ${appCol('QAN-001')}`,
+          `  QCP-001   Quantum Compass         v1.5.0    T2    ONLINE      ${appCol('QCP-001')}`,
+          `  QSM-001   Quantum State Monitor   v1.2.0    T3    ONLINE      ${appCol('QSM-001')}`,
+          `  RMG-001   Resource Magnet         v1.2.0    T1    ONLINE      ${appCol('RMG-001')}`,
+          `  SCA-001   Supercomputer Array     v5.2.0    T3    ONLINE      ${appCol('SCA-001')}`,
+          `  TLP-001   Teleport Pad            v2.2.0    T3    ONLINE      ${appCol('TLP-001')}`,
+          `  TMP-001   Temperature Monitor     v1.0.0    T1    ONLINE      ${appCol('TMP-001')}`,
+          `  THM-001   Thermal Manager         v1.0.0    T1    ONLINE      ${appCol('THM-001')}`,
+          `  UEC-001   Unstable Energy Core    v2.0.1    T2    ONLINE      ${appCol('UEC-001')}`,
+          `  VNT-001   Ventilation System      v1.0.0    T1    ONLINE      ${appCol('VNT-001')}`,
+          `  VLT-001   Volt Meter Display      v1.0.0    T1    ONLINE      ${appCol('VLT-001')}`,
           '',
-          '  usage: device <name> [test|reset|status|info]',
+          '  APP: [✓] installed  [○] available',
+          '',
+          '  usage: device <name> [test|reset|status|info|app]',
           '  example: device cache test',
           '',
         ],
@@ -1499,6 +1556,7 @@ const deviceCommand: Command = {
           '    undev <device-name> [info|test|reboot|status]',
           '    undev <device-name> [deps|combos|influence|tweaks|monitor]',
           '    undev <device-name> power <on|off>',
+          '    undev <device-name> app [--quick]',
           '    undev power <device-id> <on|off>',
           '    undev status',
           '    undev group [category]',
@@ -1587,7 +1645,8 @@ const deviceCommand: Command = {
           '',
           '    list',
           '        Show all registered devices with ID, version,',
-          '        tier, and current status.',
+          '        tier, current status, and APP install indicator.',
+          '        APP column: [✓] installed, [○] available.',
           '',
           '    <device-name> info',
           '        Display detailed device information including',
@@ -1655,6 +1714,12 @@ const deviceCommand: Command = {
           '    unlink <device1> <device2>',
           '        Remove a synergy link between two devices.',
           '        Accepts short IDs: undev unlink LCT UEC',
+          '',
+          '    <device-name> app [--quick]',
+          '        Launch the device application via the unapp',
+          '        framework. Shows status module by default.',
+          '        With --quick: single-line status summary.',
+          '        Equivalent to: unapp run <device-id>',
           '',
           '    unman',
           '        Display this manual page.',
@@ -1751,6 +1816,10 @@ const deviceCommand: Command = {
           '    tlp .... Teleport Pad management',
           '    lct .... Precision Laser management',
           '    p3d .... 3D Fabricator management',
+          '    spk .... Narrow Speaker management',
+          '    dgn .... Diagnostics Console management',
+          '    res .... Resource Manager management',
+          '    pwb .... Power Management management',
           '',
           '    Type <cmd> help for command-specific options.',
           '',
@@ -1880,7 +1949,8 @@ const deviceCommand: Command = {
           'SEE ALSO',
           '───────────────────────────────────────────────────────────────',
           '',
-          '    power(1), thermal(1), help(1)',
+          '    power(1), thermal(1), unapp(1), help(1)',
+          '    unapp list, unapp run <app-id>, unrun, unqs',
           '    cat /home/operator/.local/docs/<device>.txt',
           '',
           '───────────────────────────────────────────────────────────────',
@@ -2951,6 +3021,21 @@ const deviceCommand: Command = {
       }
     }
 
+    // Device app — launch via unapp
+    if (action === 'app') {
+      const quick = args.includes('--quick')
+      try {
+        const { fetchAppInfo } = await import('@/app/(game)/terminal/actions/unapp')
+        const app = await fetchAppInfo(device.id)
+        if (!app) return { success: false, error: `No app found for device ${device.id}.` }
+        import('@/app/(game)/terminal/actions/unapp').then(m => m.recordAppLaunch(device.id, 'undev')).catch(() => {})
+        const { renderApp } = await import('@/lib/terminal/unapp/appShell')
+        return { success: true, output: renderApp(app, null, ctx, quick) }
+      } catch {
+        return { success: false, error: `Failed to launch app for ${device.id}.` }
+      }
+    }
+
     // Device test
     if (action === 'test') {
       ctx.setTyping(true)
@@ -3805,6 +3890,54 @@ const powerCommand: Command = {
       }
     }
 
+    if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'POWER(1)              UnstableLabs Manual              POWER(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    power — lab-wide power grid control and monitoring',
+          '',
+          'SYNOPSIS',
+          '    power [status|grid|on <ID>|off <ID>|devices|emergency|budget|history]',
+          '',
+          'DESCRIPTION',
+          '    The power utility provides management and control of',
+          '    the Power Management subsystem. Use subcommands below to',
+          '    interact with the system.',
+          '',
+          '    Aliases: pwr, pwrmgmt, energy',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show power grid summary and consumption',
+          '    grid                 Display full power grid overview',
+          '    on <ID>              Power on a device by ID',
+          '    off <ID>             Power off a device by ID',
+          '    devices              List all devices with power state',
+          '    emergency            Activate emergency power shutdown',
+          '    fault                Show fault diagnostics',
+          '    unman                Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), uec(1), bat(1), mfr(1), pwb(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                POWER(1)',
+          '',
+        ],
+      }
+    }
+
     return {
       success: false,
       error: `unknown power command: ${action}\n\navailable commands:\n` +
@@ -3968,6 +4101,51 @@ const thermalCommand: Command = {
           '         disabled or temperature returns to safe levels.',
           '',
           'use thermal auto to restore automatic control.',
+          '',
+        ],
+      }
+    }
+
+    if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'THERMAL(1)            UnstableLabs Manual            THERMAL(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    thermal — panel thermal management, fan control, and cooling',
+          '',
+          'SYNOPSIS',
+          '    thermal [status|fan <id> <mode>|auto [on|off]|emergency]',
+          '',
+          'DESCRIPTION',
+          '    The thermal utility provides management and control of',
+          '    the Thermal Management subsystem. Use subcommands below to',
+          '    interact with the system.',
+          '',
+          '    Aliases: therm, temp, cooling',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show thermal status and temperature map',
+          '    fan <id> <mode>      Set fan mode (auto, low, medium, high, max)',
+          '    auto [on|off]        Toggle automatic fan control',
+          '    emergency            Activate emergency cooling',
+          '    unman                Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), tmp(1), vnt(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0              THERMAL(1)',
           '',
         ],
       }
@@ -4484,6 +4662,57 @@ const cdcCommand: Command = {
       }
     }
 
+        if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'CDC(1)              UnstableLabs Manual              CDC(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    cdc — Crystal Data Cache storage, firmware, and data management',
+          '',
+          'SYNOPSIS',
+          '    cdc [status|power|firmware|test|reset|fold|unfold|toggle|info|help]',
+          '',
+          'DESCRIPTION',
+          '    The cdc utility provides management and control of',
+          '    the Crystal Data Cache (CDC-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: cache, crystalcache',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show device state, uptime, crystal count, cache stats',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version, build date, features',
+          '    test                 Run built-in diagnostic self-test',
+          '    reset|reboot         Power-cycle the device',
+          '    fold                 Collapse to compact single-line view',
+          '    unfold               Expand to full telemetry view',
+          '    toggle               Toggle fold/unfold state',
+          '    info                 Detailed specs and system information',
+          '    help                 Show usage summary',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                CDC(1)',
+          '',
+        ],
+      }
+    }
+
     return {
       success: false,
       error: `unknown cdc command: ${action}\n\ntype cdc for available commands.`,
@@ -4977,6 +5206,57 @@ const uecCommand: Command = {
       if (!uecDevice) return { success: false, error: '[UEC-001] Device not connected' }
       uecDevice.toggleExpanded()
       return { success: true, output: ['', '[UEC-001] Device fold state toggled', ''] }
+    }
+
+        if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'UEC(1)              UnstableLabs Manual              UEC(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    uec — Unstable Energy Core power generation and monitoring',
+          '',
+          'SYNOPSIS',
+          '    uec [status|power|firmware|test|reset|fold|unfold|toggle|info|help]',
+          '',
+          'DESCRIPTION',
+          '    The uec utility provides management and control of',
+          '    the Unstable Energy Core (UEC-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: energycore, core, energy',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show core state, power output, stability metrics',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    reset|reboot         Power-cycle the energy core',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    info                 Detailed specs and system information',
+          '    help                 Show usage summary',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), power(1), bat(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                UEC(1)',
+          '',
+        ],
+      }
     }
 
     return {
@@ -5514,6 +5794,57 @@ const batCommand: Command = {
       if (!batDevice) return { success: false, error: '[BAT-001] Device not connected' }
       batDevice.toggleExpanded()
       return { success: true, output: ['', '[BAT-001] Device fold state toggled', ''] }
+    }
+
+        if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'BAT(1)              UnstableLabs Manual              BAT(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    bat — Battery Pack energy storage and charge management',
+          '',
+          'SYNOPSIS',
+          '    bat [status|power|firmware|test|reset|fold|unfold|toggle|info|help]',
+          '',
+          'DESCRIPTION',
+          '    The bat utility provides management and control of',
+          '    the Battery Pack (BAT-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: battery, pack, batterypack',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show charge level, drain rate, capacity',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    reset|reboot         Power-cycle the battery pack',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    info                 Detailed specs and system information',
+          '    help                 Show usage summary',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), power(1), uec(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                BAT(1)',
+          '',
+        ],
+      }
     }
 
     return {
@@ -6155,6 +6486,57 @@ const hmsCommand: Command = {
       if (!hmsDevice) return { success: false, error: '[HMS-001] Device not connected' }
       hmsDevice.toggleExpanded()
       return { success: true, output: ['', '[HMS-001] Device fold state toggled', ''] }
+    }
+
+        if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'HMS(1)              UnstableLabs Manual              HMS(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    hms — Handmade Synthesizer crafting and synthesis control',
+          '',
+          'SYNOPSIS',
+          '    hms [status|power|firmware|test|reset|fold|unfold|toggle|info|help]',
+          '',
+          'DESCRIPTION',
+          '    The hms utility provides management and control of',
+          '    the Handmade Synthesizer (HMS-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: synth, synthesizer',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show synth state, active recipe, queue',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    reset|reboot         Power-cycle the synthesizer',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    info                 Detailed specs and system information',
+          '    help                 Show usage summary',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), btk(1), p3d(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                HMS(1)',
+          '',
+        ],
+      }
     }
 
     return {
@@ -6839,6 +7221,57 @@ const ecrCommand: Command = {
       }
     }
 
+        if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'ECR(1)              UnstableLabs Manual              ECR(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    ecr — Echo Recorder data capture and playback',
+          '',
+          'SYNOPSIS',
+          '    ecr [status|power|firmware|test|reset|fold|unfold|toggle|info|help]',
+          '',
+          'DESCRIPTION',
+          '    The ecr utility provides management and control of',
+          '    the Echo Recorder (ECR-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: echo-recorder, ecr001',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show recorder state, buffer, recording status',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    reset|reboot         Power-cycle the recorder',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    info                 Detailed specs and system information',
+          '    help                 Show usage summary',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                ECR(1)',
+          '',
+        ],
+      }
+    }
+
     return {
       success: false,
       error: `unknown ecr command: ${action}\n\ntype ecr for available commands.`,
@@ -7312,6 +7745,57 @@ const iplCommand: Command = {
           '    /etc/ipl/config',
           '',
           '╚═════════════════════════════════════════════════════════════════╝',
+          '',
+        ],
+      }
+    }
+
+        if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'IPL(1)              UnstableLabs Manual              IPL(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    ipl — Interpolator data processing and signal analysis',
+          '',
+          'SYNOPSIS',
+          '    ipl [status|power|firmware|test|reset|fold|unfold|toggle|info|help]',
+          '',
+          'DESCRIPTION',
+          '    The ipl utility provides management and control of',
+          '    the Interpolator (INT-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: interpolator, int001',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show interpolation state, throughput, accuracy',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    reset|reboot         Power-cycle the interpolator',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    info                 Detailed specs and system information',
+          '    help                 Show usage summary',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), osc(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                IPL(1)',
           '',
         ],
       }
@@ -7792,6 +8276,57 @@ const mfrCommand: Command = {
           '    /etc/mfr/config',
           '',
           '╚═════════════════════════════════════════════════════════════════╝',
+          '',
+        ],
+      }
+    }
+
+        if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'MFR(1)              UnstableLabs Manual              MFR(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    mfr — Microfusion Reactor high-energy power generation',
+          '',
+          'SYNOPSIS',
+          '    mfr [status|power|firmware|test|reset|fold|unfold|toggle|info|help]',
+          '',
+          'DESCRIPTION',
+          '    The mfr utility provides management and control of',
+          '    the Microfusion Reactor (MFR-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: reactor, microfusion, mfr001',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show reactor state, output, containment level',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    reset|reboot         Power-cycle the reactor',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    info                 Detailed specs and system information',
+          '    help                 Show usage summary',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), power(1), uec(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                MFR(1)',
           '',
         ],
       }
@@ -8343,6 +8878,57 @@ const aicCommand: Command = {
       }
     }
 
+        if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'AIC(1)              UnstableLabs Manual              AIC(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    aic — AI Assistant Core compute and inference management',
+          '',
+          'SYNOPSIS',
+          '    aic [status|power|firmware|test|reset|fold|unfold|toggle|info|help]',
+          '',
+          'DESCRIPTION',
+          '    The aic utility provides management and control of',
+          '    the AI Assistant Core (AIC-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: ai, assistant, aic001',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show AI core state, model, inference stats',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    reset|reboot         Power-cycle the AI core',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    info                 Detailed specs and system information',
+          '    help                 Show usage summary',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), sca(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                AIC(1)',
+          '',
+        ],
+      }
+    }
+
     return {
       success: false,
       error: `unknown aic command: ${action}\n\ntype aic for available commands.`,
@@ -8603,6 +9189,56 @@ const emcCommand: Command = {
           '    - Run emc test to verify all containment systems',
           '',
           '  See also: cat ~/.local/docs/emc001.txt',
+          '',
+        ],
+      }
+    }
+
+        if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'EMC(1)              UnstableLabs Manual              EMC(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    emc — Exotic Matter Containment field management',
+          '',
+          'SYNOPSIS',
+          '    emc [status|power|firmware|test|reset|fold|unfold|toggle|info]',
+          '',
+          'DESCRIPTION',
+          '    The emc utility provides management and control of',
+          '    the Exotic Matter Containment (EMC-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: exotic, emc001, containment',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show containment state, field strength, matter level',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    reset                Power-cycle the containment unit',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    info                 Detailed specs and containment parameters',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), qua(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                EMC(1)',
           '',
         ],
       }
@@ -8938,6 +9574,60 @@ const quaCommand: Command = {
       }
     }
 
+        if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'QUA(1)              UnstableLabs Manual              QUA(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    qua — Quantum Analyzer measurement and analysis',
+          '',
+          'SYNOPSIS',
+          '    qua [status|power|firmware|test|reset|mode|sensitivity|depth|frequency|fold|unfold|toggle|info]',
+          '',
+          'DESCRIPTION',
+          '    The qua utility provides management and control of',
+          '    the Quantum Analyzer (QAN-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: analyzer, qua001, quantum-analyzer',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show analyzer state, last scan results',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    reset                Power-cycle the analyzer',
+          '    mode <mode>          Set analysis mode',
+          '    sensitivity <val>    Set scan sensitivity',
+          '    depth <val>          Set scan depth',
+          '    frequency <val>      Set scan frequency',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    info                 Detailed specs and calibration',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), qsm(1), emc(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                QUA(1)',
+          '',
+        ],
+      }
+    }
+
     return {
       success: false,
       error: `unknown qua subcommand: ${action}\nusage: qua [status|power|firmware|test|reset|mode|sensitivity|depth|frequency|fold|unfold|toggle|info]`,
@@ -9226,6 +9916,56 @@ const qsmCommand: Command = {
           '    - High error rate: reboot with qsm reset',
           '',
           '  See also: cat ~/.local/docs/qsm001.txt',
+          '',
+        ],
+      }
+    }
+
+        if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'QSM(1)              UnstableLabs Manual              QSM(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    qsm — Quantum State Monitor qubit tracking and decoherence',
+          '',
+          'SYNOPSIS',
+          '    qsm [status|power|firmware|test|reset|fold|unfold|toggle|info]',
+          '',
+          'DESCRIPTION',
+          '    The qsm utility provides management and control of',
+          '    the Quantum State Monitor (QSM-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: quantum, qsm001, qubit',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show qubit state, coherence, entanglement',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    reset                Power-cycle the state monitor',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    info                 Detailed specs and quantum parameters',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), qua(1), qcp(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                QSM(1)',
           '',
         ],
       }
@@ -9900,6 +10640,57 @@ const vntCommand: Command = {
       }
     }
 
+        if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'VNT(1)              UnstableLabs Manual              VNT(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    vnt — Ventilation System airflow and cooling management',
+          '',
+          'SYNOPSIS',
+          '    vnt [status|power|firmware|test|reset|fold|unfold|toggle|info|help]',
+          '',
+          'DESCRIPTION',
+          '    The vnt utility provides management and control of',
+          '    the Ventilation System (VNT-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: vent, ventilation, fan, vnt001, cooling',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show fan speed, airflow, filter state',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    reset|reboot         Power-cycle the ventilation system',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    info                 Detailed specs and system information',
+          '    help                 Show usage summary',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), thermal(1), tmp(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                VNT(1)',
+          '',
+        ],
+      }
+    }
+
     return {
       success: false,
       error: `unknown vnt command: ${action}\n\ntype vnt for available commands.`,
@@ -10388,6 +11179,57 @@ const scaCommand: Command = {
           '    /etc/sca/config',
           '',
           '╚═════════════════════════════════════════════════════════════════╝',
+          '',
+        ],
+      }
+    }
+
+        if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'SCA(1)              UnstableLabs Manual              SCA(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    sca — Supercomputer Array cluster compute management',
+          '',
+          'SYNOPSIS',
+          '    sca [status|power|firmware|test|reset|fold|unfold|toggle|info|help]',
+          '',
+          'DESCRIPTION',
+          '    The sca utility provides management and control of',
+          '    the Supercomputer Array (SCA-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: super, supercomputer, sca001, cluster',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show cluster state, node count, load',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    reset|reboot         Power-cycle the supercomputer',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    info                 Detailed specs and system information',
+          '    help                 Show usage summary',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), aic(1), cpu(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                SCA(1)',
           '',
         ],
       }
@@ -11185,6 +12027,52 @@ const themeCommand: Command = {
       }
     }
 
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'THEME(1)              UnstableLabs Manual              THEME(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    theme — CRT display theme customization and management',
+          '',
+          'SYNOPSIS',
+          '    theme [list|set <name>|get|save <name>|load <name>]',
+          '',
+          'DESCRIPTION',
+          '    The theme utility provides management and control of',
+          '    the CRT Theme Manager subsystem. Use subcommands below to',
+          '    interact with the system.',
+          '',
+          '    Aliases: themes',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    list                 Show available themes',
+          '    set <name>           Apply a theme',
+          '    get                  Show current theme',
+          '    save <name>          Save current settings as theme',
+          '    load <name>          Load a saved theme',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    unsyspref(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                THEME(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, error: `Unknown subcommand: ${sub}. Use: theme [list|set|get|save|load]` }
   },
 }
@@ -11355,6 +12243,52 @@ const nodesyncCommand: Command = {
       return { success: true, output }
     }
 
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'NODESYNC(1)              UnstableLabs Manual              NODESYNC(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    nodesync — NODE-SYNC blockchain network synchronization (SB-01)',
+          '',
+          'SYNOPSIS',
+          '    nodesync [status|enable|disable|stats|peers]',
+          '',
+          'DESCRIPTION',
+          '    The nodesync utility provides management and control of',
+          '    the NODE-SYNC subsystem. Use subcommands below to',
+          '    interact with the system.',
+          '',
+          '    Aliases: ns',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show sync status and block height',
+          '    enable               Enable node synchronization',
+          '    disable              Disable node synchronization',
+          '    stats                Show network statistics',
+          '    peers                List connected peers',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    poollink(1), meshcast(1), qbridge(1), screwstat(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                NODESYNC(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, error: `Unknown subcommand: ${sub}. Use: nodesync [status|enable|disable|stats|peers]` }
   },
 }
@@ -11468,6 +12402,53 @@ const poollinkCommand: Command = {
 
     if (sub === 'create') {
       return { success: true, output: ['', '  [POOL-LINK] Pool creation not yet implemented', '  Pools are auto-assigned in current version', ''] }
+    }
+
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'POOLLINK(1)              UnstableLabs Manual              POOLLINK(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    poollink — POOL-LINK mining pool management (SB-02)',
+          '',
+          'SYNOPSIS',
+          '    poollink [status|join|leave|stats|list|members]',
+          '',
+          'DESCRIPTION',
+          '    The poollink utility provides management and control of',
+          '    the POOL-LINK subsystem. Use subcommands below to',
+          '    interact with the system.',
+          '',
+          '    Aliases: pl, pool',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show pool connection status',
+          '    join                 Join a mining pool',
+          '    leave                Leave current pool',
+          '    stats                Show pool statistics and earnings',
+          '    list                 List available pools',
+          '    members              Show current pool members',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    nodesync(1), meshcast(1), qbridge(1), screwstat(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                POOLLINK(1)',
+          '',
+        ],
+      }
     }
 
     return { success: false, error: `Unknown subcommand: ${sub}. Use: poollink [status|join|leave|stats|list|members]` }
@@ -11591,6 +12572,54 @@ const meshcastCommand: Command = {
       return { success: true, output }
     }
 
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'MESHCAST(1)              UnstableLabs Manual              MESHCAST(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    meshcast — MESH-CAST memetic broadcasting network (SB-03)',
+          '',
+          'SYNOPSIS',
+          '    meshcast [status|enable|disable|broadcast|list|stats|history]',
+          '',
+          'DESCRIPTION',
+          '    The meshcast utility provides management and control of',
+          '    the MESH-CAST subsystem. Use subcommands below to',
+          '    interact with the system.',
+          '',
+          '    Aliases: mc, meme',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show mesh network status',
+          '    enable               Enable mesh broadcasting',
+          '    disable              Disable mesh broadcasting',
+          '    broadcast <msg>      Broadcast a message to the mesh',
+          '    list                 List recent broadcasts',
+          '    stats                Show broadcast statistics',
+          '    history              Show broadcast history',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    nodesync(1), poollink(1), qbridge(1), screwstat(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                MESHCAST(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, error: `Unknown subcommand: ${sub}. Use: meshcast [status|enable|disable|broadcast|list|stats|history]` }
   },
 }
@@ -11679,6 +12708,53 @@ const qbridgeCommand: Command = {
         '  (Quantum chat interface not yet available in terminal)',
         '',
       ] }
+    }
+
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'QBRIDGE(1)              UnstableLabs Manual              QBRIDGE(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    qbridge — QUANTUM-BRIDGE dimensional multiplayer link (SB-04)',
+          '',
+          'SYNOPSIS',
+          '    qbridge [status|link|unlink|share|coassemble|chat]',
+          '',
+          'DESCRIPTION',
+          '    The qbridge utility provides management and control of',
+          '    the QUANTUM-BRIDGE subsystem. Use subcommands below to',
+          '    interact with the system.',
+          '',
+          '    Aliases: qb, bridge',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show bridge connection status',
+          '    link <player>        Establish quantum link with player',
+          '    unlink               Disconnect quantum bridge',
+          '    share <item>         Share item across bridge',
+          '    coassemble           Start co-assembly session',
+          '    chat <msg>           Send message over bridge',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    nodesync(1), poollink(1), meshcast(1), screwstat(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                QBRIDGE(1)',
+          '',
+        ],
+      }
     }
 
     return { success: false, error: `Unknown subcommand: ${sub}. Use: qbridge [status|link|unlink|share|coassemble|chat]` }
@@ -11942,7 +13018,55 @@ const unaptCommand: Command = {
         return { success: true, output }
 
       default:
-        return { success: false, error: `unapt: unknown subcommand '${sub}'` }
+            if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'UNAPT(1)              UnstableLabs Manual              UNAPT(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    unapt — _unOS package manager for software installation',
+          '',
+          'SYNOPSIS',
+          '    unapt [list|install <pkg>|remove <pkg>|update|upgrade|search <term>|info <pkg>]',
+          '',
+          'DESCRIPTION',
+          '    The unapt utility provides management and control of',
+          '    the Package Manager subsystem. Use subcommands below to',
+          '    interact with the system.',
+          '',
+          '    Aliases: apt, undnf, dnf',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    list                 List installed packages',
+          '    install <pkg>        Install a package',
+          '    remove <pkg>         Remove a package',
+          '    update               Update package database',
+          '    upgrade              Upgrade all packages',
+          '    search <term>        Search package repository',
+          '    info <pkg>           Show package information',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    unpod(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                UNAPT(1)',
+          '',
+        ],
+      }
+    }
+
+    return { success: false, error: `unapt: unknown subcommand '${sub}'` }
     }
   },
 }
@@ -12035,7 +13159,54 @@ const unpodCommand: Command = {
       }
 
       default:
-        return { success: false, error: `unpod: unknown subcommand '${sub}'` }
+            if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'UNPOD(1)              UnstableLabs Manual              UNPOD(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    unpod — _unOS container runtime for isolated processes',
+          '',
+          'SYNOPSIS',
+          '    unpod [list|run <image>|stop <id>|rm <id>|logs <id>|stats|ps]',
+          '',
+          'DESCRIPTION',
+          '    The unpod utility provides management and control of',
+          '    the Container Runtime subsystem. Use subcommands below to',
+          '    interact with the system.',
+          '',
+          '    Aliases: pod',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    list|ps              List running containers',
+          '    run <image>          Start a new container',
+          '    stop <id>            Stop a running container',
+          '    rm <id>              Remove a stopped container',
+          '    logs <id>            Show container logs',
+          '    stats                Show container resource usage',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    unapt(1), unsystemctl(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                UNPOD(1)',
+          '',
+        ],
+      }
+    }
+
+    return { success: false, error: `unpod: unknown subcommand '${sub}'` }
     }
   },
 }
@@ -12143,7 +13314,54 @@ const unnetCommand: Command = {
         return { success: true, output }
 
       default:
-        return { success: false, error: `unnet: unknown subcommand '${sub}'` }
+            if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'UNNET(1)              UnstableLabs Manual              UNNET(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    unnet — _unOS network interface and connection management',
+          '',
+          'SYNOPSIS',
+          '    unnet [status|interfaces|dns|routes|ping <host>|trace <host>]',
+          '',
+          'DESCRIPTION',
+          '    The unnet utility provides management and control of',
+          '    the Network Management subsystem. Use subcommands below to',
+          '    interact with the system.',
+          '',
+          '    Aliases: ifconfig',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show network status overview',
+          '    interfaces           List network interfaces',
+          '    dns                  Show DNS configuration',
+          '    routes               Show routing table',
+          '    ping <host>          Test connectivity to host',
+          '    trace <host>         Trace route to host',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    net(1), nodesync(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                UNNET(1)',
+          '',
+        ],
+      }
+    }
+
+    return { success: false, error: `unnet: unknown subcommand '${sub}'` }
     }
   },
 }
@@ -12226,7 +13444,55 @@ const ungitCommand: Command = {
         return { success: true, output }
 
       default:
-        return { success: false, error: `ungit: unknown subcommand '${sub}'` }
+            if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'UNGIT(1)              UnstableLabs Manual              UNGIT(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    ungit — _unOS simulated version control system',
+          '',
+          'SYNOPSIS',
+          '    ungit [status|log|branch|diff|commit|push|pull]',
+          '',
+          'DESCRIPTION',
+          '    The ungit utility provides management and control of',
+          '    the Version Control subsystem. Use subcommands below to',
+          '    interact with the system.',
+          '',
+          '    Aliases: git',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show working tree status',
+          '    log                  Show commit history',
+          '    branch               List or create branches',
+          '    diff                 Show uncommitted changes',
+          '    commit               Record changes',
+          '    push                 Push to remote',
+          '    pull                 Pull from remote',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    unapt(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                UNGIT(1)',
+          '',
+        ],
+      }
+    }
+
+    return { success: false, error: `ungit: unknown subcommand '${sub}'` }
     }
   },
 }
@@ -12364,6 +13630,56 @@ const btkCommand: Command = {
     if (sub === 'toggle') {
       device.toggleExpanded()
       return { success: true, output: ['', '[BTK-001] Device view toggled', ''] }
+    }
+
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'BTK(1)              UnstableLabs Manual              BTK(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    btk — Basic Toolkit inventory and tool management',
+          '',
+          'SYNOPSIS',
+          '    btk [status|firmware|test|config|tools|reboot|fold|unfold|toggle]',
+          '',
+          'DESCRIPTION',
+          '    The btk utility provides management and control of',
+          '    the Basic Toolkit (BTK-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: toolkit',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show toolkit state and tool availability',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    config               Show configuration parameters',
+          '    tools                List available tools in the kit',
+          '    reboot               Power-cycle the toolkit',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), hms(1), p3d(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                BTK(1)',
+          '',
+        ],
+      }
     }
 
     return { success: false, output: [`[btk] Unknown subcommand: ${sub}`, 'Usage: btk <status|firmware|test|config|tools|reboot|fold|unfold|toggle>'] }
@@ -12509,6 +13825,56 @@ const pwbCommand: Command = {
       return { success: true, output: ['[pwb] Reboot complete'] }
     }
 
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'PWB(1)              UnstableLabs Manual              PWB(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    pwb — Power Management System power routing and slots',
+          '',
+          'SYNOPSIS',
+          '    pwb [status|firmware|test|config|slots|reboot|fold|unfold|toggle]',
+          '',
+          'DESCRIPTION',
+          '    The pwb utility provides management and control of',
+          '    the Power Management System (PWR-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: workbench, bench',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show power grid state and routing',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    config               Show configuration parameters',
+          '    slots                List power slots and assignments',
+          '    reboot               Power-cycle the system',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), power(1), uec(1), bat(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                PWB(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, output: [`[pwb] Unknown subcommand: ${sub}`, 'Usage: pwb <status|firmware|test|config|slots|reboot|fold|unfold|toggle>'] }
   }
 }
@@ -12615,6 +13981,57 @@ const rmgCommand: Command = {
       device.toggleExpanded()
       return { success: true, output: ['', '[RMG-001] Device view toggled', ''] }
     }
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'RMG(1)              UnstableLabs Manual              RMG(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    rmg — Resource Magnet field strength and collection',
+          '',
+          'SYNOPSIS',
+          '    rmg [status|firmware|test|config|field|strength|reboot|fold|unfold|toggle]',
+          '',
+          'DESCRIPTION',
+          '    The rmg utility provides management and control of',
+          '    the Resource Magnet (RMG-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: magnet',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show magnet state and collection rate',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    config               Show configuration parameters',
+          '    field                Show magnetic field parameters',
+          '    strength             Show current field strength',
+          '    reboot               Power-cycle the magnet',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), res(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                RMG(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, output: [`[rmg] Unknown subcommand: ${sub}`, 'Usage: rmg <status|firmware|test|config|field|strength|reboot|fold|unfold|toggle>'] }
   }
 }
@@ -12703,6 +14120,55 @@ const mscCommand: Command = {
       device.toggleExpanded()
       return { success: true, output: ['', '[MSC-001] Device view toggled', ''] }
     }
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'MSC(1)              UnstableLabs Manual              MSC(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    msc — Material Scanner detection and analysis',
+          '',
+          'SYNOPSIS',
+          '    msc [status|firmware|test|config|reboot|fold|unfold|toggle]',
+          '',
+          'DESCRIPTION',
+          '    The msc utility provides management and control of',
+          '    the Material Scanner (MSC-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: scanner, matscan',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show scanner state and last scan results',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    config               Show configuration parameters',
+          '    reboot               Power-cycle the scanner',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), rmg(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                MSC(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, output: [`[msc] Unknown subcommand: ${sub}`, 'Usage: msc <status|firmware|test|config|reboot|fold|unfold|toggle>'] }
   }
 }
@@ -12796,6 +14262,55 @@ const tmpCommand: Command = {
       await device.reboot()
       return { success: true, output: ['[tmp] Reboot complete'] }
     }
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'TMP(1)              UnstableLabs Manual              TMP(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    tmp — Temperature Monitor thermal sensing and alerts',
+          '',
+          'SYNOPSIS',
+          '    tmp [status|firmware|test|config|reboot|fold|unfold|toggle]',
+          '',
+          'DESCRIPTION',
+          '    The tmp utility provides management and control of',
+          '    the Temperature Monitor (TMP-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: temperature',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show temperature readings and thresholds',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    config               Show configuration parameters',
+          '    reboot               Power-cycle the monitor',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), thermal(1), vnt(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                TMP(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, output: [`[tmp] Unknown subcommand: ${sub}`, 'Usage: tmp <status|firmware|test|config|reboot|fold|unfold|toggle>'] }
   }
 }
@@ -12897,6 +14412,56 @@ const clkCommand: Command = {
       await device.reboot()
       return { success: true, output: ['[clk] Reboot complete'] }
     }
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'CLK(1)              UnstableLabs Manual              CLK(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    clk — Lab Clock timekeeping and synchronization',
+          '',
+          'SYNOPSIS',
+          '    clk [status|firmware|test|config|mode|reboot|fold|unfold|toggle]',
+          '',
+          'DESCRIPTION',
+          '    The clk utility provides management and control of',
+          '    the Lab Clock (CLK-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: clock',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show current time, drift, sync state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    config               Show configuration parameters',
+          '    mode                 Show or change clock mode',
+          '    reboot               Power-cycle the clock',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                CLK(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, output: [`[clk] Unknown subcommand: ${sub}`, 'Usage: clk <status|firmware|test|config|mode|reboot|fold|unfold|toggle>'] }
   }
 }
@@ -12992,6 +14557,55 @@ const cpuCommand: Command = {
       await device.reboot()
       return { success: true, output: ['[cpu] Reboot complete'] }
     }
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'CPU(1)              UnstableLabs Manual              CPU(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    cpu — CPU Monitor processor load and performance tracking',
+          '',
+          'SYNOPSIS',
+          '    cpu [status|firmware|test|config|reboot|fold|unfold|toggle]',
+          '',
+          'DESCRIPTION',
+          '    The cpu utility provides management and control of',
+          '    the CPU Monitor (CPU-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: processor',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show CPU load, frequency, core temps',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    config               Show configuration parameters',
+          '    reboot               Power-cycle the monitor',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), mem(1), sca(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                CPU(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, output: [`[cpu] Unknown subcommand: ${sub}`, 'Usage: cpu <status|firmware|test|config|reboot|fold|unfold|toggle>'] }
   }
 }
@@ -13097,6 +14711,56 @@ const memCommand: Command = {
       await device.reboot()
       return { success: true, output: ['[mem] Reboot complete'] }
     }
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'MEM(1)              UnstableLabs Manual              MEM(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    mem — Memory Monitor allocation and usage tracking',
+          '',
+          'SYNOPSIS',
+          '    mem [status|firmware|test|config|mode|reboot|fold|unfold|toggle]',
+          '',
+          'DESCRIPTION',
+          '    The mem utility provides management and control of',
+          '    the Memory Monitor (MEM-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: memory, ram',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show memory usage, allocation, swap state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    config               Show configuration parameters',
+          '    mode                 Show or change memory mode',
+          '    reboot               Power-cycle the monitor',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), cpu(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                MEM(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, output: [`[mem] Unknown subcommand: ${sub}`, 'Usage: mem [status|firmware|test|config|mode|reboot|fold|unfold|toggle]'] }
   }
 }
@@ -13212,6 +14876,57 @@ const andCommand: Command = {
       await device.reboot()
       return { success: true, output: ['[and] Reboot complete'] }
     }
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'AND(1)              UnstableLabs Manual              AND(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    and — Anomaly Detector signal monitoring and alert management',
+          '',
+          'SYNOPSIS',
+          '    and [status|firmware|test|config|mode|signal|reboot|fold|unfold|toggle]',
+          '',
+          'DESCRIPTION',
+          '    The and utility provides management and control of',
+          '    the Anomaly Detector (AND-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: anomaly, detector',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show detector state, signal, anomaly count',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    config               Show configuration parameters',
+          '    mode                 Show or change detection mode',
+          '    signal               Show current signal analysis',
+          '    reboot               Power-cycle the detector',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), qcp(1), dim(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                AND(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, output: [`[and] Unknown subcommand: ${sub}`, 'Usage: and [status|firmware|test|config|mode|signal|reboot|fold|unfold|toggle]'] }
   }
 }
@@ -13336,6 +15051,58 @@ const qcpCommand: Command = {
       await device.reboot()
       return { success: true, output: ['[qcp] Reboot complete'] }
     }
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'QCP(1)              UnstableLabs Manual              QCP(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    qcp — Quantum Compass dimensional navigation and bearing',
+          '',
+          'SYNOPSIS',
+          '    qcp [status|firmware|test|config|mode|bearing|distance|reboot|fold|unfold|toggle]',
+          '',
+          'DESCRIPTION',
+          '    The qcp utility provides management and control of',
+          '    the Quantum Compass (QCP-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: compass, qcompass',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show compass state, bearing, calibration',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    config               Show configuration parameters',
+          '    mode                 Show or change compass mode',
+          '    bearing              Show current dimensional bearing',
+          '    distance             Show distance to nearest anomaly',
+          '    reboot               Power-cycle the compass',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), and(1), dim(1), tlp(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                QCP(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, output: [`[qcp] Unknown subcommand: ${sub}`, 'Usage: qcp [status|firmware|test|config|mode|bearing|distance|reboot|fold|unfold|toggle]'] }
   }
 }
@@ -13435,6 +15202,55 @@ const dimCommand: Command = {
       await device.reboot()
       return { success: true, output: ['[dim] Reboot complete'] }
     }
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'DIM(1)              UnstableLabs Manual              DIM(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    dim — Dimension Monitor spatial rift and stability tracking',
+          '',
+          'SYNOPSIS',
+          '    dim [status|firmware|test|config|reboot|fold|unfold|toggle]',
+          '',
+          'DESCRIPTION',
+          '    The dim utility provides management and control of',
+          '    the Dimension Monitor (DIM-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: dimension',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show dimensional stability, rift proximity',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    config               Show configuration parameters',
+          '    reboot               Power-cycle the monitor',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), qcp(1), and(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                DIM(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, output: [`[dim] Unknown subcommand: ${sub}`, 'Usage: dim <status|firmware|test|config|reboot|fold|unfold|toggle>'] }
   }
 }
@@ -13529,6 +15345,55 @@ const netCommand: Command = {
       await device.reboot()
       return { success: true, output: ['[net] Reboot complete'] }
     }
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'NET(1)              UnstableLabs Manual              NET(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    net — Network Monitor connectivity and traffic analysis',
+          '',
+          'SYNOPSIS',
+          '    net [status|firmware|test|config|reboot|fold|unfold|toggle]',
+          '',
+          'DESCRIPTION',
+          '    The net utility provides management and control of',
+          '    the Network Monitor (NET-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: network, netmon',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show network state, latency, throughput',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    config               Show configuration parameters',
+          '    reboot               Power-cycle the monitor',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), nodesync(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                NET(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, output: [`[net] Unknown subcommand: ${sub}`, 'Usage: net <status|firmware|test|config|reboot|fold|unfold|toggle>'] }
   }
 }
@@ -13783,6 +15648,60 @@ const tlpCommand: Command = {
       }
     }
 
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'TLP(1)              UnstableLabs Manual              TLP(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    tlp — Teleport Pad dimensional transport and calibration',
+          '',
+          'SYNOPSIS',
+          '    tlp [status|power|firmware|test|calibrate|destinations|coordinates|jump|history|help|fold|unfold|toggle]',
+          '',
+          'DESCRIPTION',
+          '    The tlp utility provides management and control of',
+          '    the Teleport Pad (TLP-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: teleport',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show pad state, coordinates, charge level',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    calibrate            Recalibrate dimensional alignment',
+          '    destinations         List known teleport destinations',
+          '    coordinates          Show current spatial coordinates',
+          '    jump <dest>          Initiate teleport to destination',
+          '    history              Show teleport jump history',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    help                 Show usage summary',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), qcp(1), dim(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                TLP(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, error: `unknown subcommand: ${sub}. try: tlp help` }
   },
 }
@@ -13918,6 +15837,59 @@ const lctCommand: Command = {
           '  unfold       Unfold to full view',
           '  toggle       Toggle fold state',
           '  help         Show this help',
+        ],
+      }
+    }
+
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'LCT(1)              UnstableLabs Manual              LCT(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    lct — Precision Laser cutting, engraving, and calibration',
+          '',
+          'SYNOPSIS',
+          '    lct [status|power|firmware|test|calibrate|focus|intensity|mode|help|fold|unfold|toggle]',
+          '',
+          'DESCRIPTION',
+          '    The lct utility provides management and control of',
+          '    the Precision Laser (LCT-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: laser-ctrl',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show laser state, focus, intensity',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    calibrate            Recalibrate laser alignment',
+          '    focus <val>          Set laser focus distance',
+          '    intensity <val>      Set beam intensity',
+          '    mode <mode>          Set operating mode',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    help                 Show usage summary',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), p3d(1), hms(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                LCT(1)',
+          '',
         ],
       }
     }
@@ -14082,6 +16054,59 @@ const p3dCommand: Command = {
           '  unfold         Unfold to full view',
           '  toggle         Toggle fold state',
           '  help           Show this help',
+        ],
+      }
+    }
+
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'P3D(1)              UnstableLabs Manual              P3D(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    p3d — 3D Fabricator additive manufacturing and print queue',
+          '',
+          'SYNOPSIS',
+          '    p3d [status|power|firmware|test|queue|materials|calibrate|mode|help|fold|unfold|toggle]',
+          '',
+          'DESCRIPTION',
+          '    The p3d utility provides management and control of',
+          '    the 3D Fabricator (P3D-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: printer-ctrl, fab',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show fabricator state, print progress',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    queue                Show current print queue',
+          '    materials            Show material stock levels',
+          '    calibrate            Recalibrate print head',
+          '    mode <mode>          Set fabrication mode',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    help                 Show usage summary',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), lct(1), hms(1), btk(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                P3D(1)',
+          '',
         ],
       }
     }
@@ -14735,6 +16760,57 @@ const spkCommand: Command = {
       return { success: true }
     }
 
+        if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'SPK(1)              UnstableLabs Manual              SPK(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    spk — Narrow Speaker audio output and sound management',
+          '',
+          'SYNOPSIS',
+          '    spk [status|power|firmware|test|reset|fold|unfold|toggle|info|help]',
+          '',
+          'DESCRIPTION',
+          '    The spk utility provides management and control of',
+          '    the Narrow Speaker (SPK-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: speaker, spk001, narrow-speaker',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show speaker state, volume, frequency',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    reset|reboot         Power-cycle the speaker',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    info                 Detailed specs and audio parameters',
+          '    help                 Show usage summary',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), osc(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                SPK(1)',
+          '',
+        ],
+      }
+    }
+
     return {
       success: false,
       error: `unknown spk command: ${action}\n\ntype spk for available commands.`,
@@ -15112,6 +17188,60 @@ const dgnCommand: Command = {
       return { success: true }
     }
 
+        if (action === 'unman' || action === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'DGN(1)              UnstableLabs Manual              DGN(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    dgn — Diagnostics Console system-wide testing and health',
+          '',
+          'SYNOPSIS',
+          '    dgn [status|power|firmware|test|reset|fold|unfold|toggle|info|help|scan|report|history]',
+          '',
+          'DESCRIPTION',
+          '    The dgn utility provides management and control of',
+          '    the Diagnostics Console (DGN-001). Use subcommands below to',
+          '    interact with the device.',
+          '',
+          '    Aliases: diag, dgn001, diagnostics-console',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    status               Show console state and diagnostic overview',
+          '    power <on|off>       Control device power state',
+          '    firmware             Display firmware version and build info',
+          '    test                 Run built-in diagnostic self-test',
+          '    reset|reboot         Power-cycle the diagnostics console',
+          '    scan                 Run full system diagnostic scan',
+          '    report               Generate diagnostic report',
+          '    history              Show diagnostic test history',
+          '    fold                 Collapse to compact view',
+          '    unfold               Expand to full view',
+          '    toggle               Toggle fold/unfold state',
+          '    info                 Detailed specs and system information',
+          '    help                 Show usage summary',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), unsystemctl(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                DGN(1)',
+          '',
+        ],
+      }
+    }
+
     return {
       success: false,
       error: `unknown dgn command: ${action}\n\ntype dgn for available commands.`,
@@ -15373,7 +17503,722 @@ const resCommand: Command = {
       }
     }
 
+        if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'RES(1)              UnstableLabs Manual              RES(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    res — Resource container management, production, and upgrades',
+          '',
+          'SYNOPSIS',
+          '    res [list|info <ID>|tiers|unlock <ID>|upgrade <ID>|recipes|produce <RECIPE>|queue|cancel <ID>|bootstrap]',
+          '',
+          'DESCRIPTION',
+          '    The res utility provides management and control of',
+          '    the Resource Manager subsystem. Use subcommands below to',
+          '    interact with the system.',
+          '',
+          '    Aliases: resources',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    list                 Show all resource containers and levels',
+          '    info <ID>            Detailed info for a specific resource',
+          '    tiers                Show tier unlock requirements',
+          '    unlock <ID>          Unlock a new resource container',
+          '    upgrade <ID>         Upgrade a resource container',
+          '    recipes              List available production recipes',
+          '    produce <RECIPE>     Start a production run',
+          '    queue                Show active production queue',
+          '    cancel <ID>          Cancel a queued production',
+          '    bootstrap            Initialize default resource containers',
+          '    unman               Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), rmg(1), unapp(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                RES(1)',
+          '',
+        ],
+      }
+    }
+
     return { success: false, error: `Unknown subcommand: ${sub}\nUsage: res [list|info <ID>|tiers|unlock <ID>|upgrade <ID>|recipes|produce <RECIPE>|queue|cancel <ID>|bootstrap]` }
+  },
+}
+
+// ============================================================================
+// UNAPP — Application Manager Command
+// ============================================================================
+
+const unappCommand: Command = {
+  name: 'unapp',
+  aliases: [],
+  description: 'Manage and launch device applications',
+  usage: 'unapp [list|run|info|install|remove|search|status|favorite|recent|quick|version] [args]',
+  execute: async (args, ctx) => {
+    const sub = args[0]?.toLowerCase()
+
+    // Default: show help
+    if (!sub || sub === 'help' || sub === '--help') {
+      return {
+        success: true,
+        output: [
+          '',
+          '┌──────────────────────────────────────────────────────────────┐',
+          '│                    APPLICATION MANAGER                       │',
+          '└──────────────────────────────────────────────────────────────┘',
+          '',
+          '  USAGE:',
+          '    unapp list [--all] [--category dev|sys|util] [--favorites]',
+          '    unapp run <app-id> [--module <mod>] [--quick]',
+          '    unapp info <app-id>',
+          '    unapp status',
+          '    unapp search <term>',
+          '    unapp install <app-id>',
+          '    unapp remove <app-id>',
+          '    unapp favorite <app-id>',
+          '    unapp recent',
+          '    unapp quick [app-ids...]',
+          '    unapp version',
+          '    unapp unman',
+          '',
+          '  ALIASES:',
+          '    unrun <app-id>     → unapp run <app-id>',
+          '    unqs <app-id>      → unapp run <app-id> --quick',
+          '',
+        ],
+      }
+    }
+
+    if (sub === 'version') {
+      return { success: true, output: ['unapp v1.0.0 — _unOS Application Manager'] }
+    }
+
+    // LIST
+    if (sub === 'list') {
+      try {
+        const showAll = args.includes('--all')
+        const catFlag = args.indexOf('--category')
+        const catFilter = catFlag >= 0 ? args[catFlag + 1] : null
+        const favOnly = args.includes('--favorites')
+        const sortFlag = args.indexOf('--sort')
+        const sortBy = sortFlag >= 0 ? args[sortFlag + 1] : 'name'
+
+        const { fetchPlayerApps } = await import('@/app/(game)/terminal/actions/unapp')
+
+        let apps = await fetchPlayerApps()
+
+        if (catFilter) {
+          apps = apps.filter(a => a.app_category === catFilter)
+        }
+        if (favOnly) {
+          apps = apps.filter(a => a.is_favorite)
+        }
+        if (sortBy === 'recent') {
+          apps.sort((a, b) => (b.last_launched_at ?? '').localeCompare(a.last_launched_at ?? ''))
+        } else if (sortBy === 'launches') {
+          apps.sort((a, b) => b.total_launches - a.total_launches)
+        }
+
+        const lines = [
+          '',
+          '┌──────────────────────────────────────────────────────────────┐',
+          '│                    APPLICATION MANAGER                       │',
+          '└──────────────────────────────────────────────────────────────┘',
+          '',
+          '  APP-ID     NAME                      CAT   VER     STATE      ★',
+          '  ─────────  ────────────────────────  ────  ──────  ─────────  ─',
+        ]
+
+        for (const app of apps) {
+          const id = app.app_id.padEnd(9)
+          const name = app.app_name.substring(0, 24).padEnd(24)
+          const cat = app.app_category.padEnd(4)
+          const ver = app.installed_version.padEnd(6)
+          const state = app.app_state.padEnd(9)
+          const fav = app.is_favorite ? '★' : ' '
+          lines.push(`  ${id} ${name} ${cat}  ${ver}  ${state}  ${fav}`)
+        }
+
+        if (showAll) {
+          // Also show uninstalled apps from registry
+          const { fetchAppRegistry } = await import('@/app/(game)/terminal/actions/unapp')
+          const registry = await fetchAppRegistry()
+          const installedIds = new Set(apps.map(a => a.app_id))
+          const uninstalled = registry.filter(a => !installedIds.has(a.app_id))
+            .filter(a => !catFilter || a.category === catFilter)
+          for (const app of uninstalled) {
+            const id = app.app_id.padEnd(9)
+            const name = app.name.substring(0, 24).padEnd(24)
+            const cat = app.category.padEnd(4)
+            const ver = app.version.padEnd(6)
+            lines.push(`  ${id} ${name} ${cat}  ${ver}  available  `)
+          }
+        }
+
+        if (apps.length === 0 && !showAll) {
+          lines.push('  No installed apps. Use "unapp list --all" to see available apps.')
+        }
+
+        lines.push('')
+        lines.push(`  ${apps.length} installed${showAll ? ' (showing all available)' : ''}`)
+        lines.push('')
+        return { success: true, output: lines }
+      } catch {
+        return { success: false, error: 'Failed to fetch apps.' }
+      }
+    }
+
+    // RUN
+    if (sub === 'run') {
+      const appId = args[1]?.toUpperCase()
+      if (!appId) return { success: false, error: 'Usage: unapp run <app-id> [--module <mod>] [--quick]' }
+
+      const modFlag = args.indexOf('--module')
+      const moduleName = modFlag >= 0 ? args[modFlag + 1] : null
+      const quick = args.includes('--quick')
+
+      try {
+        const { fetchAppInfo } = await import('@/app/(game)/terminal/actions/unapp')
+        const app = await fetchAppInfo(appId)
+        if (!app) return { success: false, error: `App ${appId} not found.` }
+
+        // Record launch (fire and forget)
+        import('@/app/(game)/terminal/actions/unapp').then(m => m.recordAppLaunch(appId, 'unapp')).catch(() => {})
+
+        const { renderApp } = await import('@/lib/terminal/unapp/appShell')
+        return { success: true, output: renderApp(app, moduleName, ctx, quick) }
+      } catch {
+        return { success: false, error: `Failed to launch ${appId}.` }
+      }
+    }
+
+    // INFO
+    if (sub === 'info') {
+      const appId = args[1]?.toUpperCase()
+      if (!appId) return { success: false, error: 'Usage: unapp info <app-id>' }
+
+      try {
+        const { fetchAppInfo } = await import('@/app/(game)/terminal/actions/unapp')
+        const app = await fetchAppInfo(appId)
+        if (!app) return { success: false, error: `App ${appId} not found.` }
+
+        return {
+          success: true,
+          output: [
+            '',
+            `  ┌─ APP MANIFEST ─────────────────────────────────────────┐`,
+            `  │ ID:           ${app.app_id}`,
+            `  │ Name:         ${app.name}`,
+            `  │ Version:      ${app.version}`,
+            `  │ Category:     ${app.category}`,
+            `  │ Device:       ${app.device_id ?? 'N/A'}`,
+            `  │ Tech Tree:    ${app.tech_tree ?? 'None'}`,
+            `  │ Tier Req:     T${app.tier_required}`,
+            `  │ Size:         ${app.size_kb} KB`,
+            `  │ Author:       ${app.author}`,
+            `  │ Min _unOS:    ${app.min_unos_version}`,
+            `  │ Auto-Install: ${app.auto_install ? 'YES' : 'NO'}`,
+            `  │`,
+            `  │ Description:`,
+            `  │   ${app.description ?? 'No description.'}`,
+            `  │`,
+            `  │ Modules (${app.modules.length}):`,
+            ...app.modules.map(m => `  │   • ${m}`),
+            `  │`,
+            `  │ Permissions:`,
+            ...app.permissions.map(p => `  │   • ${p}`),
+            `  │`,
+            `  │ Dependencies: ${app.dependencies.length > 0 ? app.dependencies.join(', ') : 'None'}`,
+            `  └───────────────────────────────────────────────────────┘`,
+            '',
+          ],
+        }
+      } catch {
+        return { success: false, error: `Failed to fetch info for ${appId}.` }
+      }
+    }
+
+    // STATUS
+    if (sub === 'status') {
+      try {
+        const { fetchPlayerApps } = await import('@/app/(game)/terminal/actions/unapp')
+        const apps = await fetchPlayerApps()
+        const favorites = apps.filter(a => a.is_favorite).length
+        const recentCount = apps.filter(a => a.last_launched_at).length
+        const totalLaunches = apps.reduce((s, a) => s + a.total_launches, 0)
+
+        return {
+          success: true,
+          output: [
+            '',
+            '  APPLICATION STATUS',
+            '  ─────────────────────────',
+            `  Installed:     ${apps.length}`,
+            `  Favorites:     ${favorites}`,
+            `  Apps Launched:  ${recentCount}`,
+            `  Total Launches: ${totalLaunches}`,
+            '',
+          ],
+        }
+      } catch {
+        return { success: false, error: 'Failed to fetch status.' }
+      }
+    }
+
+    // SEARCH
+    if (sub === 'search') {
+      const term = args.slice(1).join(' ')
+      if (!term) return { success: false, error: 'Usage: unapp search <term>' }
+
+      try {
+        const { searchApps } = await import('@/app/(game)/terminal/actions/unapp')
+        const results = await searchApps(term)
+        if (results.length === 0) return { success: true, output: [`  No apps matching "${term}".`] }
+
+        const lines = [
+          '',
+          `  Search results for "${term}":`,
+          '',
+          '  APP-ID     NAME                      CAT   VER',
+          '  ─────────  ────────────────────────  ────  ──────',
+        ]
+        for (const app of results) {
+          lines.push(`  ${app.app_id.padEnd(9)} ${app.name.substring(0, 24).padEnd(24)} ${app.category.padEnd(4)}  ${app.version}`)
+        }
+        lines.push('')
+        lines.push(`  ${results.length} result(s)`)
+        lines.push('')
+        return { success: true, output: lines }
+      } catch {
+        return { success: false, error: 'Search failed.' }
+      }
+    }
+
+    // INSTALL
+    if (sub === 'install') {
+      const installAll = args.includes('--all')
+
+      if (installAll) {
+        try {
+          const { fetchAppRegistry, installApp, fetchPlayerApps } = await import('@/app/(game)/terminal/actions/unapp')
+          const registry = await fetchAppRegistry()
+          const installed = await fetchPlayerApps()
+          const installedIds = new Set(installed.map(a => a.app_id))
+          const toInstall = registry.filter(a => !installedIds.has(a.app_id))
+
+          if (toInstall.length === 0) {
+            return { success: true, output: ['  All apps are already installed.'] }
+          }
+
+          const lines: string[] = ['', `  Installing ${toInstall.length} apps...`, '']
+          let success = 0
+          let failed = 0
+          for (const app of toInstall) {
+            const result = await installApp(app.app_id)
+            if (result.success) {
+              lines.push(`  ✓ ${app.app_id}  ${app.name}`)
+              success++
+            } else {
+              lines.push(`  ✗ ${app.app_id}  ${result.error ?? 'failed'}`)
+              failed++
+            }
+          }
+          lines.push('')
+          lines.push(`  Done: ${success} installed, ${failed} failed.`)
+          lines.push('')
+          return { success: true, output: lines }
+        } catch {
+          return { success: false, error: 'Bulk install failed.' }
+        }
+      }
+
+      const appId = args[1]?.toUpperCase()
+      if (!appId) return { success: false, error: 'Usage: unapp install <app-id> | unapp install --all' }
+
+      try {
+        const { installApp } = await import('@/app/(game)/terminal/actions/unapp')
+        const result = await installApp(appId)
+        if (!result.success) return { success: false, error: result.error ?? 'Install failed.' }
+        return { success: true, output: [`  ✓ ${appId} installed successfully.`] }
+      } catch {
+        return { success: false, error: 'Install failed.' }
+      }
+    }
+
+    // REMOVE
+    if (sub === 'remove') {
+      const appId = args[1]?.toUpperCase()
+      if (!appId) return { success: false, error: 'Usage: unapp remove <app-id>' }
+
+      try {
+        const { removeApp } = await import('@/app/(game)/terminal/actions/unapp')
+        const result = await removeApp(appId)
+        if (!result.success) return { success: false, error: result.error ?? 'Remove failed.' }
+        return { success: true, output: [`  ✓ ${appId} removed.`] }
+      } catch {
+        return { success: false, error: 'Remove failed.' }
+      }
+    }
+
+    // FAVORITE
+    if (sub === 'favorite') {
+      const appId = args[1]?.toUpperCase()
+      if (!appId) return { success: false, error: 'Usage: unapp favorite <app-id>' }
+
+      try {
+        const { toggleFavorite } = await import('@/app/(game)/terminal/actions/unapp')
+        const isFav = await toggleFavorite(appId)
+        return { success: true, output: [`  ${appId}: ${isFav ? '★ favorited' : '☆ unfavorited'}`] }
+      } catch {
+        return { success: false, error: 'Failed to toggle favorite.' }
+      }
+    }
+
+    // RECENT
+    if (sub === 'recent') {
+      try {
+        const { fetchPlayerApps } = await import('@/app/(game)/terminal/actions/unapp')
+        const apps = await fetchPlayerApps()
+        const recent = apps
+          .filter(a => a.last_launched_at)
+          .sort((a, b) => (b.last_launched_at ?? '').localeCompare(a.last_launched_at ?? ''))
+          .slice(0, 10)
+
+        if (recent.length === 0) return { success: true, output: ['  No recently launched apps.'] }
+
+        const lines = [
+          '',
+          '  RECENTLY LAUNCHED',
+          '  ─────────────────────────',
+        ]
+        for (const app of recent) {
+          const ago = app.last_launched_at ? timeSince(new Date(app.last_launched_at)) : 'never'
+          lines.push(`  ${app.app_id.padEnd(9)} ${app.app_name.substring(0, 24).padEnd(24)} ${ago}`)
+        }
+        lines.push('')
+        return { success: true, output: lines }
+      } catch {
+        return { success: false, error: 'Failed to fetch recent apps.' }
+      }
+    }
+
+    // QUICK
+    if (sub === 'quick') {
+      const appIds = args.slice(1).filter(a => !a.startsWith('--')).map(a => a.toUpperCase())
+
+      try {
+        const { fetchAppInfo, fetchPlayerApps } = await import('@/app/(game)/terminal/actions/unapp')
+        const { renderApp } = await import('@/lib/terminal/unapp/appShell')
+        const lines: string[] = ['', '  QUICK STATUS', '  ─────────────────────────']
+
+        let targets: string[]
+        if (appIds.length > 0) {
+          targets = appIds
+        } else {
+          // All installed
+          const apps = await fetchPlayerApps()
+          targets = apps.map(a => a.app_id)
+        }
+
+        for (const id of targets) {
+          const app = await fetchAppInfo(id)
+          if (app) {
+            const rendered = renderApp(app, null, ctx, true)
+            lines.push('  ' + rendered[0])
+          }
+        }
+
+        lines.push('')
+        return { success: true, output: lines }
+      } catch {
+        return { success: false, error: 'Quick status failed.' }
+      }
+    }
+
+    // UPDATE (stub)
+    if (sub === 'update') {
+      return { success: true, output: ['  All apps are up to date.'] }
+    }
+
+    if (sub === 'unman' || sub === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'UNAPP(1)              UnstableLabs Manual              UNAPP(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    unapp — _unOS application manager',
+          '',
+          'SYNOPSIS',
+          '    unapp list [--all] [--category dev|sys|util] [--favorites]',
+          '               [--sort name|recent|launches]',
+          '    unapp run <app-id> [--module <name>] [--quick]',
+          '    unapp info <app-id>',
+          '    unapp status',
+          '    unapp search <term>',
+          '    unapp install <app-id> [--all]',
+          '    unapp remove <app-id>',
+          '    unapp favorite <app-id>',
+          '    unapp recent',
+          '    unapp quick [app-ids...]',
+          '    unapp update [--check] [--all]',
+          '    unapp version',
+          '    unapp unman',
+          '',
+          'DESCRIPTION',
+          '    The unapp utility is the central application manager for',
+          '    _unOS. It provides installation, removal, and lifecycle',
+          '    management for all device applications, system apps, and',
+          '    utility packages registered in the unapp registry.',
+          '',
+          '    Each application is identified by a unique app ID',
+          '    (e.g. UEC-001, SYS-LAB, UTL-LOG) and belongs to one of',
+          '    three categories: dev (device), sys (system), or util.',
+          '',
+          '    Device apps (dev) are tied to specific lab hardware and',
+          '    provide module-based interfaces for monitoring, config,',
+          '    diagnostics, and firmware management. System apps (sys)',
+          '    provide lab-wide dashboards. Utility apps (util) offer',
+          '    logging, configuration backup, and maintenance tools.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'COMMANDS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    list [--all] [--category <cat>] [--favorites] [--sort <by>]',
+          '        Show installed applications in a formatted table.',
+          '        Columns: APP-ID, NAME, CAT, VER, STATE, ★ (favorite).',
+          '',
+          '        --all         Include uninstalled apps (state: available)',
+          '        --category    Filter by category: dev, sys, or util',
+          '        --favorites   Show only favorited apps',
+          '        --sort        Sort by: name (default), recent, launches',
+          '',
+          '    run <app-id> [--module <name>] [--quick]',
+          '        Launch a device application. Renders the status module',
+          '        by default. Use --module to select a specific module',
+          '        (e.g. output-control, storage-analytics).',
+          '',
+          '        --module <name>   Render a specific app module',
+          '        --quick           Single-line status summary',
+          '',
+          '        Records the launch in usage history and increments',
+          '        the total launch counter for the app.',
+          '',
+          '    info <app-id>',
+          '        Display full application manifest: name, version,',
+          '        category, associated device, available modules,',
+          '        permissions, size, dependencies, and tier requirement.',
+          '',
+          '    status',
+          '        Show summary: total installed apps, favorites count,',
+          '        recent launch activity, and per-category breakdown.',
+          '',
+          '    search <term>',
+          '        Search the app registry by name, description, or',
+          '        app ID. Case-insensitive partial matching.',
+          '',
+          '    install <app-id>',
+          '        Install an application from the registry. Creates a',
+          '        player_apps record with state "installed" and the',
+          '        current registry version.',
+          '',
+          '    install --all',
+          '        Bulk install all available (uninstalled) apps from',
+          '        the registry in a single operation.',
+          '',
+          '    remove <app-id>',
+          '        Uninstall an application. Removes the player_apps',
+          '        record. App data in player_app_config is retained.',
+          '',
+          '    favorite <app-id>',
+          '        Toggle the favorite flag on an installed app.',
+          '        Favorited apps show a ★ in list output.',
+          '',
+          '    recent',
+          '        Show the 10 most recently launched apps, sorted by',
+          '        last_launched_at timestamp.',
+          '',
+          '    quick [app-ids...]',
+          '        Quick-launch one or more apps with single-line',
+          '        status output per app. With no args, shows all',
+          '        installed apps in quick mode.',
+          '',
+          '    update [--check] [--all]',
+          '        Check for or apply app version updates.',
+          '        --check   Show available updates without applying',
+          '        --all     Update all apps with pending updates',
+          '',
+          '    version',
+          '        Display unapp version string.',
+          '',
+          '    unman',
+          '        Display this manual page.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'APP CATEGORIES',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    dev — Device Applications (36 apps)',
+          '        Bound to specific lab hardware. Provides module-based',
+          '        interface: status, config, diagnostics, firmware,',
+          '        plus device-specific custom modules.',
+          '',
+          '        Examples: UEC-001 (Energy Core), CDC-001 (Data Cache),',
+          '        BTK-001 (Basic Toolkit), QAN-001 (Quantum Analyzer)',
+          '',
+          '    sys — System Applications (4 apps)',
+          '        Lab-wide dashboards and management interfaces.',
+          '',
+          '        SYS-LAB   Lab Dashboard',
+          '        SYS-PWR   Power Grid Manager',
+          '        SYS-RES   Resource Overview',
+          '        SYS-INV   Inventory Manager',
+          '',
+          '    util — Utility Applications (3 apps)',
+          '        Maintenance and operational tools.',
+          '',
+          '        UTL-LOG   System Logger',
+          '        UTL-CFG   Config Manager',
+          '        UTL-BAK   Backup Utility',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'APP MODULES',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    Each device app provides a set of modules accessible via',
+          '    unapp run <id> --module <name>. Standard modules shared',
+          '    by all device apps:',
+          '',
+          '    status          Device state and live telemetry',
+          '    config          Current configuration parameters',
+          '    diagnostics     Self-test and diagnostic results',
+          '    firmware        Version info and update status',
+          '',
+          '    Device-specific modules vary per app. Use unapp info',
+          '    <app-id> to see the full module list for any app.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'ALIASES',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    unrun <app-id>          → unapp run <app-id>',
+          '    unqs <app-id>           → unapp run <app-id> --quick',
+          '    undev <device> app      → unapp run <device-id>',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'EXAMPLES',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    List installed apps:',
+          '        $ unapp list',
+          '',
+          '    List all apps including uninstalled:',
+          '        $ unapp list --all',
+          '',
+          '    Filter by category:',
+          '        $ unapp list --category sys',
+          '',
+          '    Show only favorites, sorted by recent:',
+          '        $ unapp list --favorites --sort recent',
+          '',
+          '    Install a single app:',
+          '        $ unapp install UEC-001',
+          '',
+          '    Bulk install everything:',
+          '        $ unapp install --all',
+          '',
+          '    Launch an app (default status module):',
+          '        $ unapp run UEC-001',
+          '        $ unrun UEC-001',
+          '',
+          '    Launch a specific module:',
+          '        $ unapp run CDC-001 --module storage-analytics',
+          '',
+          '    Quick status:',
+          '        $ unapp run UEC-001 --quick',
+          '        $ unqs UEC-001',
+          '',
+          '    Search the registry:',
+          '        $ unapp search energy',
+          '        $ unapp search quantum',
+          '',
+          '    Toggle favorite:',
+          '        $ unapp favorite UEC-001',
+          '',
+          '    View app details:',
+          '        $ unapp info SYS-LAB',
+          '',
+          '    Via undev:',
+          '        $ undev cache app',
+          '        $ undev core app --quick',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    undev(1), power(1), help(1)',
+          '    undev <device> app — launch app from device context',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'AUTHORS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    UnstableLabs Engineering Division',
+          '    Application Systems Group',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                UNAPP(1)',
+          '',
+        ],
+      }
+    }
+
+    return { success: false, error: `Unknown subcommand: ${sub}\nUsage: unapp [list|run|info|install|remove|search|status|favorite|recent|quick|update|version|unman]` }
+  },
+}
+
+function timeSince(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (seconds < 60) return `${seconds}s ago`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+  return `${Math.floor(seconds / 86400)}d ago`
+}
+
+const unrunCommand: Command = {
+  name: 'unrun',
+  aliases: [],
+  description: 'Quick launch an app (alias for unapp run)',
+  usage: 'unrun <app-id> [--module <mod>]',
+  execute: async (args, ctx) => {
+    return unappCommand.execute(['run', ...args], ctx)
+  },
+}
+
+const unqsCommand: Command = {
+  name: 'unqs',
+  aliases: [],
+  description: 'Quick status for an app (alias for unapp run --quick)',
+  usage: 'unqs <app-id>',
+  execute: async (args, ctx) => {
+    return unappCommand.execute(['run', ...args, '--quick'], ctx)
   },
 }
 
@@ -15478,6 +18323,9 @@ export const commands: Command[] = [
   rebootCommand,
   unsysprefCommand,
   resCommand,
+  unappCommand,
+  unrunCommand,
+  unqsCommand,
 ]
 
 // Find command by name or alias

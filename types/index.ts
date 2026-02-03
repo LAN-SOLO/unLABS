@@ -7,6 +7,9 @@ export * from './devices'
 // System Preferences types
 export * from './sysprefs'
 
+// Application Manager types
+export * from './unapp'
+
 // Game constants
 export const CRYSTAL_COLORS = [
   'infrared',

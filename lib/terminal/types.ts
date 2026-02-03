@@ -1396,6 +1396,8 @@ export interface DataFetchers {
   resourceManager?: import('@/contexts/ResourceManager').ResourceManagerActions
   // Theme management
   themeActions?: ThemeActions
+  // Application manager
+  unappActions?: import('@/types/unapp').UnappActions
   // System power control
   systemPower?: {
     scheduleShutdown: (seconds: number, scope?: 'os' | 'system') => void
