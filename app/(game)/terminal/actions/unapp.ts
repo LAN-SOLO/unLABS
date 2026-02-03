@@ -155,13 +155,33 @@ export async function fetchAppInfo(appId: string): Promise<AppRegistryEntry | nu
 }
 
 export async function searchApps(term: string): Promise<AppRegistryEntry[]> {
+  // SECURITY: Validate and sanitize search term
+  if (!term || typeof term !== 'string') {
+    return []
+  }
+
+  // Trim and limit length to prevent abuse
+  const sanitized = term.trim().slice(0, 50)
+
+  // Reject empty or wildcard-only searches
+  if (sanitized.length === 0 || /^[%_]+$/.test(sanitized)) {
+    return []
+  }
+
+  // Escape SQL LIKE special characters to prevent injection
+  const escaped = sanitized
+    .replace(/\\/g, '\\\\')
+    .replace(/%/g, '\\%')
+    .replace(/_/g, '\\_')
+
   const supabase = await db()
   const { data, error } = await supabase
     .from('unapp_registry')
     .select('*')
     .eq('is_active', true)
-    .or(`name.ilike.%${term}%,description.ilike.%${term}%,app_id.ilike.%${term}%`)
+    .or(`name.ilike.%${escaped}%,description.ilike.%${escaped}%,app_id.ilike.%${escaped}%`)
     .order('name')
+    .limit(50) // Limit results to prevent large responses
 
   if (error) {
     console.error('searchApps error:', error)

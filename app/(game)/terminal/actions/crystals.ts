@@ -240,7 +240,8 @@ export async function mintCrystal(name: string): Promise<MintResult> {
   }
 
   if (balance.available < MINT_COST) {
-    return { success: false, error: `Insufficient balance. Minting costs ${MINT_COST} _unSC. You have ${balance.available.toFixed(2)} _unSC.` }
+    // SECURITY: Don't expose exact balance in error message
+    return { success: false, error: `Insufficient balance. Minting costs ${MINT_COST} _unSC.` }
   }
 
   // Check name uniqueness for this user
