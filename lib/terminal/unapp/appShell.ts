@@ -56,7 +56,8 @@ export function renderApp(app: AppRegistryEntry, moduleName: string | null, ctx:
   }
 
   const header = renderAppHeader(app)
-  const targetModule = (moduleName ?? 'status').toLowerCase()
+  // Normalize: lowercase + spaces→hyphens (so "Output Control" → "output-control")
+  const targetModule = (moduleName ?? 'status').toLowerCase().replace(/\s+/g, '-')
 
   // Try standard modules first
   if (STANDARD_MODULES[targetModule] && app.device_id) {
