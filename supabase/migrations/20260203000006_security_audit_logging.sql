@@ -9,7 +9,7 @@
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.audit_log (
-  id uuid DEFAULT uuid_generate_v4() PRIMARY KEY,
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
 
   -- What happened
   table_name text NOT NULL,
