@@ -4,12 +4,18 @@ import { updateSession } from '@/lib/supabase/middleware'
 export async function middleware(request: NextRequest) {
   const { supabaseResponse, user } = await updateSession(request)
 
-  // Protect game routes
+  // Protect game routes - require authentication
   if (request.nextUrl.pathname.startsWith('/lab') && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
   if (request.nextUrl.pathname.startsWith('/terminal') && !user) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Protect panel route - require authentication
+  // Additional panel token verification happens in the page component via server action
+  if (request.nextUrl.pathname.startsWith('/panel') && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 

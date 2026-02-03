@@ -267,21 +267,26 @@ export async function mintCrystal(name: string): Promise<MintResult> {
   const basePower = getBasePowerForEra(era)
   const totalPower = basePower * SLICES_PER_CRYSTAL
 
-  // Deduct balance first
-  const newBalance = balance.available - MINT_COST
-  const newTotalSpent = (balance.total_spent || 0) + MINT_COST
-
-  const { error: deductError } = await (supabase
-    .from('balances') as AnyTable)
-    .update({
-      available: newBalance,
-      total_spent: newTotalSpent,
-    })
-    .eq('user_id', user.id)
+  // Deduct balance atomically using the secure RPC function
+  // This prevents race conditions and double-spend attacks
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: deductResult, error: deductError } = await (supabase as any).rpc('deduct_balance', {
+    p_user_id: user.id,
+    p_amount: MINT_COST,
+    p_reason: `crystal_mint:${name}`,
+  })
 
   if (deductError) {
     return { success: false, error: 'Failed to deduct balance.' }
   }
+
+  // Check if deduction was successful
+  const deductRow = Array.isArray(deductResult) ? deductResult[0] : deductResult
+  if (!deductRow?.success) {
+    return { success: false, error: deductRow?.error_message || 'Insufficient balance.' }
+  }
+
+  const newBalance = deductRow.new_balance
 
   // Create crystal
   const crystalInsert = {
@@ -306,10 +311,13 @@ export async function mintCrystal(name: string): Promise<MintResult> {
   const crystal = crystalData as CrystalRow | null
 
   if (crystalError || !crystal) {
-    // Rollback balance
-    await (supabase.from('balances') as AnyTable)
-      .update({ available: balance.available })
-      .eq('user_id', user.id)
+    // Rollback balance atomically
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).rpc('credit_balance', {
+      p_user_id: user.id,
+      p_amount: MINT_COST,
+      p_reason: 'rollback:crystal_creation_failed',
+    })
 
     return { success: false, error: 'Failed to create crystal.' }
   }
@@ -321,25 +329,26 @@ export async function mintCrystal(name: string): Promise<MintResult> {
     .insert(slices)
 
   if (slicesError) {
-    // Rollback: delete crystal and restore balance
+    // Rollback: delete crystal and restore balance atomically
     await supabase.from('crystals').delete().eq('id', crystal.id)
-    await (supabase.from('balances') as AnyTable)
-      .update({ available: balance.available })
-      .eq('user_id', user.id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase as any).rpc('credit_balance', {
+      p_user_id: user.id,
+      p_amount: MINT_COST,
+      p_reason: 'rollback:slice_creation_failed',
+    })
 
     return { success: false, error: 'Failed to create crystal slices.' }
   }
 
-  // Record transaction
-  const transactionInsert = {
-    user_id: user.id,
-    type: 'mint',
-    amount: -MINT_COST,
-    crystal_id: crystal.id,
-    description: `Minted crystal: ${name}`,
-  }
-
-  await (supabase.from('transactions') as AnyTable).insert(transactionInsert)
+  // Note: Transaction already recorded by deduct_balance RPC function
+  // Update the transaction to include crystal_id for traceability
+  await (supabase.from('transactions') as AnyTable)
+    .update({ crystal_id: crystal.id })
+    .eq('user_id', user.id)
+    .eq('description', `crystal_mint:${name}`)
+    .order('created_at', { ascending: false })
+    .limit(1)
 
   return {
     success: true,

@@ -2,9 +2,45 @@
 
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
+import { createHmac, timingSafeEqual } from 'crypto'
 
 const PANEL_ACCESS_COOKIE = 'panel_access_token'
 const TOKEN_EXPIRY_MS = 5 * 60 * 1000 // 5 minutes
+
+// SECURITY: Use environment variable for HMAC secret
+// Falls back to a derived key from Supabase anon key (not ideal, but better than nothing)
+function getHmacSecret(): string {
+  const secret = process.env.PANEL_TOKEN_SECRET
+  if (secret) return secret
+
+  // Fallback: derive from existing env var (still better than hardcoded)
+  const fallback = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!fallback) {
+    throw new Error('No secret available for token signing')
+  }
+  return `panel_token_${fallback.slice(0, 32)}`
+}
+
+/**
+ * Generate HMAC-SHA256 signature for panel token.
+ */
+function signToken(payload: string): string {
+  const hmac = createHmac('sha256', getHmacSecret())
+  hmac.update(payload)
+  return hmac.digest('hex')
+}
+
+/**
+ * Verify HMAC-SHA256 signature using timing-safe comparison.
+ */
+function verifySignature(payload: string, signature: string): boolean {
+  const expected = signToken(payload)
+  try {
+    return timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'))
+  } catch {
+    return false
+  }
+}
 
 /**
  * Generate a secure panel access token.
@@ -19,14 +55,11 @@ export async function grantPanelAccess(): Promise<{ success: boolean; error?: st
     return { success: false, error: 'Not authenticated' }
   }
 
-  // Create a simple signed token: base64(userId:timestamp:hash)
+  // Create HMAC-signed token: userId:timestamp:signature
   const timestamp = Date.now()
   const payload = `${user.id}:${timestamp}`
-
-  // In production, use a proper HMAC with a secret key
-  // For now, we use a simple hash that ties the token to the user
-  const hash = Buffer.from(payload).toString('base64')
-  const token = `${payload}:${hash}`
+  const signature = signToken(payload)
+  const token = `${payload}:${signature}`
 
   const cookieStore = await cookies()
   cookieStore.set(PANEL_ACCESS_COOKIE, token, {
@@ -60,7 +93,12 @@ export async function verifyPanelAccess(): Promise<{ valid: boolean; userId?: st
   }
 
   try {
-    const [userId, timestampStr, hash] = token.split(':')
+    const parts = token.split(':')
+    if (parts.length !== 3) {
+      return { valid: false }
+    }
+
+    const [userId, timestampStr, signature] = parts
     const timestamp = parseInt(timestampStr, 10)
 
     // Verify token belongs to current user
@@ -75,10 +113,9 @@ export async function verifyPanelAccess(): Promise<{ valid: boolean; userId?: st
       return { valid: false }
     }
 
-    // Verify hash matches
-    const expectedPayload = `${userId}:${timestampStr}`
-    const expectedHash = Buffer.from(expectedPayload).toString('base64')
-    if (hash !== expectedHash) {
+    // Verify HMAC signature using timing-safe comparison
+    const payload = `${userId}:${timestampStr}`
+    if (!verifySignature(payload, signature)) {
       return { valid: false }
     }
 
