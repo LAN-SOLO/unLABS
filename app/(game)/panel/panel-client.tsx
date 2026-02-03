@@ -88,6 +88,7 @@ import { SPKManagerProvider } from '@/contexts/SPKManager'
 import { DGNManagerProvider } from '@/contexts/DGNManager'
 import { ScrewButtonManagerProvider } from '@/contexts/ScrewButtonManager'
 import { ResourceManagerProvider, useResourceManagerOptional } from '@/contexts/ResourceManager'
+import { WalletProvider } from '@/contexts/WalletContext'
 import { ResourceGrid } from '@/components/panel/modules/ResourceGrid'
 import type { EquipmentData } from '../terminal/actions/equipment'
 
@@ -126,18 +127,25 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
     return () => clearInterval(interval)
   }, [])
 
-  // Check for panel access from terminal
+  // Check for panel access from terminal (server-side verification)
   useEffect(() => {
-    const access = sessionStorage.getItem('panel_access')
-    if (access !== 'unlocked') {
-      router.replace('/terminal')
-    } else {
-      setHasAccess(true)
-    }
+    import('@/app/(game)/terminal/actions/panel-access').then(
+      ({ verifyPanelAccess }) => {
+        verifyPanelAccess().then(({ valid }) => {
+          if (!valid) {
+            router.replace('/terminal')
+          } else {
+            setHasAccess(true)
+          }
+        })
+      }
+    )
   }, [router])
 
   const handleShutdownComplete = useCallback(() => {
-    sessionStorage.removeItem('panel_access')
+    import('@/app/(game)/terminal/actions/panel-access').then(
+      ({ revokePanelAccess }) => revokePanelAccess()
+    )
     router.replace('/terminal')
   }, [router])
 
@@ -159,6 +167,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
   const volatility = equipmentData?.volatility ?? { currentTier: 1, tps: 1000, network: 'unknown' }
 
   return (
+    <WalletProvider>
     <SystemPowerManagerProvider
       onShutdownComplete={handleShutdownComplete}
       saveDeviceState={() => {
@@ -506,6 +515,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
     </ThermalManagerProvider>
     </PowerManagerProvider>
     </SystemPowerManagerProvider>
+    </WalletProvider>
   )
 }
 

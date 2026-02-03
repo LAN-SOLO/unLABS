@@ -486,9 +486,11 @@ export function useTerminal({ userId, username, balance, cdcDeviceActions, uecDe
 
       // Handle navigation if specified
       if (result.navigate) {
-        // Store access token in session for panel protection
+        // Grant secure panel access via server-side cookie
         if (result.navigate === '/panel') {
-          sessionStorage.setItem('panel_access', 'unlocked')
+          import('@/app/(game)/terminal/actions/panel-access').then(
+            ({ grantPanelAccess }) => grantPanelAccess()
+          )
         }
         setTimeout(() => {
           router.push(result.navigate!)
