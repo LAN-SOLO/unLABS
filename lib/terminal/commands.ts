@@ -17687,7 +17687,16 @@ const unappCommand: Command = {
       if (!appId) return { success: false, error: 'Usage: unapp run <app-id> [--module <mod>] [--quick]' }
 
       const modFlag = args.indexOf('--module')
-      const moduleName = modFlag >= 0 ? args[modFlag + 1] : null
+      let moduleName: string | null = null
+      if (modFlag >= 0) {
+        // Collect words after --module until next flag or end
+        const modWords: string[] = []
+        for (let i = modFlag + 1; i < args.length; i++) {
+          if (args[i].startsWith('--')) break
+          modWords.push(args[i])
+        }
+        moduleName = modWords.length > 0 ? modWords.join(' ') : null
+      }
       const quick = args.includes('--quick')
 
       try {
