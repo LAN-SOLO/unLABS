@@ -7,6 +7,7 @@ import { LED } from '../controls/LED'
 import { Slider } from '../controls/Slider'
 import { CRTScreen } from './CRTScreen'
 import { Waveform } from './Waveform'
+import { useWallet } from '@/contexts/WalletContext'
 
 interface OscilloscopeProps {
   walletAddress?: string
@@ -132,7 +133,7 @@ export function Oscilloscope({
     random: { wave: 'noise', freq1: 5.0, freq2: 7.0, interference: 100, interferenceEnabled: true, wavelength: 5, is3D: true, intensity: 75, colors: { 'R': 50, 'G': 50, 'B': 50, 'C': 50, 'M': 50, 'Y': 50 }, xGain: 50, yGain: 50, phaseKnob: 50, amplKnob: 50, freqKnob: 50 },
   }
 
-  const [isConnected, setIsConnected] = useState(false)
+  const wallet = useWallet()
   const [maikActive, setMaikActive] = useState(false)
 
   // Color mixing - track selected colors and their intensity
@@ -477,7 +478,10 @@ export function Oscilloscope({
     return amplitude * (1 + yGain / 100)
   }, [amplitude, yGain])
 
-  const isAnimated = isConnected || maikActive
+  const isAnimated = wallet.connected || maikActive
+  const walletDisplayAddress = wallet.publicKey
+    ? `${wallet.publicKey.slice(0, 4)}....${wallet.publicKey.slice(-4)}`
+    : walletAddress
   const formattedBalance = balance.toLocaleString()
 
   // Wave type options - expanded
@@ -601,7 +605,7 @@ export function Oscilloscope({
           <div className="flex items-center gap-1">
             <LED on={powerState === 'on'} color="green" size="sm" />
             <LED on={powerState === 'on' && maikActive} color="amber" size="sm" />
-            <LED on={powerState === 'on' && isConnected} color="cyan" size="sm" />
+            <LED on={powerState === 'on' && wallet.connected} color="cyan" size="sm" />
           </div>
           <button
             className={cn('px-2 py-1 rounded font-mono text-[8px] font-bold border transition-opacity',
@@ -613,10 +617,21 @@ export function Oscilloscope({
           >MAIK</button>
           <button
             className={cn('px-2 py-1 rounded font-mono text-[8px] font-bold border transition-opacity',
-              isConnected && powerState === 'on' ? 'bg-[#bfff00] text-black' : 'bg-[#2a2a1a] text-[var(--neon-amber)] border-[var(--neon-amber)]',
+              wallet.connected && powerState === 'on' ? 'bg-[#bfff00] text-black' : 'bg-[#2a2a1a] text-[var(--neon-amber)] border-[var(--neon-amber)]',
               isDeviceOff && 'opacity-30 cursor-not-allowed'
             )}
-            onClick={() => { if (powerState === 'on') { setIsConnected(!isConnected); onConnect?.() } }}
+            onClick={() => {
+              if (powerState !== 'on') return
+              if (!wallet.phantomInstalled) {
+                window.open('https://phantom.app/', '_blank')
+                return
+              }
+              if (wallet.connected) {
+                wallet.disconnect()
+              } else {
+                wallet.connect()
+              }
+            }}
             disabled={isDeviceOff}
           >WALLET</button>
         </div>
@@ -777,9 +792,15 @@ export function Oscilloscope({
 
       {/* Wallet + Dropdowns row */}
       <div className="flex gap-1 flex-shrink-0">
-        <div className="flex-1 bg-gradient-to-r from-[#2a2a6a] to-[#3a3a8a] border border-[#4a4a9a] rounded px-2 py-1 flex items-center justify-between">
-          <span className="font-mono text-[8px] text-[var(--neon-cyan)]">WALLET</span>
-          <span className="font-mono text-sm text-[var(--neon-cyan)] font-bold">{formattedBalance}</span>
+        <div className="flex-1 bg-gradient-to-r from-[#2a2a6a] to-[#3a3a8a] border border-[#4a4a9a] rounded px-2 py-1.5 flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="font-mono text-[7px] text-[var(--neon-cyan)]/60">{wallet.connected ? walletDisplayAddress : 'WALLET'}</span>
+            <span className="font-mono text-[10px] text-[var(--neon-cyan)] font-bold leading-tight">{wallet.connected ? 'CONNECTED' : 'NOT CONNECTED'}</span>
+          </div>
+          <div className="flex flex-col items-end">
+            <span className="font-mono text-[6px] text-[var(--neon-cyan)]/50">_unSC</span>
+            <span className="font-mono text-base text-[var(--neon-cyan)] font-bold leading-tight">{formattedBalance}</span>
+          </div>
         </div>
         <select value={waveType} onChange={(e) => setWaveType(e.target.value as typeof waveType)}
           className="bg-[#1a2a1a] border border-[#0a1a0a] rounded px-1 py-0.5 font-mono text-[8px] text-white max-h-[200px]">
