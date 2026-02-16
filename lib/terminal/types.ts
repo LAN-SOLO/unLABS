@@ -1407,6 +1407,31 @@ export interface DataFetchers {
     cancelCountdown: () => void
     getState: () => { systemState: string; countdownSeconds: number | null; countdownAction: string | null; powerScope: string | null }
   }
+  // Kernel actions
+  kernelActions?: KernelActions
+}
+
+export interface KernelActions {
+  getProcessList: () => { pid: number; ppid: number; name: string; cmdline: string; state: string; uid: number; priority: number; nice: number; cpuTime: number; memoryRSS: number; memoryVSZ: number; tty: string }[]
+  killProcess: (pid: number, signal: number) => { success: boolean; message: string }
+  getMemoryStats: () => { totalKB: number; freeKB: number; availableKB: number; buffersKB: number; cachedKB: number; swapTotalKB: number; swapFreeKB: number; usedKB: number; sharedKB: number }
+  getLoadAverage: () => [number, number, number]
+  getUptime: () => { seconds: number; idleSeconds: number }
+  getUname: () => { sysname: string; nodename: string; release: string; version: string; machine: string }
+  getDmesg: (level?: string) => { timestamp: number; level: string; message: string }[]
+  getModules: () => { name: string; size: number; refCount: number; dependencies: string[]; loaded: boolean }[]
+  loadModule: (name: string) => { success: boolean; messages: string[] }
+  unloadModule: (name: string) => { success: boolean; message: string }
+  getSyscallTable: () => { number: number; name: string; callCount: number }[]
+  getStrace: (pid?: number, limit?: number) => { timestamp: number; pid: number; syscall: string; args: string; ret: number }[]
+  setNice: (pid: number, nice: number) => { success: boolean; message: string }
+  getSysctl: () => { key: string; value: string; writable: boolean }[]
+  setSysctl: (key: string, value: string) => { success: boolean; message: string }
+  execCommand: (name: string, args: string[]) => number
+  finishCommand: (pid: number, exitCode: number) => void
+  getTopProcesses: (n: number) => { pid: number; name: string; cmdline: string; state: string; uid: number; cpuPercent: number; memPercent: number; memoryRSS: number; memoryVSZ: number; cpuTime: number; nice: number; tty: string }[]
+  getSchedulerStats: () => { contextSwitches: number; totalCPUTime: number; idleCPUTime: number; runQueueLength: number; processCount: number; lastPid: number }
+  toJSON: () => import('@/lib/unos/kernel').KernelSerializedState
 }
 
 export interface CommandContext {

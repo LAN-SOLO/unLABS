@@ -9,10 +9,22 @@ export class VirtualFS {
   private _cwd: string = '/unhome/operator'
   private _previousCwd: string = '/unhome/operator'
   private _mounts: MountPoint[] = []
+  private _procfsGenerator: ((path: string) => string | null) | null = null
+  private _procfsListDir: ((path: string) => string[] | null) | null = null
 
   constructor() {
     this.root = this.buildDefaultTree()
     this.initializeMounts()
+  }
+
+  /** Set dynamic procfs content generator */
+  setProcFS(generator: (path: string) => string | null) {
+    this._procfsGenerator = generator
+  }
+
+  /** Set dynamic procfs directory listing hook */
+  setProcFSListDir(listDir: (path: string) => string[] | null) {
+    this._procfsListDir = listDir
   }
 
   get cwd(): string {
@@ -732,19 +744,42 @@ export class VirtualFS {
       .filter(([name]) => flags.all || !name.startsWith('.'))
       .sort(([a], [b]) => a.localeCompare(b))
 
-    if (entries.length === 0) return []
-
-    if (flags.long) {
-      return entries.map(([, child]) => this.formatLongEntry(child))
+    // Merge dynamic procfs entries for /unproc directories
+    const absPath = this.resolvePath(targetPath)
+    let dynamicNames: string[] = []
+    if (absPath.startsWith('/unproc') && this._procfsListDir) {
+      const dynEntries = this._procfsListDir(absPath)
+      if (dynEntries) {
+        const staticNames = new Set(entries.map(([n]) => n))
+        dynamicNames = dynEntries.filter(n => !staticNames.has(n))
+      }
     }
 
-    return entries.map(([, child]) => {
+    if (entries.length === 0 && dynamicNames.length === 0) return []
+
+    if (flags.long) {
+      const result = entries.map(([, child]) => this.formatLongEntry(child))
+      // Dynamic procfs entries get a simple format
+      for (const name of dynamicNames) {
+        result.push(`dr-xr-xr-x root       root            0 ${new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })} ${name}/`)
+      }
+      return result
+    }
+
+    const result = entries.map(([, child]) => {
       if (child.type === 'dir') return `${child.name}/`
       if (child.type === 'symlink') return `${child.name}`
       if (child.type === 'device') return `${child.name}`
       if ((child.permissions & 0o111) !== 0) return `${child.name}`
       return child.name
     })
+
+    // Add dynamic procfs directories
+    for (const name of dynamicNames) {
+      result.push(`${name}/`)
+    }
+
+    return result.sort()
   }
 
   private formatLongEntry(node: VNode): string {
@@ -779,6 +814,13 @@ export class VirtualFS {
   }
 
   cat(path: string): string | null {
+    // Try dynamic procfs first for /unproc paths
+    const absPath = this.resolvePath(path)
+    if (absPath.startsWith('/unproc') && this._procfsGenerator) {
+      const dynamic = this._procfsGenerator(absPath)
+      if (dynamic !== null) return dynamic
+    }
+
     const node = this.resolve(path)
     if (!node) return `cat: ${path}: No such file or directory`
     if (node.type === 'dir') return `cat: ${path}: Is a directory`

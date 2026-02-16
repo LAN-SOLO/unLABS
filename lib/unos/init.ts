@@ -1,6 +1,7 @@
 // _unOS v2.0 — Init System (unsystemd)
 
 import type { Service, ServiceState } from './types'
+import type { Kernel } from './kernel'
 
 const DEFAULT_SERVICES: Omit<Service, 'state' | 'pid' | 'startedAt'>[] = [
   { name: 'und', description: '_unOS system daemon', dependencies: [] },
@@ -24,14 +25,14 @@ export class InitSystem {
     }
   }
 
-  async startAll(): Promise<{ started: string[]; failed: string[] }> {
+  async startAll(kernel?: Kernel): Promise<{ started: string[]; failed: string[] }> {
     const started: string[] = []
     const failed: string[] = []
 
     // Start in dependency order
     const order = this.getStartOrder()
     for (const name of order) {
-      const result = this.start(name)
+      const result = this.start(name, kernel)
       if (result.success) started.push(name)
       else failed.push(name)
     }
@@ -60,7 +61,7 @@ export class InitSystem {
     return order
   }
 
-  start(name: string): { success: boolean; message: string } {
+  start(name: string, kernel?: Kernel): { success: boolean; message: string } {
     const svc = this.services.get(name)
     if (!svc) return { success: false, message: `Service ${name} not found` }
     if (svc.state === 'running') return { success: true, message: `${name} already running` }
@@ -74,7 +75,28 @@ export class InitSystem {
     }
 
     svc.state = 'running'
-    svc.pid = 1000 + Math.floor(Math.random() * 9000)
+
+    // Use kernel process table for PID if available
+    if (kernel) {
+      // Look for a matching daemon process in the kernel
+      const procs = kernel.process.listAll()
+      const match = procs.find(p => {
+        // Match service name to daemon process names
+        const svcMap: Record<string, string> = {
+          'und': 'init',
+          'undev': 'device-monitor',
+          'unchain': 'blockchain-sync',
+          'untick': 'tick-engine',
+          'unnet': 'network-daemon',
+          'unpod': 'container-runtime',
+        }
+        return p.name === (svcMap[name] ?? name)
+      })
+      svc.pid = match?.pid ?? kernel.process.spawn(`${name}d`, `/unbin/${name}d`, 1, { uid: 0 })
+    } else {
+      svc.pid = 1000 + Math.floor(Math.random() * 9000)
+    }
+
     svc.startedAt = Date.now()
     return { success: true, message: `${name} started (PID ${svc.pid})` }
   }
@@ -90,9 +112,9 @@ export class InitSystem {
     return { success: true, message: `${name} stopped` }
   }
 
-  restart(name: string): { success: boolean; message: string } {
+  restart(name: string, kernel?: Kernel): { success: boolean; message: string } {
     this.stop(name)
-    return this.start(name)
+    return this.start(name, kernel)
   }
 
   status(name?: string): Service | Service[] {

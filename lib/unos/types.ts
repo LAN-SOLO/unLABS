@@ -138,4 +138,5 @@ export interface UnOSState {
   packages: Package[]
   network: NetworkInterface[]
   bootTime: number
+  kernel?: import('./kernel').KernelSerializedState
 }

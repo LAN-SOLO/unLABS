@@ -1,10 +1,10 @@
 'use client'
 
 import { useCallback, useMemo, useRef } from 'react'
-import { VirtualFS, UserManager } from '@/lib/unos'
+import { VirtualFS, UserManager, Kernel } from '@/lib/unos'
 import { commands } from '@/lib/terminal/commands'
 import { loadPanelState } from '@/lib/panel/panelState'
-import type { FilesystemActions, UserActions } from '@/lib/terminal/types'
+import type { FilesystemActions, UserActions, KernelActions } from '@/lib/terminal/types'
 import { useTerminal } from '@/hooks/useTerminal'
 import { TerminalOutput } from './TerminalOutput'
 import { TerminalInput } from './TerminalInput'
@@ -91,9 +91,10 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   const resourceManager = useResourceManagerOptional()
   const systemPowerManager = useSystemPowerOptional()
 
-  // Initialize VirtualFS and UserManager (persisted via refs, restored from localStorage)
+  // Initialize VirtualFS, UserManager, and Kernel (persisted via refs, restored from localStorage)
   const fsRef = useRef<VirtualFS | null>(null)
   const userMgrRef = useRef<UserManager | null>(null)
+  const kernelRef = useRef<Kernel | null>(null)
 
   if (!fsRef.current) {
     const saved = loadPanelState()
@@ -102,6 +103,20 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   if (!userMgrRef.current) {
     const saved = loadPanelState()
     userMgrRef.current = saved?.users ? UserManager.fromJSON(saved.users) : new UserManager()
+  }
+  if (!kernelRef.current) {
+    const kernel = new Kernel()
+    const saved = loadPanelState()
+    if (saved?.kernel) {
+      kernel.fromJSON(saved.kernel)
+    } else {
+      kernel.boot()
+      kernel.startTicking()
+    }
+    // Wire procfs into filesystem
+    fsRef.current!.setProcFS((path) => kernel.procfs.generate(path))
+    fsRef.current!.setProcFSListDir((path) => kernel.procfs.listDir(path))
+    kernelRef.current = kernel
   }
 
   const syncFsHomeUser = useCallback(() => {
@@ -188,6 +203,65 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     verifyPassword: (username, password) => userMgrRef.current!.verifyPassword(username, password),
     toJSON: () => userMgrRef.current!.toJSON(),
   }), [syncFsHomeUser])
+
+  // Build kernel actions (stable ref)
+  const kernelActions: KernelActions = useMemo(() => ({
+    getProcessList: () => kernelRef.current!.process.listAll().map(p => ({
+      pid: p.pid, ppid: p.ppid, name: p.name, cmdline: p.cmdline, state: p.state,
+      uid: p.uid, priority: p.priority, nice: p.nice, cpuTime: p.cpuTime,
+      memoryRSS: p.memoryRSS, memoryVSZ: p.memoryVSZ, tty: p.tty,
+    })),
+    killProcess: (pid, signal) => kernelRef.current!.process.kill(pid, signal),
+    getMemoryStats: () => {
+      const s = kernelRef.current!.memory.getStats()
+      return {
+        totalKB: s.totalKB, freeKB: s.freeKB, availableKB: s.availableKB,
+        buffersKB: s.buffersKB, cachedKB: s.cachedKB, swapTotalKB: s.swapTotalKB,
+        swapFreeKB: s.swapFreeKB,
+        usedKB: s.totalKB - s.freeKB - s.buffersKB - s.cachedKB,
+        sharedKB: Math.floor(s.cachedKB * 0.1),
+      }
+    },
+    getLoadAverage: () => kernelRef.current!.scheduler.getLoadAverage(),
+    getUptime: () => ({
+      seconds: kernelRef.current!.uptime / 1000,
+      idleSeconds: kernelRef.current!.scheduler.getStats().idleCPUTime / 1000,
+    }),
+    getUname: () => kernelRef.current!.getUname(),
+    getDmesg: (level) => kernelRef.current!.dmesg.read(level ? { level: level as 'INFO' } : undefined).map(e => ({
+      timestamp: e.timestamp, level: e.level, message: e.message,
+    })),
+    getModules: () => kernelRef.current!.modules.list().map(m => ({
+      name: m.name, size: m.size, refCount: m.refCount,
+      dependencies: m.dependencies, loaded: m.loaded,
+    })),
+    loadModule: (name) => kernelRef.current!.modules.probe(name),
+    unloadModule: (name) => kernelRef.current!.modules.unload(name),
+    getSyscallTable: () => kernelRef.current!.syscall.getTable().map(e => ({
+      number: e.number, name: e.name, callCount: e.callCount,
+    })),
+    getStrace: (pid, limit) => kernelRef.current!.syscall.getStrace(pid, limit),
+    setNice: (pid, nice) => kernelRef.current!.process.setNice(pid, nice),
+    getSysctl: () => kernelRef.current!.getSysctl(),
+    setSysctl: (key, value) => kernelRef.current!.setSysctlValue(key, value),
+    execCommand: (name, args) => kernelRef.current!.execCommand(name, args),
+    finishCommand: (pid, exitCode) => kernelRef.current!.finishCommand(pid, exitCode),
+    getTopProcesses: (n) => kernelRef.current!.scheduler.getTopProcesses(n).map(p => ({
+      pid: p.pid, name: p.name, cmdline: p.cmdline, state: p.state, uid: p.uid,
+      cpuPercent: p.cpuPercent, memPercent: p.memPercent, memoryRSS: p.memoryRSS,
+      memoryVSZ: p.memoryVSZ, cpuTime: p.cpuTime, nice: p.nice, tty: p.tty,
+    })),
+    getSchedulerStats: () => {
+      const s = kernelRef.current!.scheduler.getStats()
+      const pm = kernelRef.current!.process
+      return {
+        contextSwitches: s.contextSwitches, totalCPUTime: s.totalCPUTime,
+        idleCPUTime: s.idleCPUTime, runQueueLength: s.runQueueLength,
+        processCount: pm.getTotalCount(), lastPid: pm.getLastPid(),
+      }
+    },
+    toJSON: () => kernelRef.current!.toJSON(),
+  }), [])
 
   // Use refs to always access the latest context values
   const cdcManagerRef = useRef(cdcManager)
@@ -1766,6 +1840,7 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     userActions,
     themeActions,
     systemPowerActions,
+    kernelActions,
   })
 
   const handleAutocomplete = useCallback((input: string): string[] => {

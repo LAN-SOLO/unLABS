@@ -13,6 +13,24 @@ const ASCII_LOGO = `
 
 // Boot sequence messages for terminal (compact)
 const TERMINAL_BOOT_SEQUENCE = [
+  '[    0.000000] _unOS Kernel 6.1.0-_unSC booting...',
+  '[    0.000001] Architecture: un_x86_64',
+  '[    0.001000] Memory: 16384000K available',
+  '[    0.002000] CPU: _unSC Quantum Core v2 (8 cores @ 4200 MHz)',
+  '[    0.003000] CFS scheduler initialized (8 runqueues)',
+  '[    0.004000] Registered 32 syscalls',
+  '[    0.010000] Loaded module: unfs v2.0.0',
+  '[    0.011000] Loaded module: unnet v2.0.0',
+  '[    0.012000] Loaded module: undev v2.0.0',
+  '[    0.013000] Loaded module: uncrypto v1.4.0',
+  '[    0.015000] Loaded module: unquantum v3.1.0',
+  '[    0.016000] Loaded module: unsound v1.2.0',
+  '[    0.017000] Loaded module: uncrystal v2.0.0',
+  '[    0.018000] Loaded module: uncontain v1.0.0',
+  '[    0.100000] VFS: Mounted root (unfs) read-write on device 0:1',
+  '[    0.101000] Started init as PID 1',
+  '[    0.200000] _unOS boot complete',
+  '',
   '[SYSTEM] Security level: MAXIMUM',
   '[SYSTEM] Network: SOLANA DEVNET',
   '[SYSTEM] Session: ENCRYPTED',
@@ -257,7 +275,26 @@ const helpCommand: Command = {
       '|                      modules                               |',
       '+------------------------------------------------------------+',
       '|  run       - launch a subsystem module                     |',
-      '|  kill      - shut down a subsystem module                  |',
+      '|  kill      - kill process or shut down module              |',
+      '+------------------------------------------------------------+',
+      '|                       kernel                               |',
+      '+------------------------------------------------------------+',
+      '|  ps        - list running processes (ps aux)               |',
+      '|  top       - display system processes overview             |',
+      '|  kill      - send signal to process (kill -9 <pid>)        |',
+      '|  dmesg     - print kernel ring buffer                      |',
+      '|  free      - display memory usage (free -h)                |',
+      '|  uptime    - show system uptime and load                   |',
+      '|  uname     - print system information (uname -a)           |',
+      '|  lsmod     - list loaded kernel modules                    |',
+      '|  modprobe  - load kernel module with deps                  |',
+      '|  rmmod     - unload kernel module                          |',
+      '|  strace    - trace system calls (-p <pid>)                 |',
+      '|  lsof      - list open files by process                    |',
+      '|  sysctl    - read/write kernel parameters                  |',
+      '|  nice      - set process priority (nice -n <val> <pid>)    |',
+      '|  renice    - change running process priority               |',
+      '|  vmstat    - report virtual memory statistics              |',
       '+------------------------------------------------------------+',
       '|                      devices                               |',
       '+------------------------------------------------------------+',
@@ -1311,19 +1348,50 @@ const unsystemctlCommand: Command = {
 const killCommand: Command = {
   name: 'kill',
   aliases: ['stop'],
-  description: 'Shut down a subsystem module',
-  usage: 'kill <module> <mode> [flags]',
+  description: 'Send a signal to a process or shut down a module',
+  usage: 'kill [-<signal>] <pid> | kill <module> <mode> [flags]',
   execute: async (args, ctx) => {
     const module = args[0]?.toLowerCase()
-    const mode = args[1]?.toLowerCase()
-    const flags = args.slice(2).join(' ')
 
     if (!module) {
       return {
         success: false,
-        error: 'usage: kill <module> <mode> [flags]\navailable modules: panel',
+        error: 'usage: kill [-signal] <pid> | kill <module> <mode> [flags]',
       }
     }
+
+    // Check if first arg is a signal flag like -9 or -SIGKILL
+    let signal = 15 // default SIGTERM
+    let pidArg = args[0]
+    if (args[0]?.startsWith('-') && args[0] !== '-un') {
+      const sigStr = args[0].slice(1)
+      const parsed = parseInt(sigStr)
+      if (!isNaN(parsed)) {
+        signal = parsed
+        pidArg = args[1]
+      } else if (sigStr.startsWith('SIG')) {
+        // Named signal like -SIGKILL
+        const sigMap: Record<string, number> = { SIGHUP: 1, SIGINT: 2, SIGQUIT: 3, SIGKILL: 9, SIGTERM: 15, SIGSTOP: 19, SIGCONT: 18 }
+        if (sigMap[sigStr]) { signal = sigMap[sigStr]; pidArg = args[1] }
+        else { pidArg = args[1] }
+      } else {
+        pidArg = args[1]
+      }
+    }
+
+    // Try as PID first
+    const pid = parseInt(pidArg)
+    if (!isNaN(pid) && ctx.data.kernelActions) {
+      const result = ctx.data.kernelActions.killProcess(pid, signal)
+      if (result.success) {
+        return { success: true, output: result.message ? [result.message] : [] }
+      }
+      return { success: false, error: result.message }
+    }
+
+    // Module-based kill (legacy)
+    const mode = args[1]?.toLowerCase()
+    const flags = args.slice(2).join(' ')
 
     if (module === 'panel') {
       if (mode !== 'dev') {
@@ -1348,7 +1416,7 @@ const killCommand: Command = {
 
     return {
       success: false,
-      error: `Unknown module: ${module}\nAvailable modules: panel`,
+      error: `Unknown target: ${module}\nUsage: kill [-signal] <pid> | kill panel dev -un`,
     }
   },
 }
@@ -18274,6 +18342,432 @@ const unqsCommand: Command = {
   },
 }
 
+// ============================================================
+// Kernel Commands
+// ============================================================
+
+const psCommand: Command = {
+  name: 'ps',
+  aliases: [],
+  description: 'List running processes',
+  usage: 'ps [aux]',
+  execute: async (args, ctx) => {
+    const ka = ctx.data.kernelActions
+    if (!ka) return { success: false, error: 'Kernel not available' }
+
+    const procs = ka.getProcessList()
+    const lines: string[] = []
+
+    if (args[0] === 'aux' || args[0] === '-aux' || args[0] === '-ef') {
+      lines.push('USER       PID %CPU %MEM    VSZ   RSS TTY      STAT  TIME COMMAND')
+      const topProcs = ka.getTopProcesses(procs.length)
+      for (const p of topProcs) {
+        const user = p.uid === 0 ? 'root' : p.uid === 1001 ? 'operator' : p.uid === 1000 ? 'adm' : String(p.uid)
+        const stat = p.state === 'running' ? 'R' : p.state === 'sleeping' ? 'S' : p.state === 'stopped' ? 'T' : p.state === 'zombie' ? 'Z' : 'X'
+        const time = formatCpuTime(p.cpuTime)
+        lines.push(
+          `${user.padEnd(10)} ${String(p.pid).padStart(4)} ${p.cpuPercent.toFixed(1).padStart(4)} ${p.memPercent.toFixed(1).padStart(4)} ${String(p.memoryVSZ).padStart(7)} ${String(p.memoryRSS).padStart(6)} ${p.tty.padEnd(8)} ${stat.padEnd(5)} ${time.padStart(5)} ${p.cmdline}`
+        )
+      }
+    } else {
+      lines.push('  PID TTY          TIME CMD')
+      for (const p of procs) {
+        if (p.tty === 'pts/0' || p.uid === 1001) {
+          const time = formatCpuTime(p.cpuTime)
+          lines.push(`${String(p.pid).padStart(5)} ${p.tty.padEnd(12)} ${time.padStart(5)} ${p.name}`)
+        }
+      }
+    }
+
+    return { success: true, output: lines }
+  },
+}
+
+const topCommand: Command = {
+  name: 'top',
+  aliases: ['htop'],
+  description: 'Display system process information',
+  usage: 'top [-n <count>]',
+  execute: async (args, ctx) => {
+    const ka = ctx.data.kernelActions
+    if (!ka) return { success: false, error: 'Kernel not available' }
+
+    const limit = args.includes('-n') ? parseInt(args[args.indexOf('-n') + 1]) || 15 : 15
+    const uptime = ka.getUptime()
+    const [l1, l5, l15] = ka.getLoadAverage()
+    const mem = ka.getMemoryStats()
+    const schedStats = ka.getSchedulerStats()
+    const topProcs = ka.getTopProcesses(limit)
+
+    const uptimeStr = formatUptimeString(uptime.seconds)
+    const lines: string[] = [
+      `top - ${new Date().toLocaleTimeString()} up ${uptimeStr},  1 user,  load average: ${l1.toFixed(2)}, ${l5.toFixed(2)}, ${l15.toFixed(2)}`,
+      `Tasks: ${schedStats.processCount} total,   ${schedStats.runQueueLength} running,   ${schedStats.processCount - schedStats.runQueueLength} sleeping,   0 stopped,   0 zombie`,
+      `%Cpu(s): ${((schedStats.totalCPUTime - schedStats.idleCPUTime) / Math.max(1, schedStats.totalCPUTime) * 100).toFixed(1)} us,  0.0 sy,  0.0 ni, ${(schedStats.idleCPUTime / Math.max(1, schedStats.totalCPUTime) * 100).toFixed(1)} id,  0.0 wa`,
+      `MiB Mem :  ${(mem.totalKB / 1024).toFixed(1)} total,  ${(mem.freeKB / 1024).toFixed(1)} free,  ${(mem.usedKB / 1024).toFixed(1)} used,  ${((mem.buffersKB + mem.cachedKB) / 1024).toFixed(1)} buff/cache`,
+      `MiB Swap:  ${(mem.swapTotalKB / 1024).toFixed(1)} total,  ${(mem.swapFreeKB / 1024).toFixed(1)} free,  ${((mem.swapTotalKB - mem.swapFreeKB) / 1024).toFixed(1)} used.  ${(mem.availableKB / 1024).toFixed(1)} avail Mem`,
+      '',
+      '  PID USER      PR  NI    VIRT    RES  %CPU  %MEM     TIME+ COMMAND',
+    ]
+
+    for (const p of topProcs) {
+      const user = p.uid === 0 ? 'root' : p.uid === 1001 ? 'operator' : p.uid === 1000 ? 'adm' : String(p.uid)
+      lines.push(
+        `${String(p.pid).padStart(5)} ${user.padEnd(9)} ${String(20 + p.nice).padStart(3)} ${String(p.nice).padStart(3)} ${String(p.memoryVSZ).padStart(7)} ${String(p.memoryRSS).padStart(6)} ${p.cpuPercent.toFixed(1).padStart(5)} ${p.memPercent.toFixed(1).padStart(5)} ${formatCpuTime(p.cpuTime).padStart(9)} ${p.name}`
+      )
+    }
+
+    return { success: true, output: lines }
+  },
+}
+
+const dmesgCommand: Command = {
+  name: 'dmesg',
+  aliases: [],
+  description: 'Print kernel ring buffer',
+  usage: 'dmesg [--level <level>] [--clear]',
+  execute: async (args, ctx) => {
+    const ka = ctx.data.kernelActions
+    if (!ka) return { success: false, error: 'Kernel not available' }
+
+    if (args.includes('--clear') || args.includes('-C')) {
+      return { success: true, output: ['dmesg buffer cleared'] }
+    }
+
+    let level: string | undefined
+    const levelIdx = args.indexOf('--level')
+    if (levelIdx >= 0 && args[levelIdx + 1]) {
+      level = args[levelIdx + 1].toUpperCase()
+    }
+
+    const entries = ka.getDmesg(level)
+    const lines = entries.map(e => {
+      const ts = `[${e.timestamp.toFixed(6).padStart(12)}]`
+      return `${ts} ${e.message}`
+    })
+
+    if (lines.length === 0) {
+      return { success: true, output: ['(no kernel messages)'] }
+    }
+
+    return { success: true, output: lines }
+  },
+}
+
+const freeCommand: Command = {
+  name: 'free',
+  aliases: [],
+  description: 'Display amount of free and used memory',
+  usage: 'free [-h]',
+  execute: async (args, ctx) => {
+    const ka = ctx.data.kernelActions
+    if (!ka) return { success: false, error: 'Kernel not available' }
+
+    const mem = ka.getMemoryStats()
+    const human = args.includes('-h') || args.includes('--human')
+
+    const fmt = (kb: number) => {
+      if (!human) return String(kb).padStart(12)
+      if (kb >= 1_048_576) return `${(kb / 1_048_576).toFixed(1)}Gi`.padStart(12)
+      if (kb >= 1024) return `${(kb / 1024).toFixed(0)}Mi`.padStart(12)
+      return `${kb}Ki`.padStart(12)
+    }
+
+    const lines = [
+      `               total        used        free      shared  buff/cache   available`,
+      `Mem:    ${fmt(mem.totalKB)} ${fmt(mem.usedKB)} ${fmt(mem.freeKB)} ${fmt(mem.sharedKB)} ${fmt(mem.buffersKB + mem.cachedKB)} ${fmt(mem.availableKB)}`,
+      `Swap:   ${fmt(mem.swapTotalKB)} ${fmt(mem.swapTotalKB - mem.swapFreeKB)} ${fmt(mem.swapFreeKB)}`,
+    ]
+
+    return { success: true, output: lines }
+  },
+}
+
+const uptimeCommand: Command = {
+  name: 'uptime',
+  aliases: [],
+  description: 'Show how long the system has been running',
+  usage: 'uptime',
+  execute: async (_args, ctx) => {
+    const ka = ctx.data.kernelActions
+    if (!ka) return { success: false, error: 'Kernel not available' }
+
+    const uptime = ka.getUptime()
+    const [l1, l5, l15] = ka.getLoadAverage()
+    const uptimeStr = formatUptimeString(uptime.seconds)
+
+    return {
+      success: true,
+      output: [` ${new Date().toLocaleTimeString()} up ${uptimeStr},  1 user,  load average: ${l1.toFixed(2)}, ${l5.toFixed(2)}, ${l15.toFixed(2)}`],
+    }
+  },
+}
+
+const unameCommand: Command = {
+  name: 'uname',
+  aliases: [],
+  description: 'Print system information',
+  usage: 'uname [-a|-s|-r|-n|-m]',
+  execute: async (args, ctx) => {
+    const ka = ctx.data.kernelActions
+    if (!ka) return { success: false, error: 'Kernel not available' }
+
+    const u = ka.getUname()
+
+    if (args.length === 0 || args.includes('-s')) {
+      return { success: true, output: [u.sysname] }
+    }
+    if (args.includes('-a')) {
+      return { success: true, output: [`${u.sysname} ${u.nodename} ${u.release} ${u.version} ${u.machine}`] }
+    }
+    const parts: string[] = []
+    if (args.includes('-s')) parts.push(u.sysname)
+    if (args.includes('-n')) parts.push(u.nodename)
+    if (args.includes('-r')) parts.push(u.release)
+    if (args.includes('-v')) parts.push(u.version)
+    if (args.includes('-m')) parts.push(u.machine)
+    return { success: true, output: [parts.join(' ') || u.sysname] }
+  },
+}
+
+const lsmodCommand: Command = {
+  name: 'lsmod',
+  aliases: [],
+  description: 'Show the status of kernel modules',
+  usage: 'lsmod',
+  execute: async (_args, ctx) => {
+    const ka = ctx.data.kernelActions
+    if (!ka) return { success: false, error: 'Kernel not available' }
+
+    const modules = ka.getModules()
+    const loaded = modules.filter(m => m.loaded)
+    const lines: string[] = ['Module                  Size  Used by']
+
+    for (const m of loaded) {
+      const deps = m.dependencies.length > 0 ? m.dependencies.join(',') : ''
+      lines.push(`${m.name.padEnd(22)} ${String(m.size * 1024).padStart(6)}  ${m.refCount} ${deps}`)
+    }
+
+    return { success: true, output: lines }
+  },
+}
+
+const modprobeCommand: Command = {
+  name: 'modprobe',
+  aliases: [],
+  description: 'Load a kernel module with dependencies',
+  usage: 'modprobe <module>',
+  execute: async (args, ctx) => {
+    const ka = ctx.data.kernelActions
+    if (!ka) return { success: false, error: 'Kernel not available' }
+
+    if (!args[0]) return { success: false, error: 'usage: modprobe <module>' }
+    const result = ka.loadModule(args[0])
+    return { success: result.success, output: result.messages }
+  },
+}
+
+const rmmodCommand: Command = {
+  name: 'rmmod',
+  aliases: [],
+  description: 'Unload a kernel module',
+  usage: 'rmmod <module>',
+  execute: async (args, ctx) => {
+    const ka = ctx.data.kernelActions
+    if (!ka) return { success: false, error: 'Kernel not available' }
+
+    if (!args[0]) return { success: false, error: 'usage: rmmod <module>' }
+    const result = ka.unloadModule(args[0])
+    return result.success
+      ? { success: true, output: [result.message] }
+      : { success: false, error: result.message }
+  },
+}
+
+const straceCommand: Command = {
+  name: 'strace',
+  aliases: [],
+  description: 'Trace system calls',
+  usage: 'strace [-p <pid>] [-n <count>]',
+  execute: async (args, ctx) => {
+    const ka = ctx.data.kernelActions
+    if (!ka) return { success: false, error: 'Kernel not available' }
+
+    let pid: number | undefined
+    let limit = 20
+    const pidIdx = args.indexOf('-p')
+    if (pidIdx >= 0) pid = parseInt(args[pidIdx + 1])
+    const nIdx = args.indexOf('-n')
+    if (nIdx >= 0) limit = parseInt(args[nIdx + 1]) || 20
+
+    const entries = ka.getStrace(pid, limit)
+    if (entries.length === 0) {
+      return { success: true, output: ['(no syscall trace entries)'] }
+    }
+
+    const lines = entries.map(e => {
+      const time = new Date(e.timestamp).toLocaleTimeString()
+      return `[${time}] pid=${e.pid} ${e.syscall}(${e.args}) = ${e.ret}`
+    })
+
+    return { success: true, output: lines }
+  },
+}
+
+const lsofCommand: Command = {
+  name: 'lsof',
+  aliases: [],
+  description: 'List open files',
+  usage: 'lsof',
+  execute: async (_args, ctx) => {
+    const ka = ctx.data.kernelActions
+    if (!ka) return { success: false, error: 'Kernel not available' }
+
+    const procs = ka.getProcessList()
+    const lines: string[] = ['COMMAND     PID   USER   FD   TYPE   NAME']
+
+    // Simulate file descriptors for each process
+    for (const p of procs) {
+      if (p.state === 'zombie' || p.state === 'dead') continue
+      const user = p.uid === 0 ? 'root' : p.uid === 1001 ? 'operator' : 'adm'
+      lines.push(`${p.name.padEnd(11)} ${String(p.pid).padStart(5)} ${user.padEnd(6)} cwd    DIR    /`)
+      lines.push(`${p.name.padEnd(11)} ${String(p.pid).padStart(5)} ${user.padEnd(6)}   0r   CHR    /undev/null`)
+      lines.push(`${p.name.padEnd(11)} ${String(p.pid).padStart(5)} ${user.padEnd(6)}   1w   CHR    /undev/console`)
+      lines.push(`${p.name.padEnd(11)} ${String(p.pid).padStart(5)} ${user.padEnd(6)}   2w   CHR    /undev/console`)
+      if (lines.length > 80) break
+    }
+
+    return { success: true, output: lines }
+  },
+}
+
+const sysctlCommand: Command = {
+  name: 'sysctl',
+  aliases: [],
+  description: 'Configure kernel parameters',
+  usage: 'sysctl [-a] [-w key=value] [key]',
+  execute: async (args, ctx) => {
+    const ka = ctx.data.kernelActions
+    if (!ka) return { success: false, error: 'Kernel not available' }
+
+    if (args.length === 0 || args.includes('-a')) {
+      const all = ka.getSysctl()
+      const lines = all.map(s => `${s.key} = ${s.value}`)
+      return { success: true, output: lines }
+    }
+
+    if (args[0] === '-w' && args[1]) {
+      const eq = args[1].indexOf('=')
+      if (eq < 0) return { success: false, error: 'usage: sysctl -w key=value' }
+      const key = args[1].slice(0, eq)
+      const value = args[1].slice(eq + 1)
+      const result = ka.setSysctl(key, value)
+      return result.success
+        ? { success: true, output: [result.message] }
+        : { success: false, error: result.message }
+    }
+
+    // Read a single key
+    const all = ka.getSysctl()
+    const entry = all.find(s => s.key === args[0])
+    if (!entry) return { success: false, error: `sysctl: cannot stat /unproc/sys/${args[0].replace(/\./g, '/')}: No such file or directory` }
+    return { success: true, output: [`${entry.key} = ${entry.value}`] }
+  },
+}
+
+const niceCommand: Command = {
+  name: 'nice',
+  aliases: [],
+  description: 'Run a command with modified scheduling priority',
+  usage: 'nice -n <value> <pid>',
+  execute: async (args, ctx) => {
+    const ka = ctx.data.kernelActions
+    if (!ka) return { success: false, error: 'Kernel not available' }
+
+    if (args.length < 3 || args[0] !== '-n') {
+      return { success: false, error: 'usage: nice -n <niceness> <pid>' }
+    }
+
+    const nice = parseInt(args[1])
+    const pid = parseInt(args[2])
+    if (isNaN(nice) || isNaN(pid)) return { success: false, error: 'usage: nice -n <niceness> <pid>' }
+
+    const result = ka.setNice(pid, nice)
+    return result.success
+      ? { success: true, output: [result.message] }
+      : { success: false, error: result.message }
+  },
+}
+
+const reniceCommand: Command = {
+  name: 'renice',
+  aliases: [],
+  description: 'Alter priority of running processes',
+  usage: 'renice <priority> -p <pid>',
+  execute: async (args, ctx) => {
+    const ka = ctx.data.kernelActions
+    if (!ka) return { success: false, error: 'Kernel not available' }
+
+    if (args.length < 3) {
+      return { success: false, error: 'usage: renice <priority> -p <pid>' }
+    }
+
+    const nice = parseInt(args[0])
+    const pidIdx = args.indexOf('-p')
+    const pid = pidIdx >= 0 ? parseInt(args[pidIdx + 1]) : parseInt(args[1])
+    if (isNaN(nice) || isNaN(pid)) return { success: false, error: 'usage: renice <priority> -p <pid>' }
+
+    const result = ka.setNice(pid, nice)
+    return result.success
+      ? { success: true, output: [result.message] }
+      : { success: false, error: result.message }
+  },
+}
+
+const vmstatCommand: Command = {
+  name: 'vmstat',
+  aliases: [],
+  description: 'Report virtual memory statistics',
+  usage: 'vmstat',
+  execute: async (_args, ctx) => {
+    const ka = ctx.data.kernelActions
+    if (!ka) return { success: false, error: 'Kernel not available' }
+
+    const mem = ka.getMemoryStats()
+    const schedStats = ka.getSchedulerStats()
+    const [l1] = ka.getLoadAverage()
+
+    const userPct = Math.min(99, Math.floor(((schedStats.totalCPUTime - schedStats.idleCPUTime) / Math.max(1, schedStats.totalCPUTime)) * 100 * 0.6))
+    const sysPct = Math.min(99, Math.floor(((schedStats.totalCPUTime - schedStats.idleCPUTime) / Math.max(1, schedStats.totalCPUTime)) * 100 * 0.3))
+    const idlePct = Math.max(0, 100 - userPct - sysPct)
+    const swpd = mem.swapTotalKB - mem.swapFreeKB
+
+    const lines = [
+      'procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----',
+      ' r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st',
+      ` ${String(schedStats.runQueueLength).padStart(2)}  0 ${String(swpd).padStart(6)} ${String(Math.floor(mem.freeKB)).padStart(6)} ${String(Math.floor(mem.buffersKB)).padStart(6)} ${String(Math.floor(mem.cachedKB)).padStart(6)}    0    0     ${Math.floor(l1 * 10)}     ${Math.floor(l1 * 5)}  ${String(Math.floor(schedStats.contextSwitches / 100)).padStart(4)} ${String(Math.floor(schedStats.contextSwitches / 50)).padStart(4)} ${String(userPct).padStart(2)} ${String(sysPct).padStart(2)} ${String(idlePct).padStart(2)}  0  0`,
+    ]
+
+    return { success: true, output: lines }
+  },
+}
+
+function formatCpuTime(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${String(seconds).padStart(2, '0')}`
+}
+
+function formatUptimeString(totalSeconds: number): string {
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  if (days > 0) return `${days} day${days > 1 ? 's' : ''}, ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+  if (hours > 0) return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+  return `${minutes} min`
+}
+
 function formatTime(seconds: number): string {
   if (seconds < 60) return `${seconds}s`
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
@@ -18378,6 +18872,22 @@ export const commands: Command[] = [
   unappCommand,
   unrunCommand,
   unqsCommand,
+  // Kernel commands
+  psCommand,
+  topCommand,
+  dmesgCommand,
+  freeCommand,
+  uptimeCommand,
+  unameCommand,
+  lsmodCommand,
+  modprobeCommand,
+  rmmodCommand,
+  straceCommand,
+  lsofCommand,
+  sysctlCommand,
+  niceCommand,
+  reniceCommand,
+  vmstatCommand,
 ]
 
 // Find command by name or alias

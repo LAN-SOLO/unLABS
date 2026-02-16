@@ -7,6 +7,7 @@ export interface PanelSaveData {
   users?: string
   themeIndex?: number
   resources?: { [id: string]: { amount: number; isUnlocked: boolean; upgradeLevel?: number } }
+  kernel?: import('@/lib/unos/kernel').KernelSerializedState
   devices: {
     cdc: { isPowered: boolean; isExpanded?: boolean }
     uec: { isPowered: boolean; isExpanded?: boolean }

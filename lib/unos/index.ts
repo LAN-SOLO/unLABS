@@ -9,6 +9,7 @@ import { NetworkManager } from './network'
 import { InitSystem } from './init'
 import { ContainerRuntime } from './containers'
 import { UnShell } from './shell'
+import { Kernel } from './kernel'
 import { UNOS_VERSION, UNOS_CODENAME } from './constants'
 import type { BootResult, UnOSState } from './types'
 
@@ -24,6 +25,7 @@ export class UnOS {
   init: InitSystem
   containers: ContainerRuntime
   shell: UnShell
+  kernel: Kernel
 
   private _booted = false
   private _bootTime = 0
@@ -62,6 +64,16 @@ export class UnOS {
     this.init = new InitSystem()
     this.containers = new ContainerRuntime()
     this.shell = new UnShell()
+    this.kernel = new Kernel()
+
+    // Restore kernel state if available
+    if (state?.kernel) {
+      this.kernel.fromJSON(state.kernel)
+    }
+
+    // Wire procfs into filesystem for dynamic /unproc content
+    this.fs.setProcFS((path) => this.kernel.procfs.generate(path))
+    this.fs.setProcFSListDir((path) => this.kernel.procfs.listDir(path))
 
     // Sync fs home user with user manager
     this.fs.setHomeUser(this.users.currentUsername)
@@ -90,11 +102,17 @@ export class UnOS {
     const services: BootResult['services'] = []
     const errors: string[] = []
 
-    // 1. Start devices
+    // 1. Boot kernel first
+    if (this.kernel.state !== 'running') {
+      this.kernel.boot()
+      this.kernel.startTicking()
+    }
+
+    // 2. Start devices
     this.devices.start()
 
-    // 2. Start init services
-    const initResult = await this.init.startAll()
+    // 3. Start init services (with real PIDs from kernel)
+    const initResult = await this.init.startAll(this.kernel)
     for (const name of initResult.started) {
       services.push({ name, status: 'ok' })
     }
@@ -115,6 +133,7 @@ export class UnOS {
   }
 
   shutdown() {
+    this.kernel.shutdown()
     this.init.list().forEach(svc => this.init.stop(svc.name))
     this.devices.stop()
     this._booted = false
@@ -138,6 +157,7 @@ export class UnOS {
       packages: this.packages.toJSON(),
       network: this.network.toJSON(),
       bootTime: this._bootTime,
+      kernel: this.kernel.toJSON(),
     }
   }
 
@@ -160,6 +180,7 @@ export { NetworkManager } from './network'
 export { InitSystem } from './init'
 export { ContainerRuntime } from './containers'
 export { UnShell } from './shell'
+export { Kernel } from './kernel'
 export { UNOS_PATHS, PATH_ALIASES, UNOS_VERSION, UNOS_CODENAME, DEVICE_IDS, DEVICE_CATEGORIES } from './constants'
 export type { DeviceCategory } from './constants'
 export type * from './types'
