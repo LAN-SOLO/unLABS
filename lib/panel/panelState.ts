@@ -8,6 +8,9 @@ export interface PanelSaveData {
   themeIndex?: number
   resources?: { [id: string]: { amount: number; isUnlocked: boolean; upgradeLevel?: number } }
   kernel?: import('@/lib/unos/kernel').KernelSerializedState
+  shell?: { config: import('@/lib/unos/shell').ShellConfig; aliases: [string, string][]; env: [string, string][] }
+  journal?: { entries: import('@/lib/unos/journal').JournalEntry[]; bootTime: number }
+  cron?: { entries: import('@/lib/unos/cron').CronEntry[]; nextId: number }
   devices: {
     cdc: { isPowered: boolean; isExpanded?: boolean }
     uec: { isPowered: boolean; isExpanded?: boolean }

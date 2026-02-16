@@ -518,28 +518,98 @@ const helpCommand: Command = {
       '|             theme save       - save to ~/.themerc          |',
       '|             theme load       - load from ~/.themerc        |',
       '+------------------------------------------------------------+',
+      '|                  shell / environment                         |',
+      '+------------------------------------------------------------+',
+      '|  env       - display environment variables                  |',
+      '|  export    - set environment variable (export VAR=val)      |',
+      '|  unset     - remove environment variable                    |',
+      '|  alias     - set command alias (alias ll=\'ls -la\')          |',
+      '|  unalias   - remove command alias                           |',
+      '|  source    - source env vars from file (. file)             |',
+      '+------------------------------------------------------------+',
+      '|                  text processing                            |',
+      '+------------------------------------------------------------+',
+      '|  grep      - search file contents (grep -rn pattern path)  |',
+      '|  find      - search for files (find /path -name *.conf)    |',
+      '|  wc        - count lines/words/chars (-l, -w, -c)          |',
+      '|  sort      - sort file lines (-r, -n, -u, -k)              |',
+      '|  uniq      - filter duplicate lines (-c, -d)               |',
+      '|  diff      - compare two files (-u, --brief)               |',
+      '|  cut       - extract columns (-d, -f, -c)                  |',
+      '|  tr        - translate characters (tr a-z A-Z)              |',
+      '|  sed       - stream editor (sed s/pat/rep/g file)           |',
+      '|  awk       - pattern scanning (awk \'{print $1}\' file)      |',
+      '|  tee       - write to stdout and file (-a append)           |',
+      '|  xargs     - run command on each line of input              |',
+      '|  file      - identify file type                             |',
+      '|  strings   - print printable character sequences            |',
+      '+------------------------------------------------------------+',
+      '|                system information                           |',
+      '+------------------------------------------------------------+',
+      '|  date      - display date/time (date +%Y-%m-%d)             |',
+      '|  cal       - display calendar                               |',
+      '|  hostname  - display system hostname                        |',
+      '|  which     - locate a command (which ls)                    |',
+      '|  stat      - display file status and metadata               |',
+      '|  w         - show who is logged on (who, users)             |',
+      '|  last      - show recent login history                      |',
+      '|  tty       - print terminal device name                     |',
+      '|  watch     - execute command periodically                   |',
+      '|  man       - display manual page (man <command>)            |',
+      '+------------------------------------------------------------+',
+      '|                  disk utilities                             |',
+      '+------------------------------------------------------------+',
+      '|  df        - show filesystem disk space (-h human)          |',
+      '|  du        - estimate file space usage (-h, -s, -d)         |',
+      '|  mount     - display mounted filesystems                    |',
+      '|  umount    - unmount a filesystem                           |',
+      '|  lsblk     - list block devices                             |',
+      '|  fdisk     - display partition table (-l)                   |',
+      '|  blkid     - show block device attributes                   |',
+      '|  mkfs      - create filesystem on device                    |',
+      '|  tar       - archive utility (-c, -x, -t, -f, -z)          |',
+      '|  gzip      - compress/decompress files (-d, -k, -l)         |',
+      '+------------------------------------------------------------+',
+      '|                 networking tools                             |',
+      '+------------------------------------------------------------+',
+      '|  ping      - send ICMP packets (ping -c 4 host)             |',
+      '|  curl      - transfer data from URL                         |',
+      '|  traceroute - trace packet route to host                    |',
+      '|  netstat   - network connections (ss, -t, -l, -n, -p)       |',
+      '|  dig       - DNS lookup (nslookup)                          |',
+      '|  ip        - network config (ip addr/route/link)            |',
+      '|  ifconfig  - display network interfaces                     |',
+      '|  nc        - netcat network utility (-l, -p)                |',
+      '+------------------------------------------------------------+',
+      '|               logging & services                            |',
+      '+------------------------------------------------------------+',
+      '|  journalctl - query system journal (-u, -p, -n, -b)        |',
+      '|  logger    - write to system journal (-p, -t)               |',
+      '|  crontab   - manage cron jobs (-l, -e, -r)                  |',
+      '+------------------------------------------------------------+',
       '|                      system                                |',
       '+------------------------------------------------------------+',
       '|  unsystemctl - system control (reboot, poweroff, status)   |',
+      '|              enable/disable/is-enabled/journal              |',
+      '+------------------------------------------------------------+',
+      '|                    path utilities                           |',
+      '+------------------------------------------------------------+',
+      '|  basename  - strip directory from path                      |',
+      '|  dirname   - strip filename from path                       |',
+      '|  yes       - output a string repeatedly                     |',
       '+------------------------------------------------------------+',
       '',
       'usage: mint <name> | crystal <name> | rename <old> <new>',
-      '       run panel dev -un | kill panel dev -un',
+      '       grep -rn pattern /unetc | find / -name "*.conf"',
+      '       export FOO=bar | env | alias ll=\'ls -la\'',
+      '       ping 10.0.0.254 | netstat -tlnp | ip addr',
+      '       journalctl -u und -n 20 | crontab -l',
+      '       df -h | lsblk | mount | du -sh /unetc',
+      '       date +%Y-%m-%d | cal | hostname | stat /unetc',
       '       thermal fan cpu 75 | thermal auto on',
       '       power status | power on tlp-001 | power emergency -now',
-      '       cdc status | cdc power off | cdc firmware update',
-      '       uec status | uec power off | uec firmware update',
-      '       bat status | bat power off | bat regen on',
-      '       hms status | hms wave sine | hms knob p 50',
-      '       ecr status | ecr record on | ecr knob p 50',
-      '       ipl status | ipl power on | ipl firmware update',
-      '       mfr status | mfr power on | mfr test',
-      '       aic status | aic power on | aic learn off',
-      '       vnt status | vnt fan cpu mode auto | vnt power on',
-      '       sca status | sca test | sca power on',
-      '       exd status | exd power on | exd deploy',
+      '       unsystemctl enable und | unsystemctl journal und',
       '       theme list | theme set amber | theme save',
-      '       unsystemctl shutdown -now | unsystemctl reboot -now',
       'type a command and press enter to execute.',
       '',
     ]
@@ -1124,7 +1194,7 @@ const unsystemctlCommand: Command = {
     if (!command) {
       return {
         success: false,
-        error: 'usage: unsystemctl <command> [flags]\n\navailable commands:\n  reboot         - reboot _unOS and terminal\n  shutdown       - shutdown _unOS and return to terminal\n  status         - show system status\n  daemon-reload  - reload system daemon configuration\n\nflags:\n  -now       execute immediately\n  -XhYmZs   schedule (e.g. -30m, -1h30m, -90s)\n  -cancel    cancel scheduled action\n\nFor full system power control: unsystem',
+        error: 'usage: unsystemctl <command> [flags]\n\navailable commands:\n  reboot         - reboot _unOS and terminal\n  shutdown       - shutdown _unOS and return to terminal\n  status         - show system status\n  daemon-reload  - reload system daemon configuration\n  enable <svc>   - enable service at boot\n  disable <svc>  - disable service at boot\n  is-enabled <svc> - check if service is enabled\n  journal <svc>  - show journal for service\n\nflags:\n  -now       execute immediately\n  -XhYmZs   schedule (e.g. -30m, -1h30m, -90s)\n  -cancel    cancel scheduled action\n\nFor full system power control: unsystem',
       }
     }
 
@@ -1338,9 +1408,46 @@ const unsystemctlCommand: Command = {
       }
     }
 
+    if (command === 'enable') {
+      const svc = args[1]
+      if (!svc) return { success: false, error: 'Usage: unsystemctl enable <service>' }
+      const ia = ctx.data.initActions
+      if (!ia) return { success: false, error: 'Init system not available' }
+      const result = ia.enable(svc)
+      return { success: result.success, output: result.success ? [result.message] : undefined, error: result.success ? undefined : result.message }
+    }
+
+    if (command === 'disable') {
+      const svc = args[1]
+      if (!svc) return { success: false, error: 'Usage: unsystemctl disable <service>' }
+      const ia = ctx.data.initActions
+      if (!ia) return { success: false, error: 'Init system not available' }
+      const result = ia.disable(svc)
+      return { success: result.success, output: result.success ? [result.message] : undefined, error: result.success ? undefined : result.message }
+    }
+
+    if (command === 'is-enabled') {
+      const svc = args[1]
+      if (!svc) return { success: false, error: 'Usage: unsystemctl is-enabled <service>' }
+      const ia = ctx.data.initActions
+      if (!ia) return { success: false, error: 'Init system not available' }
+      const enabled = ia.isEnabled(svc)
+      return { success: true, output: [enabled ? 'enabled' : 'disabled'] }
+    }
+
+    if (command === 'journal') {
+      const svc = args[1]
+      if (!svc) return { success: false, error: 'Usage: unsystemctl journal <service>' }
+      const ja = ctx.data.journalActions
+      if (!ja) return { success: false, error: 'Journal not available' }
+      const entries = ja.query({ unit: svc, tail: 20 })
+      if (entries.length === 0) return { success: true, output: [`-- No journal entries for ${svc} --`] }
+      return { success: true, output: entries.map(e => ja.formatEntry(e)) }
+    }
+
     return {
       success: false,
-      error: `Unknown command: ${command}\nAvailable: reboot, shutdown, status, daemon-reload`,
+      error: `Unknown command: ${command}\nAvailable: reboot, shutdown, status, daemon-reload, enable, disable, is-enabled, journal`,
     }
   },
 }
@@ -19488,6 +19595,1544 @@ function formatTime(seconds: number): string {
   return `${Math.floor(seconds / 3600)}h${Math.floor((seconds % 3600) / 60)}m`
 }
 
+// ============================================================
+// Phase 1: Shell Infrastructure Commands
+// ============================================================
+
+const envCommand: Command = {
+  name: 'env',
+  aliases: ['printenv'],
+  description: 'Display environment variables',
+  usage: 'env [NAME]',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'ENV(1)                UnstableLabs Manual               ENV(1)', '', 'NAME', '    env — display environment variables', '', 'SYNOPSIS', '    env [NAME]', '', 'DESCRIPTION', '    Without arguments, prints all environment variables.', '    With NAME, prints the value of that variable.', '', 'SEE ALSO', '    export(1), unset(1)', ''] }
+    }
+    const sa = ctx.data.shellActions
+    if (!sa) return { success: false, error: 'Shell not available' }
+    if (args.length > 0 && args[0] !== 'unman') {
+      const val = sa.getEnv(args[0])
+      return val !== undefined ? { success: true, output: [val] } : { success: false, error: `env: ${args[0]}: not set` }
+    }
+    const all = sa.getAllEnv()
+    return { success: true, output: Object.entries(all).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`) }
+  },
+}
+
+const exportCommand: Command = {
+  name: 'export',
+  aliases: ['set'],
+  description: 'Set environment variable',
+  usage: 'export VAR=value',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'EXPORT(1)             UnstableLabs Manual            EXPORT(1)', '', 'NAME', '    export — set environment variable', '', 'SYNOPSIS', '    export VAR=value', '    export (no args — list all)', '', 'SEE ALSO', '    env(1), unset(1)', ''] }
+    }
+    const sa = ctx.data.shellActions
+    if (!sa) return { success: false, error: 'Shell not available' }
+    if (args.length === 0) {
+      const all = sa.getAllEnv()
+      return { success: true, output: Object.entries(all).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `declare -x ${k}="${v}"`) }
+    }
+    const joined = args.join(' ')
+    const eqIdx = joined.indexOf('=')
+    if (eqIdx < 1) return { success: false, error: 'Usage: export VAR=value' }
+    const key = joined.slice(0, eqIdx).trim()
+    const value = joined.slice(eqIdx + 1).replace(/^["']|["']$/g, '')
+    sa.setEnv(key, value)
+    return { success: true }
+  },
+}
+
+const unsetCommand: Command = {
+  name: 'unset',
+  aliases: [],
+  description: 'Remove environment variable',
+  usage: 'unset VAR',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'UNSET(1)              UnstableLabs Manual             UNSET(1)', '', 'NAME', '    unset — remove environment variable', '', 'SYNOPSIS', '    unset VAR', '', 'SEE ALSO', '    export(1), env(1)', ''] }
+    }
+    const sa = ctx.data.shellActions
+    if (!sa) return { success: false, error: 'Shell not available' }
+    if (args.length === 0) return { success: false, error: 'Usage: unset VAR' }
+    sa.unsetEnv(args[0])
+    return { success: true }
+  },
+}
+
+const aliasCommand: Command = {
+  name: 'alias',
+  aliases: [],
+  description: 'Define or display aliases',
+  usage: "alias [name='command']",
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'ALIAS(1)              UnstableLabs Manual             ALIAS(1)', '', 'NAME', "    alias — define or display aliases", '', 'SYNOPSIS', "    alias name='command'", '    alias (no args — list all)', '', 'SEE ALSO', '    unalias(1)', ''] }
+    }
+    const sa = ctx.data.shellActions
+    if (!sa) return { success: false, error: 'Shell not available' }
+    if (args.length === 0) {
+      const aliases = sa.listAliases()
+      const entries = Object.entries(aliases)
+      if (entries.length === 0) return { success: true, output: ['No aliases defined.'] }
+      return { success: true, output: entries.map(([k, v]) => `alias ${k}='${v}'`) }
+    }
+    const joined = args.join(' ')
+    const eqIdx = joined.indexOf('=')
+    if (eqIdx < 1) {
+      const val = sa.getAlias(joined.trim())
+      return val ? { success: true, output: [`alias ${joined.trim()}='${val}'`] } : { success: false, error: `alias: ${joined.trim()}: not found` }
+    }
+    const name = joined.slice(0, eqIdx).trim()
+    const value = joined.slice(eqIdx + 1).replace(/^["']|["']$/g, '')
+    sa.setAlias(name, value)
+    return { success: true }
+  },
+}
+
+const unaliasCommand: Command = {
+  name: 'unalias',
+  aliases: [],
+  description: 'Remove an alias',
+  usage: 'unalias name',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'UNALIAS(1)            UnstableLabs Manual           UNALIAS(1)', '', 'NAME', '    unalias — remove an alias', '', 'SYNOPSIS', '    unalias name', '', 'SEE ALSO', '    alias(1)', ''] }
+    }
+    const sa = ctx.data.shellActions
+    if (!sa) return { success: false, error: 'Shell not available' }
+    if (args.length === 0) return { success: false, error: 'Usage: unalias name' }
+    const removed = sa.removeAlias(args[0])
+    return removed ? { success: true } : { success: false, error: `unalias: ${args[0]}: not found` }
+  },
+}
+
+const sourceCommand: Command = {
+  name: 'source',
+  aliases: ['.'],
+  description: 'Read environment variables from a file',
+  usage: 'source <file>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'SOURCE(1)             UnstableLabs Manual            SOURCE(1)', '', 'NAME', '    source — execute commands from a file in the current shell', '', 'SYNOPSIS', '    source <file>', '    . <file>', '', 'DESCRIPTION', '    Reads and executes export/alias commands from a file.', '', 'SEE ALSO', '    export(1), alias(1)', ''] }
+    }
+    const sa = ctx.data.shellActions
+    const fs = ctx.data.filesystemActions
+    if (!sa || !fs) return { success: false, error: 'Shell not available' }
+    if (args.length === 0) return { success: false, error: 'Usage: source <file>' }
+    const user = ctx.data.userActions?.getCurrentUser()
+    const content = fs.cat(args[0], user?.username ?? 'operator', user?.groups ?? ['operator'])
+    if (content === null || content.startsWith('cat:')) return { success: false, error: `source: ${args[0]}: No such file or directory` }
+    let count = 0
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim()
+      if (trimmed.startsWith('#') || trimmed === '') continue
+      const exportMatch = trimmed.match(/^export\s+([A-Za-z_][A-Za-z0-9_]*)=(.*)$/)
+      if (exportMatch) {
+        sa.setEnv(exportMatch[1], exportMatch[2].replace(/^["']|["']$/g, ''))
+        count++
+      }
+    }
+    return { success: true, output: [`Sourced ${args[0]} (${count} variable${count !== 1 ? 's' : ''} set)`] }
+  },
+}
+
+// ============================================================
+// Phase 2: Text & File Processing Commands
+// ============================================================
+
+const grepCommand: Command = {
+  name: 'grep',
+  aliases: ['ungrep'],
+  description: 'Search file contents via regex',
+  usage: 'grep [-i] [-n] [-c] [-r] [-v] [-l] <pattern> <file|dir>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'GREP(1)               UnstableLabs Manual              GREP(1)', '', 'NAME', '    grep — search file contents for a pattern', '', 'SYNOPSIS', '    grep [-incrv] [-l] <pattern> <file>', '', 'OPTIONS', '    -i    Case insensitive', '    -n    Show line numbers', '    -c    Count matches only', '    -r    Recursive search', '    -v    Invert match', '    -l    List filenames only', '', 'SEE ALSO', '    find(1), sed(1), awk(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    const flags = { i: false, n: false, c: false, r: false, v: false, l: false }
+    const positional: string[] = []
+    for (const a of args) {
+      if (a.startsWith('-') && a !== '-') {
+        for (const ch of a.slice(1)) {
+          if (ch in flags) (flags as Record<string, boolean>)[ch] = true
+        }
+      } else {
+        positional.push(a)
+      }
+    }
+    if (positional.length < 1) return { success: false, error: 'Usage: grep <pattern> <file>' }
+    const pattern = positional[0]
+    const target = positional[1] || '.'
+    let regex: RegExp
+    try { regex = new RegExp(pattern, flags.i ? 'i' : '') } catch { return { success: false, error: `grep: invalid regex: ${pattern}` } }
+    const lines: string[] = []
+    const user = ctx.data.userActions?.getCurrentUser()
+    const searchFile = (path: string, displayPath: string) => {
+      const content = fs.cat(path, user?.username ?? 'operator', user?.groups ?? ['operator'])
+      if (!content || content.startsWith('cat:')) return
+      const fileLines = content.split('\n')
+      let count = 0
+      for (let i = 0; i < fileLines.length; i++) {
+        const match = regex.test(fileLines[i])
+        if (match !== flags.v) {
+          count++
+          if (flags.l) { lines.push(displayPath); return }
+          if (!flags.c) {
+            const prefix = (flags.r ? displayPath + ':' : '') + (flags.n ? `${i + 1}:` : '')
+            lines.push(prefix + fileLines[i])
+          }
+        }
+      }
+      if (flags.c) lines.push((flags.r ? displayPath + ':' : '') + String(count))
+    }
+    if (flags.r) {
+      fs.walk(target, (nodePath, node) => {
+        if (node.type === 'file') searchFile(nodePath, nodePath)
+      })
+    } else {
+      const stat = fs.stat(target)
+      if (!stat) return { success: false, error: `grep: ${target}: No such file or directory` }
+      if (stat.type === 'dir') return { success: false, error: `grep: ${target}: Is a directory (use -r)` }
+      searchFile(target, target)
+    }
+    return { success: true, output: lines.length > 0 ? lines : ['(no matches)'] }
+  },
+}
+
+const findFilesCommand: Command = {
+  name: 'find',
+  aliases: ['unfind'],
+  description: 'Search for files in directory tree',
+  usage: 'find [path] [-name <pattern>] [-type <f|d>] [-maxdepth <n>]',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'FIND(1)               UnstableLabs Manual              FIND(1)', '', 'NAME', '    find — search for files in a directory hierarchy', '', 'SYNOPSIS', '    find [path] [-name <pattern>] [-type f|d] [-maxdepth <n>]', '', 'OPTIONS', '    -name <pattern>   Match filename (supports * wildcard)', '    -type f|d         File or directory only', '    -maxdepth <n>     Limit search depth', '', 'SEE ALSO', '    grep(1), ls(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    let searchPath = '.'
+    let namePattern: string | null = null
+    let typeFilter: string | null = null
+    let maxDepth = Infinity
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-name' && args[i + 1]) { namePattern = args[++i]; continue }
+      if (args[i] === '-type' && args[i + 1]) { typeFilter = args[++i]; continue }
+      if (args[i] === '-maxdepth' && args[i + 1]) { maxDepth = parseInt(args[++i]) || Infinity; continue }
+      if (!args[i].startsWith('-')) searchPath = args[i]
+    }
+    const results: string[] = []
+    const basePath = fs.getCwd()
+    const absSearch = searchPath.startsWith('/') ? searchPath : (basePath === '/' ? '/' + searchPath : basePath + '/' + searchPath).replace(/\/\.\/?/g, '/').replace(/\/+/g, '/')
+    fs.walk(absSearch, (nodePath, node) => {
+      const depth = nodePath === absSearch ? 0 : (nodePath.slice(absSearch.length).split('/').length - 1)
+      if (depth > maxDepth) return
+      if (typeFilter === 'f' && node.type !== 'file') return
+      if (typeFilter === 'd' && node.type !== 'dir') return
+      if (namePattern) {
+        const re = new RegExp('^' + namePattern.replace(/\*/g, '.*').replace(/\?/g, '.') + '$')
+        if (!re.test(node.name)) return
+      }
+      results.push(nodePath)
+    })
+    return { success: true, output: results.length > 0 ? results : ['(no results)'] }
+  },
+}
+
+const wcCommand: Command = {
+  name: 'wc',
+  aliases: ['unwc'],
+  description: 'Count lines, words, and characters',
+  usage: 'wc [-l] [-w] [-c] <file>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'WC(1)                 UnstableLabs Manual                WC(1)', '', 'NAME', '    wc — word, line, and character count', '', 'SYNOPSIS', '    wc [-lwc] <file>', '', 'OPTIONS', '    -l    Lines only', '    -w    Words only', '    -c    Characters only', '', 'SEE ALSO', '    cat(1), grep(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    const flags = { l: false, w: false, c: false }
+    const files: string[] = []
+    for (const a of args) {
+      if (a.startsWith('-') && a !== '-') { for (const ch of a.slice(1)) { if (ch in flags) (flags as Record<string, boolean>)[ch] = true } }
+      else files.push(a)
+    }
+    const showAll = !flags.l && !flags.w && !flags.c
+    if (files.length === 0) return { success: false, error: 'Usage: wc <file>' }
+    const user = ctx.data.userActions?.getCurrentUser()
+    const lines: string[] = []
+    for (const file of files) {
+      const content = fs.cat(file, user?.username ?? 'operator', user?.groups ?? ['operator'])
+      if (content === null || content.startsWith('cat:')) { lines.push(`wc: ${file}: No such file or directory`); continue }
+      const l = content.split('\n').length
+      const w = content.split(/\s+/).filter(Boolean).length
+      const c = content.length
+      const parts: string[] = []
+      if (showAll || flags.l) parts.push(String(l).padStart(6))
+      if (showAll || flags.w) parts.push(String(w).padStart(6))
+      if (showAll || flags.c) parts.push(String(c).padStart(6))
+      parts.push(file)
+      lines.push(parts.join(' '))
+    }
+    return { success: true, output: lines }
+  },
+}
+
+const sortCommand: Command = {
+  name: 'sort',
+  aliases: ['unsort'],
+  description: 'Sort lines of a file',
+  usage: 'sort [-r] [-n] [-u] [-k <field>] <file>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'SORT(1)               UnstableLabs Manual              SORT(1)', '', 'NAME', '    sort — sort lines of text files', '', 'SYNOPSIS', '    sort [-rnu] [-k <field>] <file>', '', 'OPTIONS', '    -r    Reverse order', '    -n    Numeric sort', '    -u    Unique lines only', '    -k <n> Sort by field n', '', 'SEE ALSO', '    uniq(1), wc(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    let reverse = false, numeric = false, unique = false, keyField = 0
+    const files: string[] = []
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-r') { reverse = true; continue }
+      if (args[i] === '-n') { numeric = true; continue }
+      if (args[i] === '-u') { unique = true; continue }
+      if (args[i] === '-k' && args[i + 1]) { keyField = parseInt(args[++i]) || 0; continue }
+      if (!args[i].startsWith('-')) files.push(args[i])
+    }
+    if (files.length === 0) return { success: false, error: 'Usage: sort <file>' }
+    const user = ctx.data.userActions?.getCurrentUser()
+    const content = fs.cat(files[0], user?.username ?? 'operator', user?.groups ?? ['operator'])
+    if (content === null || content.startsWith('cat:')) return { success: false, error: `sort: ${files[0]}: No such file or directory` }
+    let lines = content.split('\n')
+    const getKey = (line: string) => keyField > 0 ? (line.split(/\s+/)[keyField - 1] || '') : line
+    lines.sort((a, b) => {
+      const ka = getKey(a), kb = getKey(b)
+      if (numeric) return parseFloat(ka) - parseFloat(kb)
+      return ka.localeCompare(kb)
+    })
+    if (reverse) lines.reverse()
+    if (unique) lines = [...new Set(lines)]
+    return { success: true, output: lines }
+  },
+}
+
+const uniqCommand: Command = {
+  name: 'uniq',
+  aliases: ['ununiq'],
+  description: 'Filter adjacent duplicate lines',
+  usage: 'uniq [-c] [-d] [-u] <file>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'UNIQ(1)               UnstableLabs Manual              UNIQ(1)', '', 'NAME', '    uniq — report or omit repeated lines', '', 'SYNOPSIS', '    uniq [-cdu] <file>', '', 'OPTIONS', '    -c    Prefix lines by count', '    -d    Only print duplicate lines', '    -u    Only print unique lines', '', 'SEE ALSO', '    sort(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    let showCount = false, dupsOnly = false, uniqOnly = false
+    const files: string[] = []
+    for (const a of args) {
+      if (a === '-c') { showCount = true; continue }
+      if (a === '-d') { dupsOnly = true; continue }
+      if (a === '-u') { uniqOnly = true; continue }
+      if (!a.startsWith('-')) files.push(a)
+    }
+    if (files.length === 0) return { success: false, error: 'Usage: uniq <file>' }
+    const user = ctx.data.userActions?.getCurrentUser()
+    const content = fs.cat(files[0], user?.username ?? 'operator', user?.groups ?? ['operator'])
+    if (content === null || content.startsWith('cat:')) return { success: false, error: `uniq: ${files[0]}: No such file or directory` }
+    const input = content.split('\n')
+    const groups: { line: string; count: number }[] = []
+    for (const line of input) {
+      if (groups.length > 0 && groups[groups.length - 1].line === line) { groups[groups.length - 1].count++; continue }
+      groups.push({ line, count: 1 })
+    }
+    let filtered = groups
+    if (dupsOnly) filtered = filtered.filter(g => g.count > 1)
+    if (uniqOnly) filtered = filtered.filter(g => g.count === 1)
+    return { success: true, output: filtered.map(g => showCount ? `${String(g.count).padStart(7)} ${g.line}` : g.line) }
+  },
+}
+
+const diffCommand: Command = {
+  name: 'diff',
+  aliases: ['undiff'],
+  description: 'Compare two files line by line',
+  usage: 'diff [-u] [--brief] <file1> <file2>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'DIFF(1)               UnstableLabs Manual              DIFF(1)', '', 'NAME', '    diff — compare files line by line', '', 'SYNOPSIS', '    diff [-u] [--brief] <file1> <file2>', '', 'OPTIONS', '    -u         Unified format', '    --brief    Report only whether files differ', '', 'SEE ALSO', '    wc(1), cmp(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    let brief = false
+    const files: string[] = []
+    for (const a of args) {
+      if (a === '--brief') { brief = true; continue }
+      if (a === '-u') continue
+      if (!a.startsWith('-')) files.push(a)
+    }
+    if (files.length < 2) return { success: false, error: 'Usage: diff <file1> <file2>' }
+    const user = ctx.data.userActions?.getCurrentUser()
+    const c1 = fs.cat(files[0], user?.username ?? 'operator', user?.groups ?? ['operator'])
+    const c2 = fs.cat(files[1], user?.username ?? 'operator', user?.groups ?? ['operator'])
+    if (c1 === null || c1.startsWith('cat:')) return { success: false, error: `diff: ${files[0]}: No such file or directory` }
+    if (c2 === null || c2.startsWith('cat:')) return { success: false, error: `diff: ${files[1]}: No such file or directory` }
+    if (c1 === c2) return { success: true, output: ['Files are identical.'] }
+    if (brief) return { success: true, output: [`Files ${files[0]} and ${files[1]} differ`] }
+    const l1 = c1.split('\n'), l2 = c2.split('\n')
+    const lines = [`--- ${files[0]}`, `+++ ${files[1]}`, `@@ -1,${l1.length} +1,${l2.length} @@`]
+    const max = Math.max(l1.length, l2.length)
+    for (let i = 0; i < max; i++) {
+      if (i >= l1.length) { lines.push(`+${l2[i]}`); continue }
+      if (i >= l2.length) { lines.push(`-${l1[i]}`); continue }
+      if (l1[i] !== l2[i]) { lines.push(`-${l1[i]}`); lines.push(`+${l2[i]}`) }
+      else lines.push(` ${l1[i]}`)
+    }
+    return { success: true, output: lines }
+  },
+}
+
+const cutCommand: Command = {
+  name: 'cut',
+  aliases: ['uncut'],
+  description: 'Extract columns from text',
+  usage: 'cut -d <delimiter> -f <fields> <file>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'CUT(1)                UnstableLabs Manual               CUT(1)', '', 'NAME', '    cut — remove sections from each line of files', '', 'SYNOPSIS', '    cut -d <delim> -f <fields> <file>', '    cut -c <chars> <file>', '', 'OPTIONS', '    -d <delim>   Field delimiter', '    -f <fields>  Field numbers (comma-separated)', '    -c <chars>   Character positions', '', 'SEE ALSO', '    awk(1), tr(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    let delim = '\t', fields: number[] = [], chars: number[] = []
+    const files: string[] = []
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-d' && args[i + 1]) { delim = args[++i]; continue }
+      if (args[i] === '-f' && args[i + 1]) { fields = args[++i].split(',').map(n => parseInt(n)).filter(n => !isNaN(n)); continue }
+      if (args[i] === '-c' && args[i + 1]) { chars = args[++i].split(',').map(n => parseInt(n)).filter(n => !isNaN(n)); continue }
+      if (!args[i].startsWith('-')) files.push(args[i])
+    }
+    if (files.length === 0) return { success: false, error: 'Usage: cut -d <delim> -f <fields> <file>' }
+    const user = ctx.data.userActions?.getCurrentUser()
+    const content = fs.cat(files[0], user?.username ?? 'operator', user?.groups ?? ['operator'])
+    if (content === null || content.startsWith('cat:')) return { success: false, error: `cut: ${files[0]}: No such file or directory` }
+    const output = content.split('\n').map(line => {
+      if (chars.length > 0) return chars.map(c => line[c - 1] || '').join('')
+      if (fields.length > 0) { const parts = line.split(delim); return fields.map(f => parts[f - 1] || '').join(delim) }
+      return line
+    })
+    return { success: true, output }
+  },
+}
+
+const trCommand: Command = {
+  name: 'tr',
+  aliases: ['untr'],
+  description: 'Translate characters',
+  usage: "tr <set1> <set2> <file>",
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'TR(1)                 UnstableLabs Manual                TR(1)', '', 'NAME', "    tr — translate characters", '', 'SYNOPSIS', "    tr 'SET1' 'SET2' <file>", '', 'DESCRIPTION', "    Translates characters in SET1 to SET2.", '    Supports a-z and A-Z ranges.', '', 'SEE ALSO', '    sed(1), cut(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    if (args.length < 3) return { success: false, error: "Usage: tr 'SET1' 'SET2' <file>" }
+    const expandRange = (s: string): string => {
+      const clean = s.replace(/^["']|["']$/g, '')
+      return clean.replace(/(.)-(.)/g, (_, a: string, b: string) => {
+        let result = ''
+        for (let i = a.charCodeAt(0); i <= b.charCodeAt(0); i++) result += String.fromCharCode(i)
+        return result
+      })
+    }
+    const set1 = expandRange(args[0]), set2 = expandRange(args[1])
+    const user = ctx.data.userActions?.getCurrentUser()
+    const content = fs.cat(args[2], user?.username ?? 'operator', user?.groups ?? ['operator'])
+    if (content === null || content.startsWith('cat:')) return { success: false, error: `tr: ${args[2]}: No such file or directory` }
+    let result = ''
+    for (const ch of content) {
+      const idx = set1.indexOf(ch)
+      result += idx >= 0 && idx < set2.length ? set2[idx] : ch
+    }
+    return { success: true, output: result.split('\n') }
+  },
+}
+
+const sedCommand: Command = {
+  name: 'sed',
+  aliases: ['unsed'],
+  description: 'Stream editor — substitute command',
+  usage: "sed 's/pattern/replacement/[g]' <file>",
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'SED(1)                UnstableLabs Manual               SED(1)', '', 'NAME', '    sed — stream editor', '', 'SYNOPSIS', "    sed 's/pattern/replacement/[g]' <file>", '', 'DESCRIPTION', '    Supports the s (substitute) command.', '    Use g flag for global replacement.', '', 'SEE ALSO', '    awk(1), grep(1), tr(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    if (args.length < 2) return { success: false, error: "Usage: sed 's/pat/rep/[g]' <file>" }
+    const expr = args[0].replace(/^["']|["']$/g, '')
+    const match = expr.match(/^s(.)(.+?)\1(.*?)\1(g?)$/)
+    if (!match) return { success: false, error: "sed: only 's/pattern/replacement/[g]' supported" }
+    const [, , pat, rep, gflag] = match
+    const user = ctx.data.userActions?.getCurrentUser()
+    const content = fs.cat(args[1], user?.username ?? 'operator', user?.groups ?? ['operator'])
+    if (content === null || content.startsWith('cat:')) return { success: false, error: `sed: ${args[1]}: No such file or directory` }
+    const regex = new RegExp(pat, gflag ? 'g' : '')
+    const output = content.split('\n').map(line => line.replace(regex, rep))
+    return { success: true, output }
+  },
+}
+
+const awkCommand: Command = {
+  name: 'awk',
+  aliases: ['unawk'],
+  description: 'Pattern scanning and processing',
+  usage: "awk [-F <sep>] '{print $N}' <file>",
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'AWK(1)                UnstableLabs Manual               AWK(1)', '', 'NAME', '    awk — pattern-directed scanning and processing', '', 'SYNOPSIS', "    awk [-F sep] '{print $N}' <file>", '', 'DESCRIPTION', '    Supports field extraction with {print $N}.', '    -F sets field separator (default: whitespace).', '    BEGIN{} and END{} blocks are recognized.', '', 'SEE ALSO', '    sed(1), cut(1), grep(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    let sep = /\s+/
+    let sepStr = ' '
+    const positional: string[] = []
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-F' && args[i + 1]) { sepStr = args[++i]; sep = new RegExp(sepStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); continue }
+      positional.push(args[i])
+    }
+    if (positional.length < 2) return { success: false, error: "Usage: awk '{print $N}' <file>" }
+    const program = positional[0].replace(/^["']|["']$/g, '')
+    const user = ctx.data.userActions?.getCurrentUser()
+    const content = fs.cat(positional[1], user?.username ?? 'operator', user?.groups ?? ['operator'])
+    if (content === null || content.startsWith('cat:')) return { success: false, error: `awk: ${positional[1]}: No such file or directory` }
+    const printMatch = program.match(/\{\s*print\s+(.*?)\s*\}/)
+    if (!printMatch) return { success: false, error: "awk: only '{print ...}' is supported" }
+    const fieldExpr = printMatch[1]
+    const output: string[] = []
+    for (const line of content.split('\n')) {
+      const fields = line.split(sep)
+      const result = fieldExpr.replace(/\$(\d+)/g, (_, n) => {
+        const idx = parseInt(n)
+        if (idx === 0) return line
+        return fields[idx - 1] || ''
+      }).replace(/\\t/g, '\t').replace(/\\n/g, '\n')
+      output.push(result)
+    }
+    return { success: true, output }
+  },
+}
+
+const teeCommand: Command = {
+  name: 'tee',
+  aliases: ['untee'],
+  description: 'Write to both stdout and a file',
+  usage: 'tee [-a] <file> < <input-file>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'TEE(1)                UnstableLabs Manual               TEE(1)', '', 'NAME', '    tee — duplicate standard output', '', 'SYNOPSIS', '    tee [-a] <output-file> <input-file>', '', 'OPTIONS', '    -a    Append to file instead of overwriting', '', 'SEE ALSO', '    cat(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    let append = false
+    const files: string[] = []
+    for (const a of args) {
+      if (a === '-a') { append = true; continue }
+      if (!a.startsWith('-')) files.push(a)
+    }
+    if (files.length < 2) return { success: false, error: 'Usage: tee <output-file> <input-file>' }
+    const user = ctx.data.userActions?.getCurrentUser()
+    const content = fs.cat(files[1], user?.username ?? 'operator', user?.groups ?? ['operator'])
+    if (content === null || content.startsWith('cat:')) return { success: false, error: `tee: ${files[1]}: No such file or directory` }
+    if (append) {
+      const existing = fs.cat(files[0], user?.username ?? 'operator', user?.groups ?? ['operator'])
+      fs.write(files[0], (existing && !existing.startsWith('cat:') ? existing + '\n' : '') + content)
+    } else {
+      fs.write(files[0], content)
+    }
+    return { success: true, output: content.split('\n') }
+  },
+}
+
+const xargsCommand: Command = {
+  name: 'xargs',
+  aliases: ['unxargs'],
+  description: 'Build and execute command lines from input',
+  usage: 'xargs <command> < <file>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'XARGS(1)              UnstableLabs Manual            XARGS(1)', '', 'NAME', '    xargs — build and execute command lines', '', 'SYNOPSIS', '    xargs <command> <input-file>', '', 'DESCRIPTION', '    Reads lines from input file and shows what commands would run.', '', 'SEE ALSO', '    find(1), grep(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    if (args.length < 2) return { success: false, error: 'Usage: xargs <command> <file>' }
+    const cmd = args[0]
+    const user = ctx.data.userActions?.getCurrentUser()
+    const content = fs.cat(args[1], user?.username ?? 'operator', user?.groups ?? ['operator'])
+    if (content === null || content.startsWith('cat:')) return { success: false, error: `xargs: ${args[1]}: No such file or directory` }
+    const lines = content.split('\n').filter(Boolean)
+    return { success: true, output: lines.map(line => `${cmd} ${line}`) }
+  },
+}
+
+const fileCommand: Command = {
+  name: 'file',
+  aliases: ['unfile'],
+  description: 'Determine file type',
+  usage: 'file <path>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'FILE(1)               UnstableLabs Manual              FILE(1)', '', 'NAME', '    file — determine file type', '', 'SYNOPSIS', '    file <path>', '', 'DESCRIPTION', '    Identifies file type by examining name and content.', '', 'SEE ALSO', '    stat(1), ls(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    if (args.length === 0) return { success: false, error: 'Usage: file <path>' }
+    const results: string[] = []
+    for (const path of args) {
+      const ftype = fs.getNodeType(path)
+      if (ftype === null) { results.push(`${path}: cannot open (No such file or directory)`); continue }
+      results.push(`${path}: ${ftype}`)
+    }
+    return { success: true, output: results }
+  },
+}
+
+const stringsCommand: Command = {
+  name: 'strings',
+  aliases: [],
+  description: 'Print printable character sequences',
+  usage: 'strings <file>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'STRINGS(1)            UnstableLabs Manual           STRINGS(1)', '', 'NAME', '    strings — find printable strings in a file', '', 'SYNOPSIS', '    strings <file>', '', 'SEE ALSO', '    file(1), cat(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    if (args.length === 0) return { success: false, error: 'Usage: strings <file>' }
+    const user = ctx.data.userActions?.getCurrentUser()
+    const content = fs.cat(args[0], user?.username ?? 'operator', user?.groups ?? ['operator'])
+    if (content === null || content.startsWith('cat:')) return { success: false, error: `strings: ${args[0]}: No such file or directory` }
+    const matches = content.match(/[\x20-\x7E]{4,}/g) || []
+    return { success: true, output: matches.length > 0 ? matches : ['(no printable strings found)'] }
+  },
+}
+
+// ============================================================
+// Phase 3: System Information & Disk Utilities
+// ============================================================
+
+const dateCommand: Command = {
+  name: 'date',
+  aliases: ['undate'],
+  description: 'Display or set date and time',
+  usage: 'date [+FORMAT] [-u]',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'DATE(1)               UnstableLabs Manual              DATE(1)', '', 'NAME', '    date — display or set date and time', '', 'SYNOPSIS', '    date [+FORMAT] [-u]', '', 'FORMAT SEQUENCES', '    %Y  Year    %m  Month   %d  Day', '    %H  Hour    %M  Minute  %S  Second', '    %Z  Timezone %s  Epoch seconds', '', 'OPTIONS', '    -u    Display UTC time', '', 'SEE ALSO', '    cal(1), uptime(1)', ''] }
+    }
+    const utc = args.includes('-u')
+    const now = new Date()
+    const format = args.find(a => a.startsWith('+'))
+    if (format) {
+      const fmt = format.slice(1)
+      const result = fmt
+        .replace(/%Y/g, utc ? String(now.getUTCFullYear()) : String(now.getFullYear()))
+        .replace(/%m/g, String(utc ? now.getUTCMonth() + 1 : now.getMonth() + 1).padStart(2, '0'))
+        .replace(/%d/g, String(utc ? now.getUTCDate() : now.getDate()).padStart(2, '0'))
+        .replace(/%H/g, String(utc ? now.getUTCHours() : now.getHours()).padStart(2, '0'))
+        .replace(/%M/g, String(utc ? now.getUTCMinutes() : now.getMinutes()).padStart(2, '0'))
+        .replace(/%S/g, String(utc ? now.getUTCSeconds() : now.getSeconds()).padStart(2, '0'))
+        .replace(/%Z/g, utc ? 'UTC' : Intl.DateTimeFormat().resolvedOptions().timeZone)
+        .replace(/%s/g, String(Math.floor(now.getTime() / 1000)))
+      return { success: true, output: [result] }
+    }
+    return { success: true, output: [utc ? now.toUTCString() : now.toString()] }
+  },
+}
+
+const calCommand: Command = {
+  name: 'cal',
+  aliases: ['uncal'],
+  description: 'Display a calendar',
+  usage: 'cal [month] [year]',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'CAL(1)                UnstableLabs Manual               CAL(1)', '', 'NAME', '    cal — display a calendar', '', 'SYNOPSIS', '    cal [month] [year]', '', 'SEE ALSO', '    date(1)', ''] }
+    }
+    const now = new Date()
+    let month = now.getMonth()
+    let year = now.getFullYear()
+    if (args.length === 2) { month = parseInt(args[0]) - 1; year = parseInt(args[1]) }
+    else if (args.length === 1) { const n = parseInt(args[0]); if (n > 12) year = n; else month = n - 1 }
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+    const title = `${monthNames[month]} ${year}`
+    const lines = [title.padStart(Math.floor((20 + title.length) / 2)), 'Su Mo Tu We Th Fr Sa']
+    const firstDay = new Date(year, month, 1).getDay()
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    let line = '   '.repeat(firstDay)
+    for (let d = 1; d <= daysInMonth; d++) {
+      line += String(d).padStart(2) + ' '
+      if ((firstDay + d) % 7 === 0) { lines.push(line.trimEnd()); line = '' }
+    }
+    if (line.trim()) lines.push(line.trimEnd())
+    return { success: true, output: lines }
+  },
+}
+
+const hostnameCommand: Command = {
+  name: 'hostname',
+  aliases: ['unhostname'],
+  description: 'Display system hostname',
+  usage: 'hostname',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'HOSTNAME(1)           UnstableLabs Manual          HOSTNAME(1)', '', 'NAME', '    hostname — show or set system hostname', '', 'SYNOPSIS', '    hostname', '', 'SEE ALSO', '    uname(1)', ''] }
+    }
+    return { success: true, output: ['_unLAB'] }
+  },
+}
+
+const whichCommand: Command = {
+  name: 'which',
+  aliases: ['whereis', 'type'],
+  description: 'Locate a command',
+  usage: 'which <command>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'WHICH(1)              UnstableLabs Manual             WHICH(1)', '', 'NAME', '    which — locate a command', '', 'SYNOPSIS', '    which <command>', '', 'DESCRIPTION', '    Shows the path of the command if it exists in the registry.', '', 'SEE ALSO', '    file(1)', ''] }
+    }
+    if (args.length === 0) return { success: false, error: 'Usage: which <command>' }
+    const name = args[0].toLowerCase()
+    const cmd = commands.find(c => c.name === name || c.aliases?.includes(name))
+    if (cmd) return { success: true, output: [`/unbin/${cmd.name}`] }
+    return { success: false, error: `which: no ${args[0]} in (/unbin:/unusr/bin)` }
+  },
+}
+
+const dfCommand: Command = {
+  name: 'df',
+  aliases: ['undf'],
+  description: 'Report filesystem disk space usage',
+  usage: 'df [-h]',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'DF(1)                 UnstableLabs Manual                DF(1)', '', 'NAME', '    df — report filesystem disk space usage', '', 'SYNOPSIS', '    df [-h]', '', 'OPTIONS', '    -h    Human-readable sizes', '', 'SEE ALSO', '    du(1), mount(1)', ''] }
+    }
+    const human = args.includes('-h')
+    const fmt = (kb: number) => {
+      if (!human) return String(kb)
+      if (kb >= 1048576) return (kb / 1048576).toFixed(1) + 'G'
+      if (kb >= 1024) return (kb / 1024).toFixed(1) + 'M'
+      return kb + 'K'
+    }
+    const lines = [
+      `Filesystem      ${human ? 'Size' : '1K-blocks'}  Used  Available Use% Mounted on`,
+      `/dev/unsda1     ${fmt(67108864)}  ${fmt(12582912)}  ${fmt(54525952)}  19% /`,
+      `tmpfs           ${fmt(65536)}  ${fmt(1024)}  ${fmt(64512)}   2% /untmp`,
+      `devfs           ${fmt(0)}  ${fmt(0)}  ${fmt(0)}   0% /undev`,
+      `procfs          ${fmt(0)}  ${fmt(0)}  ${fmt(0)}   0% /unproc`,
+      `/dev/unsdb      ${fmt(134217728)}  ${fmt(8388608)}  ${fmt(125829120)}   6% /unsrv`,
+    ]
+    return { success: true, output: lines }
+  },
+}
+
+const duCommand: Command = {
+  name: 'du',
+  aliases: ['undu'],
+  description: 'Estimate file space usage',
+  usage: 'du [-h] [-s] [-d <depth>] [path]',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'DU(1)                 UnstableLabs Manual                DU(1)', '', 'NAME', '    du — estimate file space usage', '', 'SYNOPSIS', '    du [-h] [-s] [-d <depth>] [path]', '', 'OPTIONS', '    -h          Human-readable sizes', '    -s          Summary only', '    -d <depth>  Max depth', '', 'SEE ALSO', '    df(1), ls(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    let human = false, summary = false, maxDepth = Infinity, target = '.'
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-h') { human = true; continue }
+      if (args[i] === '-s') { summary = true; continue }
+      if (args[i] === '-d' && args[i + 1]) { maxDepth = parseInt(args[++i]) || Infinity; continue }
+      if (!args[i].startsWith('-')) target = args[i]
+    }
+    const fmt = (bytes: number) => {
+      if (!human) return String(bytes)
+      if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + 'G'
+      if (bytes >= 1024) return (bytes / 1024).toFixed(1) + 'M'
+      return bytes + 'B'
+    }
+    const sizes: { path: string; size: number; depth: number }[] = []
+    const basePath = fs.getCwd()
+    const absTarget = target.startsWith('/') ? target : (basePath === '/' ? '/' + target : basePath + '/' + target).replace(/\/\.\/?/g, '/').replace(/\/+/g, '/')
+    let totalSize = 0
+    fs.walk(absTarget, (nodePath, node) => {
+      const depth = nodePath === absTarget ? 0 : (nodePath.slice(absTarget.length).split('/').length - 1)
+      if (node.type === 'file') totalSize += node.size
+      if (node.type === 'dir' && depth <= maxDepth) {
+        let dirSize = 0
+        fs.walk(nodePath, (_, n) => { if (n.type === 'file') dirSize += n.size })
+        sizes.push({ path: nodePath, size: dirSize, depth })
+      }
+    })
+    if (summary) return { success: true, output: [`${fmt(totalSize)}\t${absTarget}`] }
+    return { success: true, output: sizes.map(s => `${fmt(s.size)}\t${s.path}`) }
+  },
+}
+
+const mountCommand: Command = {
+  name: 'mount',
+  aliases: ['unmount'],
+  description: 'Display mounted filesystems',
+  usage: 'mount',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'MOUNT(1)              UnstableLabs Manual             MOUNT(1)', '', 'NAME', '    mount — display mounted filesystems', '', 'SYNOPSIS', '    mount', '', 'SEE ALSO', '    df(1), umount(1), lsblk(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    const mounts = fs.getMounts()
+    const lines = [
+      '/dev/unsda1 on / type unfs (rw,relatime)',
+      ...mounts.map(m => `${m.type} on ${m.path} type ${m.type} (${m.options.join(',')})`),
+    ]
+    return { success: true, output: lines }
+  },
+}
+
+const umountCommand: Command = {
+  name: 'umount',
+  aliases: ['unumount'],
+  description: 'Unmount a filesystem',
+  usage: 'umount <mount-point>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'UMOUNT(1)             UnstableLabs Manual            UMOUNT(1)', '', 'NAME', '    umount — unmount a filesystem', '', 'SYNOPSIS', '    umount <mount-point>', '', 'SEE ALSO', '    mount(1)', ''] }
+    }
+    if (args.length === 0) return { success: false, error: 'Usage: umount <mount-point>' }
+    const systemMounts = ['/', '/unproc', '/undev', '/untmp']
+    if (systemMounts.includes(args[0])) return { success: false, error: `umount: ${args[0]}: target is busy (system mount)` }
+    return { success: true, output: [`umount: ${args[0]}: unmounted`] }
+  },
+}
+
+const lsblkCommand: Command = {
+  name: 'lsblk',
+  aliases: ['unlsblk'],
+  description: 'List block devices',
+  usage: 'lsblk',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'LSBLK(1)              UnstableLabs Manual             LSBLK(1)', '', 'NAME', '    lsblk — list block devices', '', 'SYNOPSIS', '    lsblk', '', 'SEE ALSO', '    df(1), fdisk(1), blkid(1)', ''] }
+    }
+    return { success: true, output: [
+      'NAME      MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT',
+      'unsda     253:0    0    64G  0 disk',
+      '|-unsda1  253:1    0    60G  0 part /',
+      '|-unsda2  253:2    0     4G  0 part [SWAP]',
+      'unsdb     253:16   0   128G  0 disk /unsrv',
+    ] }
+  },
+}
+
+const statCommand: Command = {
+  name: 'stat',
+  aliases: ['unstat'],
+  description: 'Display file status',
+  usage: 'stat <file>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'STAT(1)               UnstableLabs Manual              STAT(1)', '', 'NAME', '    stat — display file or filesystem status', '', 'SYNOPSIS', '    stat <file>', '', 'SEE ALSO', '    ls(1), file(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    if (args.length === 0) return { success: false, error: 'Usage: stat <file>' }
+    const s = fs.stat(args[0])
+    if (!s) return { success: false, error: `stat: cannot stat '${args[0]}': No such file or directory` }
+    const perms = fs.formatPermissions(args[0]) || '----------'
+    const octal = '0' + s.permissions.toString(8)
+    const ftype = fs.getNodeType(args[0]) || s.type
+    return { success: true, output: [
+      `  File: ${args[0]}`,
+      `  Size: ${s.size}\t\tType: ${ftype}`,
+      `Access: (${octal}/${perms})  Uid: ${s.owner}\tGid: ${s.group}`,
+      `Modify: ${new Date(s.modified).toISOString()}`,
+    ] }
+  },
+}
+
+const manCommand: Command = {
+  name: 'man',
+  aliases: ['unman'],
+  description: 'Display manual page for a command',
+  usage: 'man <command>',
+  execute: async (args, ctx) => {
+    if (args.length === 0 || args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'MAN(1)                UnstableLabs Manual               MAN(1)', '', 'NAME', '    man — display manual pages', '', 'SYNOPSIS', '    man <command>', '', 'DESCRIPTION', '    Display the manual page for the specified command.', '    Most commands also support passing "unman" as first arg.', '', 'SEE ALSO', '    help(1), which(1)', ''] }
+    }
+    const name = args[0].toLowerCase()
+    const cmd = commands.find(c => c.name === name || c.aliases?.includes(name))
+    if (!cmd) return { success: false, error: `No manual entry for ${args[0]}` }
+    return cmd.execute(['unman'], ctx)
+  },
+}
+
+const watchCommand: Command = {
+  name: 'watch',
+  aliases: ['unwatch'],
+  description: 'Execute a command periodically (single run)',
+  usage: 'watch [-n <interval>] <command>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'WATCH(1)              UnstableLabs Manual             WATCH(1)', '', 'NAME', '    watch — execute a program periodically', '', 'SYNOPSIS', '    watch [-n <interval>] <command>', '', 'DESCRIPTION', '    Runs the command once and displays output.', '    In a real terminal, would repeat at interval.', '', 'SEE ALSO', '    date(1)', ''] }
+    }
+    const positional: string[] = []
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-n' && args[i + 1]) { i++; continue }
+      positional.push(args[i])
+    }
+    if (positional.length === 0) return { success: false, error: 'Usage: watch <command>' }
+    const now = new Date().toLocaleString()
+    ctx.addOutput(`Every 2.0s: ${positional.join(' ')}    _unLAB: ${now}`)
+    ctx.addOutput('')
+    const { executeCommand: exec } = await import('@/lib/terminal/commands')
+    const result = await exec(positional.join(' '), ctx)
+    return result
+  },
+}
+
+// ============================================================
+// Phase 4: Networking Commands
+// ============================================================
+
+const pingCommand: Command = {
+  name: 'ping',
+  aliases: ['unping'],
+  description: 'Send ICMP echo request',
+  usage: 'ping [-c <count>] <host>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'PING(1)               UnstableLabs Manual              PING(1)', '', 'NAME', '    ping — send ICMP ECHO_REQUEST to network hosts', '', 'SYNOPSIS', '    ping [-c count] <host>', '', 'OPTIONS', '    -c <count>   Stop after sending count packets', '', 'SEE ALSO', '    traceroute(1), netstat(1), ip(1)', ''] }
+    }
+    const na = ctx.data.networkActions
+    if (!na) return { success: false, error: 'Network not available' }
+    let count = 4
+    let host = ''
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-c' && args[i + 1]) { count = parseInt(args[++i]) || 4; continue }
+      if (!args[i].startsWith('-')) host = args[i]
+    }
+    if (!host) return { success: false, error: 'Usage: ping <host>' }
+    const results = na.ping(host, count)
+    const ip = results[0]?.host || host
+    const lines = [`PING ${host} (${ip}) 56(84) bytes of data.`]
+    let received = 0
+    let totalRtt = 0
+    for (const r of results) {
+      if (r.success) {
+        received++
+        totalRtt += r.rtt
+        lines.push(`64 bytes from ${r.host}: icmp_seq=${r.seq} ttl=${r.ttl} time=${r.rtt} ms`)
+      } else {
+        lines.push(`From ${ip}: icmp_seq=${r.seq} Destination Host Unreachable`)
+      }
+    }
+    lines.push('')
+    lines.push(`--- ${host} ping statistics ---`)
+    const loss = ((count - received) / count * 100).toFixed(0)
+    lines.push(`${count} packets transmitted, ${received} received, ${loss}% packet loss`)
+    if (received > 0) {
+      const avg = (totalRtt / received).toFixed(3)
+      lines.push(`rtt avg = ${avg} ms`)
+    }
+    return { success: true, output: lines }
+  },
+}
+
+const curlCommand: Command = {
+  name: 'curl',
+  aliases: ['wget', 'uncurl'],
+  description: 'Transfer data from URL',
+  usage: 'curl [-I] [-o <file>] <url>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'CURL(1)               UnstableLabs Manual              CURL(1)', '', 'NAME', '    curl — transfer a URL', '', 'SYNOPSIS', '    curl [-I] [-o <file>] <url>', '', 'OPTIONS', '    -I         Show headers only', '    -o <file>  Write output to file', '', 'SEE ALSO', '    dig(1), netstat(1)', ''] }
+    }
+    let headersOnly = false, outFile = ''
+    let url = ''
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-I') { headersOnly = true; continue }
+      if (args[i] === '-o' && args[i + 1]) { outFile = args[++i]; continue }
+      if (!args[i].startsWith('-')) url = args[i]
+    }
+    if (!url) return { success: false, error: 'Usage: curl <url>' }
+    const knownUrls: Record<string, { status: number; headers: Record<string, string>; body: string }> = {
+      'https://api.devnet.solana.com': { status: 200, headers: { 'Content-Type': 'application/json', 'Server': 'solana-rpc/1.14' }, body: '{"jsonrpc":"2.0","result":{"solana-core":"1.14.17"},"id":1}' },
+      'http://10.0.0.1:8080/status': { status: 200, headers: { 'Content-Type': 'application/json', 'Server': '_unLAB/2.0' }, body: '{"status":"operational","crystals":0,"uptime":3600}' },
+      'http://localhost:8080/status': { status: 200, headers: { 'Content-Type': 'application/json', 'Server': '_unLAB/2.0' }, body: '{"status":"operational","crystals":0,"uptime":3600}' },
+      'https://repo.unstablelabs.io': { status: 200, headers: { 'Content-Type': 'text/html', 'Server': 'nginx/1.24' }, body: '<html><body>_unOS Package Repository</body></html>' },
+    }
+    const response = knownUrls[url]
+    if (!response) {
+      if (headersOnly) return { success: true, output: ['HTTP/1.1 404 Not Found', 'Content-Length: 0', ''] }
+      return { success: false, error: `curl: (6) Could not resolve host` }
+    }
+    if (headersOnly) {
+      const lines = [`HTTP/1.1 ${response.status} OK`]
+      for (const [k, v] of Object.entries(response.headers)) lines.push(`${k}: ${v}`)
+      lines.push('')
+      return { success: true, output: lines }
+    }
+    if (outFile && ctx.data.filesystemActions) {
+      ctx.data.filesystemActions.write(outFile, response.body)
+      return { success: true, output: [`  % Total    % Received`, `  ${response.body.length}    ${response.body.length}    100`, `Saved to ${outFile}`] }
+    }
+    return { success: true, output: response.body.split('\n') }
+  },
+}
+
+const netstatCommand: Command = {
+  name: 'netstat',
+  aliases: ['ss', 'unnetstat'],
+  description: 'Show network connections and stats',
+  usage: 'netstat [-t] [-u] [-l] [-n] [-p]',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'NETSTAT(1)            UnstableLabs Manual           NETSTAT(1)', '', 'NAME', '    netstat — show network connections', '', 'SYNOPSIS', '    netstat [-tulnp]', '', 'OPTIONS', '    -t    TCP connections', '    -u    UDP connections', '    -l    Listening only', '    -n    Numeric addresses', '    -p    Show PID/program', '', 'SEE ALSO', '    ip(1), ping(1)', ''] }
+    }
+    const na = ctx.data.networkActions
+    if (!na) return { success: false, error: 'Network not available' }
+    const flags = { t: false, u: false, l: false, n: true, p: false }
+    for (const a of args) {
+      if (a.startsWith('-')) for (const ch of a.slice(1)) { if (ch in flags) (flags as Record<string, boolean>)[ch] = true }
+    }
+    const showAll = !flags.t && !flags.u
+    const conns = na.getConnections()
+    const lines = ['Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program']
+    for (const c of conns) {
+      if (!showAll && flags.t && c.proto !== 'tcp') continue
+      if (!showAll && flags.u && c.proto !== 'udp') continue
+      if (flags.l && c.state !== 'LISTEN' && c.state !== '') continue
+      const local = `${c.localAddr}:${c.localPort}`
+      const remote = c.remotePort === 0 ? `${c.remoteAddr}:*` : `${c.remoteAddr}:${c.remotePort}`
+      const pid = flags.p ? `${c.pid}/${c.process}` : '-'
+      lines.push(`${c.proto.padEnd(5)} 0      0      ${local.padEnd(24)}${remote.padEnd(24)}${(c.state || '-').padEnd(12)}${pid}`)
+    }
+    return { success: true, output: lines }
+  },
+}
+
+const tracerouteCommand: Command = {
+  name: 'traceroute',
+  aliases: ['untraceroute'],
+  description: 'Trace route to host',
+  usage: 'traceroute <host>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'TRACEROUTE(1)         UnstableLabs Manual        TRACEROUTE(1)', '', 'NAME', '    traceroute — print route packets take to host', '', 'SYNOPSIS', '    traceroute <host>', '', 'SEE ALSO', '    ping(1), ip(1)', ''] }
+    }
+    const na = ctx.data.networkActions
+    if (!na) return { success: false, error: 'Network not available' }
+    if (args.length === 0) return { success: false, error: 'Usage: traceroute <host>' }
+    const hops = na.traceroute(args[0])
+    const lines = [`traceroute to ${args[0]}, 30 hops max, 60 byte packets`]
+    for (const h of hops) {
+      lines.push(` ${String(h.hop).padStart(2)}  ${h.host.padEnd(20)} ${h.rtt} ms`)
+    }
+    return { success: true, output: lines }
+  },
+}
+
+const digCommand: Command = {
+  name: 'dig',
+  aliases: ['nslookup', 'undig'],
+  description: 'DNS lookup utility',
+  usage: 'dig <hostname>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'DIG(1)                UnstableLabs Manual               DIG(1)', '', 'NAME', '    dig — DNS lookup utility', '', 'SYNOPSIS', '    dig <hostname>', '', 'SEE ALSO', '    ping(1), ip(1)', ''] }
+    }
+    const na = ctx.data.networkActions
+    if (!na) return { success: false, error: 'Network not available' }
+    if (args.length === 0) return { success: false, error: 'Usage: dig <hostname>' }
+    const ip = na.resolveDNS(args[0])
+    if (!ip) return { success: true, output: [`;; QUESTION SECTION:`, `;${args[0]}.\t\tIN\tA`, '', `;; ANSWER SECTION:`, `(NXDOMAIN — no records found)`] }
+    return { success: true, output: [
+      '; <<>> UnDig 2.0 <<>> ' + args[0],
+      ';; QUESTION SECTION:',
+      `;${args[0]}.\t\tIN\tA`,
+      '',
+      ';; ANSWER SECTION:',
+      `${args[0]}.\t\t300\tIN\tA\t${ip}`,
+      '',
+      `;; Query time: ${Math.floor(Math.random() * 10 + 1)} msec`,
+      ';; SERVER: 10.0.0.253#53(10.0.0.253)',
+    ] }
+  },
+}
+
+const ipCommand: Command = {
+  name: 'ip',
+  aliases: ['unip'],
+  description: 'Show / manipulate routing, devices, policy routing',
+  usage: 'ip addr|route|link',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'IP(1)                 UnstableLabs Manual                IP(1)', '', 'NAME', '    ip — show/manipulate network settings', '', 'SYNOPSIS', '    ip addr    Show addresses', '    ip route   Show routing table', '    ip link    Show link status', '', 'SEE ALSO', '    ifconfig(1), netstat(1)', ''] }
+    }
+    const na = ctx.data.networkActions
+    if (!na) return { success: false, error: 'Network not available' }
+    const sub = args[0] || 'addr'
+    if (sub === 'addr' || sub === 'a') {
+      const ifaces = na.getInterfaces()
+      const lines: string[] = []
+      ifaces.forEach((iface, idx) => {
+        const state = iface.state.toUpperCase()
+        lines.push(`${idx + 1}: ${iface.name}: <${state}> mtu 1500 qdisc noqueue state ${state}`)
+        lines.push(`    link/${iface.type} ${iface.hwaddr}`)
+        lines.push(`    inet ${iface.address}/${iface.netmask === '255.0.0.0' ? '8' : iface.netmask === '255.255.0.0' ? '16' : iface.netmask === '255.255.255.0' ? '24' : 'n/a'} scope ${iface.type === 'loopback' ? 'host' : 'global'} ${iface.name}`)
+      })
+      return { success: true, output: lines }
+    }
+    if (sub === 'route' || sub === 'r') {
+      const routes = na.getRoutes()
+      const lines = routes.map(r => `${r.destination.padEnd(20)} via ${r.gateway.padEnd(16)} dev ${r.iface.padEnd(8)} proto ${r.proto} metric ${r.metric}`)
+      return { success: true, output: lines }
+    }
+    if (sub === 'link' || sub === 'l') {
+      const ifaces = na.getInterfaces()
+      const lines: string[] = []
+      ifaces.forEach((iface, idx) => {
+        const state = iface.state.toUpperCase()
+        lines.push(`${idx + 1}: ${iface.name}: <${state}> mtu 1500 qdisc noqueue state ${state}`)
+        lines.push(`    link/${iface.type} ${iface.hwaddr}`)
+        lines.push(`    RX: bytes ${iface.stats.rxBytes}  packets ${iface.stats.rxPackets}  errors ${iface.stats.rxErrors}`)
+        lines.push(`    TX: bytes ${iface.stats.txBytes}  packets ${iface.stats.txPackets}  errors ${iface.stats.txErrors}`)
+      })
+      return { success: true, output: lines }
+    }
+    return { success: false, error: `ip: unknown subcommand '${sub}'. Use addr, route, or link.` }
+  },
+}
+
+const ncCommand: Command = {
+  name: 'nc',
+  aliases: ['netcat'],
+  description: 'Arbitrary TCP/UDP connections',
+  usage: 'nc [-l] [-p <port>] <host> <port>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'NC(1)                 UnstableLabs Manual                NC(1)', '', 'NAME', '    nc — arbitrary TCP and UDP connections and listens', '', 'SYNOPSIS', '    nc [-l] [-p <port>] <host> <port>', '', 'SEE ALSO', '    netstat(1), curl(1)', ''] }
+    }
+    let listen = false
+    const positional: string[] = []
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-l') { listen = true; continue }
+      if (args[i] === '-p') { i++; continue }
+      if (!args[i].startsWith('-')) positional.push(args[i])
+    }
+    if (listen) {
+      const port = positional[0] || '8888'
+      return { success: true, output: [`Listening on 0.0.0.0 ${port}`, '(Ctrl+C to exit — simulated)'] }
+    }
+    if (positional.length < 2) return { success: false, error: 'Usage: nc <host> <port>' }
+    const na = ctx.data.networkActions
+    const ip = na?.resolveDNS(positional[0])
+    if (ip || positional[0].match(/^\d/)) {
+      return { success: true, output: [`Connection to ${positional[0]} ${positional[1]} port [tcp/*] succeeded!`] }
+    }
+    return { success: false, error: `nc: connect to ${positional[0]} port ${positional[1]} (tcp) failed: Connection refused` }
+  },
+}
+
+const ifconfigCommand: Command = {
+  name: 'ifconfig',
+  aliases: [],
+  description: 'Configure network interface (legacy)',
+  usage: 'ifconfig [interface]',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'IFCONFIG(1)           UnstableLabs Manual          IFCONFIG(1)', '', 'NAME', '    ifconfig — configure a network interface (legacy)', '', 'SYNOPSIS', '    ifconfig [interface]', '', 'DESCRIPTION', '    Deprecated. Use "ip addr" instead.', '', 'SEE ALSO', '    ip(1)', ''] }
+    }
+    const na = ctx.data.networkActions
+    if (!na) return { success: false, error: 'Network not available' }
+    const ifaces = args.length > 0 ? na.getInterfaces().filter(i => i.name === args[0]) : na.getInterfaces()
+    if (ifaces.length === 0) return { success: false, error: `ifconfig: interface ${args[0]} not found` }
+    const lines: string[] = []
+    for (const iface of ifaces) {
+      lines.push(`${iface.name}: flags=<${iface.state.toUpperCase()}>  mtu 1500`)
+      lines.push(`        inet ${iface.address}  netmask ${iface.netmask}`)
+      lines.push(`        ether ${iface.hwaddr}`)
+      lines.push(`        RX packets ${iface.stats.rxPackets}  bytes ${iface.stats.rxBytes}`)
+      lines.push(`        TX packets ${iface.stats.txPackets}  bytes ${iface.stats.txBytes}`)
+      lines.push('')
+    }
+    return { success: true, output: lines }
+  },
+}
+
+// ============================================================
+// Phase 5: Service Management & Logging Commands
+// ============================================================
+
+const journalctlCommand: Command = {
+  name: 'journalctl',
+  aliases: ['unjournalctl'],
+  description: 'Query the system journal',
+  usage: 'journalctl [-u <unit>] [-p <priority>] [-n <lines>] [-b]',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'JOURNALCTL(1)         UnstableLabs Manual        JOURNALCTL(1)', '', 'NAME', '    journalctl — query the systemd journal', '', 'SYNOPSIS', '    journalctl [-u unit] [-p priority] [-n lines] [-b] [-f]', '', 'OPTIONS', '    -u <unit>      Filter by service unit', '    -p <priority>  Filter by priority (emerg..debug)', '    -n <lines>     Show last N entries', '    -b             Show current boot only', '    -f             Follow (show latest)', '', 'SEE ALSO', '    logger(1), systemctl(1)', ''] }
+    }
+    const ja = ctx.data.journalActions
+    if (!ja) return { success: false, error: 'Journal not available' }
+    let unit: string | undefined, priority: number | undefined, tail: number | undefined, boot = false
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-u' && args[i + 1]) { unit = args[++i]; continue }
+      if (args[i] === '-p' && args[i + 1]) { priority = ja.priorityFromName(args[++i]); continue }
+      if (args[i] === '-n' && args[i + 1]) { tail = parseInt(args[++i]) || 20; continue }
+      if (args[i] === '-b') { boot = true; continue }
+      if (args[i] === '-f') { tail = 10; continue }
+    }
+    if (!tail && !unit && !boot) tail = 20
+    const entries = ja.query({ unit, priority, tail, boot })
+    if (entries.length === 0) return { success: true, output: ['-- No entries --'] }
+    return { success: true, output: entries.map(e => ja.formatEntry(e)) }
+  },
+}
+
+const loggerCommand: Command = {
+  name: 'logger',
+  aliases: ['unlogger'],
+  description: 'Write message to system journal',
+  usage: 'logger [-p <priority>] [-t <tag>] <message>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'LOGGER(1)             UnstableLabs Manual            LOGGER(1)', '', 'NAME', '    logger — write messages to the system log', '', 'SYNOPSIS', '    logger [-p priority] [-t tag] <message>', '', 'OPTIONS', '    -p <priority>  Priority level (emerg..debug)', '    -t <tag>       Message tag/unit name', '', 'SEE ALSO', '    journalctl(1)', ''] }
+    }
+    const ja = ctx.data.journalActions
+    if (!ja) return { success: false, error: 'Journal not available' }
+    let priority = 6, tag = 'user'
+    const msgParts: string[] = []
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-p' && args[i + 1]) { priority = ja.priorityFromName(args[++i]); continue }
+      if (args[i] === '-t' && args[i + 1]) { tag = args[++i]; continue }
+      msgParts.push(args[i])
+    }
+    if (msgParts.length === 0) return { success: false, error: 'Usage: logger <message>' }
+    ja.write(tag, priority, msgParts.join(' '))
+    return { success: true }
+  },
+}
+
+const crontabCommand: Command = {
+  name: 'crontab',
+  aliases: ['uncrontab'],
+  description: 'Manage cron scheduled tasks',
+  usage: 'crontab [-l] [-e] [-r <id>]',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'CRONTAB(1)            UnstableLabs Manual           CRONTAB(1)', '', 'NAME', '    crontab — maintain cron files', '', 'SYNOPSIS', '    crontab -l           List entries', '    crontab -e           Add new entry (interactive)', '    crontab -r <id>      Remove entry by ID', '', 'SEE ALSO', '    journalctl(1)', ''] }
+    }
+    const ca = ctx.data.cronActions
+    if (!ca) return { success: false, error: 'Cron not available' }
+    if (args.includes('-l') || args.length === 0) {
+      const entries = ca.list()
+      if (entries.length === 0) return { success: true, output: ['no crontab for operator'] }
+      const lines = ['# _unOS crontab for operator', '# ID  Schedule              Command                     User']
+      for (const e of entries) {
+        lines.push(`  ${String(e.id).padEnd(3)} ${e.schedule.padEnd(20)} ${e.command.padEnd(28)} ${e.user}`)
+      }
+      return { success: true, output: lines }
+    }
+    if (args.includes('-r')) {
+      const idx = args.indexOf('-r')
+      const id = parseInt(args[idx + 1])
+      if (isNaN(id)) return { success: false, error: 'Usage: crontab -r <id>' }
+      const ok = ca.remove(id)
+      return ok ? { success: true, output: [`Removed cron entry #${id}`] } : { success: false, error: `crontab: entry #${id} not found` }
+    }
+    if (args.includes('-e')) {
+      return { success: true, output: ['Usage: crontab -e is not interactive.', 'To add: specify schedule and command after -e:', 'crontab -e "*/10 * * * *" "/unbin/my-script"'] }
+    }
+    // Direct add: crontab -e "<schedule>" "<command>"
+    const eIdx = args.indexOf('-e')
+    if (eIdx >= 0 && args[eIdx + 1] && args[eIdx + 2]) {
+      const entry = ca.add(args[eIdx + 1].replace(/^["']|["']$/g, ''), args[eIdx + 2].replace(/^["']|["']$/g, ''))
+      return { success: true, output: [`Added cron entry #${entry.id}: ${entry.schedule} ${entry.command}`] }
+    }
+    return { success: false, error: 'Usage: crontab -l | -r <id> | -e "<schedule>" "<command>"' }
+  },
+}
+
+// ============================================================
+// Phase 6: Filesystem Completion & Remaining Utilities
+// ============================================================
+
+const tarCommand: Command = {
+  name: 'tar',
+  aliases: ['untar'],
+  description: 'Archive utility',
+  usage: 'tar [-c|-x|-t] [-f <archive>] [-z] [-v] [files...]',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'TAR(1)                UnstableLabs Manual               TAR(1)', '', 'NAME', '    tar — archive files', '', 'SYNOPSIS', '    tar -cf <archive> <dir>    Create archive', '    tar -tf <archive>          List contents', '    tar -xf <archive>          Extract archive', '', 'OPTIONS', '    -c  Create     -x  Extract    -t  List', '    -f  File       -z  Gzip       -v  Verbose', '', 'SEE ALSO', '    gzip(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    let create = false, extract = false, list = false, verbose = false, archiveFile = ''
+    const files: string[] = []
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i]
+      if (a.startsWith('-')) {
+        for (const ch of a.slice(1)) {
+          if (ch === 'c') create = true
+          if (ch === 'x') extract = true
+          if (ch === 't') list = true
+          if (ch === 'v') verbose = true
+          if (ch === 'z') { /* gzip simulated */ }
+          if (ch === 'f') { archiveFile = args[++i] || ''; break }
+        }
+      } else files.push(a)
+    }
+    if (list) {
+      if (!archiveFile) return { success: false, error: 'tar: no archive file specified' }
+      const stat = fs.stat(archiveFile)
+      if (!stat) return { success: false, error: `tar: ${archiveFile}: No such file or directory` }
+      const lines: string[] = []
+      fs.walk(archiveFile, (nodePath) => lines.push(nodePath))
+      return { success: true, output: lines.length > 0 ? lines : ['(empty archive)'] }
+    }
+    if (create) {
+      if (!archiveFile || files.length === 0) return { success: false, error: 'Usage: tar -cf <archive> <files...>' }
+      const listing: string[] = []
+      for (const f of files) {
+        fs.walk(f, (nodePath) => listing.push(nodePath))
+      }
+      fs.write(archiveFile, `[tar archive: ${listing.length} entries from ${files.join(', ')}]`)
+      return { success: true, output: verbose ? listing.map(l => `a ${l}`) : [`Created ${archiveFile} (${listing.length} entries)`] }
+    }
+    if (extract) {
+      return { success: true, output: [`tar: extracted ${archiveFile} (simulated)`] }
+    }
+    return { success: false, error: 'Usage: tar -c|-x|-t [-f archive] [files...]' }
+  },
+}
+
+const gzipCommand: Command = {
+  name: 'gzip',
+  aliases: ['gunzip', 'zcat'],
+  description: 'Compress or decompress files',
+  usage: 'gzip [-d] [-k] [-l] <file>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'GZIP(1)               UnstableLabs Manual              GZIP(1)', '', 'NAME', '    gzip — compress or expand files', '', 'SYNOPSIS', '    gzip [-d] [-k] [-l] <file>', '', 'OPTIONS', '    -d    Decompress', '    -k    Keep original file', '    -l    List compression info', '', 'SEE ALSO', '    tar(1)', ''] }
+    }
+    const fs = ctx.data.filesystemActions
+    if (!fs) return { success: false, error: 'Filesystem not available' }
+    let decompress = false, keep = false, listInfo = false
+    const files: string[] = []
+    for (const a of args) {
+      if (a === '-d') { decompress = true; continue }
+      if (a === '-k') { keep = true; continue }
+      if (a === '-l') { listInfo = true; continue }
+      if (!a.startsWith('-')) files.push(a)
+    }
+    if (files.length === 0) return { success: false, error: 'Usage: gzip <file>' }
+    if (listInfo) {
+      const s = fs.stat(files[0])
+      if (!s) return { success: false, error: `gzip: ${files[0]}: No such file or directory` }
+      return { success: true, output: [
+        '  compressed  uncompressed  ratio  uncompressed_name',
+        `  ${Math.floor(s.size * 0.6)}          ${s.size}            40.0%  ${files[0].replace(/\.gz$/, '')}`,
+      ] }
+    }
+    if (decompress) {
+      return { success: true, output: [`${files[0]}: decompressed (simulated)`] }
+    }
+    const newName = files[0] + '.gz'
+    const user = ctx.data.userActions?.getCurrentUser()
+    const content = fs.cat(files[0], user?.username ?? 'operator', user?.groups ?? ['operator'])
+    if (!content || content.startsWith('cat:')) return { success: false, error: `gzip: ${files[0]}: No such file or directory` }
+    fs.write(newName, `<gzip compressed: ${content.length} bytes>`)
+    if (!keep) fs.rm(files[0])
+    return { success: true, output: [`${files[0]}: compressed to ${newName}`] }
+  },
+}
+
+const mkfsCommand: Command = {
+  name: 'mkfs',
+  aliases: ['unmkfs'],
+  description: 'Build a filesystem',
+  usage: 'mkfs [-t <type>] <device>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'MKFS(1)               UnstableLabs Manual              MKFS(1)', '', 'NAME', '    mkfs — build a Linux filesystem', '', 'SYNOPSIS', '    mkfs [-t type] <device>', '', 'OPTIONS', '    -t <type>   Filesystem type (ext4, xfs, etc)', '', 'SEE ALSO', '    fdisk(1), lsblk(1)', ''] }
+    }
+    let fsType = 'ext4'
+    let device = ''
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '-t' && args[i + 1]) { fsType = args[++i]; continue }
+      if (!args[i].startsWith('-')) device = args[i]
+    }
+    if (!device) return { success: false, error: 'Usage: mkfs [-t type] <device>' }
+    return { success: true, output: [
+      `mke2fs 1.46.5 (30-Dec-2021)`,
+      `Creating filesystem with ${fsType} on ${device}`,
+      `Filesystem label=`,
+      `OS type: _unOS`,
+      `Done. (simulated)`,
+    ] }
+  },
+}
+
+const fdiskCommand: Command = {
+  name: 'fdisk',
+  aliases: ['unfdisk'],
+  description: 'Display partition table',
+  usage: 'fdisk -l [device]',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'FDISK(1)              UnstableLabs Manual             FDISK(1)', '', 'NAME', '    fdisk — manipulate disk partition table', '', 'SYNOPSIS', '    fdisk -l [device]', '', 'OPTIONS', '    -l    List partition tables', '', 'SEE ALSO', '    lsblk(1), mkfs(1), blkid(1)', ''] }
+    }
+    return { success: true, output: [
+      'Disk /dev/unsda: 64 GiB, 68719476736 bytes, 134217728 sectors',
+      'Units: sectors of 1 * 512 = 512 bytes',
+      '',
+      'Device       Boot    Start       End   Sectors  Size Id  Type',
+      '/dev/unsda1  *        2048 125829119 125827072   60G 83  Linux',
+      '/dev/unsda2      125829120 134217727   8388608    4G 82  Linux swap',
+      '',
+      'Disk /dev/unsdb: 128 GiB, 137438953472 bytes, 268435456 sectors',
+      '',
+      'Device       Boot Start       End   Sectors  Size Id  Type',
+      '/dev/unsdb1        2048 268435455 268433408  128G 83  Linux',
+    ] }
+  },
+}
+
+const blkidCommand: Command = {
+  name: 'blkid',
+  aliases: ['unblkid'],
+  description: 'Show block device attributes',
+  usage: 'blkid [device]',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'BLKID(1)              UnstableLabs Manual             BLKID(1)', '', 'NAME', '    blkid — locate/print block device attributes', '', 'SYNOPSIS', '    blkid [device]', '', 'SEE ALSO', '    lsblk(1), fdisk(1)', ''] }
+    }
+    return { success: true, output: [
+      '/dev/unsda1: UUID="a1b2c3d4-e5f6-7890-abcd-ef1234567890" TYPE="ext4" PARTUUID="00000001"',
+      '/dev/unsda2: UUID="b2c3d4e5-f6a7-8901-bcde-f12345678901" TYPE="swap" PARTUUID="00000002"',
+      '/dev/unsdb: UUID="c3d4e5f6-a7b8-9012-cdef-123456789012" TYPE="ext4"',
+    ] }
+  },
+}
+
+const wCommand: Command = {
+  name: 'w',
+  aliases: ['who', 'users'],
+  description: 'Show who is logged on',
+  usage: 'w',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'W(1)                  UnstableLabs Manual                 W(1)', '', 'NAME', '    w — show who is logged on and what they are doing', '', 'SYNOPSIS', '    w', '', 'SEE ALSO', '    last(1), id(1)', ''] }
+    }
+    const ka = ctx.data.kernelActions
+    const upStr = ka ? formatUptimeString(ka.getUptime().seconds) : '0:00'
+    const [l1] = ka ? ka.getLoadAverage() : [0]
+    const user = ctx.data.userActions?.getCurrentUser()
+    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    return { success: true, output: [
+      ` ${now} up ${upStr},  1 user,  load average: ${l1.toFixed(2)}`,
+      'USER     TTY      FROM             LOGIN@   IDLE   WHAT',
+      `${(user?.username ?? 'operator').padEnd(9)}pts/0    terminal         ${now}    0.00s  unsh`,
+    ] }
+  },
+}
+
+const lastCommand: Command = {
+  name: 'last',
+  aliases: ['unlast'],
+  description: 'Show recent logins',
+  usage: 'last',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'LAST(1)               UnstableLabs Manual              LAST(1)', '', 'NAME', '    last — show listing of last logged in users', '', 'SYNOPSIS', '    last', '', 'SEE ALSO', '    w(1)', ''] }
+    }
+    const user = ctx.data.userActions?.getCurrentUser()?.username ?? 'operator'
+    const now = new Date()
+    const fmt = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+    return { success: true, output: [
+      `${user.padEnd(10)} pts/0        terminal         ${fmt(now)}   still logged in`,
+      `${user.padEnd(10)} pts/0        terminal         ${fmt(new Date(now.getTime() - 86400000))} - ${fmt(new Date(now.getTime() - 82800000))}  (01:00)`,
+      `root       tty1         terminal         ${fmt(new Date(now.getTime() - 172800000))} - ${fmt(new Date(now.getTime() - 169200000))}  (01:00)`,
+      '',
+      'wtmp begins ' + fmt(new Date(now.getTime() - 2592000000)),
+    ] }
+  },
+}
+
+// ============================================================
+// Phase 7: Remaining Utilities
+// ============================================================
+
+const basenameCommand: Command = {
+  name: 'basename',
+  aliases: [],
+  description: 'Strip directory from filename',
+  usage: 'basename <path>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'BASENAME(1)           UnstableLabs Manual          BASENAME(1)', '', 'NAME', '    basename — strip directory and suffix from filenames', '', 'SYNOPSIS', '    basename <path> [suffix]', '', 'SEE ALSO', '    dirname(1)', ''] }
+    }
+    if (args.length === 0) return { success: false, error: 'Usage: basename <path>' }
+    let result = args[0].split('/').pop() || args[0]
+    if (args[1] && result.endsWith(args[1])) result = result.slice(0, -args[1].length)
+    return { success: true, output: [result] }
+  },
+}
+
+const dirnameCommand: Command = {
+  name: 'dirname',
+  aliases: [],
+  description: 'Strip filename from path',
+  usage: 'dirname <path>',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'DIRNAME(1)            UnstableLabs Manual           DIRNAME(1)', '', 'NAME', '    dirname — strip last component from file name', '', 'SYNOPSIS', '    dirname <path>', '', 'SEE ALSO', '    basename(1)', ''] }
+    }
+    if (args.length === 0) return { success: false, error: 'Usage: dirname <path>' }
+    const parts = args[0].split('/')
+    parts.pop()
+    return { success: true, output: [parts.join('/') || '/'] }
+  },
+}
+
+const ttyCommand: Command = {
+  name: 'tty',
+  aliases: [],
+  description: 'Print terminal name',
+  usage: 'tty',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'TTY(1)                UnstableLabs Manual               TTY(1)', '', 'NAME', '    tty — print the file name of the terminal connected to stdin', '', 'SYNOPSIS', '    tty', '', 'SEE ALSO', '    w(1)', ''] }
+    }
+    return { success: true, output: ['/undev/pts/0'] }
+  },
+}
+
+const yesCommand: Command = {
+  name: 'yes',
+  aliases: [],
+  description: 'Output a string repeatedly',
+  usage: 'yes [string]',
+  execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return { success: true, output: ['', 'YES(1)                UnstableLabs Manual               YES(1)', '', 'NAME', '    yes — output a string repeatedly until killed', '', 'SYNOPSIS', '    yes [string]', '', 'DESCRIPTION', '    Outputs string (default: y) 10 times (simulated).', '', 'SEE ALSO', '    echo(1)', ''] }
+    }
+    const str = args.length > 0 ? args.join(' ') : 'y'
+    return { success: true, output: Array(10).fill(str) }
+  },
+}
+
 // Command registry
 export const commands: Command[] = [
   helpCommand,
@@ -19602,6 +21247,67 @@ export const commands: Command[] = [
   niceCommand,
   reniceCommand,
   vmstatCommand,
+  // Phase 1: Shell infrastructure
+  envCommand,
+  exportCommand,
+  unsetCommand,
+  aliasCommand,
+  unaliasCommand,
+  sourceCommand,
+  // Phase 2: Text processing
+  grepCommand,
+  findFilesCommand,
+  wcCommand,
+  sortCommand,
+  uniqCommand,
+  diffCommand,
+  cutCommand,
+  trCommand,
+  sedCommand,
+  awkCommand,
+  teeCommand,
+  xargsCommand,
+  fileCommand,
+  stringsCommand,
+  // Phase 3: System info & disk
+  dateCommand,
+  calCommand,
+  hostnameCommand,
+  whichCommand,
+  dfCommand,
+  duCommand,
+  mountCommand,
+  umountCommand,
+  lsblkCommand,
+  statCommand,
+  manCommand,
+  watchCommand,
+  // Phase 4: Networking
+  pingCommand,
+  curlCommand,
+  netstatCommand,
+  tracerouteCommand,
+  digCommand,
+  ipCommand,
+  ncCommand,
+  ifconfigCommand,
+  // Phase 5: Logging & services
+  journalctlCommand,
+  loggerCommand,
+  crontabCommand,
+  // Phase 6: Disk & filesystem utilities
+  tarCommand,
+  gzipCommand,
+  mkfsCommand,
+  fdiskCommand,
+  blkidCommand,
+  wCommand,
+  lastCommand,
+  // Phase 7: Remaining utilities
+  basenameCommand,
+  dirnameCommand,
+  ttyCommand,
+  yesCommand,
 ]
 
 // Find command by name or alias

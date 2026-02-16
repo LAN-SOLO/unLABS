@@ -50,6 +50,9 @@ export const PATH_ALIASES: Record<string, string> = {
   '/sbin': '/unbin',
   '/opt': '/unusr/local',
   '/root': '/unhome/root',
+  '/boot': '/unboot',
+  '/sys': '/unsys',
+  '/media': '/unmedia',
 }
 
 export const DEVICE_IDS = [

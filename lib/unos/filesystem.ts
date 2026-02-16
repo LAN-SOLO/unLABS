@@ -113,6 +113,51 @@ export class VirtualFS {
 
   // --- Default filesystem hierarchy ---
 
+  // --- Walk/traversal for grep -r and find ---
+
+  walk(path: string, callback: (nodePath: string, node: VNode) => void): void {
+    const startNode = this.resolve(path)
+    if (!startNode) return
+    const absPath = this.resolvePath(path)
+    this._walkNode(absPath, startNode, callback)
+  }
+
+  private _walkNode(currentPath: string, node: VNode, callback: (nodePath: string, node: VNode) => void): void {
+    callback(currentPath, node)
+    if (node.type === 'dir' && node.children) {
+      for (const [name, child] of node.children) {
+        const childPath = currentPath === '/' ? `/${name}` : `${currentPath}/${name}`
+        this._walkNode(childPath, child, callback)
+      }
+    }
+  }
+
+  getMounts(): MountPoint[] {
+    return [...this._mounts]
+  }
+
+  getNodeType(path: string): string | null {
+    const node = this.resolve(path)
+    if (!node) return null
+    if (node.type === 'device') return node.deviceType === 'block' ? 'block device' : 'character device'
+    if (node.type === 'symlink') return 'symbolic link'
+    if (node.type === 'socket') return 'socket'
+    if (node.type === 'dir') return 'directory'
+    // Guess from extension/content
+    if (node.name.endsWith('.conf') || node.name.endsWith('.cfg')) return 'ASCII text (configuration)'
+    if (node.name.endsWith('.sh')) return 'Bourne-Again shell script'
+    if (node.name.endsWith('.ko')) return 'ELF kernel module'
+    if (node.name.endsWith('.so')) return 'ELF shared object'
+    if (node.name.endsWith('.fw')) return 'firmware binary data'
+    if (node.name.endsWith('.service')) return 'systemd unit file'
+    if (node.name.endsWith('.log')) return 'ASCII text (log file)'
+    if (node.name.endsWith('.gz')) return 'gzip compressed data'
+    if (node.name.endsWith('.tar')) return 'POSIX tar archive'
+    if (node.content?.startsWith('#!/')) return 'executable script'
+    if (node.content?.startsWith('<binary>') || node.content?.startsWith('<kernel') || node.content?.startsWith('<firmware')) return 'binary data'
+    return 'regular file'
+  }
+
   private buildDefaultTree(): VNode {
     const root = this.mknode('/', 'dir', { permissions: 0o755 })
 
@@ -125,8 +170,11 @@ export class VirtualFS {
     this.createUndev(root)
     this.createUnproc(root)
     this.createUnlib(root)
+    this.createUnboot(root)
+    this.createUnsys(root)
     this.addDir(root, 'untmp', { permissions: 0o1777 })
     this.addDir(root, 'unmnt')
+    this.addDir(root, 'unmedia')
 
     return root
   }
@@ -137,6 +185,20 @@ export class VirtualFS {
       'ls', 'cd', 'cat', 'mkdir', 'touch', 'rm', 'chmod', 'chown', 'pwd',
       'echo', 'tree', 'clear', 'su', 'sudo', 'passwd', 'id', 'groups',
       'whoami', 'useradd', 'unsh', 'undev', 'unapt', 'unnet',
+      // Phase 1: Shell
+      'env', 'export', 'unset', 'alias', 'unalias', 'source',
+      // Phase 2: Text processing
+      'grep', 'find', 'wc', 'sort', 'uniq', 'diff', 'cut', 'tr', 'sed', 'awk', 'tee', 'xargs', 'file', 'strings',
+      // Phase 3: System info
+      'date', 'cal', 'hostname', 'which', 'df', 'du', 'mount', 'umount', 'lsblk', 'stat', 'man', 'watch',
+      // Phase 4: Networking
+      'ping', 'curl', 'netstat', 'traceroute', 'dig', 'ip', 'nc', 'ifconfig',
+      // Phase 5: Logging
+      'journalctl', 'logger', 'crontab',
+      // Phase 6: Disk & utils
+      'tar', 'gzip', 'mkfs', 'fdisk', 'blkid', 'w', 'last',
+      // Phase 7: Remaining
+      'basename', 'dirname', 'tty', 'yes',
     ]
     for (const cmd of cmds) {
       this.addFile(bin, cmd, { permissions: 0o755, content: `#!/unbin/unsh\n# ${cmd} - _unOS builtin` })
@@ -531,6 +593,21 @@ export class VirtualFS {
     })
     this.addDir(varDir, 'cache')
     this.addDir(varDir, 'run')
+    const spool = this.addDir(varDir, 'spool')
+    this.addDir(spool, 'cron')
+    this.addDir(spool, 'mail')
+    const mail = this.addDir(varDir, 'mail')
+    this.addFile(mail, 'operator', { owner: 'operator', group: 'operator', content: '' })
+  }
+
+  private addBlockDevice(parent: VNode, name: string, major: number, minor: number): VNode {
+    return this.addChild(parent, this.mknode(name, 'device', {
+      deviceType: 'block',
+      major,
+      minor,
+      permissions: 0o660,
+      group: 'devices',
+    }))
   }
 
   private createUndev(root: VNode) {
@@ -544,6 +621,16 @@ export class VirtualFS {
     this.addDevice(dev, 'tty', 5, 0)
     this.addDevice(dev, 'console', 5, 1)
     this.addDevice(dev, 'ptmx', 5, 2)
+
+    // Block devices
+    this.addBlockDevice(dev, 'unsda', 253, 0)
+    this.addBlockDevice(dev, 'unsda1', 253, 1)
+    this.addBlockDevice(dev, 'unsda2', 253, 2)
+    this.addBlockDevice(dev, 'unsdb', 253, 16)
+
+    // PTS directory
+    const pts = this.addDir(dev, 'pts')
+    this.addDevice(pts, '0', 136, 0)
 
     // Device subsystem directories
     const crystal = this.addDir(dev, 'crystal', { group: 'devices' })
@@ -608,6 +695,35 @@ export class VirtualFS {
     const kernel = this.addDir(sys, 'kernel', { permissions: 0o555 })
     this.addFile(kernel, 'hostname', { permissions: 0o444, content: '_unLAB\n' })
     this.addFile(kernel, 'osrelease', { permissions: 0o444, content: `${UNOS_VERSION}\n` })
+  }
+
+  private createUnboot(root: VNode) {
+    const boot = this.addDir(root, 'unboot')
+    this.addFile(boot, 'vmlinuz-6.1.0-_unSC', { permissions: 0o644, content: '<binary: kernel image>' })
+    this.addFile(boot, 'initramfs-6.1.0-_unSC.img', { permissions: 0o644, content: '<binary: initramfs>' })
+    const grub = this.addDir(boot, 'grub')
+    this.addFile(grub, 'grub.cfg', {
+      content: [
+        '# GRUB Configuration for _unOS',
+        'set default=0',
+        'set timeout=5',
+        '',
+        'menuentry "_unOS 2.0.0 (Quantum)" {',
+        '  linux /unboot/vmlinuz-6.1.0-_unSC root=/dev/unsda1 ro quiet',
+        '  initrd /unboot/initramfs-6.1.0-_unSC.img',
+        '}',
+      ].join('\n'),
+    })
+  }
+
+  private createUnsys(root: VNode) {
+    const sys = this.addDir(root, 'unsys', { permissions: 0o555 })
+    const cls = this.addDir(sys, 'class', { permissions: 0o555 })
+    this.addDir(cls, 'net', { permissions: 0o555 })
+    this.addDir(cls, 'block', { permissions: 0o555 })
+    this.addDir(cls, 'tty', { permissions: 0o555 })
+    this.addDir(sys, 'devices', { permissions: 0o555 })
+    this.addDir(sys, 'kernel', { permissions: 0o555 })
   }
 
   private createUnlib(root: VNode) {

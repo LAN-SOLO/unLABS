@@ -1,6 +1,7 @@
 // _unOS v2.0 — Type definitions
 
 import type { DeviceCategory } from './constants'
+import type { Route, Connection } from './network'
 
 // --- Filesystem ---
 
@@ -136,7 +137,7 @@ export interface UnOSState {
   users: string       // serialized UserManager JSON
   devices: DeviceInfo[]
   packages: Package[]
-  network: NetworkInterface[]
+  network: NetworkInterface[] | { interfaces: NetworkInterface[]; routes?: Route[]; connections?: Connection[] }
   bootTime: number
   kernel?: import('./kernel').KernelSerializedState
 }

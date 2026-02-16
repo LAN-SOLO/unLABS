@@ -2,9 +2,14 @@
 
 import { useCallback, useMemo, useRef } from 'react'
 import { VirtualFS, UserManager, Kernel } from '@/lib/unos'
+import { UnShell } from '@/lib/unos/shell'
+import { NetworkManager } from '@/lib/unos/network'
+import { InitSystem } from '@/lib/unos/init'
+import { Journal } from '@/lib/unos/journal'
+import { CronManager } from '@/lib/unos/cron'
 import { commands } from '@/lib/terminal/commands'
 import { loadPanelState } from '@/lib/panel/panelState'
-import type { FilesystemActions, UserActions, KernelActions } from '@/lib/terminal/types'
+import type { FilesystemActions, UserActions, KernelActions, ShellActions, NetworkActions, JournalActions, CronActions, InitActions } from '@/lib/terminal/types'
 import { useTerminal } from '@/hooks/useTerminal'
 import { TerminalOutput } from './TerminalOutput'
 import { TerminalInput } from './TerminalInput'
@@ -95,6 +100,11 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   const fsRef = useRef<VirtualFS | null>(null)
   const userMgrRef = useRef<UserManager | null>(null)
   const kernelRef = useRef<Kernel | null>(null)
+  const shellRef = useRef<UnShell | null>(null)
+  const networkMgrRef = useRef<NetworkManager | null>(null)
+  const initSystemRef = useRef<InitSystem | null>(null)
+  const journalRef = useRef<Journal | null>(null)
+  const cronRef = useRef<CronManager | null>(null)
 
   if (!fsRef.current) {
     const saved = loadPanelState()
@@ -117,6 +127,24 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     fsRef.current!.setProcFS((path) => kernel.procfs.generate(path))
     fsRef.current!.setProcFSListDir((path) => kernel.procfs.listDir(path))
     kernelRef.current = kernel
+  }
+  if (!shellRef.current) {
+    const saved = loadPanelState()
+    shellRef.current = saved?.shell ? UnShell.fromJSON(saved.shell) : new UnShell()
+  }
+  if (!networkMgrRef.current) {
+    networkMgrRef.current = new NetworkManager()
+  }
+  if (!journalRef.current) {
+    const saved = loadPanelState()
+    journalRef.current = saved?.journal ? Journal.fromJSON(saved.journal) : new Journal()
+  }
+  if (!cronRef.current) {
+    const saved = loadPanelState()
+    cronRef.current = saved?.cron ? CronManager.fromJSON(saved.cron) : new CronManager()
+  }
+  if (!initSystemRef.current) {
+    initSystemRef.current = new InitSystem()
   }
 
   const syncFsHomeUser = useCallback(() => {
@@ -173,6 +201,9 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       return fsRef.current!.formatPermissions(node)
     },
     toJSON: () => fsRef.current!.toJSON(),
+    walk: (path, callback) => fsRef.current!.walk(path, callback),
+    getMounts: () => fsRef.current!.getMounts(),
+    getNodeType: (path) => fsRef.current!.getNodeType(path),
   }), [])
 
   // Build user actions (stable ref)
@@ -261,6 +292,52 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       }
     },
     toJSON: () => kernelRef.current!.toJSON(),
+  }), [])
+
+  // Build shell actions (stable ref)
+  const shellActions: ShellActions = useMemo(() => ({
+    getEnv: (key) => shellRef.current!.getEnv(key),
+    setEnv: (key, value) => shellRef.current!.setEnv(key, value),
+    unsetEnv: (key) => shellRef.current!.unsetEnv(key),
+    getAllEnv: () => shellRef.current!.getAllEnv(),
+    expandVars: (input) => shellRef.current!.expandVars(input),
+    getAlias: (name) => shellRef.current!.getAlias(name),
+    setAlias: (name, value) => shellRef.current!.setAlias(name, value),
+    removeAlias: (name) => shellRef.current!.removeAlias(name),
+    listAliases: () => shellRef.current!.listAliases(),
+  }), [])
+
+  // Build network actions (stable ref)
+  const networkActions: NetworkActions = useMemo(() => ({
+    getInterfaces: () => networkMgrRef.current!.list(),
+    getRoutes: () => networkMgrRef.current!.getRoutes(),
+    getDNS: () => networkMgrRef.current!.getDNS(),
+    ping: (host, count) => networkMgrRef.current!.ping(host, count),
+    traceroute: (host) => networkMgrRef.current!.traceroute(host),
+    getConnections: () => networkMgrRef.current!.getConnections(),
+    resolveDNS: (hostname) => networkMgrRef.current!.resolveDNS(hostname),
+  }), [])
+
+  // Build journal actions (stable ref)
+  const journalActions: JournalActions = useMemo(() => ({
+    query: (opts) => journalRef.current!.query(opts),
+    write: (unit, priority, message, pid) => journalRef.current!.write(unit, priority, message, pid),
+    formatEntry: (entry) => Journal.formatEntry(entry),
+    priorityFromName: (name) => Journal.priorityFromName(name),
+  }), [])
+
+  // Build cron actions (stable ref)
+  const cronActions: CronActions = useMemo(() => ({
+    list: () => cronRef.current!.list(),
+    add: (schedule, command, user) => cronRef.current!.add(schedule, command, user),
+    remove: (id) => cronRef.current!.remove(id),
+  }), [])
+
+  // Build init actions (stable ref)
+  const initActions: InitActions = useMemo(() => ({
+    enable: (name) => initSystemRef.current!.enable(name),
+    disable: (name) => initSystemRef.current!.disable(name),
+    isEnabled: (name) => initSystemRef.current!.isEnabled(name),
   }), [])
 
   // Use refs to always access the latest context values
@@ -1841,6 +1918,11 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     themeActions,
     systemPowerActions,
     kernelActions,
+    shellActions,
+    networkActions,
+    journalActions,
+    cronActions,
+    initActions,
   })
 
   const handleAutocomplete = useCallback((input: string): string[] => {

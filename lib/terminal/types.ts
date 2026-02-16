@@ -1318,6 +1318,9 @@ export interface FilesystemActions {
   resolve: (path: string) => boolean
   formatPermissions: (path: string) => string | null
   toJSON: () => string
+  walk: (path: string, callback: (nodePath: string, node: import('@/lib/unos/types').VNode) => void) => void
+  getMounts: () => import('@/lib/unos/types').MountPoint[]
+  getNodeType: (path: string) => string | null
 }
 
 export interface UserActions {
@@ -1392,6 +1395,16 @@ export interface DataFetchers {
   // Filesystem and user management
   filesystemActions?: FilesystemActions
   userActions?: UserActions
+  // Shell actions (env vars, aliases)
+  shellActions?: ShellActions
+  // Network actions
+  networkActions?: NetworkActions
+  // Journal actions
+  journalActions?: JournalActions
+  // Cron actions
+  cronActions?: CronActions
+  // Init actions (enable/disable)
+  initActions?: InitActions
   // Resource container management
   resourceManager?: import('@/contexts/ResourceManager').ResourceManagerActions
   // Theme management
@@ -1432,6 +1445,47 @@ export interface KernelActions {
   getTopProcesses: (n: number) => { pid: number; name: string; cmdline: string; state: string; uid: number; cpuPercent: number; memPercent: number; memoryRSS: number; memoryVSZ: number; cpuTime: number; nice: number; tty: string }[]
   getSchedulerStats: () => { contextSwitches: number; totalCPUTime: number; idleCPUTime: number; runQueueLength: number; processCount: number; lastPid: number }
   toJSON: () => import('@/lib/unos/kernel').KernelSerializedState
+}
+
+export interface ShellActions {
+  getEnv: (key: string) => string | undefined
+  setEnv: (key: string, value: string) => void
+  unsetEnv: (key: string) => void
+  getAllEnv: () => Record<string, string>
+  expandVars: (input: string) => string
+  getAlias: (name: string) => string | undefined
+  setAlias: (name: string, value: string) => void
+  removeAlias: (name: string) => boolean
+  listAliases: () => Record<string, string>
+}
+
+export interface NetworkActions {
+  getInterfaces: () => import('@/lib/unos/types').NetworkInterface[]
+  getRoutes: () => import('@/lib/unos/network').Route[]
+  getDNS: () => string[]
+  ping: (host: string, count?: number) => import('@/lib/unos/network').PingResult[]
+  traceroute: (host: string) => import('@/lib/unos/network').TracerouteHop[]
+  getConnections: () => import('@/lib/unos/network').Connection[]
+  resolveDNS: (hostname: string) => string | null
+}
+
+export interface JournalActions {
+  query: (opts?: import('@/lib/unos/journal').JournalQueryOptions) => import('@/lib/unos/journal').JournalEntry[]
+  write: (unit: string, priority: number, message: string, pid?: number) => void
+  formatEntry: (entry: import('@/lib/unos/journal').JournalEntry) => string
+  priorityFromName: (name: string) => number
+}
+
+export interface CronActions {
+  list: () => import('@/lib/unos/cron').CronEntry[]
+  add: (schedule: string, command: string, user?: string) => import('@/lib/unos/cron').CronEntry
+  remove: (id: number) => boolean
+}
+
+export interface InitActions {
+  enable: (name: string) => { success: boolean; message: string }
+  disable: (name: string) => { success: boolean; message: string }
+  isEnabled: (name: string) => boolean
 }
 
 export interface CommandContext {
