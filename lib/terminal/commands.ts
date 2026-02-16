@@ -1351,6 +1351,61 @@ const killCommand: Command = {
   description: 'Send a signal to a process or shut down a module',
   usage: 'kill [-<signal>] <pid> | kill <module> <mode> [flags]',
   execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'KILL(1)               UnstableLabs Manual               KILL(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    kill — send a signal to a process',
+          '',
+          'SYNOPSIS',
+          '    kill [-<signal>] <pid>',
+          '    kill <module> <mode> [flags]',
+          '',
+          'DESCRIPTION',
+          '    kill sends a signal to the specified process. By default,',
+          '    SIGTERM (15) is sent. Numeric PIDs target kernel processes;',
+          '    named targets use legacy module shutdown.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SIGNALS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    -1, -SIGHUP      Hangup',
+          '    -2, -SIGINT      Interrupt',
+          '    -3, -SIGQUIT     Quit',
+          '    -9, -SIGKILL     Kill (cannot be caught)',
+          '    -15, -SIGTERM    Terminate (default)',
+          '    -18, -SIGCONT    Continue',
+          '    -19, -SIGSTOP    Stop',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'EXAMPLES',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    kill 42            Send SIGTERM to PID 42',
+          '    kill -9 42         Send SIGKILL to PID 42',
+          '    kill -SIGKILL 42   Same as above',
+          '    kill panel dev -un Shut down panel module',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    ps(1), top(1), nice(1), renice(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                 KILL(1)',
+          '',
+        ],
+      }
+    }
+
     const module = args[0]?.toLowerCase()
 
     if (!module) {
@@ -18352,6 +18407,66 @@ const psCommand: Command = {
   description: 'List running processes',
   usage: 'ps [aux]',
   execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'PS(1)                 UnstableLabs Manual                 PS(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    ps — report a snapshot of current processes',
+          '',
+          'SYNOPSIS',
+          '    ps [aux|-ef]',
+          '',
+          'DESCRIPTION',
+          '    The ps utility displays information about active processes',
+          '    managed by the _unOS kernel. Without arguments, shows only',
+          '    processes attached to the current terminal (pts/0).',
+          '',
+          '    With aux or -ef flag, displays all processes in a detailed',
+          '    format including CPU and memory usage percentages.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'OPTIONS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    aux              Show all processes with full detail',
+          '    -ef              Same as aux (System V style)',
+          '    (none)           Show current user processes only',
+          '    unman            Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'OUTPUT COLUMNS (aux)',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    USER    Process owner',
+          '    PID     Process ID',
+          '    %CPU    CPU usage percentage',
+          '    %MEM    Memory usage percentage',
+          '    VSZ     Virtual memory size (KB)',
+          '    RSS     Resident set size (KB)',
+          '    TTY     Controlling terminal',
+          '    STAT    Process state (R/S/T/Z/X)',
+          '    TIME    Cumulative CPU time',
+          '    COMMAND Full command line',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    top(1), kill(1), nice(1), renice(1), lsof(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                   PS(1)',
+          '',
+        ],
+      }
+    }
+
     const ka = ctx.data.kernelActions
     if (!ka) return { success: false, error: 'Kernel not available' }
 
@@ -18389,6 +18504,49 @@ const topCommand: Command = {
   description: 'Display system process information',
   usage: 'top [-n <count>]',
   execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'TOP(1)                UnstableLabs Manual                TOP(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    top — display _unOS processes in real-time',
+          '',
+          'SYNOPSIS',
+          '    top [-n <count>]',
+          '',
+          'DESCRIPTION',
+          '    The top utility provides a dynamic view of a running system.',
+          '    It displays system summary information (uptime, load average,',
+          '    CPU, memory, swap) and a list of processes sorted by CPU',
+          '    usage.',
+          '',
+          '    Aliases: htop',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'OPTIONS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    -n <count>       Limit display to <count> processes',
+          '    unman            Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    ps(1), vmstat(1), free(1), uptime(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                  TOP(1)',
+          '',
+        ],
+      }
+    }
+
     const ka = ctx.data.kernelActions
     if (!ka) return { success: false, error: 'Kernel not available' }
 
@@ -18427,6 +18585,49 @@ const dmesgCommand: Command = {
   description: 'Print kernel ring buffer',
   usage: 'dmesg [--level <level>] [--clear]',
   execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'DMESG(1)              UnstableLabs Manual              DMESG(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    dmesg — print or control the kernel ring buffer',
+          '',
+          'SYNOPSIS',
+          '    dmesg [--level <level>] [--clear]',
+          '',
+          'DESCRIPTION',
+          '    dmesg displays messages from the _unOS kernel ring buffer.',
+          '    The kernel stores diagnostic messages produced during boot',
+          '    and runtime operation. Messages include timestamps relative',
+          '    to boot time.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'OPTIONS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    --level <level>  Filter by severity level:',
+          '                     EMERG, CRIT, ERR, WARN, INFO, DEBUG',
+          '    --clear, -C      Clear the ring buffer',
+          '    unman            Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    sysctl(1), lsmod(1), uname(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                DMESG(1)',
+          '',
+        ],
+      }
+    }
+
     const ka = ctx.data.kernelActions
     if (!ka) return { success: false, error: 'Kernel not available' }
 
@@ -18460,6 +18661,49 @@ const freeCommand: Command = {
   description: 'Display amount of free and used memory',
   usage: 'free [-h]',
   execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'FREE(1)               UnstableLabs Manual               FREE(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    free — display amount of free and used memory',
+          '',
+          'SYNOPSIS',
+          '    free [-h|--human]',
+          '',
+          'DESCRIPTION',
+          '    free displays the total amount of free and used physical',
+          '    and swap memory in the _unOS system. Information is gathered',
+          '    from the kernel memory manager.',
+          '',
+          '    Without flags, values are shown in kilobytes. With -h,',
+          '    values are shown in human-readable format (Mi/Gi).',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'OPTIONS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    -h, --human      Show output in human-readable format',
+          '    unman            Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    vmstat(1), top(1), ps(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                 FREE(1)',
+          '',
+        ],
+      }
+    }
+
     const ka = ctx.data.kernelActions
     if (!ka) return { success: false, error: 'Kernel not available' }
 
@@ -18489,6 +18733,39 @@ const uptimeCommand: Command = {
   description: 'Show how long the system has been running',
   usage: 'uptime',
   execute: async (_args, ctx) => {
+    if (_args[0] === 'unman' || _args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'UPTIME(1)             UnstableLabs Manual             UPTIME(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    uptime — tell how long the system has been running',
+          '',
+          'SYNOPSIS',
+          '    uptime',
+          '',
+          'DESCRIPTION',
+          '    uptime displays the current time, how long the _unOS system',
+          '    has been running, the number of users logged in, and the',
+          '    system load averages for the past 1, 5, and 15 minutes.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    top(1), uname(1), free(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0               UPTIME(1)',
+          '',
+        ],
+      }
+    }
+
     const ka = ctx.data.kernelActions
     if (!ka) return { success: false, error: 'Kernel not available' }
 
@@ -18509,6 +18786,51 @@ const unameCommand: Command = {
   description: 'Print system information',
   usage: 'uname [-a|-s|-r|-n|-m]',
   execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'UNAME(1)              UnstableLabs Manual              UNAME(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    uname — print system information',
+          '',
+          'SYNOPSIS',
+          '    uname [-a|-s|-r|-n|-m|-v]',
+          '',
+          'DESCRIPTION',
+          '    uname prints system information about the _unOS kernel.',
+          '    Without options, prints the system name. With -a, prints',
+          '    all available information.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'OPTIONS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    -a               Print all information',
+          '    -s               Print the kernel name (_unOS)',
+          '    -n               Print the network hostname',
+          '    -r               Print the kernel release',
+          '    -v               Print the kernel version',
+          '    -m               Print the machine architecture',
+          '    unman            Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    sysctl(1), uptime(1), dmesg(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                UNAME(1)',
+          '',
+        ],
+      }
+    }
+
     const ka = ctx.data.kernelActions
     if (!ka) return { success: false, error: 'Kernel not available' }
 
@@ -18536,6 +18858,48 @@ const lsmodCommand: Command = {
   description: 'Show the status of kernel modules',
   usage: 'lsmod',
   execute: async (_args, ctx) => {
+    if (_args[0] === 'unman' || _args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'LSMOD(1)              UnstableLabs Manual              LSMOD(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    lsmod — show the status of kernel modules',
+          '',
+          'SYNOPSIS',
+          '    lsmod',
+          '',
+          'DESCRIPTION',
+          '    lsmod displays information about all loaded _unOS kernel',
+          '    modules. It reads from the kernel module manager and',
+          '    formats the output as a table showing module name, size,',
+          '    reference count, and dependencies.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'OUTPUT COLUMNS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    Module           Name of the kernel module',
+          '    Size             Module size in bytes',
+          '    Used by          Reference count and dependents',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    modprobe(1), rmmod(1), dmesg(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                LSMOD(1)',
+          '',
+        ],
+      }
+    }
+
     const ka = ctx.data.kernelActions
     if (!ka) return { success: false, error: 'Kernel not available' }
 
@@ -18558,6 +18922,53 @@ const modprobeCommand: Command = {
   description: 'Load a kernel module with dependencies',
   usage: 'modprobe <module>',
   execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'MODPROBE(1)           UnstableLabs Manual           MODPROBE(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    modprobe — add or remove modules from the kernel',
+          '',
+          'SYNOPSIS',
+          '    modprobe <module>',
+          '',
+          'DESCRIPTION',
+          '    modprobe intelligently loads a kernel module along with',
+          '    all of its dependencies. It resolves the dependency tree',
+          '    and loads required modules first. If a module is already',
+          '    loaded, no action is taken.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'AVAILABLE MODULES',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    unfs             _unOS filesystem driver',
+          '    unnet            Network stack module',
+          '    undev            Device manager module',
+          '    uncrypto         Cryptographic operations',
+          '    unquantum        Quantum computing interface',
+          '    unsound          Audio subsystem driver',
+          '    uncrystal        Crystal processing engine',
+          '    uncontain        Container runtime module',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    rmmod(1), lsmod(1), dmesg(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0             MODPROBE(1)',
+          '',
+        ],
+      }
+    }
+
     const ka = ctx.data.kernelActions
     if (!ka) return { success: false, error: 'Kernel not available' }
 
@@ -18573,6 +18984,40 @@ const rmmodCommand: Command = {
   description: 'Unload a kernel module',
   usage: 'rmmod <module>',
   execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'RMMOD(1)              UnstableLabs Manual              RMMOD(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    rmmod — remove a module from the kernel',
+          '',
+          'SYNOPSIS',
+          '    rmmod <module>',
+          '',
+          'DESCRIPTION',
+          '    rmmod removes a loaded module from the _unOS kernel.',
+          '    The module cannot be removed if it has a non-zero',
+          '    reference count (other modules depend on it) or if',
+          '    it is a core system module.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    modprobe(1), lsmod(1), dmesg(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                RMMOD(1)',
+          '',
+        ],
+      }
+    }
+
     const ka = ctx.data.kernelActions
     if (!ka) return { success: false, error: 'Kernel not available' }
 
@@ -18590,6 +19035,48 @@ const straceCommand: Command = {
   description: 'Trace system calls',
   usage: 'strace [-p <pid>] [-n <count>]',
   execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'STRACE(1)             UnstableLabs Manual             STRACE(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    strace — trace system calls and signals',
+          '',
+          'SYNOPSIS',
+          '    strace [-p <pid>] [-n <count>]',
+          '',
+          'DESCRIPTION',
+          '    strace intercepts and records system calls made by',
+          '    processes. It displays the syscall name, arguments, and',
+          '    return value for each traced call. Useful for debugging',
+          '    and understanding process behavior.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'OPTIONS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    -p <pid>         Trace only calls from process <pid>',
+          '    -n <count>       Show last <count> entries (default 20)',
+          '    unman            Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    ps(1), kill(1), lsof(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0               STRACE(1)',
+          '',
+        ],
+      }
+    }
+
     const ka = ctx.data.kernelActions
     if (!ka) return { success: false, error: 'Kernel not available' }
 
@@ -18620,6 +19107,51 @@ const lsofCommand: Command = {
   description: 'List open files',
   usage: 'lsof',
   execute: async (_args, ctx) => {
+    if (_args[0] === 'unman' || _args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'LSOF(1)               UnstableLabs Manual               LSOF(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    lsof — list open files',
+          '',
+          'SYNOPSIS',
+          '    lsof',
+          '',
+          'DESCRIPTION',
+          '    lsof lists information about files opened by processes.',
+          '    In the _unOS environment, this includes standard file',
+          '    descriptors (stdin, stdout, stderr) and the current',
+          '    working directory for each active process.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'OUTPUT COLUMNS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    COMMAND     Process name',
+          '    PID         Process identifier',
+          '    USER        Process owner',
+          '    FD          File descriptor (cwd, 0r, 1w, 2w)',
+          '    TYPE        File type (DIR, CHR)',
+          '    NAME        File path',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    ps(1), strace(1), kill(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                 LSOF(1)',
+          '',
+        ],
+      }
+    }
+
     const ka = ctx.data.kernelActions
     if (!ka) return { success: false, error: 'Kernel not available' }
 
@@ -18647,6 +19179,57 @@ const sysctlCommand: Command = {
   description: 'Configure kernel parameters',
   usage: 'sysctl [-a] [-w key=value] [key]',
   execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'SYSCTL(1)             UnstableLabs Manual             SYSCTL(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    sysctl — configure kernel parameters at runtime',
+          '',
+          'SYNOPSIS',
+          '    sysctl [-a] [-w key=value] [key]',
+          '',
+          'DESCRIPTION',
+          '    sysctl reads and modifies _unOS kernel parameters.',
+          '    Parameters are accessible under /unproc/sys/ and use',
+          '    dot notation (e.g., kernel.hostname). Some parameters',
+          '    are read-only.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'OPTIONS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    -a               Display all kernel parameters',
+          '    -w key=value     Set a writable parameter',
+          '    key              Read a single parameter value',
+          '    unman            Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'EXAMPLES',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    sysctl -a',
+          '    sysctl kernel.hostname',
+          '    sysctl -w kernel.hostname=_unSC-node',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    uname(1), dmesg(1), lsmod(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0               SYSCTL(1)',
+          '',
+        ],
+      }
+    }
+
     const ka = ctx.data.kernelActions
     if (!ka) return { success: false, error: 'Kernel not available' }
 
@@ -18681,6 +19264,50 @@ const niceCommand: Command = {
   description: 'Run a command with modified scheduling priority',
   usage: 'nice -n <value> <pid>',
   execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'NICE(1)               UnstableLabs Manual               NICE(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    nice — set process scheduling priority',
+          '',
+          'SYNOPSIS',
+          '    nice -n <niceness> <pid>',
+          '',
+          'DESCRIPTION',
+          '    nice sets the scheduling priority (nice value) of a',
+          '    process. Nice values range from -20 (highest priority)',
+          '    to 19 (lowest priority). Default nice value is 0.',
+          '',
+          '    Lower nice values give more CPU time. Only root (uid 0)',
+          '    can set negative nice values.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'OPTIONS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    -n <value>       Nice value (-20 to 19)',
+          '    <pid>            Target process ID',
+          '    unman            Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    renice(1), ps(1), top(1), kill(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0                 NICE(1)',
+          '',
+        ],
+      }
+    }
+
     const ka = ctx.data.kernelActions
     if (!ka) return { success: false, error: 'Kernel not available' }
 
@@ -18705,6 +19332,49 @@ const reniceCommand: Command = {
   description: 'Alter priority of running processes',
   usage: 'renice <priority> -p <pid>',
   execute: async (args, ctx) => {
+    if (args[0] === 'unman' || args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'RENICE(1)             UnstableLabs Manual             RENICE(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    renice — alter priority of running processes',
+          '',
+          'SYNOPSIS',
+          '    renice <priority> -p <pid>',
+          '',
+          'DESCRIPTION',
+          '    renice alters the scheduling priority of a running',
+          '    process. Unlike nice, which sets priority at launch,',
+          '    renice changes the priority of an already running process.',
+          '',
+          '    Priority values range from -20 (highest) to 19 (lowest).',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'OPTIONS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    <priority>       New nice value (-20 to 19)',
+          '    -p <pid>         Target process ID',
+          '    unman            Display this manual page',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    nice(1), ps(1), top(1), kill(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0               RENICE(1)',
+          '',
+        ],
+      }
+    }
+
     const ka = ctx.data.kernelActions
     if (!ka) return { success: false, error: 'Kernel not available' }
 
@@ -18730,6 +19400,50 @@ const vmstatCommand: Command = {
   description: 'Report virtual memory statistics',
   usage: 'vmstat',
   execute: async (_args, ctx) => {
+    if (_args[0] === 'unman' || _args[0] === 'man') {
+      return {
+        success: true,
+        output: [
+          '',
+          'VMSTAT(1)             UnstableLabs Manual             VMSTAT(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          '',
+          'NAME',
+          '    vmstat — report virtual memory statistics',
+          '',
+          'SYNOPSIS',
+          '    vmstat',
+          '',
+          'DESCRIPTION',
+          '    vmstat reports information about processes, memory, swap,',
+          '    I/O, system interrupts, and CPU activity. It provides a',
+          '    snapshot of overall system performance.',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'OUTPUT COLUMNS',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    procs   r: running  b: blocked',
+          '    memory  swpd/free/buff/cache (KB)',
+          '    swap    si: swap in  so: swap out',
+          '    io      bi: blocks in  bo: blocks out',
+          '    system  in: interrupts  cs: context switches',
+          '    cpu     us/sy/id/wa/st percentages',
+          '',
+          '───────────────────────────────────────────────────────────────',
+          'SEE ALSO',
+          '───────────────────────────────────────────────────────────────',
+          '',
+          '    free(1), top(1), ps(1), uptime(1)',
+          '',
+          '═══════════════════════════════════════════════════════════════',
+          'UNSTABLELABS                   v1.0.0               VMSTAT(1)',
+          '',
+        ],
+      }
+    }
+
     const ka = ctx.data.kernelActions
     if (!ka) return { success: false, error: 'Kernel not available' }
 
