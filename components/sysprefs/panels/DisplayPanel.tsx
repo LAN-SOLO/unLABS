@@ -1,11 +1,14 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { SectionBox } from '../controls/SectionBox'
 import { Toggle } from '../controls/Toggle'
 import { Slider } from '../controls/Slider'
 import { RadioGroup } from '../controls/RadioGroup'
 import { Dropdown } from '../controls/Dropdown'
+import { ScreensaverEditor } from '@/components/screensaver/ScreensaverEditor'
+import { ScreensaverOverlay } from '@/components/screensaver/ScreensaverOverlay'
 import { getDisplayPrefs, updateDisplayPrefs, getThemes, getFonts, logPrefChange } from '@/lib/api/sysprefs'
 import type { DbPlayerDisplayPrefs, DbDisplayTheme, DbDisplayFont } from '@/types/database'
 
@@ -25,6 +28,7 @@ export function DisplayPanel({ userId, onDirty, onSaveError, onPreviewColors, sa
   const [fonts, setFonts] = useState<DbDisplayFont[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [showScreensaverOverlay, setShowScreensaverOverlay] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -172,6 +176,15 @@ export function DisplayPanel({ userId, onDirty, onSaveError, onPreviewColors, sa
         <Toggle label="Large Text" value={prefs.large_text} onChange={(v) => update('large_text', v)} description="150% font size" />
         <Toggle label="Reduced Motion" value={prefs.reduced_motion} onChange={(v) => update('reduced_motion', v)} />
       </SectionBox>
+
+      <SectionBox title="SCREENSAVER">
+        <ScreensaverEditor onFullScreen={() => setShowScreensaverOverlay(true)} />
+      </SectionBox>
+
+      {showScreensaverOverlay && createPortal(
+        <ScreensaverOverlay onDismiss={() => setShowScreensaverOverlay(false)} />,
+        document.body
+      )}
     </div>
   )
 }

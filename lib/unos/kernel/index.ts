@@ -98,6 +98,27 @@ export class Kernel {
     this.process.spawnDaemons()
     this.dmesg.write('INFO', 'kernel', 'Started init as PID 1')
 
+    // Block devices
+    this.dmesg.write('INFO', 'kernel', 'Block device unsda registered: 64GB (253:0)')
+    this.dmesg.write('INFO', 'kernel', ' unsda: unsda1 unsda2')
+    this.dmesg.write('INFO', 'kernel', 'Block device unsdb registered: 128GB (253:16)')
+
+    // Additional mounts
+    this.dmesg.write('INFO', 'kernel', 'VFS: Mounted /unboot (ext4) read-only')
+    this.dmesg.write('INFO', 'kernel', 'VFS: Mounted /unsys (sysfs)')
+    this.dmesg.write('INFO', 'kernel', 'VFS: Mounted /unproc (procfs)')
+    this.dmesg.write('INFO', 'kernel', 'VFS: Mounted /undev (devtmpfs)')
+
+    // Networking
+    this.dmesg.write('INFO', 'kernel', 'uneth0: link becomes ready')
+    this.dmesg.write('INFO', 'kernel', 'uneth0: 10.0.0.100/24 via 10.0.0.254')
+
+    // Systemd-style service init
+    this.dmesg.write('INFO', 'kernel', 'systemd[1]: Started Journal Service')
+    this.dmesg.write('INFO', 'kernel', 'systemd[1]: Loaded shell environment')
+    this.dmesg.write('INFO', 'kernel', 'systemd[1]: Started Cron Scheduler')
+    this.dmesg.write('INFO', 'kernel', 'systemd[1]: Reached target multi-user.target')
+
     // Initialize IPC between crystal-engine and blockchain-sync
     const procs = this.process.listAll()
     const crystalEngine = procs.find(p => p.name === 'crystal-engine')

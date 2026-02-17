@@ -6,7 +6,7 @@
 -- =================================
 
 create type device_category as enum ('generator', 'heavy', 'medium', 'light', 'storage');
-create type device_state as enum ('online', 'standby', 'offline', 'error', 'upgrading');
+create type device_status as enum ('online', 'standby', 'offline', 'error', 'upgrading');
 create type tweak_type as enum ('radio', 'toggle', 'slider', 'priority_list');
 
 -- =================================
@@ -33,7 +33,7 @@ create table public.devices (
 
 create table public.device_state (
   device_id varchar(10) references public.devices(device_id) on delete cascade primary key,
-  state device_state not null default 'offline',
+  state device_status not null default 'offline',
   health decimal(5,2) not null default 100,
   load decimal(5,2) not null default 0,
   uptime_seconds bigint not null default 0,
@@ -95,7 +95,7 @@ create table public.player_device_state (
   device_id varchar(10) references public.devices(device_id) on delete cascade not null,
   unlocked boolean not null default false,
   unlock_date timestamptz,
-  current_state device_state not null default 'offline',
+  current_state device_status not null default 'offline',
   tweak_settings jsonb not null default '{}'::jsonb,
   active_links text[],
   primary key (player_id, device_id)

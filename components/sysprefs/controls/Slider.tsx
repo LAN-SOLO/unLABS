@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 
 interface SliderProps {
   value: number
@@ -23,11 +23,56 @@ export function Slider({ value, min, max, step = 1, onChange, label, showPercent
 
   const display = showPercent ? `${Math.round(percent)}%` : `${value}${suffix ?? ''}`
 
+  const barRef = useRef<HTMLSpanElement>(null)
+  const draggingRef = useRef(false)
+
   const adjust = useCallback((delta: number) => {
     if (disabled) return
     const next = Math.max(min, Math.min(max, value + delta * step))
     onChange(next)
   }, [disabled, min, max, value, step, onChange])
+
+  const setFromClientX = useCallback((clientX: number) => {
+    if (disabled) return
+    const span = barRef.current
+    if (!span) return
+    const rect = span.getBoundingClientRect()
+    const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width))
+    const raw = min + ratio * (max - min)
+    const snapped = Math.round(raw / step) * step
+    onChange(Math.max(min, Math.min(max, snapped)))
+  }, [disabled, min, max, step, onChange])
+
+  const handleBarClick = useCallback((e: React.MouseEvent<HTMLSpanElement>) => {
+    e.stopPropagation()
+    setFromClientX(e.clientX)
+  }, [setFromClientX])
+
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLSpanElement>) => {
+    if (disabled) return
+    e.preventDefault()
+    draggingRef.current = true
+    setFromClientX(e.clientX)
+
+    const handleMouseMove = (ev: MouseEvent) => {
+      if (!draggingRef.current) return
+      setFromClientX(ev.clientX)
+    }
+    const handleMouseUp = () => {
+      draggingRef.current = false
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
+  }, [disabled, setFromClientX])
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    if (disabled) return
+    e.stopPropagation()
+    const delta = e.deltaY < 0 ? 1 : -1
+    adjust(e.shiftKey ? delta * 10 : delta)
+  }, [disabled, adjust])
 
   return (
     <div
@@ -36,11 +81,12 @@ export function Slider({ value, min, max, step = 1, onChange, label, showPercent
       } ${focused ? 'bg-[rgba(255,170,0,0.1)]' : ''}`}
       onKeyDown={(e) => {
         if (disabled) return
-        if (e.key === 'ArrowRight' || e.key === 'l') adjust(e.shiftKey ? 10 : 1)
-        else if (e.key === 'ArrowLeft' || e.key === 'h') adjust(e.shiftKey ? -10 : -1)
-        else if (e.key === 'Home') onChange(min)
-        else if (e.key === 'End') onChange(max)
+        if (e.key === 'ArrowRight' || e.key === 'l') { e.preventDefault(); adjust(e.shiftKey ? 10 : 1) }
+        else if (e.key === 'ArrowLeft' || e.key === 'h') { e.preventDefault(); adjust(e.shiftKey ? -10 : -1) }
+        else if (e.key === 'Home') { e.preventDefault(); onChange(min) }
+        else if (e.key === 'End') { e.preventDefault(); onChange(max) }
       }}
+      onWheel={handleWheel}
       tabIndex={disabled ? -1 : 0}
       role="slider"
       aria-valuenow={value}
@@ -49,7 +95,12 @@ export function Slider({ value, min, max, step = 1, onChange, label, showPercent
       aria-label={label}
     >
       <span className="whitespace-nowrap inline-block w-[18ch] text-right">{label}:</span>
-      <span className={focused ? 'text-[var(--neon-amber,#FFAA00)]' : ''}>
+      <span
+        ref={barRef}
+        className={`cursor-ew-resize ${focused ? 'text-[var(--neon-amber,#FFAA00)]' : ''}`}
+        onClick={handleBarClick}
+        onMouseDown={handleMouseDown}
+      >
         {focused && '▸'}[{bar}]
       </span>
       <span className="inline-block w-[6ch]">{display}</span>

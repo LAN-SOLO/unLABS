@@ -440,6 +440,8 @@ export function TerminalModule({
 
   // Track os power cycle with a simple flag
   const [inOsCycle, setInOsCycle] = useState(false)
+  // Reboot key forces Terminal remount for a real OS reboot
+  const [rebootKey, setRebootKey] = useState(0)
   const state = systemPower?.systemState ?? 'running'
   const scope = systemPower?.powerScope
 
@@ -465,6 +467,7 @@ export function TerminalModule({
 
   const handleBootComplete = useCallback(() => {
     setInOsCycle(false)
+    setRebootKey(k => k + 1)
     systemPower?.finishBoot()
   }, [systemPower])
 
@@ -731,7 +734,7 @@ export function TerminalModule({
                 } as React.CSSProperties}
               >
                 <div className="flex flex-col flex-1 min-h-0" style={{ filter: themeIndex === 0 ? 'none' : `hue-rotate(${getHueShift(themeIndex)}deg) saturate(${getSaturation(themeIndex)})` }}>
-                  <Terminal userId={userId} username={username} balance={balance} themeIndex={themeIndex} setThemeIndex={setThemeIndex} themes={CRT_THEMES} />
+                  <Terminal key={rebootKey} userId={userId} username={username} balance={balance} themeIndex={themeIndex} setThemeIndex={setThemeIndex} themes={CRT_THEMES} />
                 </div>
               </div>
 

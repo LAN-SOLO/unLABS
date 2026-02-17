@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { VirtualFS, UserManager, Kernel } from '@/lib/unos'
 import { UnShell } from '@/lib/unos/shell'
 import { NetworkManager } from '@/lib/unos/network'
@@ -15,6 +16,9 @@ import { TerminalOutput } from './TerminalOutput'
 import { TerminalInput } from './TerminalInput'
 import { MidnightCommander } from './MidnightCommander'
 import { SysprefApp } from '@/components/sysprefs/SysprefApp'
+import { ScreensaverOverlay } from '@/components/screensaver/ScreensaverOverlay'
+import type { ScreensaverPattern } from '@/components/screensaver/types'
+import { TetrisOverlay } from '@/components/tetris/TetrisOverlay'
 import { useCDCManagerOptional } from '@/contexts/CDCManager'
 import { useUECManagerOptional } from '@/contexts/UECManager'
 import { useBATManagerOptional } from '@/contexts/BATManager'
@@ -146,6 +150,13 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
   if (!initSystemRef.current) {
     initSystemRef.current = new InitSystem()
   }
+
+  // Cleanup kernel ticking on unmount (e.g. during OS reboot remount)
+  useEffect(() => {
+    return () => {
+      kernelRef.current?.stopTicking()
+    }
+  }, [])
 
   const syncFsHomeUser = useCallback(() => {
     if (fsRef.current && userMgrRef.current) {
@@ -1992,6 +2003,22 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     return (
       <div className="flex flex-col h-full">
         <SysprefApp userId={userId} username={username} initialArea={appModeData?.area as 'about' | 'display' | 'sound' | 'network' | 'user' | 'datetime' | undefined} onExit={exitAppMode} />
+      </div>
+    )
+  }
+
+  if (appMode === 'screensaver') {
+    return createPortal(
+      <ScreensaverOverlay onDismiss={exitAppMode} overridePattern={appModeData?.pattern as ScreensaverPattern | undefined} />,
+      document.body
+    )
+  }
+
+  if (appMode === 'tetris') {
+    const currentTheme = themes && themeIndex !== undefined ? themes[themeIndex] : undefined
+    return (
+      <div className="flex flex-col h-full">
+        <TetrisOverlay mode={(appModeData?.mode as '1p' | '2p') ?? '1p'} onExit={exitAppMode} theme={currentTheme} />
       </div>
     )
   }
