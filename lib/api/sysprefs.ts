@@ -32,10 +32,19 @@ export async function getDisplayPrefs(userId: string): Promise<DbPlayerDisplayPr
     .from('player_display_prefs')
     .select('*')
     .eq('player_id', userId)
-    .single()
+    .maybeSingle()
 
   if (error) throw error
-  return data as DbPlayerDisplayPrefs
+  if (data) return data as DbPlayerDisplayPrefs
+
+  // Auto-create default row if missing
+  const { data: created, error: insertErr } = await client()
+    .from('player_display_prefs')
+    .insert({ player_id: userId })
+    .select()
+    .single()
+  if (insertErr) throw insertErr
+  return created as DbPlayerDisplayPrefs
 }
 
 export async function updateDisplayPrefs(
@@ -62,10 +71,18 @@ export async function getSoundPrefs(userId: string): Promise<DbPlayerSoundPrefs>
     .from('player_sound_prefs')
     .select('*')
     .eq('player_id', userId)
-    .single()
+    .maybeSingle()
 
   if (error) throw error
-  return data as DbPlayerSoundPrefs
+  if (data) return data as DbPlayerSoundPrefs
+
+  const { data: created, error: insertErr } = await client()
+    .from('player_sound_prefs')
+    .insert({ player_id: userId })
+    .select()
+    .single()
+  if (insertErr) throw insertErr
+  return created as DbPlayerSoundPrefs
 }
 
 export async function updateSoundPrefs(
@@ -92,10 +109,18 @@ export async function getDatetimePrefs(userId: string): Promise<DbPlayerDatetime
     .from('player_datetime_prefs')
     .select('*')
     .eq('player_id', userId)
-    .single()
+    .maybeSingle()
 
   if (error) throw error
-  return data as DbPlayerDatetimePrefs
+  if (data) return data as DbPlayerDatetimePrefs
+
+  const { data: created, error: insertErr } = await client()
+    .from('player_datetime_prefs')
+    .insert({ player_id: userId })
+    .select()
+    .single()
+  if (insertErr) throw insertErr
+  return created as DbPlayerDatetimePrefs
 }
 
 export async function updateDatetimePrefs(
@@ -122,10 +147,18 @@ export async function getNetworkPrefs(userId: string): Promise<DbPlayerNetworkPr
     .from('player_network_prefs')
     .select('*')
     .eq('player_id', userId)
-    .single()
+    .maybeSingle()
 
   if (error) throw error
-  return data as DbPlayerNetworkPrefs
+  if (data) return data as DbPlayerNetworkPrefs
+
+  const { data: created, error: insertErr } = await client()
+    .from('player_network_prefs')
+    .insert({ player_id: userId })
+    .select()
+    .single()
+  if (insertErr) throw insertErr
+  return created as DbPlayerNetworkPrefs
 }
 
 export async function updateNetworkPrefs(

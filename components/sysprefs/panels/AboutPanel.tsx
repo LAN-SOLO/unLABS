@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { SectionBox } from '../controls/SectionBox'
-import { getSystemConfig } from '@/lib/api/sysprefs'
+import { getSystemConfigServer } from '@/lib/api/sysprefs-server'
 import type { DbSystemConfigCache } from '@/types/database'
 
 export function AboutPanel() {
@@ -10,7 +10,7 @@ export function AboutPanel() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getSystemConfig()
+    getSystemConfigServer()
       .then(setConfig)
       .catch(() => {})
       .finally(() => setLoading(false))

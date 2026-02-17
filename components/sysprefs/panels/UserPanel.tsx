@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { SectionBox } from '../controls/SectionBox'
-import { getSecurityPolicies } from '@/lib/api/sysprefs'
+import { getSecurityPoliciesServer } from '@/lib/api/sysprefs-server'
 import type { DbUserSecurityPolicies } from '@/types/database'
 
 interface UserPanelProps {
@@ -15,7 +15,7 @@ export function UserPanel({ userId, username }: UserPanelProps) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getSecurityPolicies()
+    getSecurityPoliciesServer()
       .then(setSecPolicy)
       .catch(() => {})
       .finally(() => setLoading(false))

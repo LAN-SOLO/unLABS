@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { SectionBox } from '../controls/SectionBox'
 import { Toggle } from '../controls/Toggle'
 import { Dropdown } from '../controls/Dropdown'
-import { getDatetimePrefs, updateDatetimePrefs, getSystemConfig, logPrefChange } from '@/lib/api/sysprefs'
+import { updateDatetimePrefs, logPrefChange } from '@/lib/api/sysprefs'
+import { getDatetimePrefsServer, getSystemConfigServer } from '@/lib/api/sysprefs-server'
 import type { DbPlayerDatetimePrefs, DbSystemConfigCache } from '@/types/database'
 
 interface DatetimePanelProps {
@@ -58,8 +59,8 @@ export function DatetimePanel({ userId, onDirty, onSaveError, saveSignal, resetS
 
   useEffect(() => {
     Promise.all([
-      getDatetimePrefs(userId),
-      getSystemConfig(),
+      getDatetimePrefsServer(userId),
+      getSystemConfigServer(),
     ]).then(([p, sc]) => {
       setPrefs(p)
       setOriginal(p)

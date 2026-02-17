@@ -5,7 +5,8 @@ import { SectionBox } from '../controls/SectionBox'
 import { Toggle } from '../controls/Toggle'
 import { Slider } from '../controls/Slider'
 import { Dropdown } from '../controls/Dropdown'
-import { getSoundPrefs, updateSoundPrefs, getSoundProfiles, logPrefChange } from '@/lib/api/sysprefs'
+import { updateSoundPrefs, logPrefChange } from '@/lib/api/sysprefs'
+import { getSoundPrefsServer, getSoundProfilesServer } from '@/lib/api/sysprefs-server'
 import type { DbPlayerSoundPrefs, DbSoundProfile } from '@/types/database'
 
 interface SoundPanelProps {
@@ -25,8 +26,8 @@ export function SoundPanel({ userId, onDirty, onSaveError, saveSignal, resetSign
 
   useEffect(() => {
     Promise.all([
-      getSoundPrefs(userId),
-      getSoundProfiles(),
+      getSoundPrefsServer(userId),
+      getSoundProfilesServer(),
     ]).then(([p, pr]) => {
       setPrefs(p)
       setOriginal(p)

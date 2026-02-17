@@ -9,7 +9,8 @@ import { RadioGroup } from '../controls/RadioGroup'
 import { Dropdown } from '../controls/Dropdown'
 import { ScreensaverEditor } from '@/components/screensaver/ScreensaverEditor'
 import { ScreensaverOverlay } from '@/components/screensaver/ScreensaverOverlay'
-import { getDisplayPrefs, updateDisplayPrefs, getThemes, getFonts, logPrefChange } from '@/lib/api/sysprefs'
+import { updateDisplayPrefs, logPrefChange } from '@/lib/api/sysprefs'
+import { getDisplayPrefsServer, getThemesServer, getFontsServer } from '@/lib/api/sysprefs-server'
 import type { DbPlayerDisplayPrefs, DbDisplayTheme, DbDisplayFont } from '@/types/database'
 
 interface DisplayPanelProps {
@@ -32,16 +33,17 @@ export function DisplayPanel({ userId, onDirty, onSaveError, onPreviewColors, sa
 
   useEffect(() => {
     Promise.all([
-      getDisplayPrefs(userId),
-      getThemes(),
-      getFonts(),
+      getDisplayPrefsServer(userId),
+      getThemesServer(),
+      getFontsServer(),
     ]).then(([p, t, f]) => {
       setPrefs(p)
       setOriginal(p)
       setThemes(t)
       setFonts(f)
     }).catch((err) => {
-      setLoadError(err instanceof Error ? err.message : 'Failed to load display preferences')
+      console.error('[DisplayPanel] load error:', err)
+      setLoadError(err instanceof Error ? err.message : String(err))
     }).finally(() => setLoading(false))
   }, [userId])
 

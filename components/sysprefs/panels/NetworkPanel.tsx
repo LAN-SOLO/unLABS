@@ -5,7 +5,8 @@ import { SectionBox } from '../controls/SectionBox'
 import { Toggle } from '../controls/Toggle'
 import { Slider } from '../controls/Slider'
 import { Dropdown } from '../controls/Dropdown'
-import { getNetworkPrefs, updateNetworkPrefs, getSystemConfig, getSecurityPolicies, logPrefChange } from '@/lib/api/sysprefs'
+import { updateNetworkPrefs, logPrefChange } from '@/lib/api/sysprefs'
+import { getNetworkPrefsServer, getSystemConfigServer, getSecurityPoliciesServer } from '@/lib/api/sysprefs-server'
 import type { DbPlayerNetworkPrefs, DbSystemConfigCache, DbUserSecurityPolicies } from '@/types/database'
 
 interface NetworkPanelProps {
@@ -26,9 +27,9 @@ export function NetworkPanel({ userId, onDirty, onSaveError, saveSignal, resetSi
 
   useEffect(() => {
     Promise.all([
-      getNetworkPrefs(userId),
-      getSystemConfig(),
-      getSecurityPolicies(),
+      getNetworkPrefsServer(userId),
+      getSystemConfigServer(),
+      getSecurityPoliciesServer(),
     ]).then(([p, sc, sp]) => {
       setPrefs(p)
       setOriginal(p)
