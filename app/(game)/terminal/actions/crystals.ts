@@ -371,26 +371,20 @@ export async function fetchCrystalByName(name: string): Promise<CrystalDetails |
 
   if (!user) return null
 
-  // Fetch crystal
-  const { data: crystalData, error } = await supabase
-    .from('crystals')
-    .select('id, name, color, volatility, rotation, state, era, is_genesis, total_power, slice_count, created_at')
+  // Single query with PostgREST embed - fetches crystal + slices in one round trip
+  const { data: crystalData, error } = await (supabase
+    .from('crystals') as AnyTable)
+    .select('id, name, color, volatility, rotation, state, era, is_genesis, total_power, slice_count, created_at, slices(id, crystal_id, position, power, is_active, hue, saturation, brightness, created_at)')
     .eq('owner_id', user.id)
     .ilike('name', name)
     .single()
 
-  const crystal = crystalData as CrystalRow | null
+  if (error || !crystalData) return null
 
-  if (error || !crystal) return null
+  const crystal = crystalData as CrystalRow & { slices: Slice[] }
 
-  // Fetch slices
-  const { data: slicesData } = await supabase
-    .from('slices')
-    .select('*')
-    .eq('crystal_id', crystal.id)
-    .order('position', { ascending: true })
-
-  const slices = (slicesData || []) as Slice[]
+  // Slices come embedded but unsorted; sort by position
+  const slices = (crystal.slices || []).sort((a: Slice, b: Slice) => a.position - b.position)
 
   return {
     id: crystal.id,

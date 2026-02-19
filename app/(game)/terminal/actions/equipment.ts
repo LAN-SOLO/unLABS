@@ -222,128 +222,45 @@ export async function investInResearch(
     return { success: false, message: 'Not authenticated' }
   }
 
-  // Get current balance
-  const { data: balance } = await (supabase.from('balances') as AnyTable)
-    .select('available, total_spent')
-    .eq('user_id', user.id)
-    .single()
+  // Single atomic RPC call replaces 6-7 sequential queries
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any).rpc('invest_in_research', {
+    p_user_id: user.id,
+    p_category: category,
+    p_amount: amount,
+  })
 
-  if (!balance || balance.available < amount) {
-    return { success: false, message: `Insufficient balance. Need ${amount} _unSC` }
+  if (error) {
+    return { success: false, message: error.message || 'Research investment failed' }
   }
 
-  // Get tech tree by category
-  const { data: techTree } = await (supabase.from('tech_trees') as AnyTable)
-    .select('*')
-    .eq('category', category)
-    .single()
-
-  if (!techTree) {
-    return { success: false, message: `Tech tree '${category}' not found` }
+  const result = data as {
+    success: boolean
+    message: string
+    new_tier?: number
+    new_balance?: number
+    tier_up?: boolean
   }
 
-  // Get or create research progress
-  let { data: progress } = await (supabase.from('research_progress') as AnyTable)
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('tech_tree_id', techTree.id)
-    .single()
-
-  if (!progress) {
-    // Create new progress entry
-    const { data: newProgress, error: createError } = await (supabase.from('research_progress') as AnyTable)
-      .insert({
-        user_id: user.id,
-        tech_tree_id: techTree.id,
-        current_tier: 0,
-        experience: 0,
-        experience_to_next: TECH_TREE_COSTS[category.toLowerCase()]?.[1] || 100,
-      })
-      .select()
-      .single()
-
-    if (createError) {
-      return { success: false, message: 'Failed to initialize research' }
-    }
-    progress = newProgress
+  if (!result.success) {
+    return { success: false, message: result.message }
   }
 
-  if (progress.current_tier >= techTree.max_tier) {
-    return { success: false, message: 'Already at max tier' }
-  }
+  const tierName = getTierName(category.toLowerCase(), result.new_tier ?? 0)
 
-  // Calculate new experience and tier
-  const newExperience = progress.experience + amount
-  const costs = TECH_TREE_COSTS[category.toLowerCase()] || [0, 100, 200, 400, 800, 1600]
-  const expToNext = costs[progress.current_tier + 1] || 100
-
-  let newTier = progress.current_tier
-  let remainingExp = newExperience
-
-  if (newExperience >= expToNext) {
-    newTier = progress.current_tier + 1
-    remainingExp = 0 // Reset on tier up
-  }
-
-  // Update balance
-  const { error: balanceError } = await (supabase.from('balances') as AnyTable)
-    .update({
-      available: balance.available - amount,
-      total_spent: balance.total_spent + amount,
-    })
-    .eq('user_id', user.id)
-
-  if (balanceError) {
-    return { success: false, message: 'Failed to deduct balance' }
-  }
-
-  // Update research progress
-  const nextExpToNext = costs[newTier + 1] || costs[costs.length - 1]
-  const { error: progressError } = await (supabase.from('research_progress') as AnyTable)
-    .update({
-      current_tier: newTier,
-      experience: remainingExp,
-      experience_to_next: nextExpToNext,
-      last_researched_at: new Date().toISOString(),
-    })
-    .eq('id', progress.id)
-
-  if (progressError) {
-    // Rollback balance
-    await (supabase.from('balances') as AnyTable)
-      .update({
-        available: balance.available,
-        total_spent: balance.total_spent,
-      })
-      .eq('user_id', user.id)
-    return { success: false, message: 'Failed to update research' }
-  }
-
-  // Record transaction
-  await (supabase.from('transactions') as AnyTable)
-    .insert({
-      user_id: user.id,
-      type: 'research',
-      amount: -amount,
-      tech_tree_id: techTree.id,
-      description: `Research investment in ${category}`,
-    })
-
-  const tierName = getTierName(category.toLowerCase(), newTier)
-
-  if (newTier > progress.current_tier) {
+  if (result.tier_up) {
     return {
       success: true,
       message: `Tier up! Now at ${tierName}`,
-      newTier,
-      newBalance: balance.available - amount,
+      newTier: result.new_tier,
+      newBalance: result.new_balance,
     }
   }
 
   return {
     success: true,
-    message: `Invested ${amount} _unSC in ${category}. Progress: ${remainingExp}/${nextExpToNext}`,
-    newTier,
-    newBalance: balance.available - amount,
+    message: result.message,
+    newTier: result.new_tier,
+    newBalance: result.new_balance,
   }
 }

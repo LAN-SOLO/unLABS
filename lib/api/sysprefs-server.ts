@@ -28,20 +28,12 @@ export async function getDisplayPrefsServer(userId: string): Promise<DbPlayerDis
   const sb = await client()
   const { data, error } = await sb
     .from('player_display_prefs')
-    .select('*')
-    .eq('player_id', userId)
-    .maybeSingle()
-
-  if (error) throw error
-  if (data) return data as DbPlayerDisplayPrefs
-
-  const { data: created, error: insertErr } = await sb
-    .from('player_display_prefs')
-    .insert({ player_id: userId })
+    .upsert({ player_id: userId }, { onConflict: 'player_id' })
     .select()
     .single()
-  if (insertErr) throw insertErr
-  return created as DbPlayerDisplayPrefs
+
+  if (error) throw error
+  return data as DbPlayerDisplayPrefs
 }
 
 // =================================
@@ -52,20 +44,12 @@ export async function getSoundPrefsServer(userId: string): Promise<DbPlayerSound
   const sb = await client()
   const { data, error } = await sb
     .from('player_sound_prefs')
-    .select('*')
-    .eq('player_id', userId)
-    .maybeSingle()
-
-  if (error) throw error
-  if (data) return data as DbPlayerSoundPrefs
-
-  const { data: created, error: insertErr } = await sb
-    .from('player_sound_prefs')
-    .insert({ player_id: userId })
+    .upsert({ player_id: userId }, { onConflict: 'player_id' })
     .select()
     .single()
-  if (insertErr) throw insertErr
-  return created as DbPlayerSoundPrefs
+
+  if (error) throw error
+  return data as DbPlayerSoundPrefs
 }
 
 // =================================
@@ -76,20 +60,12 @@ export async function getDatetimePrefsServer(userId: string): Promise<DbPlayerDa
   const sb = await client()
   const { data, error } = await sb
     .from('player_datetime_prefs')
-    .select('*')
-    .eq('player_id', userId)
-    .maybeSingle()
-
-  if (error) throw error
-  if (data) return data as DbPlayerDatetimePrefs
-
-  const { data: created, error: insertErr } = await sb
-    .from('player_datetime_prefs')
-    .insert({ player_id: userId })
+    .upsert({ player_id: userId }, { onConflict: 'player_id' })
     .select()
     .single()
-  if (insertErr) throw insertErr
-  return created as DbPlayerDatetimePrefs
+
+  if (error) throw error
+  return data as DbPlayerDatetimePrefs
 }
 
 // =================================
@@ -100,20 +76,12 @@ export async function getNetworkPrefsServer(userId: string): Promise<DbPlayerNet
   const sb = await client()
   const { data, error } = await sb
     .from('player_network_prefs')
-    .select('*')
-    .eq('player_id', userId)
-    .maybeSingle()
-
-  if (error) throw error
-  if (data) return data as DbPlayerNetworkPrefs
-
-  const { data: created, error: insertErr } = await sb
-    .from('player_network_prefs')
-    .insert({ player_id: userId })
+    .upsert({ player_id: userId }, { onConflict: 'player_id' })
     .select()
     .single()
-  if (insertErr) throw insertErr
-  return created as DbPlayerNetworkPrefs
+
+  if (error) throw error
+  return data as DbPlayerNetworkPrefs
 }
 
 // =================================

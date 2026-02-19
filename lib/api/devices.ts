@@ -11,8 +11,6 @@ import type {
   DeviceState,
   DependencyStatus,
   TweakOption,
-  DeviceRow,
-  DeviceStateRow,
   DeviceDependencyRow,
   DeviceCombinationRow,
   DeviceTweakRow,
@@ -105,7 +103,8 @@ export async function getDeviceState(device_id: string): Promise<DeviceRuntimeSt
 }
 
 export async function getAllDeviceStates(): Promise<DeviceRuntimeState[]> {
-  const result = await fromAny('device_state').select('*')
+  const result = await fromAny('device_state')
+    .select('device_id, state, health, load, uptime_seconds, power_current, temperature, last_updated')
   return throwOnError(result) as DeviceRuntimeState[]
 }
 
@@ -370,21 +369,17 @@ export async function resetTweaksToDefault(
 // =================================
 
 export async function getPowerSummary(player_id: string): Promise<DevicePowerSummary> {
-  const playerResult = await fromAny('player_device_state')
-    .select('device_id, current_state')
+  // Single query with PostgREST join: player_device_state + device_state + devices
+  const result = await fromAny('player_device_state')
+    .select('device_id, current_state, device_state(power_current), devices(category)')
     .eq('player_id', player_id)
     .eq('unlocked', true)
-  const playerDevices = throwOnError(playerResult) as Pick<PlayerDeviceStateRow, 'device_id' | 'current_state'>[]
-
-  const stateResult = await fromAny('device_state').select('device_id, power_current')
-  const states = throwOnError(stateResult) as Pick<DeviceStateRow, 'device_id' | 'power_current'>[]
-  const powerByDevice = new Map(states.map((s) => [s.device_id, s.power_current]))
-
-  const devicesResult = await fromAny('devices').select('device_id, category')
-  const devices = throwOnError(devicesResult) as Pick<DeviceRow, 'device_id' | 'category'>[]
-  const categoryByDevice = new Map(
-    devices.map((d) => [d.device_id, d.category as DeviceCategory])
-  )
+  const playerDevices = throwOnError(result) as Array<{
+    device_id: string
+    current_state: string
+    device_state: { power_current: number } | null
+    devices: { category: string } | null
+  }>
 
   let totalGeneration = 0
   let totalConsumption = 0
@@ -401,8 +396,8 @@ export async function getPowerSummary(player_id: string): Promise<DevicePowerSum
   }
 
   for (const pd of playerDevices) {
-    const power = powerByDevice.get(pd.device_id) ?? 0
-    const cat = categoryByDevice.get(pd.device_id) ?? 'light'
+    const power = pd.device_state?.power_current ?? 0
+    const cat = (pd.devices?.category ?? 'light') as DeviceCategory
 
     if (pd.current_state === 'online') countOnline++
     else if (pd.current_state === 'standby') countStandby++
@@ -431,19 +426,17 @@ export async function getPowerSummary(player_id: string): Promise<DevicePowerSum
 }
 
 export async function getDeviceCountsByCategory(): Promise<Record<DeviceCategory, number>> {
-  const result = await fromAny('devices').select('category')
-  const rows = throwOnError(result) as Pick<DeviceRow, 'category'>[]
-  const counts: Record<string, number> = {
-    generator: 0,
-    heavy: 0,
-    medium: 0,
-    light: 0,
-    storage: 0,
-  }
-  for (const r of rows) {
-    counts[r.category] = (counts[r.category] ?? 0) + 1
-  }
-  return counts as Record<DeviceCategory, number>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase() as any).rpc('get_device_counts_by_category')
+  if (error) throw error
+  const counts = (data ?? {}) as Record<string, number>
+  return {
+    generator: counts.generator ?? 0,
+    heavy: counts.heavy ?? 0,
+    medium: counts.medium ?? 0,
+    light: counts.light ?? 0,
+    storage: counts.storage ?? 0,
+  } as Record<DeviceCategory, number>
 }
 
 export async function getSystemHealth(): Promise<{
@@ -452,13 +445,16 @@ export async function getSystemHealth(): Promise<{
   offline: number
   error: number
 }> {
-  const result = await fromAny('device_state').select('state')
-  const rows = throwOnError(result) as Pick<DeviceStateRow, 'state'>[]
-  const counts = { online: 0, standby: 0, offline: 0, error: 0 }
-  for (const r of rows) {
-    if (r.state in counts) counts[r.state as keyof typeof counts]++
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase() as any).rpc('get_system_health')
+  if (error) throw error
+  const counts = (data ?? {}) as Record<string, number>
+  return {
+    online: counts.online ?? 0,
+    standby: counts.standby ?? 0,
+    offline: counts.offline ?? 0,
+    error: counts.error ?? 0,
   }
-  return counts
 }
 
 // =================================
@@ -543,25 +539,3 @@ export function subscribeToAllDeviceStates(
     .subscribe()
 }
 
-export function subscribeToPowerChanges(
-  callback: (state: DeviceRuntimeState) => void
-): RealtimeChannel {
-  return supabase()
-    .channel('device_state:power')
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'device_state',
-      },
-      (payload) => {
-        const prev = payload.old as Partial<DeviceRuntimeState>
-        const next = payload.new as DeviceRuntimeState
-        if (prev.power_current !== next.power_current || prev.state !== next.state) {
-          callback(next)
-        }
-      }
-    )
-    .subscribe()
-}

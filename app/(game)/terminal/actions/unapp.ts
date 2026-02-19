@@ -91,23 +91,13 @@ export async function toggleFavorite(appId: string): Promise<boolean> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return false
 
-  const { data: current } = await supabase
-    .from('player_apps')
-    .select('is_favorite')
-    .eq('player_id', user.id)
-    .eq('app_id', appId)
-    .single()
+  const { data, error } = await supabase.rpc('toggle_app_favorite', {
+    p_player_id: user.id,
+    p_app_id: appId,
+  })
 
-  if (!current) return false
-
-  const newVal = !current.is_favorite
-  await supabase
-    .from('player_apps')
-    .update({ is_favorite: newVal })
-    .eq('player_id', user.id)
-    .eq('app_id', appId)
-
-  return newVal
+  if (error) return false
+  return data as boolean
 }
 
 export async function recordAppLaunch(appId: string, source: LaunchSource): Promise<void> {
@@ -115,31 +105,11 @@ export async function recordAppLaunch(appId: string, source: LaunchSource): Prom
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
-  const { data: current } = await supabase
-    .from('player_apps')
-    .select('total_launches')
-    .eq('player_id', user.id)
-    .eq('app_id', appId)
-    .single()
-
-  const newCount = ((current?.total_launches as number) ?? 0) + 1
-
-  await supabase
-    .from('player_apps')
-    .update({
-      last_launched_at: new Date().toISOString(),
-      total_launches: newCount,
-    })
-    .eq('player_id', user.id)
-    .eq('app_id', appId)
-
-  await supabase
-    .from('unapp_usage_log')
-    .insert({
-      player_id: user.id,
-      app_id: appId,
-      launch_source: source,
-    })
+  await supabase.rpc('record_app_launch', {
+    p_player_id: user.id,
+    p_app_id: appId,
+    p_source: source,
+  })
 }
 
 export async function fetchAppInfo(appId: string): Promise<AppRegistryEntry | null> {

@@ -24,31 +24,22 @@ export default async function TerminalPage() {
     redirect('/login')
   }
 
-  // Get user profile
-  let profile: ProfileData | null = null
-  let balance: BalanceData | null = null
-
-  try {
-    const { data } = await supabase
+  // Fetch profile and balance in parallel
+  const [profileResult, balanceResult] = await Promise.all([
+    supabase
       .from('profiles')
       .select('username, display_name')
       .eq('id', user.id)
-      .single()
-    profile = data as ProfileData | null
-  } catch {
-    // Table may not exist yet
-  }
-
-  try {
-    const { data } = await supabase
+      .single(),
+    supabase
       .from('balances')
       .select('available, staked')
       .eq('user_id', user.id)
-      .single()
-    balance = data as BalanceData | null
-  } catch {
-    // Table may not exist yet
-  }
+      .single(),
+  ])
+
+  const profile = (profileResult.data as ProfileData | null) ?? null
+  const balance = (balanceResult.data as BalanceData | null) ?? null
 
   const username = profile?.username || profile?.display_name || user.email?.split('@')[0] || null
   const availableBalance = balance?.available || 0
