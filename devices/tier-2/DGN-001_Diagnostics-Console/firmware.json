@@ -1,0 +1,38 @@
+{
+  "device_id": "DGN-001",
+  "device_name": "Diagnostics Console",
+  "tier": 2,
+  "firmware": {
+    "version": "2.0.4",
+    "build": "2024.02.15",
+    "checksum": "D9F3B2A7",
+    "features": [
+      "system-diag",
+      "component-scan",
+      "health-monitor",
+      "alert-system",
+      "log-output",
+      "multi-category"
+    ],
+    "securityPatch": "2024.02.10"
+  },
+  "power": {
+    "full": 3,
+    "idle": 1,
+    "standby": 0.25,
+    "category": "light",
+    "priority": 2
+  },
+  "update": {
+    "version": "2.1.0",
+    "build": "2025.03.01",
+    "checksum": "A5C8F2D4",
+    "changelog": [
+      "Added deep-scan mode with full device bus analysis and error trace correlation",
+      "Improved performance monitoring with historical trend comparison graphs",
+      "New certificate verification system for secure firmware update validation"
+    ],
+    "min_version": "2.0.4",
+    "requires_reboot": true
+  }
+}

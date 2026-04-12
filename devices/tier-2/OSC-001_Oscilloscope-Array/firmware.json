@@ -1,0 +1,19 @@
+{
+  "device_id": "OSC-001",
+  "device_name": "Oscilloscope Array",
+  "tier": 2,
+  "firmware": {
+    "version": "4.6.0",
+    "build": "2025.02.15",
+    "checksum": "O5C1L4A8",
+    "features": ["multi-channel", "signal-capture", "fft-analyze", "trigger-mode", "waveform-math"],
+    "securityPatch": "2025.02.10"
+  },
+  "power": {
+    "full": 6,
+    "idle": 2,
+    "standby": 0.5,
+    "category": "medium",
+    "priority": 2
+  }
+}

@@ -1,74 +1,72 @@
-'use client'
+"use client";
 
-import type { Device, DeviceRuntimeState, PlayerDeviceState } from '@/types/devices'
-import { HealthIndicator } from '../metrics/HealthIndicator'
-import { LoadIndicator } from '../metrics/LoadIndicator'
-import { TemperatureGauge } from '../metrics/TemperatureGauge'
-import { DevicePowerChart } from './DevicePowerChart'
+import type { Device, DeviceRuntimeState, PlayerDeviceState } from "@/types/devices";
+import { HealthIndicator } from "../metrics/HealthIndicator";
+import { LoadIndicator } from "../metrics/LoadIndicator";
+import { TemperatureGauge } from "../metrics/TemperatureGauge";
+import { DevicePowerChart } from "./DevicePowerChart";
 
 interface DeviceInfoSectionProps {
-  device: Device
-  state: DeviceRuntimeState | null
-  playerState: PlayerDeviceState | null
+  device: Device;
+  state: DeviceRuntimeState | null;
+  playerState: PlayerDeviceState | null;
 }
 
 const STATE_COLORS: Record<string, string> = {
-  online: 'text-green-400',
-  standby: 'text-amber-400',
-  offline: 'text-green-500/30',
-  error: 'text-red-500',
-  upgrading: 'text-cyan-400',
-}
+  online: "text-green-400",
+  standby: "text-amber-400",
+  offline: "text-green-500/30",
+  error: "text-red-500",
+  upgrading: "text-cyan-400",
+};
 
 const CATEGORY_LABELS: Record<string, string> = {
-  generator: 'Power Generator',
-  heavy: 'Heavy Consumer',
-  medium: 'Medium Consumer',
-  light: 'Light Consumer',
-  storage: 'Storage',
-}
+  generator: "Power Generator",
+  heavy: "Heavy Consumer",
+  medium: "Medium Consumer",
+  light: "Light Consumer",
+  storage: "Storage",
+};
 
 function formatUptime(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`
-  const h = Math.floor(seconds / 3600)
-  const m = Math.floor((seconds % 3600) / 60)
-  return `${h}h ${m}m`
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  return `${h}h ${m}m`;
 }
 
 function SpecRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 leading-[18px]">
-      <span className="text-green-500/60 w-[100px] text-right">{label}:</span>
+      <span className="w-[100px] text-right text-green-500/60">{label}:</span>
       <span>{children}</span>
     </div>
-  )
+  );
 }
 
 function SectionBox({ title, children }: { title: string; children: React.ReactNode }) {
-  const titleLen = title.length + 2
-  const lineLen = Math.max(60, titleLen + 10)
-  const afterTitle = lineLen - titleLen - 2
+  const titleLen = title.length + 2;
+  const lineLen = Math.max(60, titleLen + 10);
+  const afterTitle = lineLen - titleLen - 2;
   return (
     <div className="font-mono text-[10px]">
-      <div className="text-green-500/30 whitespace-pre">
-        {'┌─ '}<span className="text-green-500/60">{title}</span>{' ' + '─'.repeat(Math.max(0, afterTitle)) + '┐'}
+      <div className="whitespace-pre text-green-500/30">
+        {"┌─ "}
+        <span className="text-green-500/60">{title}</span>
+        {" " + "─".repeat(Math.max(0, afterTitle)) + "┐"}
       </div>
-      <div className="border-l border-r border-green-500/15 px-2 py-1">
-        {children}
-      </div>
-      <div className="text-green-500/30 whitespace-pre">
-        {'└' + '─'.repeat(lineLen) + '┘'}
-      </div>
+      <div className="border-r border-l border-green-500/15 px-2 py-1">{children}</div>
+      <div className="whitespace-pre text-green-500/30">{"└" + "─".repeat(lineLen) + "┘"}</div>
     </div>
-  )
+  );
 }
 
 export function DeviceInfoSection({ device, state, playerState }: DeviceInfoSectionProps) {
-  const d = device
-  const s = state
-  const currentState = playerState?.current_state ?? s?.state ?? 'offline'
-  const stateColor = STATE_COLORS[currentState] ?? 'text-green-500/30'
+  const d = device;
+  const s = state;
+  const currentState = playerState?.current_state ?? s?.state ?? "offline";
+  const stateColor = STATE_COLORS[currentState] ?? "text-green-500/30";
 
   return (
     <div className="space-y-2">
@@ -91,13 +89,21 @@ export function DeviceInfoSection({ device, state, playerState }: DeviceInfoSect
             <span className={stateColor}>{currentState.toUpperCase()}</span>
           </SpecRow>
           <SpecRow label="HEALTH">
-            {s ? <HealthIndicator health={s.health} width={14} /> : <span className="text-green-500/30">N/A</span>}
+            {s ? (
+              <HealthIndicator health={s.health} width={14} />
+            ) : (
+              <span className="text-green-500/30">N/A</span>
+            )}
           </SpecRow>
           <SpecRow label="UPTIME">
-            <span className="text-green-400">{s ? formatUptime(s.uptime_seconds) : '--'}</span>
+            <span className="text-green-400">{s ? formatUptime(s.uptime_seconds) : "--"}</span>
           </SpecRow>
           <SpecRow label="LOAD">
-            {s ? <LoadIndicator load={s.load} width={14} /> : <span className="text-green-500/30">N/A</span>}
+            {s ? (
+              <LoadIndicator load={s.load} width={14} />
+            ) : (
+              <span className="text-green-500/30">N/A</span>
+            )}
           </SpecRow>
         </div>
       </SectionBox>
@@ -107,23 +113,26 @@ export function DeviceInfoSection({ device, state, playerState }: DeviceInfoSect
         <div className="space-y-2">
           <div className="grid grid-cols-2 gap-x-8 gap-y-0">
             <SpecRow label="FULL LOAD">
-              <span className={d.power_full >= 0 ? 'text-green-400' : 'text-red-400/80'}>
-                {d.power_full > 0 ? '+' : ''}{d.power_full.toFixed(1)} E/s
+              <span className={d.power_full >= 0 ? "text-green-400" : "text-red-400/80"}>
+                {d.power_full > 0 ? "+" : ""}
+                {d.power_full.toFixed(1)} E/s
               </span>
             </SpecRow>
             <SpecRow label="IDLE">
-              <span className={d.power_idle >= 0 ? 'text-green-400' : 'text-red-400/80'}>
-                {d.power_idle > 0 ? '+' : ''}{d.power_idle.toFixed(1)} E/s
+              <span className={d.power_idle >= 0 ? "text-green-400" : "text-red-400/80"}>
+                {d.power_idle > 0 ? "+" : ""}
+                {d.power_idle.toFixed(1)} E/s
               </span>
             </SpecRow>
             <SpecRow label="STANDBY">
-              <span className={d.power_standby >= 0 ? 'text-green-400' : 'text-red-400/80'}>
-                {d.power_standby > 0 ? '+' : ''}{d.power_standby.toFixed(1)} E/s
+              <span className={d.power_standby >= 0 ? "text-green-400" : "text-red-400/80"}>
+                {d.power_standby > 0 ? "+" : ""}
+                {d.power_standby.toFixed(1)} E/s
               </span>
             </SpecRow>
             <SpecRow label="CURRENT">
               <span className="text-amber-400">
-                {s ? `${s.power_current > 0 ? '+' : ''}${s.power_current.toFixed(1)} E/s` : '--'}
+                {s ? `${s.power_current > 0 ? "+" : ""}${s.power_current.toFixed(1)} E/s` : "--"}
               </span>
             </SpecRow>
           </div>
@@ -152,14 +161,13 @@ export function DeviceInfoSection({ device, state, playerState }: DeviceInfoSect
         <div className="flex flex-wrap gap-x-3 gap-y-0.5">
           {d.capabilities.map((cap) => (
             <span key={cap} className="text-cyan-400/80">
-              <span className="text-green-500/30">▸ </span>{cap}
+              <span className="text-green-500/30">▸ </span>
+              {cap}
             </span>
           ))}
-          {d.capabilities.length === 0 && (
-            <span className="text-green-500/30">NONE LISTED</span>
-          )}
+          {d.capabilities.length === 0 && <span className="text-green-500/30">NONE LISTED</span>}
         </div>
       </SectionBox>
     </div>
-  )
+  );
 }

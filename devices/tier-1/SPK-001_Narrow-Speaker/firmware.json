@@ -1,0 +1,38 @@
+{
+  "device_id": "SPK-001",
+  "device_name": "Narrow Speaker",
+  "tier": 1,
+  "firmware": {
+    "version": "1.0.0",
+    "build": "2024.01.20",
+    "checksum": "A3C7F1E9",
+    "features": [
+      "audio-output",
+      "volume-ctrl",
+      "freq-filter",
+      "level-meter",
+      "mute-gate",
+      "beam-focus"
+    ],
+    "securityPatch": "2024.01.18"
+  },
+  "power": {
+    "full": 3,
+    "idle": 0.5,
+    "standby": 0.1,
+    "category": "light",
+    "priority": 3
+  },
+  "update": {
+    "version": "1.1.0",
+    "build": "2025.03.01",
+    "checksum": "D2E8A4F6",
+    "changelog": [
+      "Added spatial audio beam steering with 15-degree precision targeting",
+      "Improved frequency response curve with extended sub-bass reproduction",
+      "New alert tone library with device-specific notification sounds"
+    ],
+    "min_version": "1.0.0",
+    "requires_reboot": false
+  }
+}

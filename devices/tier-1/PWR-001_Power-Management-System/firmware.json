@@ -1,0 +1,19 @@
+{
+  "device_id": "PWR-001",
+  "device_name": "Power Management System",
+  "tier": 1,
+  "firmware": {
+    "version": "1.0.0",
+    "build": "2025.02.15",
+    "checksum": "P1W4R2M8",
+    "features": ["power-route", "priority-manage", "load-balance", "emergency-cutoff"],
+    "securityPatch": "2025.02.10"
+  },
+  "power": {
+    "full": 2,
+    "idle": 1,
+    "standby": 0.3,
+    "category": "light",
+    "priority": 1
+  }
+}

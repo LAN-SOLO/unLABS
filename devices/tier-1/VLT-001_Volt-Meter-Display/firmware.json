@@ -1,0 +1,19 @@
+{
+  "device_id": "VLT-001",
+  "device_name": "Volt Meter Display",
+  "tier": 1,
+  "firmware": {
+    "version": "1.0.0",
+    "build": "2025.02.15",
+    "checksum": "V3L7T1M5",
+    "features": ["voltage-read", "current-sense", "waveform-view", "peak-detect"],
+    "securityPatch": "2025.02.10"
+  },
+  "power": {
+    "full": 1,
+    "idle": 0.3,
+    "standby": 0.1,
+    "category": "light",
+    "priority": 3
+  }
+}

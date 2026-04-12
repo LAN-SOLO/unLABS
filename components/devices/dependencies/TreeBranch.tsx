@@ -1,14 +1,14 @@
-'use client'
+"use client";
 
-import type { TreeNode } from '../hooks/useDependencyTree'
-import { TreeNodeDisplay } from './TreeNode'
+import type { TreeNode } from "../hooks/useDependencyTree";
+import { TreeNodeDisplay } from "./TreeNode";
 
 interface TreeBranchProps {
-  node: TreeNode
-  targetDeviceId: string
-  depth?: number
-  isLast?: boolean
-  prefix?: string
+  node: TreeNode;
+  targetDeviceId: string;
+  depth?: number;
+  isLast?: boolean;
+  prefix?: string;
 }
 
 export function TreeBranch({
@@ -16,18 +16,21 @@ export function TreeBranch({
   targetDeviceId,
   depth = 0,
   isLast = true,
-  prefix = '',
+  prefix = "",
 }: TreeBranchProps) {
-  const isTarget = node.device_id === targetDeviceId
-  const hasChildren = node.children.length > 0
-  const connector = depth === 0 ? '' : isLast ? '└── ' : '├── '
-  const childPrefix = depth === 0 ? '' : prefix + (isLast ? '    ' : '│   ')
+  const isTarget = node.device_id === targetDeviceId;
+  const hasChildren = node.children.length > 0;
+  const connector = depth === 0 ? "" : isLast ? "└── " : "├── ";
+  const childPrefix = depth === 0 ? "" : prefix + (isLast ? "    " : "│   ");
 
   return (
     <div className="font-mono text-[10px]">
       {/* Current node */}
       <div className="flex whitespace-pre">
-        <span className="text-green-500/30">{prefix}{connector}</span>
+        <span className="text-green-500/30">
+          {prefix}
+          {connector}
+        </span>
         <TreeNodeDisplay
           deviceId={node.device_id}
           name={node.name}
@@ -41,9 +44,8 @@ export function TreeBranch({
 
       {/* Vertical connector to children */}
       {hasChildren && (
-        <div className="text-green-500/30 whitespace-pre">
-          {childPrefix}│
-          {childPrefix}▼
+        <div className="whitespace-pre text-green-500/30">
+          {childPrefix}│{childPrefix}▼
         </div>
       )}
 
@@ -59,5 +61,5 @@ export function TreeBranch({
         />
       ))}
     </div>
-  )
+  );
 }

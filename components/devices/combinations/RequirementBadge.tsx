@@ -1,18 +1,18 @@
-'use client'
+"use client";
 
 interface RequirementBadgeProps {
-  tree: string | null
-  item: string | null
-  isUnlocked: boolean
+  tree: string | null;
+  item: string | null;
+  isUnlocked: boolean;
 }
 
 export function RequirementBadge({ tree, item, isUnlocked }: RequirementBadgeProps) {
-  if (!tree && !item) return null
+  if (!tree && !item) return null;
 
   return (
-    <span className="font-mono text-[9px] inline-flex items-center gap-1">
-      <span className={isUnlocked ? 'text-green-400' : 'text-green-500/30'}>
-        {isUnlocked ? '✓' : '●'}
+    <span className="inline-flex items-center gap-1 font-mono text-[9px]">
+      <span className={isUnlocked ? "text-green-400" : "text-green-500/30"}>
+        {isUnlocked ? "✓" : "●"}
       </span>
       <span className="text-green-500/60">Requires:</span>
       {tree && <span className="text-cyan-400/60">{tree}</span>}
@@ -23,5 +23,5 @@ export function RequirementBadge({ tree, item, isUnlocked }: RequirementBadgePro
         </>
       )}
     </span>
-  )
+  );
 }

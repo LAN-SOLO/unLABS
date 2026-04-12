@@ -1,21 +1,21 @@
-'use client'
+"use client";
 
-import { useState, useCallback, useRef } from 'react'
-import { cn } from '@/lib/utils'
+import { useState, useCallback, useRef } from "react";
+import { cn } from "@/lib/utils";
 
 interface SliderProps {
-  value?: number
-  min?: number
-  max?: number
-  onChange?: (value: number) => void
-  label?: string
-  orientation?: 'vertical' | 'horizontal'
-  height?: number
-  width?: number
-  accentColor?: string
-  showValue?: boolean
-  className?: string
-  disabled?: boolean
+  value?: number;
+  min?: number;
+  max?: number;
+  onChange?: (value: number) => void;
+  label?: string;
+  orientation?: "vertical" | "horizontal";
+  height?: number;
+  width?: number;
+  accentColor?: string;
+  showValue?: boolean;
+  className?: string;
+  disabled?: boolean;
 }
 
 export function Slider({
@@ -24,73 +24,65 @@ export function Slider({
   max = 100,
   onChange,
   label,
-  orientation = 'vertical',
+  orientation = "vertical",
   height = 80,
   width = 12,
-  accentColor = 'var(--neon-cyan)',
+  accentColor = "var(--neon-cyan)",
   showValue = false,
   className,
   disabled = false,
 }: SliderProps) {
-  const [isDragging, setIsDragging] = useState(false)
-  const trackRef = useRef<HTMLDivElement>(null)
+  const [isDragging, setIsDragging] = useState(false);
+  const trackRef = useRef<HTMLDivElement>(null);
 
-  const fillPercent = ((value - min) / (max - min)) * 100
+  const fillPercent = ((value - min) / (max - min)) * 100;
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (disabled || !trackRef.current) return
-      e.preventDefault()
-      setIsDragging(true)
+      if (disabled || !trackRef.current) return;
+      e.preventDefault();
+      setIsDragging(true);
 
       const updateValue = (clientY: number) => {
-        const rect = trackRef.current!.getBoundingClientRect()
-        let percent: number
+        const rect = trackRef.current!.getBoundingClientRect();
+        let percent: number;
 
-        if (orientation === 'vertical') {
-          percent = 1 - (clientY - rect.top) / rect.height
+        if (orientation === "vertical") {
+          percent = 1 - (clientY - rect.top) / rect.height;
         } else {
-          percent = (clientY - rect.left) / rect.width
+          percent = (clientY - rect.left) / rect.width;
         }
 
-        percent = Math.max(0, Math.min(1, percent))
-        const newValue = min + percent * (max - min)
-        onChange?.(Math.round(newValue))
-      }
+        percent = Math.max(0, Math.min(1, percent));
+        const newValue = min + percent * (max - min);
+        onChange?.(Math.round(newValue));
+      };
 
-      updateValue(orientation === 'vertical' ? e.clientY : e.clientX)
+      updateValue(orientation === "vertical" ? e.clientY : e.clientX);
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
-        updateValue(
-          orientation === 'vertical' ? moveEvent.clientY : moveEvent.clientX
-        )
-      }
+        updateValue(orientation === "vertical" ? moveEvent.clientY : moveEvent.clientX);
+      };
 
       const handleMouseUp = () => {
-        setIsDragging(false)
-        document.removeEventListener('mousemove', handleMouseMove)
-        document.removeEventListener('mouseup', handleMouseUp)
-      }
+        setIsDragging(false);
+        document.removeEventListener("mousemove", handleMouseMove);
+        document.removeEventListener("mouseup", handleMouseUp);
+      };
 
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
     },
-    [value, min, max, onChange, orientation, disabled]
-  )
+    [value, min, max, onChange, orientation, disabled],
+  );
 
-  const isVertical = orientation === 'vertical'
+  const isVertical = orientation === "vertical";
 
   return (
-    <div
-      className={cn(
-        'flex items-center gap-1',
-        isVertical ? 'flex-col' : 'flex-row',
-        className
-      )}
-    >
+    <div className={cn("flex items-center gap-1", isVertical ? "flex-col" : "flex-row", className)}>
       {label && (
         <span
-          className="font-mono text-[9px] uppercase tracking-wider"
+          className="font-mono text-[9px] tracking-wider uppercase"
           style={{ color: accentColor }}
         >
           {label}
@@ -106,23 +98,23 @@ export function Slider({
       >
         {/* Shadow below track (light from above) */}
         <div
-          className="absolute rounded pointer-events-none"
+          className="pointer-events-none absolute rounded"
           style={{
             width: isVertical ? width - 2 : height - 4,
             height: isVertical ? height - 4 : width - 2,
             left: isVertical ? 3 : 2,
             top: isVertical ? 4 : 3,
-            background: 'rgba(0, 0, 0, 0.3)',
-            filter: 'blur(3px)',
+            background: "rgba(0, 0, 0, 0.3)",
+            filter: "blur(3px)",
           }}
         />
         {/* Track */}
         <div
           ref={trackRef}
           className={cn(
-            'absolute rounded',
-            disabled && 'opacity-50 cursor-not-allowed',
-            !disabled && 'cursor-pointer'
+            "absolute rounded",
+            disabled && "cursor-not-allowed opacity-50",
+            !disabled && "cursor-pointer",
           )}
           style={{
             width: isVertical ? width : height,
@@ -133,7 +125,7 @@ export function Slider({
               linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.1) 50%, rgba(255,255,255,0.03) 100%),
               #111
             `,
-            border: '1px solid #333',
+            border: "1px solid #333",
             boxShadow: `
               inset 0 2px 4px rgba(0, 0, 0, 0.5),
               inset 0 -1px 2px rgba(255, 255, 255, 0.05)
@@ -160,7 +152,7 @@ export function Slider({
                     bottom: 0,
                     width: `${fillPercent}%`,
                   }),
-              transition: isDragging ? 'none' : 'all 0.1s ease-out',
+              transition: isDragging ? "none" : "all 0.1s ease-out",
             }}
           />
           {/* Handle with top lighting */}
@@ -184,19 +176,19 @@ export function Slider({
               background: `
                 linear-gradient(175deg, #666 0%, #444 30%, #2a2a2a 100%)
               `,
-              border: '1px solid #222',
+              border: "1px solid #222",
               borderRadius: 2,
               boxShadow: `
                 inset 0 1px 2px rgba(255, 255, 255, 0.25),
                 inset 0 -1px 2px rgba(0, 0, 0, 0.3),
                 0 2px 4px rgba(0, 0, 0, 0.4)
               `,
-              transition: isDragging ? 'none' : 'all 0.1s ease-out',
+              transition: isDragging ? "none" : "all 0.1s ease-out",
             }}
           >
             {/* Handle grip lines */}
             <div
-              className="absolute inset-x-1 top-1/2 -translate-y-1/2 flex flex-col gap-0.5"
+              className="absolute inset-x-1 top-1/2 flex -translate-y-1/2 flex-col gap-0.5"
               style={{ opacity: 0.4 }}
             >
               <div className="h-px bg-white/30" />
@@ -207,13 +199,10 @@ export function Slider({
         </div>
       </div>
       {showValue && (
-        <span
-          className="font-mono text-[10px]"
-          style={{ color: accentColor }}
-        >
+        <span className="font-mono text-[10px]" style={{ color: accentColor }}>
           {value}
         </span>
       )}
     </div>
-  )
+  );
 }

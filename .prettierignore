@@ -1,0 +1,16 @@
+node_modules
+.next
+out
+build
+coverage
+playwright-report
+test-results
+pnpm-lock.yaml
+package-lock.json
+supabase/migrations/*.sql
+public
+bin
+dist-electron
+.INSTALL
+.local
+.claude

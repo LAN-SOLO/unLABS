@@ -1,124 +1,181 @@
-'use client'
+"use client";
 
-import { useEffect, useState, useCallback } from 'react'
-import { SectionBox } from '../controls/SectionBox'
-import { Toggle } from '../controls/Toggle'
-import { Slider } from '../controls/Slider'
-import { Dropdown } from '../controls/Dropdown'
-import { updateNetworkPrefs, logPrefChange } from '@/lib/api/sysprefs'
-import { getNetworkPrefsServer, getSystemConfigServer, getSecurityPoliciesServer } from '@/lib/api/sysprefs-server'
-import type { DbPlayerNetworkPrefs, DbSystemConfigCache, DbUserSecurityPolicies } from '@/types/database'
+import { useEffect, useState, useCallback } from "react";
+import { SectionBox } from "../controls/SectionBox";
+import { Toggle } from "../controls/Toggle";
+import { Slider } from "../controls/Slider";
+import { Dropdown } from "../controls/Dropdown";
+import { updateNetworkPrefs, logPrefChange } from "@/lib/api/sysprefs";
+import {
+  getNetworkPrefsServer,
+  getSystemConfigServer,
+  getSecurityPoliciesServer,
+} from "@/lib/api/sysprefs-server";
+import type {
+  DbPlayerNetworkPrefs,
+  DbSystemConfigCache,
+  DbUserSecurityPolicies,
+} from "@/types/database";
 
 interface NetworkPanelProps {
-  userId: string
-  onDirty: (dirty: boolean) => void
-  onSaveError: (msg: string) => void
-  saveSignal: number
-  resetSignal: number
+  userId: string;
+  onDirty: (dirty: boolean) => void;
+  onSaveError: (msg: string) => void;
+  saveSignal: number;
+  resetSignal: number;
 }
 
-export function NetworkPanel({ userId, onDirty, onSaveError, saveSignal, resetSignal }: NetworkPanelProps) {
-  const [prefs, setPrefs] = useState<DbPlayerNetworkPrefs | null>(null)
-  const [original, setOriginal] = useState<DbPlayerNetworkPrefs | null>(null)
-  const [sysConfig, setSysConfig] = useState<DbSystemConfigCache | null>(null)
-  const [secPolicy, setSecPolicy] = useState<DbUserSecurityPolicies | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
+export function NetworkPanel({
+  userId,
+  onDirty,
+  onSaveError,
+  saveSignal,
+  resetSignal,
+}: NetworkPanelProps) {
+  const [prefs, setPrefs] = useState<DbPlayerNetworkPrefs | null>(null);
+  const [original, setOriginal] = useState<DbPlayerNetworkPrefs | null>(null);
+  const [sysConfig, setSysConfig] = useState<DbSystemConfigCache | null>(null);
+  const [secPolicy, setSecPolicy] = useState<DbUserSecurityPolicies | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
       getNetworkPrefsServer(userId),
       getSystemConfigServer(),
       getSecurityPoliciesServer(),
-    ]).then(([p, sc, sp]) => {
-      setPrefs(p)
-      setOriginal(p)
-      setSysConfig(sc)
-      setSecPolicy(sp)
-    }).catch((err) => {
-      setLoadError(err instanceof Error ? err.message : 'Failed to load network preferences')
-    }).finally(() => setLoading(false))
-  }, [userId])
-
-  useEffect(() => {
-    if (!prefs || !original) return
-    onDirty(JSON.stringify(prefs) !== JSON.stringify(original))
-  }, [prefs, original, onDirty])
-
-  useEffect(() => {
-    if (saveSignal === 0 || !prefs || !original) return
-    const { id, player_id, created_at, updated_at, ...updates } = prefs
-    updateNetworkPrefs(userId, updates)
-      .then((saved) => {
-        const changedKeys = Object.keys(updates) as (keyof typeof updates)[]
-        for (const key of changedKeys) {
-          const oldVal = String(original[key as keyof DbPlayerNetworkPrefs] ?? '')
-          const newVal = String(prefs[key as keyof DbPlayerNetworkPrefs] ?? '')
-          if (oldVal !== newVal) {
-            logPrefChange(userId, 'network', key, oldVal, newVal, userId).catch(() => {})
-          }
-        }
-        setPrefs(saved); setOriginal(saved)
+    ])
+      .then(([p, sc, sp]) => {
+        setPrefs(p);
+        setOriginal(p);
+        setSysConfig(sc);
+        setSecPolicy(sp);
       })
       .catch((err) => {
-        onSaveError(err instanceof Error ? err.message : 'Failed to save network preferences')
+        setLoadError(err instanceof Error ? err.message : "Failed to load network preferences");
       })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [saveSignal])
+      .finally(() => setLoading(false));
+  }, [userId]);
 
   useEffect(() => {
-    if (resetSignal === 0 || !original) return
-    setPrefs(original)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resetSignal])
+    if (!prefs || !original) return;
+    onDirty(JSON.stringify(prefs) !== JSON.stringify(original));
+  }, [prefs, original, onDirty]);
 
-  const update = useCallback(<K extends keyof DbPlayerNetworkPrefs>(key: K, value: DbPlayerNetworkPrefs[K]) => {
-    setPrefs(prev => prev ? { ...prev, [key]: value } : prev)
-  }, [])
+  useEffect(() => {
+    if (saveSignal === 0 || !prefs || !original) return;
+    const { id, player_id, created_at, updated_at, ...updates } = prefs;
+    updateNetworkPrefs(userId, updates)
+      .then((saved) => {
+        const changedKeys = Object.keys(updates) as (keyof typeof updates)[];
+        for (const key of changedKeys) {
+          const oldVal = String(original[key as keyof DbPlayerNetworkPrefs] ?? "");
+          const newVal = String(prefs[key as keyof DbPlayerNetworkPrefs] ?? "");
+          if (oldVal !== newVal) {
+            logPrefChange(userId, "network", key, oldVal, newVal, userId).catch(() => {});
+          }
+        }
+        setPrefs(saved);
+        setOriginal(saved);
+      })
+      .catch((err) => {
+        onSaveError(err instanceof Error ? err.message : "Failed to save network preferences");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveSignal]);
 
-  if (loading) return <div className="p-2">Loading network preferences...</div>
-  if (loadError) return <div className="p-2 text-[var(--state-error,#FF3300)]">Error: {loadError}</div>
-  if (!prefs) return <div className="p-2 text-[var(--state-error,#FF3300)]">Failed to load network preferences</div>
+  useEffect(() => {
+    if (resetSignal === 0 || !original) return;
+    setPrefs(original);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetSignal]);
+
+  const update = useCallback(
+    <K extends keyof DbPlayerNetworkPrefs>(key: K, value: DbPlayerNetworkPrefs[K]) => {
+      setPrefs((prev) => (prev ? { ...prev, [key]: value } : prev));
+    },
+    [],
+  );
+
+  if (loading) return <div className="p-2">Loading network preferences...</div>;
+  if (loadError)
+    return <div className="p-2 text-[var(--state-error,#FF3300)]">Error: {loadError}</div>;
+  if (!prefs)
+    return (
+      <div className="p-2 text-[var(--state-error,#FF3300)]">
+        Failed to load network preferences
+      </div>
+    );
 
   const regionOptions = [
-    { value: 'auto', label: 'Auto-detect' },
-    { value: 'us-east', label: 'US East' },
-    { value: 'us-west', label: 'US West' },
-    { value: 'eu-west', label: 'EU West' },
-    { value: 'eu-central', label: 'EU Central' },
-    { value: 'asia-east', label: 'Asia East' },
-  ]
+    { value: "auto", label: "Auto-detect" },
+    { value: "us-east", label: "US East" },
+    { value: "us-west", label: "US West" },
+    { value: "eu-west", label: "EU West" },
+    { value: "eu-central", label: "EU Central" },
+    { value: "asia-east", label: "Asia East" },
+  ];
 
   const qualityOptions = [
-    { value: 'auto', label: 'Auto' },
-    { value: 'low', label: 'Low Bandwidth' },
-    { value: 'medium', label: 'Medium' },
-    { value: 'high', label: 'High Quality' },
-  ]
+    { value: "auto", label: "Auto" },
+    { value: "low", label: "Low Bandwidth" },
+    { value: "medium", label: "Medium" },
+    { value: "high", label: "High Quality" },
+  ];
 
   return (
-    <div className="overflow-y-auto space-y-1">
+    <div className="space-y-1 overflow-y-auto">
       <SectionBox title="CONNECTION">
-        <Toggle label="Auto-Reconnect" value={prefs.auto_reconnect} onChange={(v) => update('auto_reconnect', v)} />
-        <Slider label="Ping Interval" value={prefs.ping_interval_seconds} min={10} max={300} showPercent={false} suffix="s" onChange={(v) => update('ping_interval_seconds', v)} />
-        <Dropdown label="Region" options={regionOptions} value={prefs.preferred_region ?? 'auto'} onChange={(v) => update('preferred_region', v === 'auto' ? null : v)} />
-        <Dropdown label="Quality" options={qualityOptions} value={prefs.connection_quality} onChange={(v) => update('connection_quality', v)} />
-        <Toggle label="Notify Disconnect" value={prefs.notify_connection_lost} onChange={(v) => update('notify_connection_lost', v)} />
-        <Toggle label="Notify Restart" value={prefs.notify_server_restart} onChange={(v) => update('notify_server_restart', v)} />
+        <Toggle
+          label="Auto-Reconnect"
+          value={prefs.auto_reconnect}
+          onChange={(v) => update("auto_reconnect", v)}
+        />
+        <Slider
+          label="Ping Interval"
+          value={prefs.ping_interval_seconds}
+          min={10}
+          max={300}
+          showPercent={false}
+          suffix="s"
+          onChange={(v) => update("ping_interval_seconds", v)}
+        />
+        <Dropdown
+          label="Region"
+          options={regionOptions}
+          value={prefs.preferred_region ?? "auto"}
+          onChange={(v) => update("preferred_region", v === "auto" ? null : v)}
+        />
+        <Dropdown
+          label="Quality"
+          options={qualityOptions}
+          value={prefs.connection_quality}
+          onChange={(v) => update("connection_quality", v)}
+        />
+        <Toggle
+          label="Notify Disconnect"
+          value={prefs.notify_connection_lost}
+          onChange={(v) => update("notify_connection_lost", v)}
+        />
+        <Toggle
+          label="Notify Restart"
+          value={prefs.notify_server_restart}
+          onChange={(v) => update("notify_server_restart", v)}
+        />
       </SectionBox>
 
       {sysConfig && (
         <>
           <SectionBox title="DNS (READ-ONLY)">
-            <Row label="Servers" value={sysConfig.dns_servers.join(', ')} />
-            <Row label="Search Domain" value={sysConfig.dns_search_domain ?? 'none'} />
+            <Row label="Servers" value={sysConfig.dns_servers.join(", ")} />
+            <Row label="Search Domain" value={sysConfig.dns_search_domain ?? "none"} />
           </SectionBox>
 
           <SectionBox title="FIREWALL (READ-ONLY)">
-            <Row label="Status" value={sysConfig.firewall_enabled ? 'ENABLED' : 'DISABLED'} />
+            <Row label="Status" value={sysConfig.firewall_enabled ? "ENABLED" : "DISABLED"} />
             <Row label="Incoming" value={sysConfig.firewall_default_incoming.toUpperCase()} />
             <Row label="Outgoing" value={sysConfig.firewall_default_outgoing.toUpperCase()} />
-            <Row label="Allowed Ports" value={sysConfig.firewall_allowed_ports.join(', ')} />
+            <Row label="Allowed Ports" value={sysConfig.firewall_allowed_ports.join(", ")} />
           </SectionBox>
 
           <SectionBox title="GAME SERVERS (READ-ONLY)">
@@ -132,8 +189,11 @@ export function NetworkPanel({ userId, onDirty, onSaveError, saveSignal, resetSi
       {secPolicy && (
         <SectionBox title="SECURITY POLICY (READ-ONLY)">
           <Row label="Min Password" value={`${secPolicy.min_password_length} chars`} />
-          <Row label="Special Char" value={secPolicy.require_special_char ? 'Required' : 'Optional'} />
-          <Row label="Uppercase" value={secPolicy.require_uppercase ? 'Required' : 'Optional'} />
+          <Row
+            label="Special Char"
+            value={secPolicy.require_special_char ? "Required" : "Optional"}
+          />
+          <Row label="Uppercase" value={secPolicy.require_uppercase ? "Required" : "Optional"} />
           <Row label="Max Attempts" value={String(secPolicy.max_login_attempts)} />
           <Row label="Lockout" value={`${secPolicy.lockout_duration_seconds}s`} />
           <Row label="Session Timeout" value={`${secPolicy.session_timeout_seconds}s`} />
@@ -141,7 +201,7 @@ export function NetworkPanel({ userId, onDirty, onSaveError, saveSignal, resetSi
         </SectionBox>
       )}
     </div>
-  )
+  );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -150,5 +210,5 @@ function Row({ label, value }: { label: string; value: string }) {
       <span className="min-w-[16ch] text-[var(--state-offline,#666)]">{label}:</span>
       <span>{value}</span>
     </div>
-  )
+  );
 }

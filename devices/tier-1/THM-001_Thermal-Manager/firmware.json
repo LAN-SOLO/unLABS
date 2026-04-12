@@ -1,0 +1,19 @@
+{
+  "device_id": "THM-001",
+  "device_name": "Thermal Manager",
+  "tier": 1,
+  "firmware": {
+    "version": "1.0.0",
+    "build": "2025.02.15",
+    "checksum": "T2H5M3A9",
+    "features": ["zone-control", "thermal-map", "fan-orchestrate", "emergency-cool"],
+    "securityPatch": "2025.02.10"
+  },
+  "power": {
+    "full": 3,
+    "idle": 1,
+    "standby": 0.3,
+    "category": "light",
+    "priority": 1
+  }
+}

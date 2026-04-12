@@ -1,0 +1,31 @@
+{
+  "device_id": "MEM-001",
+  "device_name": "Memory Monitor",
+  "tier": 1,
+  "firmware": {
+    "version": "3.1.0",
+    "build": "2025.10.20",
+    "checksum": "M3M0RY01",
+    "features": ["dimm-detect", "spd-read", "timing-config", "bandwidth-test", "multi-mode"],
+    "securityPatch": "2025.10.15"
+  },
+  "power": {
+    "full": 0.6,
+    "idle": 0.2,
+    "standby": 0.05,
+    "category": "light",
+    "priority": 1
+  },
+  "update": {
+    "version": "3.2.0",
+    "build": "2025.03.01",
+    "checksum": "E5A3C7F9",
+    "changelog": [
+      "Added heap fragmentation visualization with real-time defrag suggestions",
+      "Improved memory leak detection with stack trace correlation analysis",
+      "New page fault prediction engine reduces swap thrashing by 35%"
+    ],
+    "min_version": "3.1.0",
+    "requires_reboot": true
+  }
+}

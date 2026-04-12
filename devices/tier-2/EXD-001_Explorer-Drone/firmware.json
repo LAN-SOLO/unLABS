@@ -1,0 +1,31 @@
+{
+  "device_id": "EXD-001",
+  "device_name": "Explorer Drone",
+  "tier": 2,
+  "firmware": {
+    "version": "3.1.2",
+    "build": "2026.01.28",
+    "checksum": "D3X1F7A9",
+    "features": ["autonomous-nav", "resource-scan", "cargo-haul", "gps-lock", "imu-stabilize"],
+    "securityPatch": "2026.01.20"
+  },
+  "power": {
+    "full": 40,
+    "idle": 10,
+    "standby": 2,
+    "category": "heavy",
+    "priority": 3
+  },
+  "update": {
+    "version": "3.2.0",
+    "build": "2025.03.01",
+    "checksum": "B6E4C8A2",
+    "changelog": [
+      "Upgraded autonomous navigation with obstacle avoidance and path optimization",
+      "Added multi-sample collection queue with priority-based return scheduling",
+      "Improved remote pilot responsiveness with 40% lower control input latency"
+    ],
+    "min_version": "3.1.2",
+    "requires_reboot": true
+  }
+}

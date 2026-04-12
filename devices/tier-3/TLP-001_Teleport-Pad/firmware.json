@@ -1,0 +1,38 @@
+{
+  "device_id": "TLP-001",
+  "device_name": "Teleport Pad",
+  "tier": 3,
+  "firmware": {
+    "version": "2.2.0",
+    "build": "2025.08.10",
+    "checksum": "T3L3P0RT",
+    "features": [
+      "capacitor-charge",
+      "matrix-align",
+      "quantum-lock",
+      "coord-load",
+      "stabilize",
+      "portal-gen"
+    ],
+    "securityPatch": "2025.08.05"
+  },
+  "power": {
+    "full": 100,
+    "idle": 3,
+    "standby": 0.5,
+    "category": "heavy",
+    "priority": 4
+  },
+  "update": {
+    "version": "2.3.0",
+    "build": "2025.03.01",
+    "checksum": "B5F9D3A7",
+    "changelog": [
+      "Added destination cache with instant-recall for previously locked coordinates",
+      "Improved matter scanning resolution prevents molecular degradation during transit",
+      "New energy buffer pre-charge mode reduces teleportation cycle time by 40%"
+    ],
+    "min_version": "2.2.0",
+    "requires_reboot": true
+  }
+}

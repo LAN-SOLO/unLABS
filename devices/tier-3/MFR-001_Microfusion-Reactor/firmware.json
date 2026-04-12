@@ -1,0 +1,37 @@
+{
+  "device_id": "MFR-001",
+  "device_name": "Microfusion Reactor",
+  "tier": 3,
+  "firmware": {
+    "version": "2.3.0",
+    "build": "2024.02.01",
+    "checksum": "B8D4E6F2",
+    "features": [
+      "plasma-contain",
+      "power-regulate",
+      "thermal-manage",
+      "auto-scram",
+      "efficiency-tune"
+    ],
+    "securityPatch": "2024.01.28"
+  },
+  "power": {
+    "output": 250,
+    "idle": 150,
+    "standby": 5,
+    "category": "generator",
+    "priority": 1
+  },
+  "update": {
+    "version": "2.4.0",
+    "build": "2025.03.01",
+    "checksum": "C6F2A8D4",
+    "changelog": [
+      "Improved plasma containment stability with magnetic mirror reinforcement",
+      "Added fuel mixture auto-tuning for 15% higher sustained power output",
+      "Enhanced auto-scram response with cascading safety shutdown under 100ms"
+    ],
+    "min_version": "2.3.0",
+    "requires_reboot": true
+  }
+}

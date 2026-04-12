@@ -1,41 +1,38 @@
-'use client'
+"use client";
 
-import { cn } from '@/lib/utils'
+import { cn } from "@/lib/utils";
 
 interface CRTScreenProps {
-  children: React.ReactNode
-  variant?: 'green' | 'amber'
-  showScanlines?: boolean
-  showGlow?: boolean
-  className?: string
+  children: React.ReactNode;
+  variant?: "green" | "amber";
+  showScanlines?: boolean;
+  showGlow?: boolean;
+  className?: string;
 }
 
 export function CRTScreen({
   children,
-  variant = 'green',
+  variant = "green",
   showScanlines = true,
   showGlow = true,
   className,
 }: CRTScreenProps) {
-  const bgColor = variant === 'green' ? '#0a1a0a' : '#1a150a'
-  const glowColor =
-    variant === 'green'
-      ? 'rgba(0, 255, 100, 0.08)'
-      : 'rgba(255, 170, 0, 0.08)'
+  const bgColor = variant === "green" ? "#0a1a0a" : "#1a150a";
+  const glowColor = variant === "green" ? "rgba(0, 255, 100, 0.08)" : "rgba(255, 170, 0, 0.08)";
 
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded border-4 border-[#333]',
-        'shadow-[inset_0_0_60px_rgba(0,0,0,0.5)]',
-        className
+        "relative overflow-hidden rounded border-4 border-[#333]",
+        "shadow-[inset_0_0_60px_rgba(0,0,0,0.5)]",
+        className,
       )}
       style={{ backgroundColor: bgColor }}
     >
       {/* Glow effect */}
       {showGlow && (
         <div
-          className="absolute inset-0 pointer-events-none"
+          className="pointer-events-none absolute inset-0"
           style={{
             background: `radial-gradient(ellipse at center, ${glowColor} 0%, transparent 70%)`,
           }}
@@ -48,7 +45,7 @@ export function CRTScreen({
       {/* Scanlines */}
       {showScanlines && (
         <div
-          className="absolute inset-0 pointer-events-none z-[10]"
+          className="pointer-events-none absolute inset-0 z-[10]"
           style={{
             background: `repeating-linear-gradient(
               to bottom,
@@ -63,11 +60,11 @@ export function CRTScreen({
 
       {/* Curvature vignette */}
       <div
-        className="absolute inset-0 pointer-events-none z-[11]"
+        className="pointer-events-none absolute inset-0 z-[11]"
         style={{
-          boxShadow: 'inset 0 0 100px rgba(0, 0, 0, 0.4)',
+          boxShadow: "inset 0 0 100px rgba(0, 0, 0, 0.4)",
         }}
       />
     </div>
-  )
+  );
 }

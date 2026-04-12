@@ -1,0 +1,37 @@
+{
+  "device_id": "NET-001",
+  "device_name": "Network Monitor",
+  "tier": 1,
+  "firmware": {
+    "version": "2.1.0",
+    "build": "2026.01.28",
+    "checksum": "N7E4T2M1",
+    "features": [
+      "nic-detect",
+      "dhcp-client",
+      "throughput-monitor",
+      "latency-track",
+      "packet-inspect"
+    ],
+    "securityPatch": "2026.01.20"
+  },
+  "power": {
+    "full": 3.5,
+    "idle": 1.5,
+    "standby": 0.3,
+    "category": "light",
+    "priority": 2
+  },
+  "update": {
+    "version": "2.2.0",
+    "build": "2025.03.01",
+    "checksum": "B4E9F3A7",
+    "changelog": [
+      "Added deep packet inspection with protocol-aware filtering for anomaly detection",
+      "Improved DNS resolver with caching and parallel query support",
+      "New bandwidth throttle alerts with configurable per-device thresholds"
+    ],
+    "min_version": "2.1.0",
+    "requires_reboot": true
+  }
+}

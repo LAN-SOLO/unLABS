@@ -1,473 +1,778 @@
-'use client'
+"use client";
 
-import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { createPortal } from 'react-dom'
-import { VirtualFS, UserManager, Kernel } from '@/lib/unos'
-import { UnShell } from '@/lib/unos/shell'
-import { NetworkManager } from '@/lib/unos/network'
-import { InitSystem } from '@/lib/unos/init'
-import { Journal } from '@/lib/unos/journal'
-import { CronManager } from '@/lib/unos/cron'
-import { commands } from '@/lib/terminal/commands'
-import { loadPanelState } from '@/lib/panel/panelState'
-import type { FilesystemActions, UserActions, KernelActions, ShellActions, NetworkActions, JournalActions, CronActions, InitActions } from '@/lib/terminal/types'
-import { useTerminal } from '@/hooks/useTerminal'
-import { TerminalOutput } from './TerminalOutput'
-import { TerminalInput } from './TerminalInput'
-import { MidnightCommander } from './MidnightCommander'
-import { SysprefApp } from '@/components/sysprefs/SysprefApp'
-import { ScreensaverOverlay } from '@/components/screensaver/ScreensaverOverlay'
-import type { ScreensaverPattern } from '@/components/screensaver/types'
-import { TetrisOverlay } from '@/components/tetris/TetrisOverlay'
-import { useCDCManagerOptional } from '@/contexts/CDCManager'
-import { useUECManagerOptional } from '@/contexts/UECManager'
-import { useBATManagerOptional } from '@/contexts/BATManager'
-import { useHMSManagerOptional } from '@/contexts/HMSManager'
-import { useECRManagerOptional } from '@/contexts/ECRManager'
-import { useIPLManagerOptional } from '@/contexts/IPLManager'
-import { useMFRManagerOptional } from '@/contexts/MFRManager'
-import { useAICManagerOptional } from '@/contexts/AICManager'
-import { useVNTManagerOptional } from '@/contexts/VNTManager'
-import { useSCAManagerOptional } from '@/contexts/SCAManager'
-import { useEXDManagerOptional } from '@/contexts/EXDManager'
-import { useQSMManagerOptional } from '@/contexts/QSMManager'
-import { useEMCManagerOptional } from '@/contexts/EMCManager'
-import { useQUAManagerOptional } from '@/contexts/QUAManager'
-import { usePWBManagerOptional } from '@/contexts/PWBManager'
-import { useBTKManagerOptional } from '@/contexts/BTKManager'
-import { useRMGManagerOptional } from '@/contexts/RMGManager'
-import { useMSCManagerOptional } from '@/contexts/MSCManager'
-import { useNETManagerOptional } from '@/contexts/NETManager'
-import { useTMPManagerOptional } from '@/contexts/TMPManager'
-import { useDIMManagerOptional } from '@/contexts/DIMManager'
-import { useCPUManagerOptional } from '@/contexts/CPUManager'
-import { useCLKManagerOptional } from '@/contexts/CLKManager'
-import { useMEMManagerOptional } from '@/contexts/MEMManager'
-import { useANDManagerOptional } from '@/contexts/ANDManager'
-import { useQCPManagerOptional } from '@/contexts/QCPManager'
-import { useTLPManagerOptional } from '@/contexts/TLPManager'
-import { useLCTManagerOptional } from '@/contexts/LCTManager'
-import { useP3DManagerOptional } from '@/contexts/P3DManager'
-import { useSPKManagerOptional } from '@/contexts/SPKManager'
-import { useDGNManagerOptional } from '@/contexts/DGNManager'
-import { useScrewButtonManagerOptional } from '@/contexts/ScrewButtonManager'
-import { useResourceManagerOptional } from '@/contexts/ResourceManager'
-import { useSystemPowerOptional } from '@/contexts/SystemPowerManager'
-import type { CDCDeviceActions, UECDeviceActions, BATDeviceActions, HMSDeviceActions, ECRDeviceActions, IPLDeviceActions, MFRDeviceActions, AICDeviceActions, VNTDeviceActions, SCADeviceActions, EXDDeviceActions, QSMDeviceActions, EMCDeviceActions, QUADeviceActions, PWBDeviceActions, BTKDeviceActions, RMGDeviceActions, MSCDeviceActions, NETDeviceActions, TMPDeviceActions, DIMDeviceActions, CPUDeviceActions, CLKDeviceActions, MEMDeviceActions, ANDDeviceActions, QCPDeviceActions, TLPDeviceActions, LCTDeviceActions, P3DDeviceActions, SPKDeviceActions, DGNDeviceActions, ScrewButtonDeviceActions, ThemeActions } from '@/lib/terminal/types'
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
+import { VirtualFS, UserManager, Kernel } from "@/lib/unos";
+import { UnShell } from "@/lib/unos/shell";
+import { NetworkManager } from "@/lib/unos/network";
+import { InitSystem } from "@/lib/unos/init";
+import { Journal } from "@/lib/unos/journal";
+import { CronManager } from "@/lib/unos/cron";
+import { commands } from "@/lib/terminal/commands";
+import { loadPanelState } from "@/lib/panel/panelState";
+import type {
+  FilesystemActions,
+  UserActions,
+  KernelActions,
+  ShellActions,
+  NetworkActions,
+  JournalActions,
+  CronActions,
+  InitActions,
+} from "@/lib/terminal/types";
+import { useTerminal } from "@/hooks/useTerminal";
+import { TerminalOutput } from "./TerminalOutput";
+import { TerminalInput } from "./TerminalInput";
+import { MidnightCommander } from "./MidnightCommander";
+import { SysprefApp } from "@/components/sysprefs/SysprefApp";
+import { ScreensaverOverlay } from "@/components/screensaver/ScreensaverOverlay";
+import type { ScreensaverPattern } from "@/components/screensaver/types";
+import { TetrisOverlay } from "@/components/tetris/TetrisOverlay";
+import { useCDCManagerOptional } from "@/contexts/CDCManager";
+import { useUECManagerOptional } from "@/contexts/UECManager";
+import { useBATManagerOptional } from "@/contexts/BATManager";
+import { useHMSManagerOptional } from "@/contexts/HMSManager";
+import { useECRManagerOptional } from "@/contexts/ECRManager";
+import { useIPLManagerOptional } from "@/contexts/IPLManager";
+import { useMFRManagerOptional } from "@/contexts/MFRManager";
+import { useAICManagerOptional } from "@/contexts/AICManager";
+import { useVNTManagerOptional } from "@/contexts/VNTManager";
+import { useSCAManagerOptional } from "@/contexts/SCAManager";
+import { useEXDManagerOptional } from "@/contexts/EXDManager";
+import { useQSMManagerOptional } from "@/contexts/QSMManager";
+import { useEMCManagerOptional } from "@/contexts/EMCManager";
+import { useQUAManagerOptional } from "@/contexts/QUAManager";
+import { usePWBManagerOptional } from "@/contexts/PWBManager";
+import { useBTKManagerOptional } from "@/contexts/BTKManager";
+import { useRMGManagerOptional } from "@/contexts/RMGManager";
+import { useMSCManagerOptional } from "@/contexts/MSCManager";
+import { useNETManagerOptional } from "@/contexts/NETManager";
+import { useTMPManagerOptional } from "@/contexts/TMPManager";
+import { useDIMManagerOptional } from "@/contexts/DIMManager";
+import { useCPUManagerOptional } from "@/contexts/CPUManager";
+import { useCLKManagerOptional } from "@/contexts/CLKManager";
+import { useMEMManagerOptional } from "@/contexts/MEMManager";
+import { useANDManagerOptional } from "@/contexts/ANDManager";
+import { useQCPManagerOptional } from "@/contexts/QCPManager";
+import { useTLPManagerOptional } from "@/contexts/TLPManager";
+import { useLCTManagerOptional } from "@/contexts/LCTManager";
+import { useP3DManagerOptional } from "@/contexts/P3DManager";
+import { useSPKManagerOptional } from "@/contexts/SPKManager";
+import { useDGNManagerOptional } from "@/contexts/DGNManager";
+import { useScrewButtonManagerOptional } from "@/contexts/ScrewButtonManager";
+import { useResourceManagerOptional } from "@/contexts/ResourceManager";
+import { useSystemPowerOptional } from "@/contexts/SystemPowerManager";
+import { useFirmwareManagerOptional } from "@/contexts/FirmwareManager";
+import { useMission } from "@/contexts/MissionProvider";
+import { useResonance } from "@/contexts/ResonanceProvider";
+import type { MissionTerminalActions, ResonanceTerminalActions } from "@/lib/terminal/types";
+import type {
+  CDCDeviceActions,
+  UECDeviceActions,
+  BATDeviceActions,
+  HMSDeviceActions,
+  ECRDeviceActions,
+  IPLDeviceActions,
+  MFRDeviceActions,
+  AICDeviceActions,
+  VNTDeviceActions,
+  SCADeviceActions,
+  EXDDeviceActions,
+  QSMDeviceActions,
+  EMCDeviceActions,
+  QUADeviceActions,
+  PWBDeviceActions,
+  BTKDeviceActions,
+  RMGDeviceActions,
+  MSCDeviceActions,
+  NETDeviceActions,
+  TMPDeviceActions,
+  DIMDeviceActions,
+  CPUDeviceActions,
+  CLKDeviceActions,
+  MEMDeviceActions,
+  ANDDeviceActions,
+  QCPDeviceActions,
+  TLPDeviceActions,
+  LCTDeviceActions,
+  P3DDeviceActions,
+  SPKDeviceActions,
+  DGNDeviceActions,
+  ScrewButtonDeviceActions,
+  ThemeActions,
+} from "@/lib/terminal/types";
 
 interface TerminalProps {
-  userId: string
-  username: string | null
-  balance: number
-  themeIndex?: number
-  setThemeIndex?: (index: number) => void
-  themes?: readonly { name: string; fg: string; glow: string; screen: string; bar: string }[]
+  userId: string;
+  username: string | null;
+  balance: number;
+  themeIndex?: number;
+  setThemeIndex?: (index: number) => void;
+  themes?: readonly { name: string; fg: string; glow: string; screen: string; bar: string }[];
 }
 
-export function Terminal({ userId, username, balance, themeIndex, setThemeIndex, themes }: TerminalProps) {
-  const cdcManager = useCDCManagerOptional()
-  const uecManager = useUECManagerOptional()
-  const batManager = useBATManagerOptional()
-  const hmsManager = useHMSManagerOptional()
-  const ecrManager = useECRManagerOptional()
-  const iplManager = useIPLManagerOptional()
-  const mfrManager = useMFRManagerOptional()
-  const aicManager = useAICManagerOptional()
-  const vntManager = useVNTManagerOptional()
-  const scaManager = useSCAManagerOptional()
-  const exdManager = useEXDManagerOptional()
-  const qsmManager = useQSMManagerOptional()
-  const emcManager = useEMCManagerOptional()
-  const quaManager = useQUAManagerOptional()
-  const pwbManager = usePWBManagerOptional()
-  const btkManager = useBTKManagerOptional()
-  const rmgManager = useRMGManagerOptional()
-  const mscManager = useMSCManagerOptional()
-  const netManager = useNETManagerOptional()
-  const tmpManager = useTMPManagerOptional()
-  const dimManager = useDIMManagerOptional()
-  const cpuManager = useCPUManagerOptional()
-  const clkManager = useCLKManagerOptional()
-  const memManager = useMEMManagerOptional()
-  const andManager = useANDManagerOptional()
-  const qcpManager = useQCPManagerOptional()
-  const tlpManager = useTLPManagerOptional()
-  const lctManager = useLCTManagerOptional()
-  const p3dManager = useP3DManagerOptional()
-  const spkManager = useSPKManagerOptional()
-  const dgnManager = useDGNManagerOptional()
-  const screwButtonManager = useScrewButtonManagerOptional()
-  const resourceManager = useResourceManagerOptional()
-  const systemPowerManager = useSystemPowerOptional()
+export function Terminal({
+  userId,
+  username,
+  balance,
+  themeIndex,
+  setThemeIndex,
+  themes,
+}: TerminalProps) {
+  const cdcManager = useCDCManagerOptional();
+  const uecManager = useUECManagerOptional();
+  const batManager = useBATManagerOptional();
+  const hmsManager = useHMSManagerOptional();
+  const ecrManager = useECRManagerOptional();
+  const iplManager = useIPLManagerOptional();
+  const mfrManager = useMFRManagerOptional();
+  const aicManager = useAICManagerOptional();
+  const vntManager = useVNTManagerOptional();
+  const scaManager = useSCAManagerOptional();
+  const exdManager = useEXDManagerOptional();
+  const qsmManager = useQSMManagerOptional();
+  const emcManager = useEMCManagerOptional();
+  const quaManager = useQUAManagerOptional();
+  const pwbManager = usePWBManagerOptional();
+  const btkManager = useBTKManagerOptional();
+  const rmgManager = useRMGManagerOptional();
+  const mscManager = useMSCManagerOptional();
+  const netManager = useNETManagerOptional();
+  const tmpManager = useTMPManagerOptional();
+  const dimManager = useDIMManagerOptional();
+  const cpuManager = useCPUManagerOptional();
+  const clkManager = useCLKManagerOptional();
+  const memManager = useMEMManagerOptional();
+  const andManager = useANDManagerOptional();
+  const qcpManager = useQCPManagerOptional();
+  const tlpManager = useTLPManagerOptional();
+  const lctManager = useLCTManagerOptional();
+  const p3dManager = useP3DManagerOptional();
+  const spkManager = useSPKManagerOptional();
+  const dgnManager = useDGNManagerOptional();
+  const screwButtonManager = useScrewButtonManagerOptional();
+  const resourceManager = useResourceManagerOptional();
+  const systemPowerManager = useSystemPowerOptional();
+  const firmwareManager = useFirmwareManagerOptional();
+
+  // Mission and resonance systems
+  let missionCtx: ReturnType<typeof useMission> | null = null;
+  let resonanceCtx: ReturnType<typeof useResonance> | null = null;
+  try {
+    missionCtx = useMission();
+  } catch {
+    /* not mounted */
+  }
+  try {
+    resonanceCtx = useResonance();
+  } catch {
+    /* not mounted */
+  }
+
+  const missionTerminalActions: MissionTerminalActions | undefined = useMemo(() => {
+    if (!missionCtx) return undefined;
+    const ctx = missionCtx;
+    return {
+      whatNext: () => ctx.whatNext(),
+      getAllMissions: () =>
+        ctx.allMissions.map((m) => ({
+          id: m.id,
+          title: m.title,
+          flavor: m.flavor,
+          category: m.category,
+          status: m.status,
+          completedTaskCount: m.completedTaskCount,
+          totalTaskCount: m.tasks.length,
+          tasks: m.tasks.map((t) => ({
+            id: t.id,
+            label: t.label,
+            status: t.status,
+            objectives: t.objectives.map((o) => ({
+              id: o.id,
+              description: o.description,
+              currentValue: o.currentValue,
+              targetValue: o.targetValue,
+              status: o.status,
+              hint: o.hint,
+              deepDiveHint: o.deepDiveHint,
+            })),
+          })),
+        })),
+      trackMission: (id: string) => ctx.trackMission(id),
+      untrackMission: (id: string) => ctx.untrackMission(id),
+      claimMission: (id: string) => ctx.claimMission(id),
+    };
+  }, [missionCtx]);
+
+  const resonanceTerminalActions: ResonanceTerminalActions | undefined = useMemo(() => {
+    if (!resonanceCtx) return undefined;
+    const ctx = resonanceCtx;
+    return {
+      getDiscoveries: () => ctx.discoveries,
+      getUndiscoveredCount: () => ctx.undiscoveredCount,
+      getAllProtocols: () =>
+        ctx.allProtocols.map((p) => ({
+          id: p.id,
+          codename: p.codename,
+          description: p.description,
+          loreClue: p.loreClue,
+          rarity: p.rarity,
+          isDiscovered: ctx.discoveries.includes(p.id),
+        })),
+      pushCommandEvent: (command: string) => ctx.pushCommandEvent(command),
+    };
+  }, [resonanceCtx]);
 
   // Initialize VirtualFS, UserManager, and Kernel (persisted via refs, restored from localStorage)
-  const fsRef = useRef<VirtualFS | null>(null)
-  const userMgrRef = useRef<UserManager | null>(null)
-  const kernelRef = useRef<Kernel | null>(null)
-  const shellRef = useRef<UnShell | null>(null)
-  const networkMgrRef = useRef<NetworkManager | null>(null)
-  const initSystemRef = useRef<InitSystem | null>(null)
-  const journalRef = useRef<Journal | null>(null)
-  const cronRef = useRef<CronManager | null>(null)
+  const fsRef = useRef<VirtualFS | null>(null);
+  const userMgrRef = useRef<UserManager | null>(null);
+  const kernelRef = useRef<Kernel | null>(null);
+  const shellRef = useRef<UnShell | null>(null);
+  const networkMgrRef = useRef<NetworkManager | null>(null);
+  const initSystemRef = useRef<InitSystem | null>(null);
+  const journalRef = useRef<Journal | null>(null);
+  const cronRef = useRef<CronManager | null>(null);
 
   if (!fsRef.current) {
-    const saved = loadPanelState()
-    fsRef.current = saved?.filesystem ? VirtualFS.fromJSON(saved.filesystem) : new VirtualFS()
+    const saved = loadPanelState();
+    fsRef.current = saved?.filesystem ? VirtualFS.fromJSON(saved.filesystem) : new VirtualFS();
   }
   if (!userMgrRef.current) {
-    const saved = loadPanelState()
-    userMgrRef.current = saved?.users ? UserManager.fromJSON(saved.users) : new UserManager()
+    const saved = loadPanelState();
+    userMgrRef.current = saved?.users ? UserManager.fromJSON(saved.users) : new UserManager();
   }
   if (!kernelRef.current) {
-    const kernel = new Kernel()
-    const saved = loadPanelState()
+    const kernel = new Kernel();
+    const saved = loadPanelState();
     if (saved?.kernel) {
-      kernel.fromJSON(saved.kernel)
+      kernel.fromJSON(saved.kernel);
     } else {
-      kernel.boot()
-      kernel.startTicking()
+      kernel.boot();
+      kernel.startTicking();
     }
     // Wire procfs into filesystem
-    fsRef.current!.setProcFS((path) => kernel.procfs.generate(path))
-    fsRef.current!.setProcFSListDir((path) => kernel.procfs.listDir(path))
-    kernelRef.current = kernel
+    fsRef.current!.setProcFS((path) => kernel.procfs.generate(path));
+    fsRef.current!.setProcFSListDir((path) => kernel.procfs.listDir(path));
+    kernelRef.current = kernel;
   }
   if (!shellRef.current) {
-    const saved = loadPanelState()
-    shellRef.current = saved?.shell ? UnShell.fromJSON(saved.shell) : new UnShell()
+    const saved = loadPanelState();
+    shellRef.current = saved?.shell ? UnShell.fromJSON(saved.shell) : new UnShell();
   }
   if (!networkMgrRef.current) {
-    networkMgrRef.current = new NetworkManager()
+    networkMgrRef.current = new NetworkManager();
   }
   if (!journalRef.current) {
-    const saved = loadPanelState()
-    journalRef.current = saved?.journal ? Journal.fromJSON(saved.journal) : new Journal()
+    const saved = loadPanelState();
+    journalRef.current = saved?.journal ? Journal.fromJSON(saved.journal) : new Journal();
   }
   if (!cronRef.current) {
-    const saved = loadPanelState()
-    cronRef.current = saved?.cron ? CronManager.fromJSON(saved.cron) : new CronManager()
+    const saved = loadPanelState();
+    cronRef.current = saved?.cron ? CronManager.fromJSON(saved.cron) : new CronManager();
   }
   if (!initSystemRef.current) {
-    initSystemRef.current = new InitSystem()
+    initSystemRef.current = new InitSystem();
   }
 
   // Cleanup kernel ticking on unmount (e.g. during OS reboot remount)
   useEffect(() => {
     return () => {
-      kernelRef.current?.stopTicking()
-    }
-  }, [])
+      kernelRef.current?.stopTicking();
+    };
+  }, []);
 
   const syncFsHomeUser = useCallback(() => {
     if (fsRef.current && userMgrRef.current) {
-      const username = userMgrRef.current.currentUsername
-      const home = userMgrRef.current.currentUser.home
-      fsRef.current.setHomeUser(username)
+      const username = userMgrRef.current.currentUsername;
+      const home = userMgrRef.current.currentUser.home;
+      fsRef.current.setHomeUser(username);
       // Ensure home dir exists
-      fsRef.current.mkdir(home, true)
+      fsRef.current.mkdir(home, true);
       // cd to new user's home
-      fsRef.current.cd(home)
+      fsRef.current.cd(home);
     }
-  }, [])
+  }, []);
 
   // Build filesystem actions (stable ref)
-  const filesystemActions: FilesystemActions = useMemo(() => ({
-    getCwd: () => fsRef.current!.cwd,
-    ls: (path, flags) => fsRef.current!.ls(path, flags),
-    cd: (path) => {
-      const err = fsRef.current!.cd(path)
-      return err
-    },
-    cat: (path, user, groups) => {
-      const node = fsRef.current!.stat(path)
-      if (!node) return null
-      // Permission check for reading
-      if (!fsRef.current!.checkPermission(node, user, groups, 'r')) {
-        return `cat: ${path}: Permission denied`
-      }
-      return fsRef.current!.cat(path)
-    },
-    mkdir: (path, parents) => fsRef.current!.mkdir(path, parents),
-    touch: (path) => fsRef.current!.touch(path),
-    rm: (path, recursive) => fsRef.current!.rm(path, recursive),
-    tree: (path, depth) => fsRef.current!.tree(path, depth),
-    stat: (path) => {
-      const node = fsRef.current!.stat(path)
-      if (!node) return null
-      return { permissions: node.permissions, owner: node.owner, group: node.group, size: node.size, modified: node.modified, type: node.type }
-    },
-    chmod: (path, mode) => fsRef.current!.chmod(path, mode),
-    chown: (path, owner, group) => fsRef.current!.chown(path, owner, group),
-    cp: (src, dest, recursive) => fsRef.current!.cp(src, dest, recursive),
-    mv: (src, dest) => fsRef.current!.mv(src, dest),
-    ln: (target, linkName, symbolic) => fsRef.current!.ln(target, linkName, symbolic),
-    head: (path, lines) => fsRef.current!.head(path, lines),
-    tail: (path, lines) => fsRef.current!.tail(path, lines),
-    write: (path, content) => fsRef.current!.write(path, content),
-    pwd: () => fsRef.current!.pwd(),
-    resolve: (path) => fsRef.current!.resolve(path) !== null,
-    formatPermissions: (path) => {
-      const node = fsRef.current!.stat(path)
-      if (!node) return null
-      return fsRef.current!.formatPermissions(node)
-    },
-    toJSON: () => fsRef.current!.toJSON(),
-    walk: (path, callback) => fsRef.current!.walk(path, callback),
-    getMounts: () => fsRef.current!.getMounts(),
-    getNodeType: (path) => fsRef.current!.getNodeType(path),
-  }), [])
+  const filesystemActions: FilesystemActions = useMemo(
+    () => ({
+      getCwd: () => fsRef.current!.cwd,
+      ls: (path, flags) => fsRef.current!.ls(path, flags),
+      cd: (path) => {
+        const err = fsRef.current!.cd(path);
+        return err;
+      },
+      cat: (path, user, groups) => {
+        const node = fsRef.current!.stat(path);
+        if (!node) return null;
+        // Permission check for reading
+        if (!fsRef.current!.checkPermission(node, user, groups, "r")) {
+          return `cat: ${path}: Permission denied`;
+        }
+        return fsRef.current!.cat(path);
+      },
+      mkdir: (path, parents) => fsRef.current!.mkdir(path, parents),
+      touch: (path) => fsRef.current!.touch(path),
+      rm: (path, recursive) => fsRef.current!.rm(path, recursive),
+      tree: (path, depth) => fsRef.current!.tree(path, depth),
+      stat: (path) => {
+        const node = fsRef.current!.stat(path);
+        if (!node) return null;
+        return {
+          permissions: node.permissions,
+          owner: node.owner,
+          group: node.group,
+          size: node.size,
+          modified: node.modified,
+          type: node.type,
+        };
+      },
+      chmod: (path, mode) => fsRef.current!.chmod(path, mode),
+      chown: (path, owner, group) => fsRef.current!.chown(path, owner, group),
+      cp: (src, dest, recursive) => fsRef.current!.cp(src, dest, recursive),
+      mv: (src, dest) => fsRef.current!.mv(src, dest),
+      ln: (target, linkName, symbolic) => fsRef.current!.ln(target, linkName, symbolic),
+      head: (path, lines) => fsRef.current!.head(path, lines),
+      tail: (path, lines) => fsRef.current!.tail(path, lines),
+      write: (path, content) => fsRef.current!.write(path, content),
+      pwd: () => fsRef.current!.pwd(),
+      resolve: (path) => fsRef.current!.resolve(path) !== null,
+      formatPermissions: (path) => {
+        const node = fsRef.current!.stat(path);
+        if (!node) return null;
+        return fsRef.current!.formatPermissions(node);
+      },
+      toJSON: () => fsRef.current!.toJSON(),
+      walk: (path, callback) => fsRef.current!.walk(path, callback),
+      getMounts: () => fsRef.current!.getMounts(),
+      getNodeType: (path) => fsRef.current!.getNodeType(path),
+    }),
+    [],
+  );
 
   // Build user actions (stable ref)
-  const userActions: UserActions = useMemo(() => ({
-    whoami: () => userMgrRef.current!.whoami(),
-    id: (username) => userMgrRef.current!.id(username),
-    su: (target, password) => {
-      const result = userMgrRef.current!.su(target, password)
-      if (result.success) syncFsHomeUser()
-      return result
-    },
-    sudo: (callback) => {
-      if (!userMgrRef.current!.canSudo()) return false
-      callback()
-      return true
-    },
-    canSudo: () => userMgrRef.current!.canSudo(),
-    isRoot: () => userMgrRef.current!.isRoot(),
-    passwd: (user, newPass) => userMgrRef.current!.passwd(user, newPass),
-    useradd: (name, opts) => userMgrRef.current!.useradd(name, opts),
-    userdel: (name) => userMgrRef.current!.userdel(name),
-    usermod: (name, opts) => userMgrRef.current!.usermod(name, opts),
-    groups: (user) => userMgrRef.current!.groups(user),
-    getCurrentUser: () => {
-      const u = userMgrRef.current!.currentUser
-      return { uid: u.uid, username: u.username, groups: u.groups, home: u.home, isRoot: u.isRoot }
-    },
-    verifyPassword: (username, password) => userMgrRef.current!.verifyPassword(username, password),
-    toJSON: () => userMgrRef.current!.toJSON(),
-  }), [syncFsHomeUser])
+  const userActions: UserActions = useMemo(
+    () => ({
+      whoami: () => userMgrRef.current!.whoami(),
+      id: (username) => userMgrRef.current!.id(username),
+      su: (target, password) => {
+        const result = userMgrRef.current!.su(target, password);
+        if (result.success) syncFsHomeUser();
+        return result;
+      },
+      sudo: (callback) => {
+        if (!userMgrRef.current!.canSudo()) return false;
+        callback();
+        return true;
+      },
+      canSudo: () => userMgrRef.current!.canSudo(),
+      isRoot: () => userMgrRef.current!.isRoot(),
+      passwd: (user, newPass) => userMgrRef.current!.passwd(user, newPass),
+      useradd: (name, opts) => userMgrRef.current!.useradd(name, opts),
+      userdel: (name) => userMgrRef.current!.userdel(name),
+      usermod: (name, opts) => userMgrRef.current!.usermod(name, opts),
+      groups: (user) => userMgrRef.current!.groups(user),
+      getCurrentUser: () => {
+        const u = userMgrRef.current!.currentUser;
+        return {
+          uid: u.uid,
+          username: u.username,
+          groups: u.groups,
+          home: u.home,
+          isRoot: u.isRoot,
+        };
+      },
+      verifyPassword: (username, password) =>
+        userMgrRef.current!.verifyPassword(username, password),
+      toJSON: () => userMgrRef.current!.toJSON(),
+    }),
+    [syncFsHomeUser],
+  );
 
   // Build kernel actions (stable ref)
-  const kernelActions: KernelActions = useMemo(() => ({
-    getProcessList: () => kernelRef.current!.process.listAll().map(p => ({
-      pid: p.pid, ppid: p.ppid, name: p.name, cmdline: p.cmdline, state: p.state,
-      uid: p.uid, priority: p.priority, nice: p.nice, cpuTime: p.cpuTime,
-      memoryRSS: p.memoryRSS, memoryVSZ: p.memoryVSZ, tty: p.tty,
-    })),
-    killProcess: (pid, signal) => kernelRef.current!.process.kill(pid, signal),
-    getMemoryStats: () => {
-      const s = kernelRef.current!.memory.getStats()
-      return {
-        totalKB: s.totalKB, freeKB: s.freeKB, availableKB: s.availableKB,
-        buffersKB: s.buffersKB, cachedKB: s.cachedKB, swapTotalKB: s.swapTotalKB,
-        swapFreeKB: s.swapFreeKB,
-        usedKB: s.totalKB - s.freeKB - s.buffersKB - s.cachedKB,
-        sharedKB: Math.floor(s.cachedKB * 0.1),
-      }
-    },
-    getLoadAverage: () => kernelRef.current!.scheduler.getLoadAverage(),
-    getUptime: () => ({
-      seconds: kernelRef.current!.uptime / 1000,
-      idleSeconds: kernelRef.current!.scheduler.getStats().idleCPUTime / 1000,
+  const kernelActions: KernelActions = useMemo(
+    () => ({
+      getProcessList: () =>
+        kernelRef.current!.process.listAll().map((p) => ({
+          pid: p.pid,
+          ppid: p.ppid,
+          name: p.name,
+          cmdline: p.cmdline,
+          state: p.state,
+          uid: p.uid,
+          priority: p.priority,
+          nice: p.nice,
+          cpuTime: p.cpuTime,
+          memoryRSS: p.memoryRSS,
+          memoryVSZ: p.memoryVSZ,
+          tty: p.tty,
+        })),
+      killProcess: (pid, signal) => kernelRef.current!.process.kill(pid, signal),
+      getMemoryStats: () => {
+        const s = kernelRef.current!.memory.getStats();
+        return {
+          totalKB: s.totalKB,
+          freeKB: s.freeKB,
+          availableKB: s.availableKB,
+          buffersKB: s.buffersKB,
+          cachedKB: s.cachedKB,
+          swapTotalKB: s.swapTotalKB,
+          swapFreeKB: s.swapFreeKB,
+          usedKB: s.totalKB - s.freeKB - s.buffersKB - s.cachedKB,
+          sharedKB: Math.floor(s.cachedKB * 0.1),
+        };
+      },
+      getLoadAverage: () => kernelRef.current!.scheduler.getLoadAverage(),
+      getUptime: () => ({
+        seconds: kernelRef.current!.uptime / 1000,
+        idleSeconds: kernelRef.current!.scheduler.getStats().idleCPUTime / 1000,
+      }),
+      getUname: () => kernelRef.current!.getUname(),
+      getDmesg: (level) =>
+        kernelRef.current!.dmesg.read(level ? { level: level as "INFO" } : undefined).map((e) => ({
+          timestamp: e.timestamp,
+          level: e.level,
+          message: e.message,
+        })),
+      getModules: () =>
+        kernelRef.current!.modules.list().map((m) => ({
+          name: m.name,
+          size: m.size,
+          refCount: m.refCount,
+          dependencies: m.dependencies,
+          loaded: m.loaded,
+        })),
+      loadModule: (name) => kernelRef.current!.modules.probe(name),
+      unloadModule: (name) => kernelRef.current!.modules.unload(name),
+      getSyscallTable: () =>
+        kernelRef.current!.syscall.getTable().map((e) => ({
+          number: e.number,
+          name: e.name,
+          callCount: e.callCount,
+        })),
+      getStrace: (pid, limit) => kernelRef.current!.syscall.getStrace(pid, limit),
+      setNice: (pid, nice) => kernelRef.current!.process.setNice(pid, nice),
+      getSysctl: () => kernelRef.current!.getSysctl(),
+      setSysctl: (key, value) => kernelRef.current!.setSysctlValue(key, value),
+      execCommand: (name, args) => kernelRef.current!.execCommand(name, args),
+      finishCommand: (pid, exitCode) => kernelRef.current!.finishCommand(pid, exitCode),
+      getTopProcesses: (n) =>
+        kernelRef.current!.scheduler.getTopProcesses(n).map((p) => ({
+          pid: p.pid,
+          name: p.name,
+          cmdline: p.cmdline,
+          state: p.state,
+          uid: p.uid,
+          cpuPercent: p.cpuPercent,
+          memPercent: p.memPercent,
+          memoryRSS: p.memoryRSS,
+          memoryVSZ: p.memoryVSZ,
+          cpuTime: p.cpuTime,
+          nice: p.nice,
+          tty: p.tty,
+        })),
+      getSchedulerStats: () => {
+        const s = kernelRef.current!.scheduler.getStats();
+        const pm = kernelRef.current!.process;
+        return {
+          contextSwitches: s.contextSwitches,
+          totalCPUTime: s.totalCPUTime,
+          idleCPUTime: s.idleCPUTime,
+          runQueueLength: s.runQueueLength,
+          processCount: pm.getTotalCount(),
+          lastPid: pm.getLastPid(),
+        };
+      },
+      toJSON: () => kernelRef.current!.toJSON(),
     }),
-    getUname: () => kernelRef.current!.getUname(),
-    getDmesg: (level) => kernelRef.current!.dmesg.read(level ? { level: level as 'INFO' } : undefined).map(e => ({
-      timestamp: e.timestamp, level: e.level, message: e.message,
-    })),
-    getModules: () => kernelRef.current!.modules.list().map(m => ({
-      name: m.name, size: m.size, refCount: m.refCount,
-      dependencies: m.dependencies, loaded: m.loaded,
-    })),
-    loadModule: (name) => kernelRef.current!.modules.probe(name),
-    unloadModule: (name) => kernelRef.current!.modules.unload(name),
-    getSyscallTable: () => kernelRef.current!.syscall.getTable().map(e => ({
-      number: e.number, name: e.name, callCount: e.callCount,
-    })),
-    getStrace: (pid, limit) => kernelRef.current!.syscall.getStrace(pid, limit),
-    setNice: (pid, nice) => kernelRef.current!.process.setNice(pid, nice),
-    getSysctl: () => kernelRef.current!.getSysctl(),
-    setSysctl: (key, value) => kernelRef.current!.setSysctlValue(key, value),
-    execCommand: (name, args) => kernelRef.current!.execCommand(name, args),
-    finishCommand: (pid, exitCode) => kernelRef.current!.finishCommand(pid, exitCode),
-    getTopProcesses: (n) => kernelRef.current!.scheduler.getTopProcesses(n).map(p => ({
-      pid: p.pid, name: p.name, cmdline: p.cmdline, state: p.state, uid: p.uid,
-      cpuPercent: p.cpuPercent, memPercent: p.memPercent, memoryRSS: p.memoryRSS,
-      memoryVSZ: p.memoryVSZ, cpuTime: p.cpuTime, nice: p.nice, tty: p.tty,
-    })),
-    getSchedulerStats: () => {
-      const s = kernelRef.current!.scheduler.getStats()
-      const pm = kernelRef.current!.process
-      return {
-        contextSwitches: s.contextSwitches, totalCPUTime: s.totalCPUTime,
-        idleCPUTime: s.idleCPUTime, runQueueLength: s.runQueueLength,
-        processCount: pm.getTotalCount(), lastPid: pm.getLastPid(),
-      }
-    },
-    toJSON: () => kernelRef.current!.toJSON(),
-  }), [])
+    [],
+  );
 
   // Build shell actions (stable ref)
-  const shellActions: ShellActions = useMemo(() => ({
-    getEnv: (key) => shellRef.current!.getEnv(key),
-    setEnv: (key, value) => shellRef.current!.setEnv(key, value),
-    unsetEnv: (key) => shellRef.current!.unsetEnv(key),
-    getAllEnv: () => shellRef.current!.getAllEnv(),
-    expandVars: (input) => shellRef.current!.expandVars(input),
-    getAlias: (name) => shellRef.current!.getAlias(name),
-    setAlias: (name, value) => shellRef.current!.setAlias(name, value),
-    removeAlias: (name) => shellRef.current!.removeAlias(name),
-    listAliases: () => shellRef.current!.listAliases(),
-  }), [])
+  const shellActions: ShellActions = useMemo(
+    () => ({
+      getEnv: (key) => shellRef.current!.getEnv(key),
+      setEnv: (key, value) => shellRef.current!.setEnv(key, value),
+      unsetEnv: (key) => shellRef.current!.unsetEnv(key),
+      getAllEnv: () => shellRef.current!.getAllEnv(),
+      expandVars: (input) => shellRef.current!.expandVars(input),
+      getAlias: (name) => shellRef.current!.getAlias(name),
+      setAlias: (name, value) => shellRef.current!.setAlias(name, value),
+      removeAlias: (name) => shellRef.current!.removeAlias(name),
+      listAliases: () => shellRef.current!.listAliases(),
+    }),
+    [],
+  );
 
   // Build network actions (stable ref)
-  const networkActions: NetworkActions = useMemo(() => ({
-    getInterfaces: () => networkMgrRef.current!.list(),
-    getRoutes: () => networkMgrRef.current!.getRoutes(),
-    getDNS: () => networkMgrRef.current!.getDNS(),
-    ping: (host, count) => networkMgrRef.current!.ping(host, count),
-    traceroute: (host) => networkMgrRef.current!.traceroute(host),
-    getConnections: () => networkMgrRef.current!.getConnections(),
-    resolveDNS: (hostname) => networkMgrRef.current!.resolveDNS(hostname),
-  }), [])
+  const networkActions: NetworkActions = useMemo(
+    () => ({
+      getInterfaces: () => networkMgrRef.current!.list(),
+      getRoutes: () => networkMgrRef.current!.getRoutes(),
+      getDNS: () => networkMgrRef.current!.getDNS(),
+      ping: (host, count) => networkMgrRef.current!.ping(host, count),
+      traceroute: (host) => networkMgrRef.current!.traceroute(host),
+      getConnections: () => networkMgrRef.current!.getConnections(),
+      resolveDNS: (hostname) => networkMgrRef.current!.resolveDNS(hostname),
+    }),
+    [],
+  );
 
   // Build journal actions (stable ref)
-  const journalActions: JournalActions = useMemo(() => ({
-    query: (opts) => journalRef.current!.query(opts),
-    write: (unit, priority, message, pid) => journalRef.current!.write(unit, priority, message, pid),
-    formatEntry: (entry) => Journal.formatEntry(entry),
-    priorityFromName: (name) => Journal.priorityFromName(name),
-  }), [])
+  const journalActions: JournalActions = useMemo(
+    () => ({
+      query: (opts) => journalRef.current!.query(opts),
+      write: (unit, priority, message, pid) =>
+        journalRef.current!.write(unit, priority, message, pid),
+      formatEntry: (entry) => Journal.formatEntry(entry),
+      priorityFromName: (name) => Journal.priorityFromName(name),
+    }),
+    [],
+  );
 
   // Build cron actions (stable ref)
-  const cronActions: CronActions = useMemo(() => ({
-    list: () => cronRef.current!.list(),
-    add: (schedule, command, user) => cronRef.current!.add(schedule, command, user),
-    remove: (id) => cronRef.current!.remove(id),
-  }), [])
+  const cronActions: CronActions = useMemo(
+    () => ({
+      list: () => cronRef.current!.list(),
+      add: (schedule, command, user) => cronRef.current!.add(schedule, command, user),
+      remove: (id) => cronRef.current!.remove(id),
+    }),
+    [],
+  );
 
   // Build init actions (stable ref)
-  const initActions: InitActions = useMemo(() => ({
-    enable: (name) => initSystemRef.current!.enable(name),
-    disable: (name) => initSystemRef.current!.disable(name),
-    isEnabled: (name) => initSystemRef.current!.isEnabled(name),
-  }), [])
+  const initActions: InitActions = useMemo(
+    () => ({
+      enable: (name) => initSystemRef.current!.enable(name),
+      disable: (name) => initSystemRef.current!.disable(name),
+      isEnabled: (name) => initSystemRef.current!.isEnabled(name),
+    }),
+    [],
+  );
 
   // Use refs to always access the latest context values
-  const cdcManagerRef = useRef(cdcManager)
-  cdcManagerRef.current = cdcManager
+  const cdcManagerRef = useRef(cdcManager);
+  cdcManagerRef.current = cdcManager;
 
-  const uecManagerRef = useRef(uecManager)
-  uecManagerRef.current = uecManager
+  const uecManagerRef = useRef(uecManager);
+  uecManagerRef.current = uecManager;
 
-  const batManagerRef = useRef(batManager)
-  batManagerRef.current = batManager
+  const batManagerRef = useRef(batManager);
+  batManagerRef.current = batManager;
 
-  const hmsManagerRef = useRef(hmsManager)
-  hmsManagerRef.current = hmsManager
+  const hmsManagerRef = useRef(hmsManager);
+  hmsManagerRef.current = hmsManager;
 
-  const ecrManagerRef = useRef(ecrManager)
-  ecrManagerRef.current = ecrManager
+  const ecrManagerRef = useRef(ecrManager);
+  ecrManagerRef.current = ecrManager;
 
-  const iplManagerRef = useRef(iplManager)
-  iplManagerRef.current = iplManager
+  const iplManagerRef = useRef(iplManager);
+  iplManagerRef.current = iplManager;
 
-  const mfrManagerRef = useRef(mfrManager)
-  mfrManagerRef.current = mfrManager
+  const mfrManagerRef = useRef(mfrManager);
+  mfrManagerRef.current = mfrManager;
 
-  const aicManagerRef = useRef(aicManager)
-  aicManagerRef.current = aicManager
+  const aicManagerRef = useRef(aicManager);
+  aicManagerRef.current = aicManager;
 
-  const vntManagerRef = useRef(vntManager)
-  vntManagerRef.current = vntManager
+  const vntManagerRef = useRef(vntManager);
+  vntManagerRef.current = vntManager;
 
-  const scaManagerRef = useRef(scaManager)
-  scaManagerRef.current = scaManager
+  const scaManagerRef = useRef(scaManager);
+  scaManagerRef.current = scaManager;
 
-  const exdManagerRef = useRef(exdManager)
-  exdManagerRef.current = exdManager
+  const exdManagerRef = useRef(exdManager);
+  exdManagerRef.current = exdManager;
 
-  const qsmManagerRef = useRef(qsmManager)
-  qsmManagerRef.current = qsmManager
+  const qsmManagerRef = useRef(qsmManager);
+  qsmManagerRef.current = qsmManager;
 
-  const emcManagerRef = useRef(emcManager)
-  emcManagerRef.current = emcManager
+  const emcManagerRef = useRef(emcManager);
+  emcManagerRef.current = emcManager;
 
-  const quaManagerRef = useRef(quaManager)
-  quaManagerRef.current = quaManager
+  const quaManagerRef = useRef(quaManager);
+  quaManagerRef.current = quaManager;
 
-  const pwbManagerRef = useRef(pwbManager)
-  pwbManagerRef.current = pwbManager
+  const pwbManagerRef = useRef(pwbManager);
+  pwbManagerRef.current = pwbManager;
 
-  const btkManagerRef = useRef(btkManager)
-  btkManagerRef.current = btkManager
+  const btkManagerRef = useRef(btkManager);
+  btkManagerRef.current = btkManager;
 
-  const rmgManagerRef = useRef(rmgManager)
-  rmgManagerRef.current = rmgManager
+  const rmgManagerRef = useRef(rmgManager);
+  rmgManagerRef.current = rmgManager;
 
-  const mscManagerRef = useRef(mscManager)
-  mscManagerRef.current = mscManager
+  const mscManagerRef = useRef(mscManager);
+  mscManagerRef.current = mscManager;
 
-  const netManagerRef = useRef(netManager)
-  netManagerRef.current = netManager
+  const netManagerRef = useRef(netManager);
+  netManagerRef.current = netManager;
 
-  const tmpManagerRef = useRef(tmpManager)
-  tmpManagerRef.current = tmpManager
+  const tmpManagerRef = useRef(tmpManager);
+  tmpManagerRef.current = tmpManager;
 
-  const dimManagerRef = useRef(dimManager)
-  dimManagerRef.current = dimManager
+  const dimManagerRef = useRef(dimManager);
+  dimManagerRef.current = dimManager;
 
-  const cpuManagerRef = useRef(cpuManager)
-  cpuManagerRef.current = cpuManager
+  const cpuManagerRef = useRef(cpuManager);
+  cpuManagerRef.current = cpuManager;
 
-  const clkManagerRef = useRef(clkManager)
-  clkManagerRef.current = clkManager
+  const clkManagerRef = useRef(clkManager);
+  clkManagerRef.current = clkManager;
 
-  const memManagerRef = useRef(memManager)
-  memManagerRef.current = memManager
+  const memManagerRef = useRef(memManager);
+  memManagerRef.current = memManager;
 
-  const andManagerRef = useRef(andManager)
-  andManagerRef.current = andManager
+  const andManagerRef = useRef(andManager);
+  andManagerRef.current = andManager;
 
-  const qcpManagerRef = useRef(qcpManager)
-  qcpManagerRef.current = qcpManager
+  const qcpManagerRef = useRef(qcpManager);
+  qcpManagerRef.current = qcpManager;
 
-  const tlpManagerRef = useRef(tlpManager)
-  tlpManagerRef.current = tlpManager
+  const tlpManagerRef = useRef(tlpManager);
+  tlpManagerRef.current = tlpManager;
 
-  const lctManagerRef = useRef(lctManager)
-  lctManagerRef.current = lctManager
+  const lctManagerRef = useRef(lctManager);
+  lctManagerRef.current = lctManager;
 
-  const p3dManagerRef = useRef(p3dManager)
-  p3dManagerRef.current = p3dManager
-  const spkManagerRef = useRef(spkManager)
-  spkManagerRef.current = spkManager
-  const dgnManagerRef = useRef(dgnManager)
-  dgnManagerRef.current = dgnManager
+  const p3dManagerRef = useRef(p3dManager);
+  p3dManagerRef.current = p3dManager;
+  const spkManagerRef = useRef(spkManager);
+  spkManagerRef.current = spkManager;
+  const dgnManagerRef = useRef(dgnManager);
+  dgnManagerRef.current = dgnManager;
 
-  const screwButtonManagerRef = useRef(screwButtonManager)
-  screwButtonManagerRef.current = screwButtonManager
+  const screwButtonManagerRef = useRef(screwButtonManager);
+  screwButtonManagerRef.current = screwButtonManager;
 
   // Build screw button device actions
   const screwButtonDeviceActions: ScrewButtonDeviceActions | undefined = useMemo(() => {
-    if (!screwButtonManager) return undefined
+    if (!screwButtonManager) return undefined;
     return {
       activate: (id) => screwButtonManagerRef.current?.activate(id) ?? Promise.resolve(false),
       deactivate: (id) => screwButtonManagerRef.current?.deactivate(id) ?? Promise.resolve(false),
       isUnlocked: (id) => screwButtonManagerRef.current?.isUnlocked(id) ?? false,
       isActive: (id) => screwButtonManagerRef.current?.isActive(id) ?? false,
-      getState: (id) => screwButtonManagerRef.current?.getState(id) ?? { unlocked: false, active: false, unlockedAt: null, activatedAt: null, totalActiveTime: 0 },
-      getAllStates: () => screwButtonManagerRef.current?.getAllStates() ?? { 'SB-01': { unlocked: false, active: false, unlockedAt: null, activatedAt: null, totalActiveTime: 0 }, 'SB-02': { unlocked: false, active: false, unlockedAt: null, activatedAt: null, totalActiveTime: 0 }, 'SB-03': { unlocked: false, active: false, unlockedAt: null, activatedAt: null, totalActiveTime: 0 }, 'SB-04': { unlocked: false, active: false, unlockedAt: null, activatedAt: null, totalActiveTime: 0 } },
-      getNodeSyncStats: () => screwButtonManagerRef.current?.getNodeSyncStats() ?? { connectedNodes: 0, totalNodes: 0, syncRate: '0', hashRate: '0', latency: '0', uptime: '0', lastSync: '', peersOnline: 0, bandwidthIn: '0', bandwidthOut: '0' },
-      getPoolStats: () => screwButtonManagerRef.current?.getPoolStats() ?? { poolName: '', members: 0, maxMembers: 0, totalHashRate: '0', yourContribution: '0', pendingRewards: 0, blocksFound: 0, efficiency: '0', uptime: '0' },
-      getMeshCastStats: () => screwButtonManagerRef.current?.getMeshCastStats() ?? { activeBroadcasts: 0, receivedBuffs: [], networkReach: 0, signalStrength: '0', memesGenerated: 0, memesReceived: 0, bandwidth: '0' },
-      getBridgeStats: () => screwButtonManagerRef.current?.getBridgeStats() ?? { linkedLab: '', bridgeStability: '0', entanglementFidelity: '0', dataTransferred: '0', sharedCrystals: 0, coAssemblies: 0, chatMessages: 0, bridgeUptime: '0', quantumChannel: '' },
-      getFeature: (id) => screwButtonManagerRef.current?.getFeature(id) ?? { id, name: '', fullName: '', description: '', unlockRequirement: '', activationCost: 0 },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screwButtonManager !== undefined])
+      getState: (id) =>
+        screwButtonManagerRef.current?.getState(id) ?? {
+          unlocked: false,
+          active: false,
+          unlockedAt: null,
+          activatedAt: null,
+          totalActiveTime: 0,
+        },
+      getAllStates: () =>
+        screwButtonManagerRef.current?.getAllStates() ?? {
+          "SB-01": {
+            unlocked: false,
+            active: false,
+            unlockedAt: null,
+            activatedAt: null,
+            totalActiveTime: 0,
+          },
+          "SB-02": {
+            unlocked: false,
+            active: false,
+            unlockedAt: null,
+            activatedAt: null,
+            totalActiveTime: 0,
+          },
+          "SB-03": {
+            unlocked: false,
+            active: false,
+            unlockedAt: null,
+            activatedAt: null,
+            totalActiveTime: 0,
+          },
+          "SB-04": {
+            unlocked: false,
+            active: false,
+            unlockedAt: null,
+            activatedAt: null,
+            totalActiveTime: 0,
+          },
+        },
+      getNodeSyncStats: () =>
+        screwButtonManagerRef.current?.getNodeSyncStats() ?? {
+          connectedNodes: 0,
+          totalNodes: 0,
+          syncRate: "0",
+          hashRate: "0",
+          latency: "0",
+          uptime: "0",
+          lastSync: "",
+          peersOnline: 0,
+          bandwidthIn: "0",
+          bandwidthOut: "0",
+        },
+      getPoolStats: () =>
+        screwButtonManagerRef.current?.getPoolStats() ?? {
+          poolName: "",
+          members: 0,
+          maxMembers: 0,
+          totalHashRate: "0",
+          yourContribution: "0",
+          pendingRewards: 0,
+          blocksFound: 0,
+          efficiency: "0",
+          uptime: "0",
+        },
+      getMeshCastStats: () =>
+        screwButtonManagerRef.current?.getMeshCastStats() ?? {
+          activeBroadcasts: 0,
+          receivedBuffs: [],
+          networkReach: 0,
+          signalStrength: "0",
+          memesGenerated: 0,
+          memesReceived: 0,
+          bandwidth: "0",
+        },
+      getBridgeStats: () =>
+        screwButtonManagerRef.current?.getBridgeStats() ?? {
+          linkedLab: "",
+          bridgeStability: "0",
+          entanglementFidelity: "0",
+          dataTransferred: "0",
+          sharedCrystals: 0,
+          coAssemblies: 0,
+          chatMessages: 0,
+          bridgeUptime: "0",
+          quantumChannel: "",
+        },
+      getFeature: (id) =>
+        screwButtonManagerRef.current?.getFeature(id) ?? {
+          id,
+          name: "",
+          fullName: "",
+          description: "",
+          unlockRequirement: "",
+          activationCost: 0,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [screwButtonManager !== undefined]);
+
+  // Helper: get firmware with FirmwareManager override
+  const getFirmwareWithOverride = useCallback(
+    (
+      deviceId: string,
+      fallback: {
+        version: string;
+        build: string;
+        checksum: string;
+        features: string[];
+        securityPatch: string;
+      },
+    ) => {
+      const fwState = firmwareManager?.getInstalledVersion(deviceId);
+      return fwState ?? fallback;
+    },
+    [firmwareManager],
+  );
 
   // Build CDC device actions - stable reference that accesses latest values via ref
   const cdcDeviceActions: CDCDeviceActions | undefined = useMemo(() => {
-    if (!cdcManager) return undefined
+    if (!cdcManager) return undefined;
     return {
       powerOn: () => cdcManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => cdcManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -476,39 +781,44 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => cdcManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => cdcManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = cdcManagerRef.current
+        const m = cdcManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           crystalCount: m?.crystalCount ?? 0,
           sliceCount: m?.sliceCount ?? 0,
           totalPower: m?.totalPower ?? 0,
           currentDraw: m?.currentDraw ?? 0,
-        }
+        };
       },
-      getFirmware: () => cdcManagerRef.current?.firmware ?? {
-        version: '1.4.2',
-        build: '2024.01.15',
-        checksum: 'A7F3B2E1',
-        features: ['crystal-index', 'slice-tracking', 'power-calc', 'auto-sync'],
-        securityPatch: '2024.01.10',
-      },
-      getPowerSpecs: () => cdcManagerRef.current?.powerSpecs ?? {
-        full: 15,
-        idle: 5,
-        standby: 1,
-        category: 'medium',
-        priority: 1,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cdcManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "CDC-001",
+          cdcManagerRef.current?.firmware ?? {
+            version: "1.4.2",
+            build: "2024.01.15",
+            checksum: "A7F3B2E1",
+            features: ["crystal-index", "slice-tracking", "power-calc", "auto-sync"],
+            securityPatch: "2024.01.10",
+          },
+        ),
+      getPowerSpecs: () =>
+        cdcManagerRef.current?.powerSpecs ?? {
+          full: 15,
+          idle: 5,
+          standby: 1,
+          category: "medium",
+          priority: 1,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cdcManager !== undefined]);
 
   // Build UEC device actions - stable reference that accesses latest values via ref
   const uecDeviceActions: UECDeviceActions | undefined = useMemo(() => {
-    if (!uecManager) return undefined
+    if (!uecManager) return undefined;
     return {
       powerOn: () => uecManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => uecManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -517,40 +827,51 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => uecManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => uecManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = uecManagerRef.current
+        const m = uecManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           volatilityTier: m?.volatilityTier ?? 1,
           tps: m?.tps ?? 0,
           energyOutput: m?.energyOutput ?? 0,
           fieldStability: m?.fieldStability ?? 0,
-        }
+        };
       },
-      getFirmware: () => uecManagerRef.current?.firmware ?? {
-        version: '2.0.1',
-        build: '2024.02.08',
-        checksum: 'E9C4F7A2',
-        features: ['volatility-tracking', 'tps-monitor', 'tier-calc', 'network-sync', 'field-stabilizer'],
-        securityPatch: '2024.02.01',
-      },
-      getPowerSpecs: () => uecManagerRef.current?.powerSpecs ?? {
-        outputMax: 500,
-        outputPerTier: 100,
-        selfConsume: 10,
-        standby: 2,
-        category: 'generator',
-        priority: 0,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uecManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "UEC-001",
+          uecManagerRef.current?.firmware ?? {
+            version: "2.0.1",
+            build: "2024.02.08",
+            checksum: "E9C4F7A2",
+            features: [
+              "volatility-tracking",
+              "tps-monitor",
+              "tier-calc",
+              "network-sync",
+              "field-stabilizer",
+            ],
+            securityPatch: "2024.02.01",
+          },
+        ),
+      getPowerSpecs: () =>
+        uecManagerRef.current?.powerSpecs ?? {
+          outputMax: 500,
+          outputPerTier: 100,
+          selfConsume: 10,
+          standby: 2,
+          category: "generator",
+          priority: 0,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uecManager !== undefined]);
 
   // Build BAT device actions - stable reference that accesses latest values via ref
   const batDeviceActions: BATDeviceActions | undefined = useMemo(() => {
-    if (!batManager) return undefined
+    if (!batManager) return undefined;
     return {
       powerOn: () => batManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => batManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -560,10 +881,10 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => batManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => batManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = batManagerRef.current
+        const m = batManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           currentCharge: m?.currentCharge ?? 0,
@@ -573,45 +894,58 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           cellHealth: m?.cellHealth ?? [0, 0, 0, 0],
           temperature: m?.temperature ?? 0,
           autoRegen: m?.autoRegen ?? false,
-        }
+        };
       },
-      getFirmware: () => batManagerRef.current?.firmware ?? {
-        version: '1.8.0',
-        build: '2024.01.20',
-        checksum: 'B4C7D9E2',
-        features: ['cell-monitor', 'auto-regen', 'capacity-track', 'thermal-protect', 'cdc-handshake'],
-        securityPatch: '2024.01.15',
-      },
-      getPowerSpecs: () => batManagerRef.current?.powerSpecs ?? {
-        capacity: 5000,
-        chargeRate: 100,
-        dischargeRate: 150,
-        selfDischarge: 0.5,
-        standbyDrain: 0.1,
-        category: 'storage',
-        priority: 2,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [batManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "BAT-001",
+          batManagerRef.current?.firmware ?? {
+            version: "1.8.0",
+            build: "2024.01.20",
+            checksum: "B4C7D9E2",
+            features: [
+              "cell-monitor",
+              "auto-regen",
+              "capacity-track",
+              "thermal-protect",
+              "cdc-handshake",
+            ],
+            securityPatch: "2024.01.15",
+          },
+        ),
+      getPowerSpecs: () =>
+        batManagerRef.current?.powerSpecs ?? {
+          capacity: 5000,
+          chargeRate: 100,
+          dischargeRate: 150,
+          selfDischarge: 0.5,
+          standbyDrain: 0.1,
+          category: "storage",
+          priority: 2,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batManager !== undefined]);
 
   // Build HMS device actions - stable reference that accesses latest values via ref
   const hmsDeviceActions: HMSDeviceActions | undefined = useMemo(() => {
-    if (!hmsManager) return undefined
+    if (!hmsManager) return undefined;
     return {
       powerOn: () => hmsManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => hmsManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => hmsManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => hmsManagerRef.current?.reboot() ?? Promise.resolve(),
-      setKnobValue: (knob: 'pulse' | 'tempo' | 'freq', value: number) => hmsManagerRef.current?.setKnobValue(knob, value),
-      setWaveform: (type: 'sine' | 'square' | 'saw' | 'triangle') => hmsManagerRef.current?.setWaveform(type),
+      setKnobValue: (knob: "pulse" | "tempo" | "freq", value: number) =>
+        hmsManagerRef.current?.setKnobValue(knob, value),
+      setWaveform: (type: "sine" | "square" | "saw" | "triangle") =>
+        hmsManagerRef.current?.setWaveform(type),
       setExpanded: (expanded: boolean) => hmsManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => hmsManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = hmsManagerRef.current
+        const m = hmsManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           pulseValue: m?.pulseValue ?? 0,
@@ -619,45 +953,57 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           freqValue: m?.freqValue ?? 0,
           currentTier: m?.currentTier ?? 1,
           oscillatorCount: m?.oscillatorCount ?? 4,
-          waveformType: m?.waveformType ?? 'sine',
-        }
+          waveformType: m?.waveformType ?? "sine",
+        };
       },
-      getFirmware: () => hmsManagerRef.current?.firmware ?? {
-        version: '3.2.1',
-        build: '2024.02.15',
-        checksum: 'C5D8E3F1',
-        features: ['multi-osc', 'waveform-gen', 'filter-bank', 'slice-synthesis', 'trait-morph'],
-        securityPatch: '2024.02.10',
-      },
-      getPowerSpecs: () => hmsManagerRef.current?.powerSpecs ?? {
-        full: 8,
-        idle: 3,
-        standby: 0.5,
-        resonance: 12,
-        category: 'medium',
-        priority: 3,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hmsManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "HMS-001",
+          hmsManagerRef.current?.firmware ?? {
+            version: "3.2.1",
+            build: "2024.02.15",
+            checksum: "C5D8E3F1",
+            features: [
+              "multi-osc",
+              "waveform-gen",
+              "filter-bank",
+              "slice-synthesis",
+              "trait-morph",
+            ],
+            securityPatch: "2024.02.10",
+          },
+        ),
+      getPowerSpecs: () =>
+        hmsManagerRef.current?.powerSpecs ?? {
+          full: 8,
+          idle: 3,
+          standby: 0.5,
+          resonance: 12,
+          category: "medium",
+          priority: 3,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hmsManager !== undefined]);
 
   // Build ECR device actions - stable reference that accesses latest values via ref
   const ecrDeviceActions: ECRDeviceActions | undefined = useMemo(() => {
-    if (!ecrManager) return undefined
+    if (!ecrManager) return undefined;
     return {
       powerOn: () => ecrManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => ecrManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => ecrManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => ecrManagerRef.current?.reboot() ?? Promise.resolve(),
-      setKnobValue: (knob: 'pulse' | 'bloom', value: number) => ecrManagerRef.current?.setKnobValue(knob, value),
+      setKnobValue: (knob: "pulse" | "bloom", value: number) =>
+        ecrManagerRef.current?.setKnobValue(knob, value),
       setRecording: (recording: boolean) => ecrManagerRef.current?.setRecording(recording),
       setExpanded: (expanded: boolean) => ecrManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => ecrManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = ecrManagerRef.current
+        const m = ecrManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           pulseValue: m?.pulseValue ?? 0,
           bloomValue: m?.bloomValue ?? 0,
@@ -666,30 +1012,41 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           signalStrength: m?.signalStrength ?? 0,
           currentTier: m?.currentTier ?? 1,
           isExpanded: m?.isExpanded ?? false,
-        }
+        };
       },
-      getFirmware: () => ecrManagerRef.current?.firmware ?? {
-        version: '1.1.0',
-        build: '2024.01.28',
-        checksum: 'D7E9F2A3',
-        features: ['blockchain-feed', 'rotation-track', 'oracle-sync', 'signal-decode', 'ticker-tap'],
-        securityPatch: '2024.01.25',
-      },
-      getPowerSpecs: () => ecrManagerRef.current?.powerSpecs ?? {
-        full: 5,
-        idle: 2,
-        standby: 0.3,
-        recording: 7,
-        category: 'low',
-        priority: 4,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ecrManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "ECR-001",
+          ecrManagerRef.current?.firmware ?? {
+            version: "1.1.0",
+            build: "2024.01.28",
+            checksum: "D7E9F2A3",
+            features: [
+              "blockchain-feed",
+              "rotation-track",
+              "oracle-sync",
+              "signal-decode",
+              "ticker-tap",
+            ],
+            securityPatch: "2024.01.25",
+          },
+        ),
+      getPowerSpecs: () =>
+        ecrManagerRef.current?.powerSpecs ?? {
+          full: 5,
+          idle: 2,
+          standby: 0.3,
+          recording: 7,
+          category: "low",
+          priority: 4,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ecrManager !== undefined]);
 
   // Build IPL device actions - stable reference that accesses latest values via ref
   const iplDeviceActions: IPLDeviceActions | undefined = useMemo(() => {
-    if (!iplManager) return undefined
+    if (!iplManager) return undefined;
     return {
       powerOn: () => iplManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => iplManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -698,10 +1055,10 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => iplManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => iplManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = iplManagerRef.current
+        const m = iplManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           spectrumWidth: m?.spectrumWidth ?? 0,
           interpolationAccuracy: m?.interpolationAccuracy ?? 97.5,
@@ -709,30 +1066,41 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           predictionHorizon: m?.predictionHorizon ?? 60,
           currentTier: m?.currentTier ?? 1,
           isExpanded: m?.isExpanded ?? false,
-        }
+        };
       },
-      getFirmware: () => iplManagerRef.current?.firmware ?? {
-        version: '2.5.3',
-        build: '2024.02.10',
-        checksum: 'F3A8C5D7',
-        features: ['color-interp', 'era-manipulate', 'prism-array', 'spectrum-lock', 'prediction-engine'],
-        securityPatch: '2024.02.05',
-      },
-      getPowerSpecs: () => iplManagerRef.current?.powerSpecs ?? {
-        full: 20,
-        idle: 6,
-        standby: 1,
-        predictive: 30,
-        category: 'medium',
-        priority: 2,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [iplManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "INT-001",
+          iplManagerRef.current?.firmware ?? {
+            version: "2.5.3",
+            build: "2024.02.10",
+            checksum: "F3A8C5D7",
+            features: [
+              "color-interp",
+              "era-manipulate",
+              "prism-array",
+              "spectrum-lock",
+              "prediction-engine",
+            ],
+            securityPatch: "2024.02.05",
+          },
+        ),
+      getPowerSpecs: () =>
+        iplManagerRef.current?.powerSpecs ?? {
+          full: 20,
+          idle: 6,
+          standby: 1,
+          predictive: 30,
+          category: "medium",
+          priority: 2,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [iplManager !== undefined]);
 
   // Build MFR device actions - stable reference that accesses latest values via ref
   const mfrDeviceActions: MFRDeviceActions | undefined = useMemo(() => {
-    if (!mfrManager) return undefined
+    if (!mfrManager) return undefined;
     return {
       powerOn: () => mfrManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => mfrManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -741,10 +1109,10 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => mfrManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => mfrManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = mfrManagerRef.current
+        const m = mfrManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           powerOutput: m?.powerOutput ?? 0,
           stability: m?.stability ?? 0,
@@ -752,31 +1120,42 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           efficiency: m?.efficiency ?? 92,
           ringSpeed: m?.ringSpeed ?? 0,
           isExpanded: m?.isExpanded ?? false,
-        }
+        };
       },
-      getFirmware: () => mfrManagerRef.current?.firmware ?? {
-        version: '2.3.0',
-        build: '2024.02.01',
-        checksum: 'B8D4E6F2',
-        features: ['plasma-contain', 'power-regulate', 'thermal-manage', 'auto-scram', 'efficiency-tune'],
-        securityPatch: '2024.01.28',
-      },
-      getPowerSpecs: () => mfrManagerRef.current?.powerSpecs ?? {
-        full: 250,
-        idle: 150,
-        standby: 25,
-        startupCost: 500,
-        efficiency: 92,
-        category: 'generator',
-        tier: 2,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mfrManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "MFR-001",
+          mfrManagerRef.current?.firmware ?? {
+            version: "2.3.0",
+            build: "2024.02.01",
+            checksum: "B8D4E6F2",
+            features: [
+              "plasma-contain",
+              "power-regulate",
+              "thermal-manage",
+              "auto-scram",
+              "efficiency-tune",
+            ],
+            securityPatch: "2024.01.28",
+          },
+        ),
+      getPowerSpecs: () =>
+        mfrManagerRef.current?.powerSpecs ?? {
+          full: 250,
+          idle: 150,
+          standby: 25,
+          startupCost: 500,
+          efficiency: 92,
+          category: "generator",
+          tier: 2,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mfrManager !== undefined]);
 
   // Build AIC device actions - stable reference that accesses latest values via ref
   const aicDeviceActions: AICDeviceActions | undefined = useMemo(() => {
-    if (!aicManager) return undefined
+    if (!aicManager) return undefined;
     return {
       powerOn: () => aicManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => aicManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -786,10 +1165,10 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => aicManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => aicManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = aicManagerRef.current
+        const m = aicManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           taskQueue: m?.taskQueue ?? 0,
           efficiency: m?.efficiency ?? 0,
@@ -798,80 +1177,98 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           anomalyCount: m?.anomalyCount ?? 0,
           uptime: m?.uptime ?? 0,
           isExpanded: m?.isExpanded ?? false,
-        }
+        };
       },
-      getFirmware: () => aicManagerRef.current?.firmware ?? {
-        version: '2.4.0',
-        build: '2024.02.20',
-        checksum: 'E7A9C3B5',
-        features: ['neural-core', 'task-queue', 'auto-optimize', 'learning-mode', 'anomaly-detect'],
-        securityPatch: '2024.02.15',
-      },
-      getPowerSpecs: () => aicManagerRef.current?.powerSpecs ?? {
-        full: 35,
-        idle: 12,
-        standby: 3,
-        learning: 50,
-        category: 'heavy',
-        priority: 1,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aicManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "AIC-001",
+          aicManagerRef.current?.firmware ?? {
+            version: "2.4.0",
+            build: "2024.02.20",
+            checksum: "E7A9C3B5",
+            features: [
+              "neural-core",
+              "task-queue",
+              "auto-optimize",
+              "learning-mode",
+              "anomaly-detect",
+            ],
+            securityPatch: "2024.02.15",
+          },
+        ),
+      getPowerSpecs: () =>
+        aicManagerRef.current?.powerSpecs ?? {
+          full: 35,
+          idle: 12,
+          standby: 3,
+          learning: 50,
+          category: "heavy",
+          priority: 1,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aicManager !== undefined]);
 
   // Build VNT device actions - stable reference that accesses latest values via ref
   const vntDeviceActions: VNTDeviceActions | undefined = useMemo(() => {
-    if (!vntManager) return undefined
+    if (!vntManager) return undefined;
     return {
       powerOn: () => vntManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => vntManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => vntManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => vntManagerRef.current?.reboot() ?? Promise.resolve(),
-      setFanSpeed: (fanId: 'cpu' | 'gpu', speed: number) => vntManagerRef.current?.setFanSpeed(fanId, speed),
-      setFanMode: (fanId: 'cpu' | 'gpu', mode: 'AUTO' | 'LOW' | 'MED' | 'HIGH') => vntManagerRef.current?.setFanMode(fanId, mode),
-      toggleFan: (fanId: 'cpu' | 'gpu', on: boolean) => vntManagerRef.current?.toggleFan(fanId, on),
+      setFanSpeed: (fanId: "cpu" | "gpu", speed: number) =>
+        vntManagerRef.current?.setFanSpeed(fanId, speed),
+      setFanMode: (fanId: "cpu" | "gpu", mode: "AUTO" | "LOW" | "MED" | "HIGH") =>
+        vntManagerRef.current?.setFanMode(fanId, mode),
+      toggleFan: (fanId: "cpu" | "gpu", on: boolean) => vntManagerRef.current?.toggleFan(fanId, on),
       emergencyPurge: () => vntManagerRef.current?.emergencyPurge() ?? Promise.resolve(),
       setExpanded: (expanded: boolean) => vntManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => vntManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = vntManagerRef.current
+        const m = vntManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
-          cpuFan: m?.cpuFan ?? { speed: 0, rpm: 0, mode: 'AUTO', isOn: false },
-          gpuFan: m?.gpuFan ?? { speed: 0, rpm: 0, mode: 'AUTO', isOn: false },
+          cpuFan: m?.cpuFan ?? { speed: 0, rpm: 0, mode: "AUTO", isOn: false },
+          gpuFan: m?.gpuFan ?? { speed: 0, rpm: 0, mode: "AUTO", isOn: false },
           cpuTemp: m?.cpuTemp ?? 0,
           gpuTemp: m?.gpuTemp ?? 0,
           currentDraw: m?.currentDraw ?? 0,
           filterHealth: m?.filterHealth ?? 0,
           airQuality: m?.airQuality ?? 0,
           humidity: m?.humidity ?? 0,
-        }
+        };
       },
-      getFirmware: () => vntManagerRef.current?.firmware ?? {
-        version: '1.0.0',
-        build: '2026.01.28',
-        checksum: 'V4F1N7E2',
-        features: ['air-exchange', 'hepa-filter', 'humidity-ctrl', 'damper-ctrl', 'dual-fan'],
-        securityPatch: '2026.01.20',
-      },
-      getPowerSpecs: () => vntManagerRef.current?.powerSpecs ?? {
-        full: 4,
-        idle: 2,
-        standby: 0.5,
-        emergency: 12,
-        category: 'light',
-        priority: 1,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vntManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "VNT-001",
+          vntManagerRef.current?.firmware ?? {
+            version: "1.0.0",
+            build: "2026.01.28",
+            checksum: "V4F1N7E2",
+            features: ["air-exchange", "hepa-filter", "humidity-ctrl", "damper-ctrl", "dual-fan"],
+            securityPatch: "2026.01.20",
+          },
+        ),
+      getPowerSpecs: () =>
+        vntManagerRef.current?.powerSpecs ?? {
+          full: 4,
+          idle: 2,
+          standby: 0.5,
+          emergency: 12,
+          category: "light",
+          priority: 1,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vntManager !== undefined]);
 
   // Build SCA device actions
   const scaDeviceActions: SCADeviceActions | undefined = useMemo(() => {
-    if (!scaManager) return undefined
+    if (!scaManager) return undefined;
     return {
       powerOn: () => scaManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => scaManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -880,10 +1277,10 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => scaManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => scaManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = scaManagerRef.current
+        const m = scaManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           flops: m?.flops ?? 0,
@@ -895,30 +1292,41 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           interconnectBandwidth: m?.interconnectBandwidth ?? 0,
           uptime: m?.uptime ?? 0,
           currentDraw: m?.currentDraw ?? 0,
-        }
+        };
       },
-      getFirmware: () => scaManagerRef.current?.firmware ?? {
-        version: '5.2.0',
-        build: '2026.01.28',
-        checksum: 'C8A5F2E7',
-        features: ['16-node-cluster', 'ecc-memory', 'job-scheduler', 'linpack-bench', 'interconnect-mesh'],
-        securityPatch: '2026.01.20',
-      },
-      getPowerSpecs: () => scaManagerRef.current?.powerSpecs ?? {
-        full: 45,
-        idle: 15,
-        standby: 5,
-        benchmark: 60,
-        category: 'heavy',
-        priority: 3,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scaManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "SCA-001",
+          scaManagerRef.current?.firmware ?? {
+            version: "5.2.0",
+            build: "2026.01.28",
+            checksum: "C8A5F2E7",
+            features: [
+              "16-node-cluster",
+              "ecc-memory",
+              "job-scheduler",
+              "linpack-bench",
+              "interconnect-mesh",
+            ],
+            securityPatch: "2026.01.20",
+          },
+        ),
+      getPowerSpecs: () =>
+        scaManagerRef.current?.powerSpecs ?? {
+          full: 45,
+          idle: 15,
+          standby: 5,
+          benchmark: 60,
+          category: "heavy",
+          priority: 3,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scaManager !== undefined]);
 
   // Build EXD device actions
   const exdDeviceActions: EXDDeviceActions | undefined = useMemo(() => {
-    if (!exdManager) return undefined
+    if (!exdManager) return undefined;
     return {
       powerOn: () => exdManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => exdManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -929,10 +1337,10 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => exdManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => exdManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = exdManagerRef.current
+        const m = exdManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           range: m?.range ?? 0,
@@ -945,30 +1353,41 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           radarActive: m?.radarActive ?? false,
           isDeployed: m?.isDeployed ?? false,
           currentDraw: m?.currentDraw ?? 0,
-        }
+        };
       },
-      getFirmware: () => exdManagerRef.current?.firmware ?? {
-        version: '3.1.2',
-        build: '2026.01.28',
-        checksum: 'D3X1F7A9',
-        features: ['autonomous-nav', 'resource-scan', 'cargo-haul', 'gps-lock', 'imu-stabilize'],
-        securityPatch: '2026.01.20',
-      },
-      getPowerSpecs: () => exdManagerRef.current?.powerSpecs ?? {
-        full: 40,
-        idle: 15,
-        standby: 1,
-        highSpeed: 65,
-        category: 'heavy',
-        priority: 3,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exdManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "EXD-001",
+          exdManagerRef.current?.firmware ?? {
+            version: "3.1.2",
+            build: "2026.01.28",
+            checksum: "D3X1F7A9",
+            features: [
+              "autonomous-nav",
+              "resource-scan",
+              "cargo-haul",
+              "gps-lock",
+              "imu-stabilize",
+            ],
+            securityPatch: "2026.01.20",
+          },
+        ),
+      getPowerSpecs: () =>
+        exdManagerRef.current?.powerSpecs ?? {
+          full: 40,
+          idle: 15,
+          standby: 1,
+          highSpeed: 65,
+          category: "heavy",
+          priority: 3,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exdManager !== undefined]);
 
   // Build QSM device actions
   const qsmDeviceActions: QSMDeviceActions | undefined = useMemo(() => {
-    if (!qsmManager) return undefined
+    if (!qsmManager) return undefined;
     return {
       powerOn: () => qsmManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => qsmManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -977,10 +1396,10 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (v: boolean) => qsmManagerRef.current?.setExpanded(v),
       toggleExpanded: () => qsmManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = qsmManagerRef.current
+        const m = qsmManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           coherence: m?.coherence ?? 0,
@@ -989,30 +1408,41 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           currentDraw: m?.currentDraw ?? 0,
           errorRate: m?.errorRate ?? 0,
           temperature: m?.temperature ?? 15,
-        }
+        };
       },
-      getFirmware: () => qsmManagerRef.current?.firmware ?? {
-        version: '1.2.0',
-        build: '2026.01.20',
-        checksum: 'Q7S4M1N9',
-        features: ['qubit-array', 'coherence-tracking', 'entanglement-verify', 'error-correction', 'wave-function'],
-        securityPatch: '2026.01.18',
-      },
-      getPowerSpecs: () => qsmManagerRef.current?.powerSpecs ?? {
-        full: 12,
-        idle: 7,
-        standby: 1,
-        scan: 18,
-        category: 'medium',
-        priority: 2,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qsmManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "QSM-001",
+          qsmManagerRef.current?.firmware ?? {
+            version: "1.2.0",
+            build: "2026.01.20",
+            checksum: "Q7S4M1N9",
+            features: [
+              "qubit-array",
+              "coherence-tracking",
+              "entanglement-verify",
+              "error-correction",
+              "wave-function",
+            ],
+            securityPatch: "2026.01.18",
+          },
+        ),
+      getPowerSpecs: () =>
+        qsmManagerRef.current?.powerSpecs ?? {
+          full: 12,
+          idle: 7,
+          standby: 1,
+          scan: 18,
+          category: "medium",
+          priority: 2,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qsmManager !== undefined]);
 
   // Build EMC device actions
   const emcDeviceActions: EMCDeviceActions | undefined = useMemo(() => {
-    if (!emcManager) return undefined
+    if (!emcManager) return undefined;
     return {
       powerOn: () => emcManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => emcManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -1021,10 +1451,10 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (v: boolean) => emcManagerRef.current?.setExpanded(v),
       toggleExpanded: () => emcManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = emcManagerRef.current
+        const m = emcManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           units: m?.units ?? 0,
@@ -1033,78 +1463,95 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           temperature: m?.temperature ?? 800,
           isContained: m?.isContained ?? false,
           currentDraw: m?.currentDraw ?? 0,
-        }
+        };
       },
-      getFirmware: () => emcManagerRef.current?.firmware ?? {
-        version: '4.0.1',
-        build: '2026.01.29',
-        checksum: 'E8X4M2C7',
-        features: ['containment-field', 'particle-tracking', 'stability-calc', 'matter-compress', 'field-harmonics'],
-        securityPatch: '2026.01.25',
-      },
-      getPowerSpecs: () => emcManagerRef.current?.powerSpecs ?? {
-        full: 40,
-        idle: 18,
-        standby: 2,
-        scan: 55,
-        category: 'heavy',
-        priority: 1,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emcManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "EMC-001",
+          emcManagerRef.current?.firmware ?? {
+            version: "4.0.1",
+            build: "2026.01.29",
+            checksum: "E8X4M2C7",
+            features: [
+              "containment-field",
+              "particle-tracking",
+              "stability-calc",
+              "matter-compress",
+              "field-harmonics",
+            ],
+            securityPatch: "2026.01.25",
+          },
+        ),
+      getPowerSpecs: () =>
+        emcManagerRef.current?.powerSpecs ?? {
+          full: 40,
+          idle: 18,
+          standby: 2,
+          scan: 55,
+          category: "heavy",
+          priority: 1,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emcManager !== undefined]);
 
   // Build QUA device actions
   const quaDeviceActions: QUADeviceActions | undefined = useMemo(() => {
-    if (!quaManager) return undefined
+    if (!quaManager) return undefined;
     return {
       powerOn: () => quaManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => quaManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => quaManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => quaManagerRef.current?.reboot() ?? Promise.resolve(),
-      setMode: (mode: 'ANOMALY' | 'RESOURCE' | 'DECRYPT' | 'DIAGNOSE' | 'SIMULATE' | 'SCAN') => quaManagerRef.current?.setMode(mode),
+      setMode: (mode: "ANOMALY" | "RESOURCE" | "DECRYPT" | "DIAGNOSE" | "SIMULATE" | "SCAN") =>
+        quaManagerRef.current?.setMode(mode),
       setSensitivity: (value: number) => quaManagerRef.current?.setSensitivity(value),
       setDepth: (value: number) => quaManagerRef.current?.setDepth(value),
       setFrequency: (value: number) => quaManagerRef.current?.setFrequency(value),
       setExpanded: (v: boolean) => quaManagerRef.current?.setExpanded(v),
       toggleExpanded: () => quaManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = quaManagerRef.current
+        const m = quaManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
-          mode: m?.mode ?? 'ANOMALY',
+          mode: m?.mode ?? "ANOMALY",
           sensitivity: m?.sensitivity ?? 65,
           depth: m?.depth ?? 50,
           frequency: m?.frequency ?? 40,
           coherence: m?.coherence ?? 0,
           isAnalyzing: m?.isAnalyzing ?? false,
           currentDraw: m?.currentDraw ?? 2,
-        }
+        };
       },
-      getFirmware: () => quaManagerRef.current?.firmware ?? {
-        version: '3.7.2',
-        build: '2026.01.29',
-        checksum: 'Q7A3N5X8',
-        features: ['quantum-core', 'neural-network', 'multi-mode', 'waveform-gen', 'deep-scan'],
-        securityPatch: '2026.01.25',
-      },
-      getPowerSpecs: () => quaManagerRef.current?.powerSpecs ?? {
-        full: 25,
-        idle: 10,
-        standby: 2,
-        analysis: 35,
-        category: 'heavy',
-        priority: 2,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quaManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "QAN-001",
+          quaManagerRef.current?.firmware ?? {
+            version: "3.7.2",
+            build: "2026.01.29",
+            checksum: "Q7A3N5X8",
+            features: ["quantum-core", "neural-network", "multi-mode", "waveform-gen", "deep-scan"],
+            securityPatch: "2026.01.25",
+          },
+        ),
+      getPowerSpecs: () =>
+        quaManagerRef.current?.powerSpecs ?? {
+          full: 25,
+          idle: 10,
+          standby: 2,
+          analysis: 35,
+          category: "heavy",
+          priority: 2,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quaManager !== undefined]);
 
   const pwbDeviceActions: PWBDeviceActions | undefined = useMemo(() => {
-    if (!pwbManager) return undefined
+    if (!pwbManager) return undefined;
     return {
       powerOn: () => pwbManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => pwbManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -1113,38 +1560,43 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => pwbManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => pwbManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = pwbManagerRef.current
+        const m = pwbManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           currentDraw: m?.currentDraw ?? 0,
           activeSlot: m?.activeSlot ?? null,
           queuedItems: m?.queuedItems ?? 0,
           craftingProgress: m?.craftingProgress ?? 0,
-        }
+        };
       },
-      getFirmware: () => pwbManagerRef.current?.firmware ?? {
-        version: '1.1.0',
-        build: '2024.02.20',
-        checksum: 'D4E8F1A3',
-        features: ['slot-management', 'auto-calibrate', 'tool-tracking', 'assembly-queue'],
-        securityPatch: '2024.02.15',
-      },
-      getPowerSpecs: () => pwbManagerRef.current?.powerSpecs ?? {
-        full: 3,
-        idle: 0.8,
-        standby: 0.15,
-        category: 'light',
-        priority: 2,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pwbManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "PWB-001",
+          pwbManagerRef.current?.firmware ?? {
+            version: "1.1.0",
+            build: "2024.02.20",
+            checksum: "D4E8F1A3",
+            features: ["slot-management", "auto-calibrate", "tool-tracking", "assembly-queue"],
+            securityPatch: "2024.02.15",
+          },
+        ),
+      getPowerSpecs: () =>
+        pwbManagerRef.current?.powerSpecs ?? {
+          full: 3,
+          idle: 0.8,
+          standby: 0.15,
+          category: "light",
+          priority: 2,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pwbManager !== undefined]);
 
   const btkDeviceActions: BTKDeviceActions | undefined = useMemo(() => {
-    if (!btkManager) return undefined
+    if (!btkManager) return undefined;
     return {
       powerOn: () => btkManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => btkManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -1153,36 +1605,41 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => btkManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => btkManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = btkManagerRef.current
+        const m = btkManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           currentDraw: m?.currentDraw ?? 0,
           selectedTool: m?.selectedTool ?? null,
           isExpanded: m?.isExpanded ?? true,
-        }
+        };
       },
-      getFirmware: () => btkManagerRef.current?.firmware ?? {
-        version: '1.2.0',
-        build: '2024.03.10',
-        checksum: 'B3A7C5D2',
-        features: ['probe-calibrate', 'clamp-feedback', 'laser-safety', 'drill-torque-ctrl'],
-        securityPatch: '2024.03.05',
-      },
-      getPowerSpecs: () => btkManagerRef.current?.powerSpecs ?? {
-        full: 0.5,
-        idle: 0.3,
-        standby: 0.05,
-        category: 'light',
-        priority: 2,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [btkManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "BTK-001",
+          btkManagerRef.current?.firmware ?? {
+            version: "1.2.0",
+            build: "2024.03.10",
+            checksum: "B3A7C5D2",
+            features: ["probe-calibrate", "clamp-feedback", "laser-safety", "drill-torque-ctrl"],
+            securityPatch: "2024.03.05",
+          },
+        ),
+      getPowerSpecs: () =>
+        btkManagerRef.current?.powerSpecs ?? {
+          full: 0.5,
+          idle: 0.3,
+          standby: 0.05,
+          category: "light",
+          priority: 2,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [btkManager !== undefined]);
 
   const rmgDeviceActions: RMGDeviceActions | undefined = useMemo(() => {
-    if (!rmgManager) return undefined
+    if (!rmgManager) return undefined;
     return {
       powerOn: () => rmgManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => rmgManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -1192,37 +1649,42 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => rmgManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => rmgManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = rmgManagerRef.current
+        const m = rmgManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           currentDraw: m?.currentDraw ?? 0,
           strength: m?.strength ?? 45,
           fieldActive: m?.fieldActive ?? false,
           isExpanded: m?.isExpanded ?? true,
-        }
+        };
       },
-      getFirmware: () => rmgManagerRef.current?.firmware ?? {
-        version: '1.2.0',
-        build: '2024.03.15',
-        checksum: 'E2C4A8F6',
-        features: ['coil-feedback', 'flux-stabilize', 'field-calibrate', 'auto-attract'],
-        securityPatch: '2024.03.10',
-      },
-      getPowerSpecs: () => rmgManagerRef.current?.powerSpecs ?? {
-        full: 5,
-        idle: 3,
-        standby: 0.2,
-        category: 'medium',
-        priority: 3,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rmgManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "RMG-001",
+          rmgManagerRef.current?.firmware ?? {
+            version: "1.2.0",
+            build: "2024.03.15",
+            checksum: "E2C4A8F6",
+            features: ["coil-feedback", "flux-stabilize", "field-calibrate", "auto-attract"],
+            securityPatch: "2024.03.10",
+          },
+        ),
+      getPowerSpecs: () =>
+        rmgManagerRef.current?.powerSpecs ?? {
+          full: 5,
+          idle: 3,
+          standby: 0.2,
+          category: "medium",
+          priority: 3,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rmgManager !== undefined]);
 
   const mscDeviceActions: MSCDeviceActions | undefined = useMemo(() => {
-    if (!mscManager) return undefined
+    if (!mscManager) return undefined;
     return {
       powerOn: () => mscManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => mscManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -1231,37 +1693,42 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => mscManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => mscManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = mscManagerRef.current
+        const m = mscManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           currentDraw: m?.currentDraw ?? 0,
           scanLine: m?.scanLine ?? 0,
           detectedMaterials: m?.detectedMaterials ?? 0,
           isExpanded: m?.isExpanded ?? true,
-        }
+        };
       },
-      getFirmware: () => mscManagerRef.current?.firmware ?? {
-        version: '1.3.0',
-        build: '2024.02.28',
-        checksum: 'F7A3C9D2',
-        features: ['material-detect', 'anomaly-flag', 'sweep-scan', 'auto-calibrate'],
-        securityPatch: '2024.02.20',
-      },
-      getPowerSpecs: () => mscManagerRef.current?.powerSpecs ?? {
-        full: 2,
-        idle: 1,
-        standby: 0.1,
-        category: 'light',
-        priority: 2,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mscManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "MSC-001",
+          mscManagerRef.current?.firmware ?? {
+            version: "1.3.0",
+            build: "2024.02.28",
+            checksum: "F7A3C9D2",
+            features: ["material-detect", "anomaly-flag", "sweep-scan", "auto-calibrate"],
+            securityPatch: "2024.02.20",
+          },
+        ),
+      getPowerSpecs: () =>
+        mscManagerRef.current?.powerSpecs ?? {
+          full: 2,
+          idle: 1,
+          standby: 0.1,
+          category: "light",
+          priority: 2,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mscManager !== undefined]);
 
   const netDeviceActions: NETDeviceActions | undefined = useMemo(() => {
-    if (!netManager) return undefined
+    if (!netManager) return undefined;
     return {
       powerOn: () => netManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => netManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -1272,10 +1739,10 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => netManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => netManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = netManagerRef.current
+        const m = netManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           currentDraw: m?.currentDraw ?? 0,
@@ -1283,28 +1750,39 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           latencyMs: m?.latencyMs ?? 12,
           isConnected: m?.isConnected ?? false,
           packetLoss: m?.packetLoss ?? 0,
-        }
+        };
       },
-      getFirmware: () => netManagerRef.current?.firmware ?? {
-        version: '2.1.0',
-        build: '2026.01.28',
-        checksum: 'N7E4T2M1',
-        features: ['nic-detect', 'dhcp-client', 'throughput-monitor', 'latency-track', 'packet-inspect'],
-        securityPatch: '2026.01.20',
-      },
-      getPowerSpecs: () => netManagerRef.current?.powerSpecs ?? {
-        full: 1.5,
-        idle: 0.8,
-        standby: 0.1,
-        category: 'light',
-        priority: 2,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [netManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "NET-001",
+          netManagerRef.current?.firmware ?? {
+            version: "2.1.0",
+            build: "2026.01.28",
+            checksum: "N7E4T2M1",
+            features: [
+              "nic-detect",
+              "dhcp-client",
+              "throughput-monitor",
+              "latency-track",
+              "packet-inspect",
+            ],
+            securityPatch: "2026.01.20",
+          },
+        ),
+      getPowerSpecs: () =>
+        netManagerRef.current?.powerSpecs ?? {
+          full: 1.5,
+          idle: 0.8,
+          standby: 0.1,
+          category: "light",
+          priority: 2,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [netManager !== undefined]);
 
   const tmpDeviceActions: TMPDeviceActions | undefined = useMemo(() => {
-    if (!tmpManager) return undefined
+    if (!tmpManager) return undefined;
     return {
       powerOn: () => tmpManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => tmpManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -1314,10 +1792,10 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => tmpManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => tmpManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = tmpManagerRef.current
+        const m = tmpManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           currentDraw: m?.currentDraw ?? 0,
@@ -1325,28 +1803,39 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           maxTemp: m?.maxTemp ?? 85,
           minTemp: m?.minTemp ?? 15,
           fluctuation: m?.fluctuation ?? 0,
-        }
+        };
       },
-      getFirmware: () => tmpManagerRef.current?.firmware ?? {
-        version: '1.0.0',
-        build: '2025.11.15',
-        checksum: 'T3M1P4K2',
-        features: ['thermal-probe', 'multi-sensor', 'threshold-alert', 'cooling-monitor', 'auto-calibrate'],
-        securityPatch: '2025.11.10',
-      },
-      getPowerSpecs: () => tmpManagerRef.current?.powerSpecs ?? {
-        full: 1.2,
-        idle: 0.8,
-        standby: 0.1,
-        category: 'light',
-        priority: 1,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tmpManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "TMP-001",
+          tmpManagerRef.current?.firmware ?? {
+            version: "1.0.0",
+            build: "2025.11.15",
+            checksum: "T3M1P4K2",
+            features: [
+              "thermal-probe",
+              "multi-sensor",
+              "threshold-alert",
+              "cooling-monitor",
+              "auto-calibrate",
+            ],
+            securityPatch: "2025.11.10",
+          },
+        ),
+      getPowerSpecs: () =>
+        tmpManagerRef.current?.powerSpecs ?? {
+          full: 1.2,
+          idle: 0.8,
+          standby: 0.1,
+          category: "light",
+          priority: 1,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tmpManager !== undefined]);
 
   const dimDeviceActions: DIMDeviceActions | undefined = useMemo(() => {
-    if (!dimManager) return undefined
+    if (!dimManager) return undefined;
     return {
       powerOn: () => dimManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => dimManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -1356,10 +1845,10 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => dimManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => dimManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = dimManagerRef.current
+        const m = dimManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           currentDraw: m?.currentDraw ?? 0,
@@ -1368,28 +1857,39 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           riftActivity: m?.riftActivity ?? 0.02,
           fluctuation: m?.fluctuation ?? 0,
           testResult: m?.testResult ?? null,
-        }
+        };
       },
-      getFirmware: () => dimManagerRef.current?.firmware ?? {
-        version: '1.0.0',
-        build: '2025.12.01',
-        checksum: 'D1M3N501',
-        features: ['d-space-probe', 'rift-scan', 'stability-lock', 'halo-monitor', 'auto-calibrate'],
-        securityPatch: '2025.11.28',
-      },
-      getPowerSpecs: () => dimManagerRef.current?.powerSpecs ?? {
-        full: 1.5,
-        idle: 0.8,
-        standby: 0.1,
-        category: 'light',
-        priority: 2,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dimManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "DIM-001",
+          dimManagerRef.current?.firmware ?? {
+            version: "1.0.0",
+            build: "2025.12.01",
+            checksum: "D1M3N501",
+            features: [
+              "d-space-probe",
+              "rift-scan",
+              "stability-lock",
+              "halo-monitor",
+              "auto-calibrate",
+            ],
+            securityPatch: "2025.11.28",
+          },
+        ),
+      getPowerSpecs: () =>
+        dimManagerRef.current?.powerSpecs ?? {
+          full: 1.5,
+          idle: 0.8,
+          standby: 0.1,
+          category: "light",
+          priority: 2,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dimManager !== undefined]);
 
   const cpuDeviceActions: CPUDeviceActions | undefined = useMemo(() => {
-    if (!cpuManager) return undefined
+    if (!cpuManager) return undefined;
     return {
       powerOn: () => cpuManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => cpuManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -1401,10 +1901,10 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => cpuManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => cpuManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = cpuManagerRef.current
+        const m = cpuManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           currentDraw: m?.currentDraw ?? 0,
@@ -1414,35 +1914,47 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           coreLoads: m?.coreLoads ?? [],
           temperature: m?.temperature ?? 62,
           testResult: m?.testResult ?? null,
-        }
+        };
       },
-      getFirmware: () => cpuManagerRef.current?.firmware ?? {
-        version: '3.2.1',
-        build: '2025.08.15',
-        checksum: 'CPU3M0N1',
-        features: ['multi-core-monitor', 'freq-scaling', 'thermal-link', 'cache-analysis', 'stress-test'],
-        securityPatch: '2025.08.01',
-      },
-      getPowerSpecs: () => cpuManagerRef.current?.powerSpecs ?? {
-        full: 0.8,
-        idle: 0.5,
-        standby: 0.05,
-        category: 'light',
-        priority: 1,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cpuManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "CPU-001",
+          cpuManagerRef.current?.firmware ?? {
+            version: "3.2.1",
+            build: "2025.08.15",
+            checksum: "CPU3M0N1",
+            features: [
+              "multi-core-monitor",
+              "freq-scaling",
+              "thermal-link",
+              "cache-analysis",
+              "stress-test",
+            ],
+            securityPatch: "2025.08.01",
+          },
+        ),
+      getPowerSpecs: () =>
+        cpuManagerRef.current?.powerSpecs ?? {
+          full: 0.8,
+          idle: 0.5,
+          standby: 0.05,
+          category: "light",
+          priority: 1,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cpuManager !== undefined]);
 
   const clkDeviceActions: CLKDeviceActions | undefined = useMemo(() => {
-    if (!clkManager) return undefined
+    if (!clkManager) return undefined;
     return {
       powerOn: () => clkManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => clkManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => clkManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => clkManagerRef.current?.reboot() ?? Promise.resolve(),
       cycleMode: () => clkManagerRef.current?.cycleMode(),
-      setMode: (mode: 'local' | 'utc' | 'date' | 'uptime' | 'countdown' | 'stopwatch') => clkManagerRef.current?.setMode(mode),
+      setMode: (mode: "local" | "utc" | "date" | "uptime" | "countdown" | "stopwatch") =>
+        clkManagerRef.current?.setMode(mode),
       toggleStopwatch: () => clkManagerRef.current?.toggleStopwatch(),
       resetStopwatch: () => clkManagerRef.current?.resetStopwatch(),
       toggleCountdown: () => clkManagerRef.current?.toggleCountdown(),
@@ -1450,14 +1962,14 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setExpanded: (expanded: boolean) => clkManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => clkManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = clkManagerRef.current
+        const m = clkManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           currentDraw: m?.currentDraw ?? 0,
-          displayMode: m?.displayMode ?? 'local',
+          displayMode: m?.displayMode ?? "local",
           currentTime: m?.currentTime ?? new Date(),
           uptime: m?.uptime ?? 0,
           stopwatchTime: m?.stopwatchTime ?? 0,
@@ -1465,300 +1977,383 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           countdownTime: m?.countdownTime ?? 3600,
           countdownRunning: m?.countdownRunning ?? false,
           testResult: m?.testResult ?? null,
-        }
+        };
       },
-      getFirmware: () => clkManagerRef.current?.firmware ?? {
-        version: '2.4.0',
-        build: '2025.06.20',
-        checksum: 'CLK7M3R0',
-        features: ['rtc-sync', 'ntp-query', 'drift-comp', 'multi-mode', 'stopwatch', 'countdown'],
-        securityPatch: '2025.06.15',
-      },
-      getPowerSpecs: () => clkManagerRef.current?.powerSpecs ?? {
-        full: 0.5,
-        idle: 0.3,
-        standby: 0.02,
-        category: 'light',
-        priority: 1,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clkManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "CLK-001",
+          clkManagerRef.current?.firmware ?? {
+            version: "2.4.0",
+            build: "2025.06.20",
+            checksum: "CLK7M3R0",
+            features: [
+              "rtc-sync",
+              "ntp-query",
+              "drift-comp",
+              "multi-mode",
+              "stopwatch",
+              "countdown",
+            ],
+            securityPatch: "2025.06.15",
+          },
+        ),
+      getPowerSpecs: () =>
+        clkManagerRef.current?.powerSpecs ?? {
+          full: 0.5,
+          idle: 0.3,
+          standby: 0.02,
+          category: "light",
+          priority: 1,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clkManager !== undefined]);
 
   const memDeviceActions: MEMDeviceActions | undefined = useMemo(() => {
-    if (!memManager) return undefined
+    if (!memManager) return undefined;
     return {
       powerOn: () => memManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => memManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => memManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => memManagerRef.current?.reboot() ?? Promise.resolve(),
       cycleMode: () => memManagerRef.current?.cycleMode(),
-      setMode: (mode: 'usage' | 'heap' | 'cache' | 'swap' | 'processes' | 'allocation') => memManagerRef.current?.setMode(mode),
+      setMode: (mode: "usage" | "heap" | "cache" | "swap" | "processes" | "allocation") =>
+        memManagerRef.current?.setMode(mode),
       setTotalMemory: (value: number) => memManagerRef.current?.setTotalMemory(value),
       setUsedMemory: (value: number) => memManagerRef.current?.setUsedMemory(value),
       setExpanded: (expanded: boolean) => memManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => memManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = memManagerRef.current
+        const m = memManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           currentDraw: m?.currentDraw ?? 0,
           totalMemory: m?.totalMemory ?? 16,
           usedMemory: m?.usedMemory ?? 11.5,
-          displayMode: m?.displayMode ?? 'usage',
+          displayMode: m?.displayMode ?? "usage",
           testResult: m?.testResult ?? null,
-        }
+        };
       },
-      getFirmware: () => memManagerRef.current?.firmware ?? {
-        version: '3.1.0',
-        build: '2025.10.20',
-        checksum: 'M3M0RY01',
-        features: ['dimm-detect', 'spd-read', 'timing-config', 'bandwidth-test', 'multi-mode'],
-        securityPatch: '2025.10.15',
-      },
-      getPowerSpecs: () => memManagerRef.current?.powerSpecs ?? {
-        full: 0.6,
-        idle: 0.4,
-        standby: 0.05,
-        category: 'light',
-        priority: 1,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [memManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "MEM-001",
+          memManagerRef.current?.firmware ?? {
+            version: "3.1.0",
+            build: "2025.10.20",
+            checksum: "M3M0RY01",
+            features: ["dimm-detect", "spd-read", "timing-config", "bandwidth-test", "multi-mode"],
+            securityPatch: "2025.10.15",
+          },
+        ),
+      getPowerSpecs: () =>
+        memManagerRef.current?.powerSpecs ?? {
+          full: 0.6,
+          idle: 0.4,
+          standby: 0.05,
+          category: "light",
+          priority: 1,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memManager !== undefined]);
 
   const andDeviceActions: ANDDeviceActions | undefined = useMemo(() => {
-    if (!andManager) return undefined
+    if (!andManager) return undefined;
     return {
       powerOn: () => andManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => andManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => andManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => andManagerRef.current?.reboot() ?? Promise.resolve(),
       cycleMode: () => andManagerRef.current?.cycleMode(),
-      setMode: (mode: 'waveform' | 'spectrum' | 'heatmap' | 'timeline' | 'frequency' | 'radar') => andManagerRef.current?.setMode(mode),
+      setMode: (mode: "waveform" | "spectrum" | "heatmap" | "timeline" | "frequency" | "radar") =>
+        andManagerRef.current?.setMode(mode),
       setSignalStrength: (value: number) => andManagerRef.current?.setSignalStrength(value),
       setAnomaliesFound: (value: number) => andManagerRef.current?.setAnomaliesFound(value),
       setExpanded: (expanded: boolean) => andManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => andManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = andManagerRef.current
+        const m = andManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           currentDraw: m?.currentDraw ?? 0,
           signalStrength: m?.signalStrength ?? 67,
           anomaliesFound: m?.anomaliesFound ?? 3,
-          displayMode: m?.displayMode ?? 'waveform',
+          displayMode: m?.displayMode ?? "waveform",
           testResult: m?.testResult ?? null,
-        }
+        };
       },
-      getFirmware: () => andManagerRef.current?.firmware ?? {
-        version: '2.3.0',
-        build: '2025.11.08',
-        checksum: 'AN0MALY01',
-        features: ['waveform-scan', 'anomaly-detect', 'signal-analysis', 'freq-sweep', 'multi-mode', 'halo-link'],
-        securityPatch: '2025.11.01',
-      },
-      getPowerSpecs: () => andManagerRef.current?.powerSpecs ?? {
-        full: 4,
-        idle: 2,
-        standby: 0.1,
-        category: 'medium',
-        priority: 2,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [andManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "AND-001",
+          andManagerRef.current?.firmware ?? {
+            version: "2.3.0",
+            build: "2025.11.08",
+            checksum: "AN0MALY01",
+            features: [
+              "waveform-scan",
+              "anomaly-detect",
+              "signal-analysis",
+              "freq-sweep",
+              "multi-mode",
+              "halo-link",
+            ],
+            securityPatch: "2025.11.01",
+          },
+        ),
+      getPowerSpecs: () =>
+        andManagerRef.current?.powerSpecs ?? {
+          full: 4,
+          idle: 2,
+          standby: 0.1,
+          category: "medium",
+          priority: 2,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [andManager !== undefined]);
 
   const qcpDeviceActions: QCPDeviceActions | undefined = useMemo(() => {
-    if (!qcpManager) return undefined
+    if (!qcpManager) return undefined;
     return {
       powerOn: () => qcpManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => qcpManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => qcpManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => qcpManagerRef.current?.reboot() ?? Promise.resolve(),
       cycleMode: () => qcpManagerRef.current?.cycleMode(),
-      setMode: (mode: 'compass' | 'radar' | 'heatmap' | 'trajectory' | 'triangulate' | 'history') => qcpManagerRef.current?.setMode(mode),
+      setMode: (mode: "compass" | "radar" | "heatmap" | "trajectory" | "triangulate" | "history") =>
+        qcpManagerRef.current?.setMode(mode),
       setAnomalyDirection: (value: number) => qcpManagerRef.current?.setAnomalyDirection(value),
       setAnomalyDistance: (value: number) => qcpManagerRef.current?.setAnomalyDistance(value),
       setExpanded: (expanded: boolean) => qcpManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => qcpManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = qcpManagerRef.current
+        const m = qcpManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           currentDraw: m?.currentDraw ?? 0,
           anomalyDirection: m?.anomalyDirection ?? 127,
           anomalyDistance: m?.anomalyDistance ?? 42,
-          displayMode: m?.displayMode ?? 'compass',
+          displayMode: m?.displayMode ?? "compass",
           testResult: m?.testResult ?? null,
-        }
+        };
       },
-      getFirmware: () => qcpManagerRef.current?.firmware ?? {
-        version: '1.5.0',
-        build: '2025.09.22',
-        checksum: 'QC0MPA55',
-        features: ['gyroscope', 'magnetometer', 'quantum-link', 'anomaly-track', 'distance-calc', 'needle-stabilize'],
-        securityPatch: '2025.09.15',
-      },
-      getPowerSpecs: () => qcpManagerRef.current?.powerSpecs ?? {
-        full: 2.5,
-        idle: 0.8,
-        standby: 0.2,
-        category: 'light',
-        priority: 3,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qcpManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "QCP-001",
+          qcpManagerRef.current?.firmware ?? {
+            version: "1.5.0",
+            build: "2025.09.22",
+            checksum: "QC0MPA55",
+            features: [
+              "gyroscope",
+              "magnetometer",
+              "quantum-link",
+              "anomaly-track",
+              "distance-calc",
+              "needle-stabilize",
+            ],
+            securityPatch: "2025.09.15",
+          },
+        ),
+      getPowerSpecs: () =>
+        qcpManagerRef.current?.powerSpecs ?? {
+          full: 2.5,
+          idle: 0.8,
+          standby: 0.2,
+          category: "light",
+          priority: 3,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qcpManager !== undefined]);
 
   const tlpDeviceActions: TLPDeviceActions | undefined = useMemo(() => {
-    if (!tlpManager) return undefined
+    if (!tlpManager) return undefined;
     return {
       powerOn: () => tlpManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => tlpManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => tlpManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => tlpManagerRef.current?.reboot() ?? Promise.resolve(),
       cycleMode: () => tlpManagerRef.current?.cycleMode(),
-      setMode: (mode: 'standard' | 'precision' | 'express' | 'stealth' | 'cargo' | 'emergency') => tlpManagerRef.current?.setMode(mode),
+      setMode: (mode: "standard" | "precision" | "express" | "stealth" | "cargo" | "emergency") =>
+        tlpManagerRef.current?.setMode(mode),
       setChargeLevel: (value: number) => tlpManagerRef.current?.setChargeLevel(value),
       setLastDestination: (value: string) => tlpManagerRef.current?.setLastDestination(value),
       setExpanded: (expanded: boolean) => tlpManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => tlpManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = tlpManagerRef.current
+        const m = tlpManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           currentDraw: m?.currentDraw ?? 0,
           chargeLevel: m?.chargeLevel ?? 65,
-          lastDestination: m?.lastDestination ?? 'LAB-Ω',
-          displayMode: m?.displayMode ?? 'standard',
+          lastDestination: m?.lastDestination ?? "LAB-Ω",
+          displayMode: m?.displayMode ?? "standard",
           testResult: m?.testResult ?? null,
-        }
+        };
       },
-      getFirmware: () => tlpManagerRef.current?.firmware ?? {
-        version: '2.2.0',
-        build: '2025.08.10',
-        checksum: 'T3L3P0RT',
-        features: ['capacitor-charge', 'matrix-align', 'quantum-lock', 'coord-load', 'stabilize', 'portal-gen'],
-        securityPatch: '2025.08.05',
-      },
-      getPowerSpecs: () => tlpManagerRef.current?.powerSpecs ?? {
-        full: 35,
-        idle: 3,
-        standby: 0.5,
-        category: 'heavy',
-        priority: 4,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tlpManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "TLP-001",
+          tlpManagerRef.current?.firmware ?? {
+            version: "2.2.0",
+            build: "2025.08.10",
+            checksum: "T3L3P0RT",
+            features: [
+              "capacitor-charge",
+              "matrix-align",
+              "quantum-lock",
+              "coord-load",
+              "stabilize",
+              "portal-gen",
+            ],
+            securityPatch: "2025.08.05",
+          },
+        ),
+      getPowerSpecs: () =>
+        tlpManagerRef.current?.powerSpecs ?? {
+          full: 35,
+          idle: 3,
+          standby: 0.5,
+          category: "heavy",
+          priority: 4,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tlpManager !== undefined]);
 
   const lctDeviceActions: LCTDeviceActions | undefined = useMemo(() => {
-    if (!lctManager) return undefined
+    if (!lctManager) return undefined;
     return {
       powerOn: () => lctManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => lctManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => lctManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => lctManagerRef.current?.reboot() ?? Promise.resolve(),
       cycleMode: () => lctManagerRef.current?.cycleMode(),
-      setMode: (mode: 'cutting' | 'engraving' | 'welding' | 'marking' | 'drilling' | 'scanning') => lctManagerRef.current?.setMode(mode),
+      setMode: (mode: "cutting" | "engraving" | "welding" | "marking" | "drilling" | "scanning") =>
+        lctManagerRef.current?.setMode(mode),
       setLaserPower: (value: number) => lctManagerRef.current?.setLaserPower(value),
       setPrecision: (value: number) => lctManagerRef.current?.setPrecision(value),
       setExpanded: (expanded: boolean) => lctManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => lctManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = lctManagerRef.current
+        const m = lctManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
           currentDraw: m?.currentDraw ?? 0,
           laserPower: m?.laserPower ?? 450,
           precision: m?.precision ?? 0.01,
-          displayMode: m?.displayMode ?? 'cutting',
+          displayMode: m?.displayMode ?? "cutting",
           testResult: m?.testResult ?? null,
-        }
+        };
       },
-      getFirmware: () => lctManagerRef.current?.firmware ?? {
-        version: '2.1.0',
-        build: '2025.07.20',
-        checksum: 'L4S3RCUT',
-        features: ['diode-array', 'optics-check', 'focus-calibrate', 'power-regulate', 'thermal-protect', 'precision-cut'],
-        securityPatch: '2025.07.15',
-      },
-      getPowerSpecs: () => lctManagerRef.current?.powerSpecs ?? {
-        full: 25,
-        idle: 4,
-        standby: 0.5,
-        category: 'heavy',
-        priority: 3,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lctManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "LCT-001",
+          lctManagerRef.current?.firmware ?? {
+            version: "2.1.0",
+            build: "2025.07.20",
+            checksum: "L4S3RCUT",
+            features: [
+              "diode-array",
+              "optics-check",
+              "focus-calibrate",
+              "power-regulate",
+              "thermal-protect",
+              "precision-cut",
+            ],
+            securityPatch: "2025.07.15",
+          },
+        ),
+      getPowerSpecs: () =>
+        lctManagerRef.current?.powerSpecs ?? {
+          full: 25,
+          idle: 4,
+          standby: 0.5,
+          category: "heavy",
+          priority: 3,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lctManager !== undefined]);
 
   const p3dDeviceActions: P3DDeviceActions | undefined = useMemo(() => {
-    if (!p3dManager) return undefined
+    if (!p3dManager) return undefined;
     return {
       powerOn: () => p3dManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => p3dManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => p3dManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => p3dManagerRef.current?.reboot() ?? Promise.resolve(),
       cycleMode: () => p3dManagerRef.current?.cycleMode(),
-      setMode: (mode: 'plastic' | 'metal' | 'crystal' | 'composite' | 'nano' | 'prototype') => p3dManagerRef.current?.setMode(mode),
+      setMode: (mode: "plastic" | "metal" | "crystal" | "composite" | "nano" | "prototype") =>
+        p3dManagerRef.current?.setMode(mode),
       setProgress: (value: number) => p3dManagerRef.current?.setProgress(value),
       setLayerCount: (value: number) => p3dManagerRef.current?.setLayerCount(value),
       setBedTemp: (value: number) => p3dManagerRef.current?.setBedTemp(value),
       setExpanded: (expanded: boolean) => p3dManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => p3dManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = p3dManagerRef.current
+        const m = p3dManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           currentDraw: m?.currentDraw ?? 0,
           progress: m?.progress ?? 67,
           layerCount: m?.layerCount ?? 234,
           bedTemp: m?.bedTemp ?? 60,
-          displayMode: m?.displayMode ?? 'plastic',
+          displayMode: m?.displayMode ?? "plastic",
           testResult: m?.testResult ?? null,
           isExpanded: m?.isExpanded ?? true,
-        }
+        };
       },
-      getFirmware: () => p3dManagerRef.current?.firmware ?? {
-        version: '3.2.1',
-        build: '2025.06.15',
-        checksum: 'F4BR1C8R',
-        features: ['bed-level', 'nozzle-calibrate', 'extrusion-ctrl', 'layer-track', 'thermal-manage', 'multi-material'],
-        securityPatch: '2025.06.10',
-      },
-      getPowerSpecs: () => p3dManagerRef.current?.powerSpecs ?? {
-        full: 18,
-        idle: 3,
-        standby: 0.5,
-        category: 'heavy',
-        priority: 3,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [p3dManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "P3D-001",
+          p3dManagerRef.current?.firmware ?? {
+            version: "3.2.1",
+            build: "2025.06.15",
+            checksum: "F4BR1C8R",
+            features: [
+              "bed-level",
+              "nozzle-calibrate",
+              "extrusion-ctrl",
+              "layer-track",
+              "thermal-manage",
+              "multi-material",
+            ],
+            securityPatch: "2025.06.10",
+          },
+        ),
+      getPowerSpecs: () =>
+        p3dManagerRef.current?.powerSpecs ?? {
+          full: 18,
+          idle: 3,
+          standby: 0.5,
+          category: "heavy",
+          priority: 3,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p3dManager !== undefined]);
 
   const spkDeviceActions: SPKDeviceActions | undefined = useMemo(() => {
-    if (!spkManager) return undefined
+    if (!spkManager) return undefined;
     return {
       powerOn: () => spkManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => spkManagerRef.current?.powerOff() ?? Promise.resolve(),
@@ -1767,15 +2362,17 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
       setVolume: (volume: number) => spkManagerRef.current?.setVolume(volume),
       setMuted: (muted: boolean) => spkManagerRef.current?.setMuted(muted),
       toggleMute: () => spkManagerRef.current?.toggleMute(),
-      setFilter: (filter: 'bass' | 'mid' | 'high', enabled: boolean) => spkManagerRef.current?.setFilter(filter, enabled),
-      toggleFilter: (filter: 'bass' | 'mid' | 'high') => spkManagerRef.current?.toggleFilter(filter),
+      setFilter: (filter: "bass" | "mid" | "high", enabled: boolean) =>
+        spkManagerRef.current?.setFilter(filter, enabled),
+      toggleFilter: (filter: "bass" | "mid" | "high") =>
+        spkManagerRef.current?.toggleFilter(filter),
       setExpanded: (expanded: boolean) => spkManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => spkManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = spkManagerRef.current
+        const m = spkManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? '',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "",
           isPowered: m?.isPowered ?? false,
           volume: m?.volume ?? 45,
           isMuted: m?.isMuted ?? false,
@@ -1783,95 +2380,123 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
           peakLevel: m?.peakLevel ?? 0,
           testResult: m?.testResult ?? null,
           isExpanded: m?.isExpanded ?? false,
-        }
+        };
       },
-      getFirmware: () => spkManagerRef.current?.firmware ?? {
-        version: '1.0.0',
-        build: '2024.01.20',
-        checksum: 'A3C7F1E9',
-        features: ['audio-output', 'volume-ctrl', 'freq-filter', 'level-meter', 'mute-gate', 'beam-focus'],
-        securityPatch: '2024.01.18',
-      },
-      getPowerSpecs: () => spkManagerRef.current?.powerSpecs ?? {
-        full: 3,
-        idle: 0.5,
-        standby: 0.1,
-        category: 'light',
-        priority: 3,
-      },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [spkManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "SPK-001",
+          spkManagerRef.current?.firmware ?? {
+            version: "1.0.0",
+            build: "2024.01.20",
+            checksum: "A3C7F1E9",
+            features: [
+              "audio-output",
+              "volume-ctrl",
+              "freq-filter",
+              "level-meter",
+              "mute-gate",
+              "beam-focus",
+            ],
+            securityPatch: "2024.01.18",
+          },
+        ),
+      getPowerSpecs: () =>
+        spkManagerRef.current?.powerSpecs ?? {
+          full: 3,
+          idle: 0.5,
+          standby: 0.1,
+          category: "light",
+          priority: 3,
+        },
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spkManager !== undefined]);
 
   const dgnDeviceActions: DGNDeviceActions | undefined = useMemo(() => {
-    if (!dgnManager) return undefined
+    if (!dgnManager) return undefined;
     return {
       powerOn: () => dgnManagerRef.current?.powerOn() ?? Promise.resolve(),
       powerOff: () => dgnManagerRef.current?.powerOff() ?? Promise.resolve(),
       runTest: () => dgnManagerRef.current?.runTest() ?? Promise.resolve(),
       reboot: () => dgnManagerRef.current?.reboot() ?? Promise.resolve(),
-      setCategory: (cat: 'SYSTEMS' | 'DEVICES' | 'ENERGY' | 'NETWORK' | 'CRYSTALS' | 'PROCESS') => dgnManagerRef.current?.setCategory(cat),
+      setCategory: (cat: "SYSTEMS" | "DEVICES" | "ENERGY" | "NETWORK" | "CRYSTALS" | "PROCESS") =>
+        dgnManagerRef.current?.setCategory(cat),
       setScanDepth: (depth: number) => dgnManagerRef.current?.setScanDepth(depth),
       runDiagnostics: () => dgnManagerRef.current?.runDiagnostics() ?? Promise.resolve(),
       clearAlerts: () => dgnManagerRef.current?.clearAlerts(),
       setExpanded: (expanded: boolean) => dgnManagerRef.current?.setExpanded(expanded),
       toggleExpanded: () => dgnManagerRef.current?.toggleExpanded(),
       getState: () => {
-        const m = dgnManagerRef.current
+        const m = dgnManagerRef.current;
         return {
-          deviceState: m?.deviceState ?? 'standby',
-          statusMessage: m?.statusMessage ?? 'Offline',
+          deviceState: m?.deviceState ?? "standby",
+          statusMessage: m?.statusMessage ?? "Offline",
           isPowered: m?.isPowered ?? false,
           isExpanded: m?.isExpanded ?? true,
-          category: m?.category ?? 'SYSTEMS',
+          category: m?.category ?? "SYSTEMS",
           scanDepth: m?.scanDepth ?? 75,
           healthPercent: m?.healthPercent ?? 100,
           alertCount: m?.alertCount ?? 0,
           isRunningDiag: m?.isRunningDiag ?? false,
           diagProgress: m?.diagProgress ?? 0,
           testResult: m?.testResult ?? null,
-        }
+        };
       },
-      getFirmware: () => dgnManagerRef.current?.firmware ?? {
-        version: '0.0.0', build: '0000.00.00', checksum: '00000000', features: [], securityPatch: '0000.00.00',
-      },
-      getPowerSpecs: () => dgnManagerRef.current?.powerSpecs ?? {
-        full: 3, idle: 1, standby: 0.25, category: 'light', priority: 2,
-      },
-    }
-  }, [dgnManager !== undefined])
+      getFirmware: () =>
+        getFirmwareWithOverride(
+          "DGN-001",
+          dgnManagerRef.current?.firmware ?? {
+            version: "0.0.0",
+            build: "0000.00.00",
+            checksum: "00000000",
+            features: [],
+            securityPatch: "0000.00.00",
+          },
+        ),
+      getPowerSpecs: () =>
+        dgnManagerRef.current?.powerSpecs ?? {
+          full: 3,
+          idle: 1,
+          standby: 0.25,
+          category: "light",
+          priority: 2,
+        },
+    };
+  }, [dgnManager !== undefined]);
 
   // Build theme actions from props - use refs for stable reference
-  const themeIndexRef = useRef(themeIndex)
-  themeIndexRef.current = themeIndex
-  const setThemeIndexRef = useRef(setThemeIndex)
-  setThemeIndexRef.current = setThemeIndex
-  const themesRef = useRef(themes)
-  themesRef.current = themes
+  const themeIndexRef = useRef(themeIndex);
+  themeIndexRef.current = themeIndex;
+  const setThemeIndexRef = useRef(setThemeIndex);
+  setThemeIndexRef.current = setThemeIndex;
+  const themesRef = useRef(themes);
+  themesRef.current = themes;
 
   const themeActions: ThemeActions | undefined = useMemo(() => {
-    if (!themes || themeIndex === undefined || !setThemeIndex) return undefined
+    if (!themes || themeIndex === undefined || !setThemeIndex) return undefined;
     return {
       list: () => themesRef.current!.map((t, i) => ({ name: t.name, fg: t.fg, index: i })),
       get: () => {
-        const idx = themeIndexRef.current!
-        const t = themesRef.current!
-        return { name: t[idx].name, fg: t[idx].fg, index: idx }
+        const idx = themeIndexRef.current!;
+        const t = themesRef.current!;
+        return { name: t[idx].name, fg: t[idx].fg, index: idx };
       },
       set: (index: number) => {
-        const t = themesRef.current!
-        if (index >= 0 && index < t.length) setThemeIndexRef.current!(index)
+        const t = themesRef.current!;
+        if (index >= 0 && index < t.length) setThemeIndexRef.current!(index);
       },
       getByName: (name: string) => {
-        const idx = themesRef.current!.findIndex(t => t.name.toLowerCase() === name.toLowerCase())
-        return idx >= 0 ? idx : null
+        const idx = themesRef.current!.findIndex(
+          (t) => t.name.toLowerCase() === name.toLowerCase(),
+        );
+        return idx >= 0 ? idx : null;
       },
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [themes !== undefined, themeIndex !== undefined, setThemeIndex !== undefined])
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [themes !== undefined, themeIndex !== undefined, setThemeIndex !== undefined]);
 
   const systemPowerActions = useMemo(() => {
-    if (!systemPowerManager) return undefined
+    if (!systemPowerManager) return undefined;
     return {
       scheduleShutdown: systemPowerManager.scheduleShutdown,
       scheduleReboot: systemPowerManager.scheduleReboot,
@@ -1884,10 +2509,20 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
         countdownAction: systemPowerManager.countdownAction,
         powerScope: systemPowerManager.powerScope,
       }),
-    }
-  }, [systemPowerManager])
+    };
+  }, [systemPowerManager]);
 
-  const { lines, isTyping, processCommand, navigateHistory, prompt, passwordMode, appMode, appModeData, exitAppMode } = useTerminal({
+  const {
+    lines,
+    isTyping,
+    processCommand,
+    navigateHistory,
+    prompt,
+    passwordMode,
+    appMode,
+    appModeData,
+    exitAppMode,
+  } = useTerminal({
     userId,
     username,
     balance,
@@ -1934,106 +2569,134 @@ export function Terminal({ userId, username, balance, themeIndex, setThemeIndex,
     journalActions,
     cronActions,
     initActions,
-  })
+    firmwareActions: firmwareManager ?? undefined,
+    missionActions: missionTerminalActions,
+    resonanceActions: resonanceTerminalActions,
+  });
 
   const handleAutocomplete = useCallback((input: string): string[] => {
-    const parts = input.split(/\s+/)
+    const parts = input.split(/\s+/);
 
     if (parts.length <= 1) {
       // Completing a command name
-      const partial = (parts[0] || '').toLowerCase()
-      if (!partial) return []
+      const partial = (parts[0] || "").toLowerCase();
+      if (!partial) return [];
 
-      const matches: string[] = []
+      const matches: string[] = [];
       for (const cmd of commands) {
-        if (cmd.name.startsWith(partial)) matches.push(cmd.name + ' ')
+        if (cmd.name.startsWith(partial)) matches.push(cmd.name + " ");
         if (cmd.aliases) {
           for (const alias of cmd.aliases) {
-            if (alias.startsWith(partial) && alias !== cmd.name) matches.push(alias + ' ')
+            if (alias.startsWith(partial) && alias !== cmd.name) matches.push(alias + " ");
           }
         }
       }
-      return [...new Set(matches)].sort().slice(0, 12)
+      return [...new Set(matches)].sort().slice(0, 12);
     }
 
     // Completing a file/directory path argument
-    const cmd = parts[0]
-    const partial = parts[parts.length - 1] || ''
-    const prefix = parts.slice(0, -1).join(' ') + ' '
+    const cmd = parts[0];
+    const partial = parts[parts.length - 1] || "";
+    const prefix = parts.slice(0, -1).join(" ") + " ";
 
     // Get directory to list and the partial filename
-    let dirPath: string
-    let filePrefix: string
+    let dirPath: string;
+    let filePrefix: string;
 
-    const lastSlash = partial.lastIndexOf('/')
+    const lastSlash = partial.lastIndexOf("/");
     if (lastSlash >= 0) {
-      dirPath = partial.slice(0, lastSlash) || '/'
-      filePrefix = partial.slice(lastSlash + 1)
+      dirPath = partial.slice(0, lastSlash) || "/";
+      filePrefix = partial.slice(lastSlash + 1);
     } else {
-      dirPath = '.'
-      filePrefix = partial
+      dirPath = ".";
+      filePrefix = partial;
     }
 
     try {
-      const entries = fsRef.current?.ls(dirPath, { all: false }) ?? []
-      const matches: string[] = []
+      const entries = fsRef.current?.ls(dirPath, { all: false }) ?? [];
+      const matches: string[] = [];
       for (const entry of entries) {
         // Strip trailing / from dirs for comparison
-        const clean = entry.replace(/\/$/, '')
+        const clean = entry.replace(/\/$/, "");
         if (clean.toLowerCase().startsWith(filePrefix.toLowerCase())) {
-          const pathBase = lastSlash >= 0 ? partial.slice(0, lastSlash + 1) : ''
-          matches.push(prefix + pathBase + entry)
+          const pathBase = lastSlash >= 0 ? partial.slice(0, lastSlash + 1) : "";
+          matches.push(prefix + pathBase + entry);
         }
       }
-      return matches.slice(0, 12)
+      return matches.slice(0, 12);
     } catch {
-      return []
+      return [];
     }
-  }, [])
+  }, []);
 
-  if (appMode === 'mc' || appMode === 'mcedit') {
+  if (appMode === "mc" || appMode === "mcedit") {
     return (
-      <div className="flex flex-col h-full">
-        <MidnightCommander filesystemActions={filesystemActions} onExit={exitAppMode} initialEditFile={appMode === 'mcedit' ? appModeData?.editFile : undefined} />
+      <div className="flex h-full flex-col">
+        <MidnightCommander
+          filesystemActions={filesystemActions}
+          onExit={exitAppMode}
+          initialEditFile={appMode === "mcedit" ? appModeData?.editFile : undefined}
+        />
       </div>
-    )
+    );
   }
 
-  if (appMode === 'syspref') {
+  if (appMode === "syspref") {
     return (
-      <div className="flex flex-col h-full">
-        <SysprefApp userId={userId} username={username} initialArea={appModeData?.area as 'about' | 'display' | 'sound' | 'network' | 'user' | 'datetime' | undefined} onExit={exitAppMode} />
+      <div className="flex h-full flex-col">
+        <SysprefApp
+          userId={userId}
+          username={username}
+          initialArea={
+            appModeData?.area as
+              | "about"
+              | "display"
+              | "sound"
+              | "network"
+              | "user"
+              | "datetime"
+              | undefined
+          }
+          onExit={exitAppMode}
+        />
       </div>
-    )
+    );
   }
 
-  if (appMode === 'screensaver') {
+  if (appMode === "screensaver") {
     return createPortal(
-      <ScreensaverOverlay onDismiss={exitAppMode} overridePattern={appModeData?.pattern as ScreensaverPattern | undefined} />,
-      document.body
-    )
+      <ScreensaverOverlay
+        onDismiss={exitAppMode}
+        overridePattern={appModeData?.pattern as ScreensaverPattern | undefined}
+      />,
+      document.body,
+    );
   }
 
-  if (appMode === 'tetris') {
-    const currentTheme = themes && themeIndex !== undefined ? themes[themeIndex] : undefined
+  if (appMode === "tetris") {
+    const currentTheme = themes && themeIndex !== undefined ? themes[themeIndex] : undefined;
     return (
-      <div className="flex flex-col h-full">
-        <TetrisOverlay mode={(appModeData?.mode as '1p' | '2p') ?? '1p'} onExit={exitAppMode} theme={currentTheme} />
+      <div className="flex h-full flex-col">
+        <TetrisOverlay
+          mode={(appModeData?.mode as "1p" | "2p") ?? "1p"}
+          onExit={exitAppMode}
+          theme={currentTheme}
+        />
       </div>
-    )
+    );
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       <TerminalOutput lines={lines} isTyping={isTyping} />
       <TerminalInput
         onSubmit={processCommand}
         onNavigateHistory={navigateHistory}
         onAutocomplete={handleAutocomplete}
         disabled={isTyping}
-        prompt={passwordMode ? 'Password:' : prompt}
+        prompt={passwordMode ? "Password:" : prompt}
         passwordMode={passwordMode}
       />
     </div>
-  )
+  );
 }

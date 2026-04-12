@@ -3,1516 +3,1987 @@ import type {
   Crystal,
   TechProgress,
   CommandHistoryEntry,
-} from '@/app/(game)/terminal/actions/data'
+} from "@/app/(game)/terminal/actions/data";
 import type {
   MintResult,
   CrystalDetails,
   RenameResult,
-} from '@/app/(game)/terminal/actions/crystals'
+} from "@/app/(game)/terminal/actions/crystals";
 
 export interface TerminalLine {
-  id: string
-  type: 'input' | 'output' | 'error' | 'system' | 'ascii'
-  content: string
-  timestamp: Date
+  id: string;
+  type: "input" | "output" | "error" | "system" | "ascii";
+  content: string;
+  timestamp: Date;
 }
 
 export interface Command {
-  name: string
-  aliases?: string[]
-  description: string
-  usage?: string
-  execute: (args: string[], context: CommandContext) => Promise<CommandResult>
+  name: string;
+  aliases?: string[];
+  description: string;
+  usage?: string;
+  execute: (args: string[], context: CommandContext) => Promise<CommandResult>;
 }
 
 // CDC Device state type for terminal sync
-export type CDCDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type CDCDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface CDCDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: CDCDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    crystalCount: number
-    sliceCount: number
-    totalPower: number
-    currentDraw: number
-  }
+    deviceState: CDCDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    crystalCount: number;
+    sliceCount: number;
+    totalPower: number;
+    currentDraw: number;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // UEC Device state type for terminal sync
-export type UECDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type UECDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface UECDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: UECDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    volatilityTier: number
-    tps: number
-    energyOutput: number
-    fieldStability: number
-  }
+    deviceState: UECDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    volatilityTier: number;
+    tps: number;
+    energyOutput: number;
+    fieldStability: number;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    outputMax: number
-    outputPerTier: number
-    selfConsume: number
-    standby: number
-    category: string
-    priority: number
-  }
+    outputMax: number;
+    outputPerTier: number;
+    selfConsume: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // BAT Device state type for terminal sync
-export type BATDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown' | 'charging' | 'discharging'
+export type BATDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown"
+  | "charging"
+  | "discharging";
 
 export interface BATDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setAutoRegen: (enabled: boolean) => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setAutoRegen: (enabled: boolean) => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: BATDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    currentCharge: number
-    chargePercent: number
-    isCharging: boolean
-    isDischarging: boolean
-    cellHealth: number[]
-    temperature: number
-    autoRegen: boolean
-  }
+    deviceState: BATDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    currentCharge: number;
+    chargePercent: number;
+    isCharging: boolean;
+    isDischarging: boolean;
+    cellHealth: number[];
+    temperature: number;
+    autoRegen: boolean;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    capacity: number
-    chargeRate: number
-    dischargeRate: number
-    selfDischarge: number
-    standbyDrain: number
-    category: string
-    priority: number
-  }
+    capacity: number;
+    chargeRate: number;
+    dischargeRate: number;
+    selfDischarge: number;
+    standbyDrain: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // HMS Device state type for terminal sync
-export type HMSDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type HMSDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface HMSDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setKnobValue: (knob: 'pulse' | 'tempo' | 'freq', value: number) => void
-  setWaveform: (type: 'sine' | 'square' | 'saw' | 'triangle') => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setKnobValue: (knob: "pulse" | "tempo" | "freq", value: number) => void;
+  setWaveform: (type: "sine" | "square" | "saw" | "triangle") => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: HMSDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    pulseValue: number
-    tempoValue: number
-    freqValue: number
-    currentTier: number
-    oscillatorCount: number
-    waveformType: 'sine' | 'square' | 'saw' | 'triangle'
-  }
+    deviceState: HMSDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    pulseValue: number;
+    tempoValue: number;
+    freqValue: number;
+    currentTier: number;
+    oscillatorCount: number;
+    waveformType: "sine" | "square" | "saw" | "triangle";
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    resonance: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    resonance: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // ECR Device state type for terminal sync
-export type ECRDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type ECRDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface ECRDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setKnobValue: (knob: 'pulse' | 'bloom', value: number) => void
-  setRecording: (recording: boolean) => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setKnobValue: (knob: "pulse" | "bloom", value: number) => void;
+  setRecording: (recording: boolean) => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: ECRDeviceState
-    statusMessage: string
-    isPowered: boolean
-    pulseValue: number
-    bloomValue: number
-    tickerTap: number
-    isRecording: boolean
-    signalStrength: number
-    currentTier: number
-    isExpanded: boolean
-  }
+    deviceState: ECRDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    pulseValue: number;
+    bloomValue: number;
+    tickerTap: number;
+    isRecording: boolean;
+    signalStrength: number;
+    currentTier: number;
+    isExpanded: boolean;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    recording: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    recording: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // IPL Device state type for terminal sync
-export type IPLDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type IPLDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface IPLDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: IPLDeviceState
-    statusMessage: string
-    isPowered: boolean
-    spectrumWidth: number
-    interpolationAccuracy: number
-    inputStreams: number
-    predictionHorizon: number
-    currentTier: number
-    isExpanded: boolean
-  }
+    deviceState: IPLDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    spectrumWidth: number;
+    interpolationAccuracy: number;
+    inputStreams: number;
+    predictionHorizon: number;
+    currentTier: number;
+    isExpanded: boolean;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    predictive: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    predictive: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // MFR Device state type for terminal sync
-export type MFRDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type MFRDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface MFRDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: MFRDeviceState
-    statusMessage: string
-    isPowered: boolean
-    powerOutput: number
-    stability: number
-    plasmaTemp: number
-    efficiency: number
-    ringSpeed: number
-    isExpanded: boolean
-  }
+    deviceState: MFRDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    powerOutput: number;
+    stability: number;
+    plasmaTemp: number;
+    efficiency: number;
+    ringSpeed: number;
+    isExpanded: boolean;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    startupCost: number
-    efficiency: number
-    category: string
-    tier: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    startupCost: number;
+    efficiency: number;
+    category: string;
+    tier: number;
+  };
 }
 
 // VNT Device state type for terminal sync
-export type VNTDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type VNTDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface VNTDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setFanSpeed: (fanId: 'cpu' | 'gpu', speed: number) => void
-  setFanMode: (fanId: 'cpu' | 'gpu', mode: 'AUTO' | 'LOW' | 'MED' | 'HIGH') => void
-  toggleFan: (fanId: 'cpu' | 'gpu', on: boolean) => void
-  emergencyPurge: () => Promise<void>
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setFanSpeed: (fanId: "cpu" | "gpu", speed: number) => void;
+  setFanMode: (fanId: "cpu" | "gpu", mode: "AUTO" | "LOW" | "MED" | "HIGH") => void;
+  toggleFan: (fanId: "cpu" | "gpu", on: boolean) => void;
+  emergencyPurge: () => Promise<void>;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: VNTDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    cpuFan: { speed: number; rpm: number; mode: string; isOn: boolean }
-    gpuFan: { speed: number; rpm: number; mode: string; isOn: boolean }
-    cpuTemp: number
-    gpuTemp: number
-    currentDraw: number
-    filterHealth: number
-    airQuality: number
-    humidity: number
-  }
+    deviceState: VNTDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    cpuFan: { speed: number; rpm: number; mode: string; isOn: boolean };
+    gpuFan: { speed: number; rpm: number; mode: string; isOn: boolean };
+    cpuTemp: number;
+    gpuTemp: number;
+    currentDraw: number;
+    filterHealth: number;
+    airQuality: number;
+    humidity: number;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    emergency: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    emergency: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // AIC Device state type for terminal sync
-export type AICDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type AICDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface AICDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setLearningMode: (enabled: boolean) => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setLearningMode: (enabled: boolean) => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: AICDeviceState
-    statusMessage: string
-    isPowered: boolean
-    taskQueue: number
-    efficiency: number
-    isLearning: boolean
-    nodeActivity: number[]
-    anomalyCount: number
-    uptime: number
-    isExpanded: boolean
-  }
+    deviceState: AICDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    taskQueue: number;
+    efficiency: number;
+    isLearning: boolean;
+    nodeActivity: number[];
+    anomalyCount: number;
+    uptime: number;
+    isExpanded: boolean;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    learning: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    learning: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // EXD Device state type for terminal sync
-export type EXDDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type EXDDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface EXDDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  deploy: () => void
-  recall: () => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  deploy: () => void;
+  recall: () => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: EXDDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    range: number
-    battery: number
-    altitude: number
-    speed: number
-    gpsSignal: number
-    cargoLoad: number
-    flightTime: number
-    radarActive: boolean
-    isDeployed: boolean
-    currentDraw: number
-  }
+    deviceState: EXDDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    range: number;
+    battery: number;
+    altitude: number;
+    speed: number;
+    gpsSignal: number;
+    cargoLoad: number;
+    flightTime: number;
+    radarActive: boolean;
+    isDeployed: boolean;
+    currentDraw: number;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    highSpeed: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    highSpeed: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // SCA Device state type for terminal sync
-export type SCADeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type SCADeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface SCADeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: SCADeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    flops: number
-    utilization: number
-    activeNodes: number
-    jobQueue: number
-    temperature: number
-    memoryUsage: number
-    interconnectBandwidth: number
-    uptime: number
-    currentDraw: number
-  }
+    deviceState: SCADeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    flops: number;
+    utilization: number;
+    activeNodes: number;
+    jobQueue: number;
+    temperature: number;
+    memoryUsage: number;
+    interconnectBandwidth: number;
+    uptime: number;
+    currentDraw: number;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    benchmark: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    benchmark: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // EMC Device state type for terminal sync
-export type EMCDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type EMCDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface EMCDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: EMCDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    units: number
-    stability: number
-    fieldStrength: number
-    temperature: number
-    isContained: boolean
-    currentDraw: number
-  }
+    deviceState: EMCDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    units: number;
+    stability: number;
+    fieldStrength: number;
+    temperature: number;
+    isContained: boolean;
+    currentDraw: number;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    scan: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    scan: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // QUA Device state type for terminal sync
-export type QUADeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type QUADeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface QUADeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setMode: (mode: 'ANOMALY' | 'RESOURCE' | 'DECRYPT' | 'DIAGNOSE' | 'SIMULATE' | 'SCAN') => void
-  setSensitivity: (value: number) => void
-  setDepth: (value: number) => void
-  setFrequency: (value: number) => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setMode: (mode: "ANOMALY" | "RESOURCE" | "DECRYPT" | "DIAGNOSE" | "SIMULATE" | "SCAN") => void;
+  setSensitivity: (value: number) => void;
+  setDepth: (value: number) => void;
+  setFrequency: (value: number) => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: QUADeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    mode: string
-    sensitivity: number
-    depth: number
-    frequency: number
-    coherence: number
-    isAnalyzing: boolean
-    currentDraw: number
-  }
+    deviceState: QUADeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    mode: string;
+    sensitivity: number;
+    depth: number;
+    frequency: number;
+    coherence: number;
+    isAnalyzing: boolean;
+    currentDraw: number;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    analysis: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    analysis: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // QSM Device state type for terminal sync
-export type QSMDeviceStateTerm = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type QSMDeviceStateTerm =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface QSMDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: QSMDeviceStateTerm
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    coherence: number
-    qubits: number
-    isEntangled: boolean
-    currentDraw: number
-    errorRate: number
-    temperature: number
-  }
+    deviceState: QSMDeviceStateTerm;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    coherence: number;
+    qubits: number;
+    isEntangled: boolean;
+    currentDraw: number;
+    errorRate: number;
+    temperature: number;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    scan: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    scan: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // MSC Device state type for terminal sync
-export type MSCDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type MSCDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface MSCDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: MSCDeviceState
-    statusMessage: string
-    isPowered: boolean
-    currentDraw: number
-    scanLine: number
-    detectedMaterials: number
-    isExpanded: boolean
-  }
+    deviceState: MSCDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    currentDraw: number;
+    scanLine: number;
+    detectedMaterials: number;
+    isExpanded: boolean;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // TMP Device state type for terminal sync
-export type TMPDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type TMPDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface TMPDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setTemperature: (value: number) => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setTemperature: (value: number) => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: TMPDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    currentDraw: number
-    temperature: number
-    maxTemp: number
-    minTemp: number
-    fluctuation: number
-  }
+    deviceState: TMPDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    currentDraw: number;
+    temperature: number;
+    maxTemp: number;
+    minTemp: number;
+    fluctuation: number;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // CLK Device state type for terminal sync
-export type CLKDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type CLKDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface CLKDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  cycleMode: () => void
-  setMode: (mode: 'local' | 'utc' | 'date' | 'uptime' | 'countdown' | 'stopwatch') => void
-  toggleStopwatch: () => void
-  resetStopwatch: () => void
-  toggleCountdown: () => void
-  resetCountdown: () => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  cycleMode: () => void;
+  setMode: (mode: "local" | "utc" | "date" | "uptime" | "countdown" | "stopwatch") => void;
+  toggleStopwatch: () => void;
+  resetStopwatch: () => void;
+  toggleCountdown: () => void;
+  resetCountdown: () => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: CLKDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    currentDraw: number
-    displayMode: string
-    currentTime: Date
-    uptime: number
-    stopwatchTime: number
-    stopwatchRunning: boolean
-    countdownTime: number
-    countdownRunning: boolean
-    testResult: 'pass' | 'fail' | null
-  }
+    deviceState: CLKDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    currentDraw: number;
+    displayMode: string;
+    currentTime: Date;
+    uptime: number;
+    stopwatchTime: number;
+    stopwatchRunning: boolean;
+    countdownTime: number;
+    countdownRunning: boolean;
+    testResult: "pass" | "fail" | null;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // MEM Device state type for terminal sync
-export type MEMDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type MEMDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface MEMDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  cycleMode: () => void
-  setMode: (mode: 'usage' | 'heap' | 'cache' | 'swap' | 'processes' | 'allocation') => void
-  setTotalMemory: (value: number) => void
-  setUsedMemory: (value: number) => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  cycleMode: () => void;
+  setMode: (mode: "usage" | "heap" | "cache" | "swap" | "processes" | "allocation") => void;
+  setTotalMemory: (value: number) => void;
+  setUsedMemory: (value: number) => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: MEMDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    currentDraw: number
-    totalMemory: number
-    usedMemory: number
-    displayMode: string
-    testResult: 'pass' | 'fail' | null
-  }
+    deviceState: MEMDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    currentDraw: number;
+    totalMemory: number;
+    usedMemory: number;
+    displayMode: string;
+    testResult: "pass" | "fail" | null;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // AND Device state type for terminal sync
-export type ANDDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type ANDDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface ANDDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  cycleMode: () => void
-  setMode: (mode: 'waveform' | 'spectrum' | 'heatmap' | 'timeline' | 'frequency' | 'radar') => void
-  setSignalStrength: (value: number) => void
-  setAnomaliesFound: (value: number) => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  cycleMode: () => void;
+  setMode: (mode: "waveform" | "spectrum" | "heatmap" | "timeline" | "frequency" | "radar") => void;
+  setSignalStrength: (value: number) => void;
+  setAnomaliesFound: (value: number) => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: ANDDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    currentDraw: number
-    signalStrength: number
-    anomaliesFound: number
-    displayMode: string
-    testResult: 'pass' | 'fail' | null
-  }
+    deviceState: ANDDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    currentDraw: number;
+    signalStrength: number;
+    anomaliesFound: number;
+    displayMode: string;
+    testResult: "pass" | "fail" | null;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // QCP Device state type for terminal sync
-export type QCPDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type QCPDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface QCPDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  cycleMode: () => void
-  setMode: (mode: 'compass' | 'radar' | 'heatmap' | 'trajectory' | 'triangulate' | 'history') => void
-  setAnomalyDirection: (value: number) => void
-  setAnomalyDistance: (value: number) => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  cycleMode: () => void;
+  setMode: (
+    mode: "compass" | "radar" | "heatmap" | "trajectory" | "triangulate" | "history",
+  ) => void;
+  setAnomalyDirection: (value: number) => void;
+  setAnomalyDistance: (value: number) => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: QCPDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    currentDraw: number
-    anomalyDirection: number
-    anomalyDistance: number
-    displayMode: string
-    testResult: 'pass' | 'fail' | null
-  }
+    deviceState: QCPDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    currentDraw: number;
+    anomalyDirection: number;
+    anomalyDistance: number;
+    displayMode: string;
+    testResult: "pass" | "fail" | null;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // TLP Device state type for terminal sync
-export type TLPDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type TLPDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface TLPDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  cycleMode: () => void
-  setMode: (mode: 'standard' | 'precision' | 'express' | 'stealth' | 'cargo' | 'emergency') => void
-  setChargeLevel: (value: number) => void
-  setLastDestination: (value: string) => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  cycleMode: () => void;
+  setMode: (mode: "standard" | "precision" | "express" | "stealth" | "cargo" | "emergency") => void;
+  setChargeLevel: (value: number) => void;
+  setLastDestination: (value: string) => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: TLPDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    currentDraw: number
-    chargeLevel: number
-    lastDestination: string
-    displayMode: string
-    testResult: 'pass' | 'fail' | null
-  }
+    deviceState: TLPDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    currentDraw: number;
+    chargeLevel: number;
+    lastDestination: string;
+    displayMode: string;
+    testResult: "pass" | "fail" | null;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // P3D Device state type for terminal sync
-export type P3DDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type P3DDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface P3DDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  cycleMode: () => void
-  setMode: (mode: 'plastic' | 'metal' | 'crystal' | 'composite' | 'nano' | 'prototype') => void
-  setProgress: (value: number) => void
-  setLayerCount: (value: number) => void
-  setBedTemp: (value: number) => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  cycleMode: () => void;
+  setMode: (mode: "plastic" | "metal" | "crystal" | "composite" | "nano" | "prototype") => void;
+  setProgress: (value: number) => void;
+  setLayerCount: (value: number) => void;
+  setBedTemp: (value: number) => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: P3DDeviceState
-    statusMessage: string
-    isPowered: boolean
-    currentDraw: number
-    progress: number
-    layerCount: number
-    bedTemp: number
-    displayMode: string
-    testResult: 'pass' | 'fail' | null
-    isExpanded: boolean
-  }
+    deviceState: P3DDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    currentDraw: number;
+    progress: number;
+    layerCount: number;
+    bedTemp: number;
+    displayMode: string;
+    testResult: "pass" | "fail" | null;
+    isExpanded: boolean;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // SPK Device state type for terminal sync
-export type SPKDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type SPKDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface SPKDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setVolume: (volume: number) => void
-  setMuted: (muted: boolean) => void
-  toggleMute: () => void
-  setFilter: (filter: 'bass' | 'mid' | 'high', enabled: boolean) => void
-  toggleFilter: (filter: 'bass' | 'mid' | 'high') => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setVolume: (volume: number) => void;
+  setMuted: (muted: boolean) => void;
+  toggleMute: () => void;
+  setFilter: (filter: "bass" | "mid" | "high", enabled: boolean) => void;
+  toggleFilter: (filter: "bass" | "mid" | "high") => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: SPKDeviceState
-    statusMessage: string
-    isPowered: boolean
-    volume: number
-    isMuted: boolean
-    filters: { bass: boolean; mid: boolean; high: boolean }
-    peakLevel: number
-    testResult: 'pass' | 'fail' | null
-    isExpanded: boolean
-  }
+    deviceState: SPKDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    volume: number;
+    isMuted: boolean;
+    filters: { bass: boolean; mid: boolean; high: boolean };
+    peakLevel: number;
+    testResult: "pass" | "fail" | null;
+    isExpanded: boolean;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // DGN Device state type for terminal sync
-export type DGNDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type DGNDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface DGNDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setCategory: (cat: 'SYSTEMS' | 'DEVICES' | 'ENERGY' | 'NETWORK' | 'CRYSTALS' | 'PROCESS') => void
-  setScanDepth: (depth: number) => void
-  runDiagnostics: () => Promise<void>
-  clearAlerts: () => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setCategory: (cat: "SYSTEMS" | "DEVICES" | "ENERGY" | "NETWORK" | "CRYSTALS" | "PROCESS") => void;
+  setScanDepth: (depth: number) => void;
+  runDiagnostics: () => Promise<void>;
+  clearAlerts: () => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: DGNDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    category: string
-    scanDepth: number
-    healthPercent: number
-    alertCount: number
-    isRunningDiag: boolean
-    diagProgress: number
-    testResult: 'pass' | 'fail' | null
-  }
+    deviceState: DGNDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    category: string;
+    scanDepth: number;
+    healthPercent: number;
+    alertCount: number;
+    isRunningDiag: boolean;
+    diagProgress: number;
+    testResult: "pass" | "fail" | null;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // LCT Device state type for terminal sync
-export type LCTDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type LCTDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface LCTDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  cycleMode: () => void
-  setMode: (mode: 'cutting' | 'engraving' | 'welding' | 'marking' | 'drilling' | 'scanning') => void
-  setLaserPower: (value: number) => void
-  setPrecision: (value: number) => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  cycleMode: () => void;
+  setMode: (
+    mode: "cutting" | "engraving" | "welding" | "marking" | "drilling" | "scanning",
+  ) => void;
+  setLaserPower: (value: number) => void;
+  setPrecision: (value: number) => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: LCTDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    currentDraw: number
-    laserPower: number
-    precision: number
-    displayMode: string
-    testResult: 'pass' | 'fail' | null
-  }
+    deviceState: LCTDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    currentDraw: number;
+    laserPower: number;
+    precision: number;
+    displayMode: string;
+    testResult: "pass" | "fail" | null;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // CPU Device state type for terminal sync
-export type CPUDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type CPUDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface CPUDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setCores: (value: number) => void
-  setUtilization: (value: number) => void
-  setFrequency: (value: number) => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setCores: (value: number) => void;
+  setUtilization: (value: number) => void;
+  setFrequency: (value: number) => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: CPUDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    currentDraw: number
-    cores: number
-    utilization: number
-    frequency: number
-    coreLoads: number[]
-    temperature: number
-    testResult: 'pass' | 'fail' | null
-  }
+    deviceState: CPUDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    currentDraw: number;
+    cores: number;
+    utilization: number;
+    frequency: number;
+    coreLoads: number[];
+    temperature: number;
+    testResult: "pass" | "fail" | null;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // DIM Device state type for terminal sync
-export type DIMDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type DIMDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface DIMDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setDimension: (value: number) => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setDimension: (value: number) => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: DIMDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    currentDraw: number
-    dimension: number
-    stability: number
-    riftActivity: number
-    fluctuation: number
-    testResult: 'pass' | 'fail' | null
-  }
+    deviceState: DIMDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    currentDraw: number;
+    dimension: number;
+    stability: number;
+    riftActivity: number;
+    fluctuation: number;
+    testResult: "pass" | "fail" | null;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // NET Device state type for terminal sync
-export type NETDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type NETDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface NETDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setBandwidth: (value: number) => void
-  setLatency: (value: number) => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setBandwidth: (value: number) => void;
+  setLatency: (value: number) => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: NETDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    currentDraw: number
-    bandwidth: number
-    latencyMs: number
-    isConnected: boolean
-    packetLoss: number
-  }
+    deviceState: NETDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    currentDraw: number;
+    bandwidth: number;
+    latencyMs: number;
+    isConnected: boolean;
+    packetLoss: number;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // RMG Device state type for terminal sync
-export type RMGDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type RMGDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface RMGDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setStrength: (value: number) => void
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setStrength: (value: number) => void;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: RMGDeviceState
-    statusMessage: string
-    isPowered: boolean
-    currentDraw: number
-    strength: number
-    fieldActive: boolean
-    isExpanded: boolean
-  }
+    deviceState: RMGDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    currentDraw: number;
+    strength: number;
+    fieldActive: boolean;
+    isExpanded: boolean;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // BTK Device state type for terminal sync
-export type BTKDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type BTKDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface BTKDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: BTKDeviceState
-    statusMessage: string
-    isPowered: boolean
-    currentDraw: number
-    selectedTool: string | null
-    isExpanded: boolean
-  }
+    deviceState: BTKDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    currentDraw: number;
+    selectedTool: string | null;
+    isExpanded: boolean;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // PWB Device state type for terminal sync
-export type PWBDeviceState = 'booting' | 'online' | 'testing' | 'rebooting' | 'standby' | 'shutdown'
+export type PWBDeviceState =
+  | "booting"
+  | "online"
+  | "testing"
+  | "rebooting"
+  | "standby"
+  | "shutdown";
 
 export interface PWBDeviceActions {
-  powerOn: () => Promise<void>
-  powerOff: () => Promise<void>
-  runTest: () => Promise<void>
-  reboot: () => Promise<void>
-  setExpanded: (expanded: boolean) => void
-  toggleExpanded: () => void
+  powerOn: () => Promise<void>;
+  powerOff: () => Promise<void>;
+  runTest: () => Promise<void>;
+  reboot: () => Promise<void>;
+  setExpanded: (expanded: boolean) => void;
+  toggleExpanded: () => void;
   getState: () => {
-    deviceState: PWBDeviceState
-    statusMessage: string
-    isPowered: boolean
-    isExpanded: boolean
-    currentDraw: number
-    activeSlot: number | null
-    queuedItems: number
-    craftingProgress: number
-  }
+    deviceState: PWBDeviceState;
+    statusMessage: string;
+    isPowered: boolean;
+    isExpanded: boolean;
+    currentDraw: number;
+    activeSlot: number | null;
+    queuedItems: number;
+    craftingProgress: number;
+  };
   getFirmware: () => {
-    version: string
-    build: string
-    checksum: string
-    features: string[]
-    securityPatch: string
-  }
+    version: string;
+    build: string;
+    checksum: string;
+    features: string[];
+    securityPatch: string;
+  };
   getPowerSpecs: () => {
-    full: number
-    idle: number
-    standby: number
-    category: string
-    priority: number
-  }
+    full: number;
+    idle: number;
+    standby: number;
+    category: string;
+    priority: number;
+  };
 }
 
 // ScrewButton types for terminal sync
-export type ScrewButtonId = 'SB-01' | 'SB-02' | 'SB-03' | 'SB-04'
+export type ScrewButtonId = "SB-01" | "SB-02" | "SB-03" | "SB-04";
 
 export interface ScrewButtonDeviceActions {
-  activate: (id: ScrewButtonId) => Promise<boolean>
-  deactivate: (id: ScrewButtonId) => Promise<boolean>
-  isUnlocked: (id: ScrewButtonId) => boolean
-  isActive: (id: ScrewButtonId) => boolean
-  getState: (id: ScrewButtonId) => { unlocked: boolean; active: boolean; unlockedAt: number | null; activatedAt: number | null; totalActiveTime: number }
-  getAllStates: () => Record<ScrewButtonId, { unlocked: boolean; active: boolean; unlockedAt: number | null; activatedAt: number | null; totalActiveTime: number }>
-  getNodeSyncStats: () => { connectedNodes: number; totalNodes: number; syncRate: string; hashRate: string; latency: string; uptime: string; lastSync: string; peersOnline: number; bandwidthIn: string; bandwidthOut: string }
-  getPoolStats: () => { poolName: string; members: number; maxMembers: number; totalHashRate: string; yourContribution: string; pendingRewards: number; blocksFound: number; efficiency: string; uptime: string }
-  getMeshCastStats: () => { activeBroadcasts: number; receivedBuffs: string[]; networkReach: number; signalStrength: string; memesGenerated: number; memesReceived: number; bandwidth: string }
-  getBridgeStats: () => { linkedLab: string; bridgeStability: string; entanglementFidelity: string; dataTransferred: string; sharedCrystals: number; coAssemblies: number; chatMessages: number; bridgeUptime: string; quantumChannel: string }
-  getFeature: (id: ScrewButtonId) => { id: ScrewButtonId; name: string; fullName: string; description: string; unlockRequirement: string; activationCost: number }
+  activate: (id: ScrewButtonId) => Promise<boolean>;
+  deactivate: (id: ScrewButtonId) => Promise<boolean>;
+  isUnlocked: (id: ScrewButtonId) => boolean;
+  isActive: (id: ScrewButtonId) => boolean;
+  getState: (id: ScrewButtonId) => {
+    unlocked: boolean;
+    active: boolean;
+    unlockedAt: number | null;
+    activatedAt: number | null;
+    totalActiveTime: number;
+  };
+  getAllStates: () => Record<
+    ScrewButtonId,
+    {
+      unlocked: boolean;
+      active: boolean;
+      unlockedAt: number | null;
+      activatedAt: number | null;
+      totalActiveTime: number;
+    }
+  >;
+  getNodeSyncStats: () => {
+    connectedNodes: number;
+    totalNodes: number;
+    syncRate: string;
+    hashRate: string;
+    latency: string;
+    uptime: string;
+    lastSync: string;
+    peersOnline: number;
+    bandwidthIn: string;
+    bandwidthOut: string;
+  };
+  getPoolStats: () => {
+    poolName: string;
+    members: number;
+    maxMembers: number;
+    totalHashRate: string;
+    yourContribution: string;
+    pendingRewards: number;
+    blocksFound: number;
+    efficiency: string;
+    uptime: string;
+  };
+  getMeshCastStats: () => {
+    activeBroadcasts: number;
+    receivedBuffs: string[];
+    networkReach: number;
+    signalStrength: string;
+    memesGenerated: number;
+    memesReceived: number;
+    bandwidth: string;
+  };
+  getBridgeStats: () => {
+    linkedLab: string;
+    bridgeStability: string;
+    entanglementFidelity: string;
+    dataTransferred: string;
+    sharedCrystals: number;
+    coAssemblies: number;
+    chatMessages: number;
+    bridgeUptime: string;
+    quantumChannel: string;
+  };
+  getFeature: (id: ScrewButtonId) => {
+    id: ScrewButtonId;
+    name: string;
+    fullName: string;
+    description: string;
+    unlockRequirement: string;
+    activationCost: number;
+  };
 }
 
 export interface ThemeActions {
-  list: () => { name: string; fg: string; index: number }[]
-  get: () => { name: string; fg: string; index: number }
-  set: (index: number) => void
-  getByName: (name: string) => number | null
+  list: () => { name: string; fg: string; index: number }[];
+  get: () => { name: string; fg: string; index: number };
+  set: (index: number) => void;
+  getByName: (name: string) => number | null;
 }
 
 export interface FilesystemActions {
-  getCwd: () => string
-  ls: (path?: string, flags?: { long?: boolean; all?: boolean }) => string[]
-  cd: (path: string) => string | null
-  cat: (path: string, user: string, groups: string[]) => string | null
-  mkdir: (path: string, parents?: boolean) => string | null
-  touch: (path: string) => string | null
-  rm: (path: string, recursive?: boolean) => string | null
-  tree: (path?: string, depth?: number) => string[]
-  stat: (path: string) => { permissions: number; owner: string; group: string; size: number; modified: number; type: string } | null
-  chmod: (path: string, mode: number) => string | null
-  chown: (path: string, owner: string, group?: string) => string | null
-  cp: (src: string, dest: string, recursive?: boolean) => string | null
-  mv: (src: string, dest: string) => string | null
-  ln: (target: string, linkName: string, symbolic?: boolean) => string | null
-  head: (path: string, lines?: number) => string | null
-  tail: (path: string, lines?: number) => string | null
-  write: (path: string, content: string) => string | null
-  pwd: () => string
-  resolve: (path: string) => boolean
-  formatPermissions: (path: string) => string | null
-  toJSON: () => string
-  walk: (path: string, callback: (nodePath: string, node: import('@/lib/unos/types').VNode) => void) => void
-  getMounts: () => import('@/lib/unos/types').MountPoint[]
-  getNodeType: (path: string) => string | null
+  getCwd: () => string;
+  ls: (path?: string, flags?: { long?: boolean; all?: boolean }) => string[];
+  cd: (path: string) => string | null;
+  cat: (path: string, user: string, groups: string[]) => string | null;
+  mkdir: (path: string, parents?: boolean) => string | null;
+  touch: (path: string) => string | null;
+  rm: (path: string, recursive?: boolean) => string | null;
+  tree: (path?: string, depth?: number) => string[];
+  stat: (path: string) => {
+    permissions: number;
+    owner: string;
+    group: string;
+    size: number;
+    modified: number;
+    type: string;
+  } | null;
+  chmod: (path: string, mode: number) => string | null;
+  chown: (path: string, owner: string, group?: string) => string | null;
+  cp: (src: string, dest: string, recursive?: boolean) => string | null;
+  mv: (src: string, dest: string) => string | null;
+  ln: (target: string, linkName: string, symbolic?: boolean) => string | null;
+  head: (path: string, lines?: number) => string | null;
+  tail: (path: string, lines?: number) => string | null;
+  write: (path: string, content: string) => string | null;
+  pwd: () => string;
+  resolve: (path: string) => boolean;
+  formatPermissions: (path: string) => string | null;
+  toJSON: () => string;
+  walk: (
+    path: string,
+    callback: (nodePath: string, node: import("@/lib/unos/types").VNode) => void,
+  ) => void;
+  getMounts: () => import("@/lib/unos/types").MountPoint[];
+  getNodeType: (path: string) => string | null;
 }
 
 export interface UserActions {
-  whoami: () => string
-  id: (username?: string) => string
-  su: (targetUser: string, password?: string) => { success: boolean; message: string }
-  sudo: (callback: () => void) => boolean
-  canSudo: () => boolean
-  isRoot: () => boolean
-  passwd: (user: string, newPass: string) => { success: boolean; message: string }
-  useradd: (name: string, opts?: { uid?: number; groups?: string[]; home?: string }) => { success: boolean; message: string }
-  userdel: (name: string) => { success: boolean; message: string }
-  usermod: (name: string, opts: { groups?: string[] }) => { success: boolean; message: string }
-  groups: (user?: string) => string
-  getCurrentUser: () => { uid: number; username: string; groups: string[]; home: string; isRoot: boolean }
-  verifyPassword: (username: string, password: string) => boolean
-  toJSON: () => string
+  whoami: () => string;
+  id: (username?: string) => string;
+  su: (targetUser: string, password?: string) => { success: boolean; message: string };
+  sudo: (callback: () => void) => boolean;
+  canSudo: () => boolean;
+  isRoot: () => boolean;
+  passwd: (user: string, newPass: string) => { success: boolean; message: string };
+  useradd: (
+    name: string,
+    opts?: { uid?: number; groups?: string[]; home?: string },
+  ) => { success: boolean; message: string };
+  userdel: (name: string) => { success: boolean; message: string };
+  usermod: (name: string, opts: { groups?: string[] }) => { success: boolean; message: string };
+  groups: (user?: string) => string;
+  getCurrentUser: () => {
+    uid: number;
+    username: string;
+    groups: string[];
+    home: string;
+    isRoot: boolean;
+  };
+  verifyPassword: (username: string, password: string) => boolean;
+  toJSON: () => string;
 }
 
 export interface DataFetchers {
-  fetchBalance: () => Promise<UserBalance | null>
-  fetchCrystals: () => Promise<Crystal[]>
-  fetchResearchProgress: () => Promise<TechProgress[]>
-  fetchCommandHistory: (limit?: number) => Promise<CommandHistoryEntry[]>
-  fetchVolatility: () => Promise<{ tps: number; tier: string; block_time_ms: number } | null>
+  fetchBalance: () => Promise<UserBalance | null>;
+  fetchCrystals: () => Promise<Crystal[]>;
+  fetchResearchProgress: () => Promise<TechProgress[]>;
+  fetchCommandHistory: (limit?: number) => Promise<CommandHistoryEntry[]>;
+  fetchVolatility: () => Promise<{ tps: number; tier: string; block_time_ms: number } | null>;
   logCommand: (
     command: string,
     args: string[],
     output: string,
     success: boolean,
-    executionTimeMs: number
-  ) => Promise<void>
-  mintCrystal: (name: string) => Promise<MintResult>
-  fetchCrystalByName: (name: string) => Promise<CrystalDetails | null>
-  renameCrystal: (oldName: string, newName: string) => Promise<RenameResult>
+    executionTimeMs: number,
+  ) => Promise<void>;
+  mintCrystal: (name: string) => Promise<MintResult>;
+  fetchCrystalByName: (name: string) => Promise<CrystalDetails | null>;
+  renameCrystal: (oldName: string, newName: string) => Promise<RenameResult>;
   // Panel state save/restore
-  saveAllDeviceState?: () => void
+  saveAllDeviceState?: () => void;
   // Device actions for bidirectional sync
-  cdcDevice?: CDCDeviceActions
-  uecDevice?: UECDeviceActions
-  batDevice?: BATDeviceActions
-  hmsDevice?: HMSDeviceActions
-  ecrDevice?: ECRDeviceActions
-  iplDevice?: IPLDeviceActions
-  mfrDevice?: MFRDeviceActions
-  aicDevice?: AICDeviceActions
-  vntDevice?: VNTDeviceActions
-  scaDevice?: SCADeviceActions
-  exdDevice?: EXDDeviceActions
-  emcDevice?: EMCDeviceActions
-  qsmDevice?: QSMDeviceActions
-  quaDevice?: QUADeviceActions
-  pwbDevice?: PWBDeviceActions
-  btkDevice?: BTKDeviceActions
-  rmgDevice?: RMGDeviceActions
-  mscDevice?: MSCDeviceActions
-  netDevice?: NETDeviceActions
-  tmpDevice?: TMPDeviceActions
-  dimDevice?: DIMDeviceActions
-  cpuDevice?: CPUDeviceActions
-  clkDevice?: CLKDeviceActions
-  memDevice?: MEMDeviceActions
-  andDevice?: ANDDeviceActions
-  qcpDevice?: QCPDeviceActions
-  tlpDevice?: TLPDeviceActions
-  lctDevice?: LCTDeviceActions
-  p3dDevice?: P3DDeviceActions
-  spkDevice?: SPKDeviceActions
-  dgnDevice?: DGNDeviceActions
+  cdcDevice?: CDCDeviceActions;
+  uecDevice?: UECDeviceActions;
+  batDevice?: BATDeviceActions;
+  hmsDevice?: HMSDeviceActions;
+  ecrDevice?: ECRDeviceActions;
+  iplDevice?: IPLDeviceActions;
+  mfrDevice?: MFRDeviceActions;
+  aicDevice?: AICDeviceActions;
+  vntDevice?: VNTDeviceActions;
+  scaDevice?: SCADeviceActions;
+  exdDevice?: EXDDeviceActions;
+  emcDevice?: EMCDeviceActions;
+  qsmDevice?: QSMDeviceActions;
+  quaDevice?: QUADeviceActions;
+  pwbDevice?: PWBDeviceActions;
+  btkDevice?: BTKDeviceActions;
+  rmgDevice?: RMGDeviceActions;
+  mscDevice?: MSCDeviceActions;
+  netDevice?: NETDeviceActions;
+  tmpDevice?: TMPDeviceActions;
+  dimDevice?: DIMDeviceActions;
+  cpuDevice?: CPUDeviceActions;
+  clkDevice?: CLKDeviceActions;
+  memDevice?: MEMDeviceActions;
+  andDevice?: ANDDeviceActions;
+  qcpDevice?: QCPDeviceActions;
+  tlpDevice?: TLPDeviceActions;
+  lctDevice?: LCTDeviceActions;
+  p3dDevice?: P3DDeviceActions;
+  spkDevice?: SPKDeviceActions;
+  dgnDevice?: DGNDeviceActions;
   // Screw button actions
-  screwButtons?: ScrewButtonDeviceActions
+  screwButtons?: ScrewButtonDeviceActions;
   // Filesystem and user management
-  filesystemActions?: FilesystemActions
-  userActions?: UserActions
+  filesystemActions?: FilesystemActions;
+  userActions?: UserActions;
   // Shell actions (env vars, aliases)
-  shellActions?: ShellActions
+  shellActions?: ShellActions;
   // Network actions
-  networkActions?: NetworkActions
+  networkActions?: NetworkActions;
   // Journal actions
-  journalActions?: JournalActions
+  journalActions?: JournalActions;
   // Cron actions
-  cronActions?: CronActions
+  cronActions?: CronActions;
   // Init actions (enable/disable)
-  initActions?: InitActions
+  initActions?: InitActions;
   // Resource container management
-  resourceManager?: import('@/contexts/ResourceManager').ResourceManagerActions
+  resourceManager?: import("@/contexts/ResourceManager").ResourceManagerActions;
   // Theme management
-  themeActions?: ThemeActions
+  themeActions?: ThemeActions;
   // Application manager
-  unappActions?: import('@/types/unapp').UnappActions
+  unappActions?: import("@/types/unapp").UnappActions;
   // System power control
   systemPower?: {
-    scheduleShutdown: (seconds: number, scope?: 'os' | 'system') => void
-    scheduleReboot: (seconds: number, scope?: 'os' | 'system') => void
-    shutdownNow: (scope?: 'os' | 'system') => void
-    rebootNow: (scope?: 'os' | 'system') => void
-    cancelCountdown: () => void
-    getState: () => { systemState: string; countdownSeconds: number | null; countdownAction: string | null; powerScope: string | null }
-  }
+    scheduleShutdown: (seconds: number, scope?: "os" | "system") => void;
+    scheduleReboot: (seconds: number, scope?: "os" | "system") => void;
+    shutdownNow: (scope?: "os" | "system") => void;
+    rebootNow: (scope?: "os" | "system") => void;
+    cancelCountdown: () => void;
+    getState: () => {
+      systemState: string;
+      countdownSeconds: number | null;
+      countdownAction: string | null;
+      powerScope: string | null;
+    };
+  };
   // Kernel actions
-  kernelActions?: KernelActions
+  kernelActions?: KernelActions;
+  // Firmware management
+  firmwareActions?: import("@/lib/firmware/types").FirmwareActions;
+  // Thermal management subsystem
+  thermalDevice?: ThermalDeviceActions;
+  // Mission system
+  missionActions?: MissionTerminalActions;
+  // Resonance discovery system
+  resonanceActions?: ResonanceTerminalActions;
+}
+
+/**
+ * Terminal-facing mission actions. Kept minimal — the terminal only needs
+ * read access and the whatNext suggestion.
+ */
+export interface MissionTerminalActions {
+  whatNext: () => {
+    action: string;
+    reason: string;
+    voice?: string;
+    missionId?: string;
+    hintLevel: number;
+  };
+  getAllMissions: () => Array<{
+    id: string;
+    title: string;
+    flavor: string;
+    category: string;
+    status: string;
+    completedTaskCount: number;
+    totalTaskCount: number;
+    tasks: Array<{
+      id: string;
+      label: string;
+      status: string;
+      objectives: Array<{
+        id: string;
+        description: string;
+        currentValue: number;
+        targetValue: number;
+        status: string;
+        hint?: string;
+        deepDiveHint?: string;
+      }>;
+    }>;
+  }>;
+  trackMission: (id: string) => void;
+  untrackMission: (id: string) => void;
+  claimMission: (id: string) => void;
+}
+
+/**
+ * Terminal-facing resonance actions for the discoveries command.
+ */
+export interface ResonanceTerminalActions {
+  getDiscoveries: () => string[];
+  getUndiscoveredCount: () => number;
+  getAllProtocols: () => Array<{
+    id: string;
+    codename: string;
+    description: string;
+    loreClue: string;
+    rarity: string;
+    isDiscovered: boolean;
+  }>;
+  pushCommandEvent: (command: string) => void;
+}
+
+/**
+ * Slim, hook-free view of the ThermalManager surface that the `thermal`
+ * terminal command consumes. The full React context lives in
+ * `contexts/ThermalManager.tsx`; this interface only re-declares what the
+ * shell needs so types.ts stays free of UI imports.
+ */
+export interface ThermalDeviceActions {
+  getState: () => {
+    panelTemperature: number;
+    ambientTemperature: number;
+    chassisVolumeL: number;
+    chassisHeatCapacityJ: number;
+    totalHeatW: number;
+    totalCoolingW: number;
+    netHeatW: number;
+    overallStatus: "nominal" | "elevated" | "warning" | "critical";
+    isOverheating: boolean;
+    performanceThrottle: number;
+    autoMode: boolean;
+    zones: {
+      cpu: {
+        temperature: number;
+        targetTemp: number;
+        warningThreshold: number;
+        criticalThreshold: number;
+      };
+      gpu: {
+        temperature: number;
+        targetTemp: number;
+        warningThreshold: number;
+        criticalThreshold: number;
+      };
+      panel: {
+        temperature: number;
+        targetTemp: number;
+        warningThreshold: number;
+        criticalThreshold: number;
+      };
+    };
+    fans: {
+      cpu: { speed: number; rpm: number; mode: string; isOn: boolean; coolingPower: number };
+      gpu: { speed: number; rpm: number; mode: string; isOn: boolean; coolingPower: number };
+    };
+  };
+  listDevices: () => Array<{
+    id: string;
+    name: string;
+    load: number;
+    heatOutput: number;
+    volumeL: number;
+    heatCapacityJ: number;
+    temperature: number;
+  }>;
+  getChassisInfo: () => {
+    volumeL: number;
+    deviceVolumeL: number;
+    airGapL: number;
+    heatCapacityJ: number;
+  };
+  setFanSpeed: (fanId: "cpu" | "gpu", speed: number) => void;
+  setFanMode: (fanId: "cpu" | "gpu", mode: "AUTO" | "LOW" | "MED" | "HIGH" | "MANUAL") => void;
+  toggleFan: (fanId: "cpu" | "gpu", on: boolean) => void;
+  setAutoMode: (enabled: boolean) => void;
+  emergencyCool: () => void;
+  registerDevice: (id: string, name: string, initialLoad?: number) => void;
+  updateDeviceLoad: (id: string, load: number) => void;
+  getTemperatureColor: (temp: number) => string;
 }
 
 export interface KernelActions {
-  getProcessList: () => { pid: number; ppid: number; name: string; cmdline: string; state: string; uid: number; priority: number; nice: number; cpuTime: number; memoryRSS: number; memoryVSZ: number; tty: string }[]
-  killProcess: (pid: number, signal: number) => { success: boolean; message: string }
-  getMemoryStats: () => { totalKB: number; freeKB: number; availableKB: number; buffersKB: number; cachedKB: number; swapTotalKB: number; swapFreeKB: number; usedKB: number; sharedKB: number }
-  getLoadAverage: () => [number, number, number]
-  getUptime: () => { seconds: number; idleSeconds: number }
-  getUname: () => { sysname: string; nodename: string; release: string; version: string; machine: string }
-  getDmesg: (level?: string) => { timestamp: number; level: string; message: string }[]
-  getModules: () => { name: string; size: number; refCount: number; dependencies: string[]; loaded: boolean }[]
-  loadModule: (name: string) => { success: boolean; messages: string[] }
-  unloadModule: (name: string) => { success: boolean; message: string }
-  getSyscallTable: () => { number: number; name: string; callCount: number }[]
-  getStrace: (pid?: number, limit?: number) => { timestamp: number; pid: number; syscall: string; args: string; ret: number }[]
-  setNice: (pid: number, nice: number) => { success: boolean; message: string }
-  getSysctl: () => { key: string; value: string; writable: boolean }[]
-  setSysctl: (key: string, value: string) => { success: boolean; message: string }
-  execCommand: (name: string, args: string[]) => number
-  finishCommand: (pid: number, exitCode: number) => void
-  getTopProcesses: (n: number) => { pid: number; name: string; cmdline: string; state: string; uid: number; cpuPercent: number; memPercent: number; memoryRSS: number; memoryVSZ: number; cpuTime: number; nice: number; tty: string }[]
-  getSchedulerStats: () => { contextSwitches: number; totalCPUTime: number; idleCPUTime: number; runQueueLength: number; processCount: number; lastPid: number }
-  toJSON: () => import('@/lib/unos/kernel').KernelSerializedState
+  getProcessList: () => {
+    pid: number;
+    ppid: number;
+    name: string;
+    cmdline: string;
+    state: string;
+    uid: number;
+    priority: number;
+    nice: number;
+    cpuTime: number;
+    memoryRSS: number;
+    memoryVSZ: number;
+    tty: string;
+  }[];
+  killProcess: (pid: number, signal: number) => { success: boolean; message: string };
+  getMemoryStats: () => {
+    totalKB: number;
+    freeKB: number;
+    availableKB: number;
+    buffersKB: number;
+    cachedKB: number;
+    swapTotalKB: number;
+    swapFreeKB: number;
+    usedKB: number;
+    sharedKB: number;
+  };
+  getLoadAverage: () => [number, number, number];
+  getUptime: () => { seconds: number; idleSeconds: number };
+  getUname: () => {
+    sysname: string;
+    nodename: string;
+    release: string;
+    version: string;
+    machine: string;
+  };
+  getDmesg: (level?: string) => { timestamp: number; level: string; message: string }[];
+  getModules: () => {
+    name: string;
+    size: number;
+    refCount: number;
+    dependencies: string[];
+    loaded: boolean;
+  }[];
+  loadModule: (name: string) => { success: boolean; messages: string[] };
+  unloadModule: (name: string) => { success: boolean; message: string };
+  getSyscallTable: () => { number: number; name: string; callCount: number }[];
+  getStrace: (
+    pid?: number,
+    limit?: number,
+  ) => { timestamp: number; pid: number; syscall: string; args: string; ret: number }[];
+  setNice: (pid: number, nice: number) => { success: boolean; message: string };
+  getSysctl: () => { key: string; value: string; writable: boolean }[];
+  setSysctl: (key: string, value: string) => { success: boolean; message: string };
+  execCommand: (name: string, args: string[]) => number;
+  finishCommand: (pid: number, exitCode: number) => void;
+  getTopProcesses: (n: number) => {
+    pid: number;
+    name: string;
+    cmdline: string;
+    state: string;
+    uid: number;
+    cpuPercent: number;
+    memPercent: number;
+    memoryRSS: number;
+    memoryVSZ: number;
+    cpuTime: number;
+    nice: number;
+    tty: string;
+  }[];
+  getSchedulerStats: () => {
+    contextSwitches: number;
+    totalCPUTime: number;
+    idleCPUTime: number;
+    runQueueLength: number;
+    processCount: number;
+    lastPid: number;
+  };
+  toJSON: () => import("@/lib/unos/kernel").KernelSerializedState;
 }
 
 export interface ShellActions {
-  getEnv: (key: string) => string | undefined
-  setEnv: (key: string, value: string) => void
-  unsetEnv: (key: string) => void
-  getAllEnv: () => Record<string, string>
-  expandVars: (input: string) => string
-  getAlias: (name: string) => string | undefined
-  setAlias: (name: string, value: string) => void
-  removeAlias: (name: string) => boolean
-  listAliases: () => Record<string, string>
+  getEnv: (key: string) => string | undefined;
+  setEnv: (key: string, value: string) => void;
+  unsetEnv: (key: string) => void;
+  getAllEnv: () => Record<string, string>;
+  expandVars: (input: string) => string;
+  getAlias: (name: string) => string | undefined;
+  setAlias: (name: string, value: string) => void;
+  removeAlias: (name: string) => boolean;
+  listAliases: () => Record<string, string>;
 }
 
 export interface NetworkActions {
-  getInterfaces: () => import('@/lib/unos/types').NetworkInterface[]
-  getRoutes: () => import('@/lib/unos/network').Route[]
-  getDNS: () => string[]
-  ping: (host: string, count?: number) => import('@/lib/unos/network').PingResult[]
-  traceroute: (host: string) => import('@/lib/unos/network').TracerouteHop[]
-  getConnections: () => import('@/lib/unos/network').Connection[]
-  resolveDNS: (hostname: string) => string | null
+  getInterfaces: () => import("@/lib/unos/types").NetworkInterface[];
+  getRoutes: () => import("@/lib/unos/network").Route[];
+  getDNS: () => string[];
+  ping: (host: string, count?: number) => import("@/lib/unos/network").PingResult[];
+  traceroute: (host: string) => import("@/lib/unos/network").TracerouteHop[];
+  getConnections: () => import("@/lib/unos/network").Connection[];
+  resolveDNS: (hostname: string) => string | null;
 }
 
 export interface JournalActions {
-  query: (opts?: import('@/lib/unos/journal').JournalQueryOptions) => import('@/lib/unos/journal').JournalEntry[]
-  write: (unit: string, priority: number, message: string, pid?: number) => void
-  formatEntry: (entry: import('@/lib/unos/journal').JournalEntry) => string
-  priorityFromName: (name: string) => number
+  query: (
+    opts?: import("@/lib/unos/journal").JournalQueryOptions,
+  ) => import("@/lib/unos/journal").JournalEntry[];
+  write: (unit: string, priority: number, message: string, pid?: number) => void;
+  formatEntry: (entry: import("@/lib/unos/journal").JournalEntry) => string;
+  priorityFromName: (name: string) => number;
 }
 
 export interface CronActions {
-  list: () => import('@/lib/unos/cron').CronEntry[]
-  add: (schedule: string, command: string, user?: string) => import('@/lib/unos/cron').CronEntry
-  remove: (id: number) => boolean
+  list: () => import("@/lib/unos/cron").CronEntry[];
+  add: (schedule: string, command: string, user?: string) => import("@/lib/unos/cron").CronEntry;
+  remove: (id: number) => boolean;
 }
 
 export interface InitActions {
-  enable: (name: string) => { success: boolean; message: string }
-  disable: (name: string) => { success: boolean; message: string }
-  isEnabled: (name: string) => boolean
+  enable: (name: string) => { success: boolean; message: string };
+  disable: (name: string) => { success: boolean; message: string };
+  isEnabled: (name: string) => boolean;
 }
 
 export interface CommandContext {
-  userId: string
-  username: string | null
-  balance: number
-  addOutput: (content: string, type?: TerminalLine['type']) => void
-  clearScreen: () => void
-  setTyping: (typing: boolean) => void
-  data: DataFetchers
-  sessionHistory?: string[]
+  userId: string;
+  username: string | null;
+  balance: number;
+  addOutput: (content: string, type?: TerminalLine["type"]) => void;
+  clearScreen: () => void;
+  setTyping: (typing: boolean) => void;
+  data: DataFetchers;
+  sessionHistory?: string[];
 }
 
 export interface CommandResult {
-  success: boolean
-  output?: string[]
-  error?: string
-  navigate?: string  // URL to navigate to after command execution
-  clearPanelAccess?: boolean  // Clear panel access token
-  refresh?: boolean  // Force page refresh after command execution
-  appMode?: string  // Launch an interactive app (e.g. 'mc' for Midnight Commander)
-  appModeData?: Record<string, string>  // Extra data for the app mode (e.g. { editFile: '/path' })
+  success: boolean;
+  output?: string[];
+  error?: string;
+  navigate?: string; // URL to navigate to after command execution
+  clearPanelAccess?: boolean; // Clear panel access token
+  refresh?: boolean; // Force page refresh after command execution
+  appMode?: string; // Launch an interactive app (e.g. 'mc' for Midnight Commander)
+  appModeData?: Record<string, string>; // Extra data for the app mode (e.g. { editFile: '/path' })
 }
 
 export interface TerminalState {
-  lines: TerminalLine[]
-  history: string[]
-  historyIndex: number
-  isTyping: boolean
+  lines: TerminalLine[];
+  history: string[];
+  historyIndex: number;
+  isTyping: boolean;
 }

@@ -1,57 +1,51 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { logout } from '@/app/(auth)/actions'
-import { Terminal } from '@/components/terminal'
-import { TerminalPowerWrapper } from './terminal-power-wrapper'
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { logout } from "@/app/(auth)/actions";
+import { TerminalPowerWrapper } from "./terminal-power-wrapper";
+import { TerminalFrame } from "./terminal-frame";
+import { QuestOverlay } from "@/components/quest/QuestOverlay";
+import { AnomalyOverlay } from "@/components/quest/AnomalyOverlay";
 
 interface ProfileData {
-  username: string | null
-  display_name: string | null
+  username: string | null;
+  display_name: string | null;
 }
 
 interface BalanceData {
-  available: number
-  staked: number
+  available: number;
+  staked: number;
 }
 
 export default async function TerminalPage() {
-  const supabase = await createClient()
+  const supabase = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser()
+  } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/login')
+    redirect("/login");
   }
 
   // Fetch profile and balance in parallel
   const [profileResult, balanceResult] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('username, display_name')
-      .eq('id', user.id)
-      .single(),
-    supabase
-      .from('balances')
-      .select('available, staked')
-      .eq('user_id', user.id)
-      .single(),
-  ])
+    supabase.from("profiles").select("username, display_name").eq("id", user.id).single(),
+    supabase.from("balances").select("available, staked").eq("user_id", user.id).single(),
+  ]);
 
-  const profile = (profileResult.data as ProfileData | null) ?? null
-  const balance = (balanceResult.data as BalanceData | null) ?? null
+  const profile = (profileResult.data as ProfileData | null) ?? null;
+  const balance = (balanceResult.data as BalanceData | null) ?? null;
 
-  const username = profile?.username || profile?.display_name || user.email?.split('@')[0] || null
-  const availableBalance = balance?.available || 0
+  const username = profile?.username || profile?.display_name || user.email?.split("@")[0] || null;
+  const availableBalance = balance?.available || 0;
 
   return (
-    <div className="min-h-screen bg-black text-green-500 font-mono">
+    <div className="min-h-screen bg-black font-mono text-green-500">
       {/* Scanline overlay */}
       <div
         className="pointer-events-none fixed inset-0 z-50"
         style={{
           background:
-            'repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 2px)',
+            "repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 2px)",
         }}
       />
 
@@ -59,69 +53,27 @@ export default async function TerminalPage() {
       <div
         className="pointer-events-none fixed inset-0 z-40"
         style={{
-          boxShadow: 'inset 0 0 100px rgba(34, 197, 94, 0.1)',
+          boxShadow: "inset 0 0 100px rgba(34, 197, 94, 0.1)",
         }}
       />
 
-      <div className="h-screen flex items-center justify-center p-4">
-        {/* Terminal window - Fixed 4:3 aspect ratio (800x600) */}
-        <div
-          className="flex flex-col border border-green-500/30 rounded-lg overflow-hidden shadow-[0_0_30px_rgba(34,197,94,0.15)]"
-          style={{
-            width: '800px',
-            height: '600px',
-            minWidth: '800px',
-            minHeight: '600px',
-            maxWidth: '800px',
-            maxHeight: '600px',
-            flexShrink: 0,
-            flexGrow: 0,
-          }}
-        >
-          {/* Title bar */}
-          <div className="bg-green-900/20 border-b border-green-500/30 px-4 py-2 flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="flex gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-red-500/70 hover:bg-red-500 transition-colors" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500/70 hover:bg-yellow-500 transition-colors" />
-                <div className="w-3 h-3 rounded-full bg-green-500/70 hover:bg-green-500 transition-colors" />
-              </div>
-              <span className="text-green-500/70 text-xs ml-2">
-                unLABS://terminal — {username || 'UNKNOWN'}
-              </span>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-green-500/50 text-xs">
-                {availableBalance.toFixed(2)} _unSC
-              </span>
-              <form action={logout}>
-                <button
-                  type="submit"
-                  className="text-red-500/70 text-xs hover:text-red-400 transition-colors"
-                >
-                  [DISCONNECT]
-                </button>
-              </form>
-            </div>
-          </div>
+      <TerminalFrame username={username} availableBalance={availableBalance} logoutAction={logout}>
+        <TerminalPowerWrapper userId={user.id} username={username} balance={availableBalance} />
+      </TerminalFrame>
 
-          {/* Terminal content */}
-          <div className="flex-1 bg-black/95 p-4 overflow-hidden">
-            <TerminalPowerWrapper
-              userId={user.id}
-              username={username}
-              balance={availableBalance}
-            />
-          </div>
-        </div>
+      {/* Phase 2: quest overlay. Renders null when there is no active step. */}
+      <QuestOverlay />
 
-        {/* Status bar */}
-        <div className="shrink-0 mt-2 px-2 flex justify-between text-xs text-green-500/40">
-          <span>SOLANA DEVNET</span>
-          <span>v0.1.0-alpha</span>
-          <span>↑↓ HISTORY | ESC CLEAR | ENTER EXECUTE</span>
-        </div>
-      </div>
+      {/* Phase 3: ambient anomaly effect. Active once EP1 ep1.reveal fires. */}
+      <AnomalyOverlay />
+
+      {/* Phase 4: persistent link to the production hub. */}
+      <a
+        href="/lab"
+        className="fixed right-4 bottom-4 z-40 border border-green-500/60 bg-black/80 px-3 py-1 font-mono text-xs text-green-300 hover:bg-green-500/20"
+      >
+        &gt; /lab · production
+      </a>
     </div>
-  )
+  );
 }

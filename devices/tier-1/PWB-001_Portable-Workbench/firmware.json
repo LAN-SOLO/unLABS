@@ -1,0 +1,19 @@
+{
+  "device_id": "PWB-001",
+  "device_name": "Portable Workbench",
+  "tier": 1,
+  "firmware": {
+    "version": "1.1.0",
+    "build": "2024.02.20",
+    "checksum": "D4E8F1A3",
+    "features": ["slot-management", "auto-calibrate", "tool-tracking", "assembly-queue"],
+    "securityPatch": "2024.02.15"
+  },
+  "power": {
+    "full": 3,
+    "idle": 1,
+    "standby": 0.2,
+    "category": "light",
+    "priority": 2
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "device_id": "UEC-001",
+  "device_name": "Unstable Energy Core",
+  "tier": 2,
+  "firmware": {
+    "version": "2.0.1",
+    "build": "2024.02.08",
+    "checksum": "E9C4F7A2",
+    "features": [
+      "volatility-tracking",
+      "tps-monitor",
+      "tier-calc",
+      "network-sync",
+      "field-stabilizer"
+    ],
+    "securityPatch": "2024.02.05"
+  },
+  "power": {
+    "output_max": 500,
+    "per_tier": 100,
+    "self_consumption": 10,
+    "standby": 2,
+    "category": "generator",
+    "priority": 1
+  }
+}

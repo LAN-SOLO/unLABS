@@ -2,125 +2,101 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
-
-**UnstableLabs** - A retro cyberpunk idle laboratory game with blockchain integration. Players manage NFT crystals (_unITM) composed of 30 slices (_unSLC) through a terminal-style UI, earning _unSC tokens through gameplay.
-
 ## Commands
 
-```bash
-npm run dev      # Start development server (http://localhost:3000)
-npm run build    # Build for production
-npm run lint     # Run ESLint
-```
+- `pnpm dev` — Start Next.js dev server (port 3000)
+- `pnpm build` — Production build
+- `pnpm start` — Run the production build
+- `pnpm lint` / `pnpm lint:fix` — ESLint (`eslint-config-next` + `eslint-config-prettier`)
+- `pnpm typecheck` — `tsc --noEmit`
+- `pnpm format` / `pnpm format:check` — Prettier
+- `pnpm test` / `pnpm test:watch` — Vitest unit tests
+- `pnpm test:e2e` — Playwright smoke tests (requires `pnpm exec playwright install --with-deps chromium` once)
+- `pnpm check` — lint + typecheck + format:check + test + build (the same gates CI runs)
+- `pnpm db:start` / `db:stop` / `db:reset` / `db:new <name>` / `db:diff` / `db:types` — Supabase CLI wrappers
 
-## Tech Stack
+See `docs/PIPELINE.md` for the full pipeline breakdown. Lefthook runs format/lint/typecheck on every commit and `pnpm test` on every push. GitHub Actions re-runs the same commands in CI.
 
-- **Next.js 16** with App Router and React 19 (Server Components by default)
-- **TypeScript** with strict mode
-- **Tailwind CSS v4** with PostCSS
-- **Supabase** for auth, database, and real-time subscriptions
-- **shadcn/ui** (new-york style) with Radix UI primitives
+Supabase local stack lives under `supabase/` (`config.toml`, `migrations/`). Use the Supabase CLI via the `db:*` scripts for migrations; never edit schema directly.
 
-## Project Structure
+## Project Standards (non-negotiable)
 
-```
-├── app/                    # Next.js App Router
-│   ├── (auth)/            # Auth routes (login, register)
-│   ├── (game)/            # Protected game routes (terminal, lab)
-│   └── api/               # API routes
-├── components/
-│   ├── ui/                # shadcn/ui components
-│   ├── terminal/          # Terminal UI components
-│   └── game/              # Game-specific components
-├── lib/
-│   ├── supabase/          # Supabase client utilities
-│   │   ├── client.ts      # Browser client
-│   │   ├── server.ts      # Server client
-│   │   └── middleware.ts  # Auth session helper
-│   └── utils.ts           # cn() and utilities
-├── types/
-│   ├── database.ts        # Supabase generated types
-│   └── index.ts           # Type exports and constants
-├── supabase/
-│   └── migrations/        # SQL migration files
-└── middleware.ts          # Next.js auth middleware
-```
+### Language & Runtime
 
-## Database Schema
+- TypeScript strict mode (already enabled in `tsconfig.json`)
+- **PNPM only** — never `npm` or `yarn`
+- Node.js 20+ / ES2022+
+- Next.js 16 (App Router) + React 19
 
-### Core Tables
-| Table | Description |
-|-------|-------------|
-| `profiles` | User profiles (extends auth.users) |
-| `crystals` | NFT items (_unITM) with traits |
-| `slices` | Crystal components (_unSLC), 30 per crystal |
-| `tech_trees` | 12 research trees |
-| `research_progress` | User progression per tree |
-| `balances` | _unSC token balances |
-| `transactions` | Token transaction history |
-| `command_history` | Terminal command logs |
-| `volatility_snapshots` | Blockchain TPS data |
+### Code
 
-### Crystal Traits
-- **Color**: infrared, red, orange, yellow, green, blue, indigo, violet, gamma
-- **Volatility**: Tier 1-5 (based on blockchain TPS)
-- **Rotation**: CW (clockwise) / CCW (counter-clockwise)
-- **State**: stable / volatile / hybrid
-- **Era**: 8-bit / 16-bit / 32-bit / 64-bit
+- Follow existing patterns before introducing new ones
+- No `any` — use `unknown` and narrow with type guards
+- Prefer named exports
+- Use the `@/*` path alias for absolute imports (the only alias defined in `tsconfig.json`)
 
-## Code Conventions
+### Database
 
-### Components
-- Server Components by default; use `'use client'` only when needed
-- Use Server Actions for mutations
-- Terminal aesthetic: monospace fonts, dark theme, CRT effects
+- Never modify the schema directly — always use migrations under `supabase/migrations/`
+- Never run destructive queries (`DROP`, `TRUNCATE`) without explicit user confirmation
 
-### File Naming
-| Type | Convention | Example |
-|------|------------|---------|
-| Components | PascalCase | `Terminal.tsx` |
-| Hooks | camelCase with 'use' | `useTerminal.ts` |
-| Utilities | camelCase | `parseCommand.ts` |
-| Types | PascalCase | `Crystal.ts` |
+### Git
 
-### Supabase Usage
-```typescript
-// Server Component / Server Action
-import { createClient } from '@/lib/supabase/server'
-const supabase = await createClient()
+- Never force-push `main` or `develop`
+- Never commit secrets or `.env` files
+- Run lint and type-check before committing
 
-// Client Component
-import { createClient } from '@/lib/supabase/client'
-const supabase = createClient()
-```
+### Architecture
 
-### Type Imports
-```typescript
-import type { Crystal, Profile, Balance } from '@/types'
-import { CRYSTAL_COLORS, SLICES_PER_CRYSTAL } from '@/types'
-```
+- Keep business logic out of API route handlers — use service layers (`lib/api/*`, `lib/unos/*`)
+- Prefer composition over inheritance
 
-## Terminal UI Requirements
+## High-Level Architecture
 
-- Monospace font (system or custom)
-- Dark background with green/amber text
-- CRT scanline effect (subtle CSS)
-- Typing animation for output
-- Command history (up/down arrows)
-- ASCII art support
+UnstableLabs is a Next.js App Router game that simulates a Linux-like operating system (`_unOS`) with a terminal, a hardware panel, and ~37 in-game devices. The non-obvious cross-cutting structure:
 
-## Adding shadcn/ui Components
+### Routes
 
-```bash
-npx shadcn@latest add [component-name]
-```
+- `app/(auth)/`, `app/auth/` — authentication
+- `app/(game)/terminal/` — terminal UI (`terminal-frame.tsx`, `terminal-power-wrapper.tsx`, `actions/` for server actions)
+- `app/(game)/panel/` — hardware panel UI (`panel-client.tsx`)
+- `app/api/` — API routes; keep handlers thin and delegate to `lib/`
 
-## Environment Variables
+### \_unOS Kernel — `lib/unos/kernel/`
 
-Required in `.env.local`:
-```
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-```
+A simulated kernel with subsystems: `dmesg`, `process`, `memory`, `scheduler`, `syscall`, `ipc`, `modules`, `procfs`. Surrounding modules in `lib/unos/`: `filesystem`, `users`, `network`, `packages`, `containers`, `cron`, `journal`, `shell`, `devices`, `init`.
+
+- The kernel is instantiated in `components/terminal/Terminal.tsx` via `kernelRef` and exposed through a `KernelActions` interface.
+- `procfs` hooks into the virtual filesystem via `setProcFS()` / `setProcFSListDir()` to render dynamic `/unproc` content.
+- Kernel state persists to `localStorage` through `PanelSaveData.kernel` (see `lib/panel/panelState.ts`).
+- `init.ts` accepts an optional `Kernel` so processes get real PIDs from the process table.
+
+### Terminal Subsystem — `lib/terminal/`
+
+- `commands.ts` is **~18,500+ lines**. New commands must be registered in **two** places: (1) the command definition itself, and (2) the `commands[]` array at the bottom of the file. Missing the array registration is the most common bug.
+- `types.ts` defines `DataFetchers` (~line 1340) — the contract every command uses to read game state and dispatch actions.
+- `unapp/` (`appShell.ts`, `deviceApps.ts`, `moduleRenderers.ts`) implements in-terminal "apps" that render device modules.
+- `hooks/useTerminal.ts` builds the `dataFetchers` object and wraps every command execution with `kernelActions.execCommand()` / `finishCommand()` so the kernel sees real processes.
+
+### Device System — `contexts/` + `devices/` + `lib/firmware/`
+
+Each in-game device has the same fan-out:
+
+1. **Manager context** — `contexts/[XXX]Manager.tsx` (e.g. `VNTManager.tsx`, `CPUManager.tsx`). React provider holding state, firmware metadata, power specs, and action callbacks.
+2. **Ref pattern** — `components/terminal/Terminal.tsx` collects every manager's ref and assembles an actions object.
+3. **DataFetchers wiring** — `hooks/useTerminal.ts` wires those actions into `dataFetchers`.
+4. **Command access** — terminal commands reach the device through `ctx.data.<actions>` (kernel actions live at `ctx.data.kernelActions`).
+5. **UI module** — `components/panel/modules/` renders the device on the hardware panel.
+6. **Docs/firmware metadata** — `devices/tier-{1,2,3}/<DEVICE>/` contains `DEVICE-ID.md` and `firmware.json`. `lib/firmware/registry.ts` and `lib/firmware/types.ts` model firmware at runtime; `contexts/FirmwareManager.tsx` is the runtime owner.
+
+When adding device functionality, follow this exact pattern end-to-end — skipping the wiring layer is the second most common bug. See `devices/README.md` for the full device catalog and `devices/FIRMWARE-API.md` / `FIRMWARE-SPEC.md` for firmware contracts.
+
+### Supabase / Data Layer
+
+- Client setup in `lib/supabase/`, schema types in `types/database.ts` and `types/devices.ts`.
+- All device DB operations go through `lib/api/devices.ts` (queries, runtime state, combinations, tweaks). System preferences split into `sysprefs.ts` (client) and `sysprefs-server.ts` (server actions) — server actions are the canonical loader for preference data.
+- Recent perf work has consolidated sequential queries into RPCs/embeds/upserts; keep that pattern when adding new data flows.
+
+### Panel Save Game
+
+`lib/panel/panelState.ts` is the single source of truth for serialized game state (including kernel snapshot). Read it before designing any new persistence.

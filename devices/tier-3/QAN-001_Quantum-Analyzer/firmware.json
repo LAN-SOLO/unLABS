@@ -1,0 +1,19 @@
+{
+  "device_id": "QAN-001",
+  "device_name": "Quantum Analyzer",
+  "tier": 3,
+  "firmware": {
+    "version": "3.7.2",
+    "build": "2026.01.29",
+    "checksum": "Q7A3N5X8",
+    "features": ["quantum-core", "neural-network", "multi-mode", "waveform-gen", "deep-scan"],
+    "securityPatch": "2026.01.25"
+  },
+  "power": {
+    "full": 80,
+    "idle": 10,
+    "standby": 2,
+    "category": "heavy",
+    "priority": 2
+  }
+}

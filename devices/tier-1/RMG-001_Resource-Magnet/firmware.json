@@ -1,0 +1,31 @@
+{
+  "device_id": "RMG-001",
+  "device_name": "Resource Magnet",
+  "tier": 1,
+  "firmware": {
+    "version": "1.2.0",
+    "build": "2024.03.15",
+    "checksum": "E2C4A8F6",
+    "features": ["coil-feedback", "flux-stabilize", "field-calibrate", "auto-attract"],
+    "securityPatch": "2024.03.10"
+  },
+  "power": {
+    "full": 10,
+    "idle": 3,
+    "standby": 0.5,
+    "category": "medium",
+    "priority": 3
+  },
+  "update": {
+    "version": "1.3.0",
+    "build": "2025.03.01",
+    "checksum": "C7F1D5A3",
+    "changelog": [
+      "Enhanced field generator with variable polarity for selective material attraction",
+      "Added spectrum-based filter presets for common crystal component harvesting",
+      "Reduced idle power draw by 20% with adaptive coil duty cycling"
+    ],
+    "min_version": "1.2.0",
+    "requires_reboot": true
+  }
+}

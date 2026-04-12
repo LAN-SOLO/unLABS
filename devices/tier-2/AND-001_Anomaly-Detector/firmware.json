@@ -1,0 +1,38 @@
+{
+  "device_id": "AND-001",
+  "device_name": "Anomaly Detector",
+  "tier": 2,
+  "firmware": {
+    "version": "2.3.0",
+    "build": "2025.11.08",
+    "checksum": "AN0MALY01",
+    "features": [
+      "waveform-scan",
+      "anomaly-detect",
+      "signal-analysis",
+      "freq-sweep",
+      "multi-mode",
+      "halo-link"
+    ],
+    "securityPatch": "2025.11.01"
+  },
+  "power": {
+    "full": 15,
+    "idle": 4,
+    "standby": 0.8,
+    "category": "medium",
+    "priority": 2
+  },
+  "update": {
+    "version": "2.4.0",
+    "build": "2025.03.01",
+    "checksum": "E3B7D9F1",
+    "changelog": [
+      "Added machine-learning anomaly classification with 95% detection accuracy",
+      "Improved multi-band scanning with simultaneous 8-channel frequency sweeps",
+      "New auto-tracking mode locks onto transient anomalies across dimensional boundaries"
+    ],
+    "min_version": "2.3.0",
+    "requires_reboot": true
+  }
+}

@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from "@/lib/supabase/client";
 import type {
   DbPlayerDisplayPrefs,
   DbPlayerSoundPrefs,
@@ -11,16 +11,16 @@ import type {
   DbSoundProfile,
   DbSysprefAuditLog,
   UpdateTables,
-} from '@/types/database'
-import type { SysprefAuditArea, SysprefArea } from '@/types/sysprefs'
+} from "@/types/database";
+import type { SysprefAuditArea, SysprefArea } from "@/types/sysprefs";
 
 // Helper: Supabase typed client sometimes can't resolve hand-maintained tables.
 // We use typed params + runtime casts where needed.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyClient = ReturnType<typeof createClient> & { from: any; rpc: any }
+type AnyClient = ReturnType<typeof createClient> & { from: any; rpc: any };
 
 function client() {
-  return createClient() as AnyClient
+  return createClient() as AnyClient;
 }
 
 // =================================
@@ -29,28 +29,28 @@ function client() {
 
 export async function getDisplayPrefs(userId: string): Promise<DbPlayerDisplayPrefs> {
   const { data, error } = await client()
-    .from('player_display_prefs')
-    .upsert({ player_id: userId }, { onConflict: 'player_id' })
+    .from("player_display_prefs")
+    .upsert({ player_id: userId }, { onConflict: "player_id" })
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data as DbPlayerDisplayPrefs
+  if (error) throw error;
+  return data as DbPlayerDisplayPrefs;
 }
 
 export async function updateDisplayPrefs(
   userId: string,
-  prefs: UpdateTables<'player_display_prefs'>
+  prefs: UpdateTables<"player_display_prefs">,
 ): Promise<DbPlayerDisplayPrefs> {
   const { data, error } = await client()
-    .from('player_display_prefs')
+    .from("player_display_prefs")
     .update(prefs)
-    .eq('player_id', userId)
+    .eq("player_id", userId)
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data as DbPlayerDisplayPrefs
+  if (error) throw error;
+  return data as DbPlayerDisplayPrefs;
 }
 
 // =================================
@@ -59,28 +59,28 @@ export async function updateDisplayPrefs(
 
 export async function getSoundPrefs(userId: string): Promise<DbPlayerSoundPrefs> {
   const { data, error } = await client()
-    .from('player_sound_prefs')
-    .upsert({ player_id: userId }, { onConflict: 'player_id' })
+    .from("player_sound_prefs")
+    .upsert({ player_id: userId }, { onConflict: "player_id" })
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data as DbPlayerSoundPrefs
+  if (error) throw error;
+  return data as DbPlayerSoundPrefs;
 }
 
 export async function updateSoundPrefs(
   userId: string,
-  prefs: UpdateTables<'player_sound_prefs'>
+  prefs: UpdateTables<"player_sound_prefs">,
 ): Promise<DbPlayerSoundPrefs> {
   const { data, error } = await client()
-    .from('player_sound_prefs')
+    .from("player_sound_prefs")
     .update(prefs)
-    .eq('player_id', userId)
+    .eq("player_id", userId)
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data as DbPlayerSoundPrefs
+  if (error) throw error;
+  return data as DbPlayerSoundPrefs;
 }
 
 // =================================
@@ -89,28 +89,28 @@ export async function updateSoundPrefs(
 
 export async function getDatetimePrefs(userId: string): Promise<DbPlayerDatetimePrefs> {
   const { data, error } = await client()
-    .from('player_datetime_prefs')
-    .upsert({ player_id: userId }, { onConflict: 'player_id' })
+    .from("player_datetime_prefs")
+    .upsert({ player_id: userId }, { onConflict: "player_id" })
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data as DbPlayerDatetimePrefs
+  if (error) throw error;
+  return data as DbPlayerDatetimePrefs;
 }
 
 export async function updateDatetimePrefs(
   userId: string,
-  prefs: UpdateTables<'player_datetime_prefs'>
+  prefs: UpdateTables<"player_datetime_prefs">,
 ): Promise<DbPlayerDatetimePrefs> {
   const { data, error } = await client()
-    .from('player_datetime_prefs')
+    .from("player_datetime_prefs")
     .update(prefs)
-    .eq('player_id', userId)
+    .eq("player_id", userId)
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data as DbPlayerDatetimePrefs
+  if (error) throw error;
+  return data as DbPlayerDatetimePrefs;
 }
 
 // =================================
@@ -119,28 +119,28 @@ export async function updateDatetimePrefs(
 
 export async function getNetworkPrefs(userId: string): Promise<DbPlayerNetworkPrefs> {
   const { data, error } = await client()
-    .from('player_network_prefs')
-    .upsert({ player_id: userId }, { onConflict: 'player_id' })
+    .from("player_network_prefs")
+    .upsert({ player_id: userId }, { onConflict: "player_id" })
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data as DbPlayerNetworkPrefs
+  if (error) throw error;
+  return data as DbPlayerNetworkPrefs;
 }
 
 export async function updateNetworkPrefs(
   userId: string,
-  prefs: UpdateTables<'player_network_prefs'>
+  prefs: UpdateTables<"player_network_prefs">,
 ): Promise<DbPlayerNetworkPrefs> {
   const { data, error } = await client()
-    .from('player_network_prefs')
+    .from("player_network_prefs")
     .update(prefs)
-    .eq('player_id', userId)
+    .eq("player_id", userId)
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data as DbPlayerNetworkPrefs
+  if (error) throw error;
+  return data as DbPlayerNetworkPrefs;
 }
 
 // =================================
@@ -148,53 +148,38 @@ export async function updateNetworkPrefs(
 // =================================
 
 export async function getSystemConfig(): Promise<DbSystemConfigCache> {
-  const { data, error } = await client()
-    .from('system_config_cache')
-    .select('*')
-    .single()
+  const { data, error } = await client().from("system_config_cache").select("*").single();
 
-  if (error) throw error
-  return data as DbSystemConfigCache
+  if (error) throw error;
+  return data as DbSystemConfigCache;
 }
 
 export async function getSecurityPolicies(): Promise<DbUserSecurityPolicies> {
-  const { data, error } = await client()
-    .from('user_security_policies')
-    .select('*')
-    .single()
+  const { data, error } = await client().from("user_security_policies").select("*").single();
 
-  if (error) throw error
-  return data as DbUserSecurityPolicies
+  if (error) throw error;
+  return data as DbUserSecurityPolicies;
 }
 
 export async function getThemes(): Promise<DbDisplayTheme[]> {
-  const { data, error } = await client()
-    .from('display_themes')
-    .select('*')
-    .order('sort_order')
+  const { data, error } = await client().from("display_themes").select("*").order("sort_order");
 
-  if (error) throw error
-  return data as DbDisplayTheme[]
+  if (error) throw error;
+  return data as DbDisplayTheme[];
 }
 
 export async function getFonts(): Promise<DbDisplayFont[]> {
-  const { data, error } = await client()
-    .from('display_fonts')
-    .select('*')
-    .order('sort_order')
+  const { data, error } = await client().from("display_fonts").select("*").order("sort_order");
 
-  if (error) throw error
-  return data as DbDisplayFont[]
+  if (error) throw error;
+  return data as DbDisplayFont[];
 }
 
 export async function getSoundProfiles(): Promise<DbSoundProfile[]> {
-  const { data, error } = await client()
-    .from('sound_profiles')
-    .select('*')
-    .order('sort_order')
+  const { data, error } = await client().from("sound_profiles").select("*").order("sort_order");
 
-  if (error) throw error
-  return data as DbSoundProfile[]
+  if (error) throw error;
+  return data as DbSoundProfile[];
 }
 
 // =================================
@@ -202,20 +187,20 @@ export async function getSoundProfiles(): Promise<DbSoundProfile[]> {
 // =================================
 
 export async function initializePlayerPrefs(userId: string): Promise<void> {
-  const { error } = await client().rpc('initialize_player_prefs', {
+  const { error } = await client().rpc("initialize_player_prefs", {
     p_player_id: userId,
-  })
+  });
 
-  if (error) throw error
+  if (error) throw error;
 }
 
 export async function resetPlayerPrefs(userId: string, area?: SysprefArea): Promise<void> {
-  const { error } = await client().rpc('reset_player_prefs', {
+  const { error } = await client().rpc("reset_player_prefs", {
     p_player_id: userId,
     p_area: area ?? null,
-  })
+  });
 
-  if (error) throw error
+  if (error) throw error;
 }
 
 // =================================
@@ -228,44 +213,44 @@ export async function logPrefChange(
   settingKey: string,
   oldValue: string | null,
   newValue: string | null,
-  changedBy?: string
+  changedBy?: string,
 ): Promise<string> {
-  const { data, error } = await client().rpc('log_pref_change', {
+  const { data, error } = await client().rpc("log_pref_change", {
     p_player_id: playerId,
     p_area: area,
     p_key: settingKey,
     p_old_value: oldValue,
     p_new_value: newValue,
     p_changed_by: changedBy ?? null,
-  })
+  });
 
-  if (error) throw error
-  return data as string
+  if (error) throw error;
+  return data as string;
 }
 
 export async function getAuditLog(
   userId: string,
-  options?: { area?: SysprefAuditArea; limit?: number; offset?: number }
+  options?: { area?: SysprefAuditArea; limit?: number; offset?: number },
 ): Promise<DbSysprefAuditLog[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query: any = client()
-    .from('syspref_audit_log')
-    .select('*')
-    .eq('player_id', userId)
-    .order('changed_at', { ascending: false })
+    .from("syspref_audit_log")
+    .select("*")
+    .eq("player_id", userId)
+    .order("changed_at", { ascending: false });
 
   if (options?.area) {
-    query = query.eq('area', options.area)
+    query = query.eq("area", options.area);
   }
 
-  query = query.limit(options?.limit ?? 100)
+  query = query.limit(options?.limit ?? 100);
 
   if (options?.offset) {
-    query = query.range(options.offset, options.offset + (options.limit ?? 50) - 1)
+    query = query.range(options.offset, options.offset + (options.limit ?? 50) - 1);
   }
 
-  const { data, error } = await query
+  const { data, error } = await query;
 
-  if (error) throw error
-  return data as DbSysprefAuditLog[]
+  if (error) throw error;
+  return data as DbSysprefAuditLog[];
 }

@@ -1,0 +1,31 @@
+{
+  "device_id": "VNT-001",
+  "device_name": "Ventilation System",
+  "tier": 1,
+  "firmware": {
+    "version": "1.0.0",
+    "build": "2026.01.28",
+    "checksum": "V4F1N7E2",
+    "features": ["air-exchange", "hepa-filter", "humidity-ctrl", "damper-ctrl", "dual-fan"],
+    "securityPatch": "2026.01.20"
+  },
+  "power": {
+    "full": 4,
+    "idle": 2,
+    "standby": 0.3,
+    "category": "light",
+    "priority": 1
+  },
+  "update": {
+    "version": "1.1.0",
+    "build": "2025.03.01",
+    "checksum": "F5C9A2D8",
+    "changelog": [
+      "Added intelligent airflow routing with per-zone temperature targeting",
+      "Improved dust filter monitoring with clog prediction and maintenance alerts",
+      "New quiet mode reduces fan noise by 12dB during low-demand periods"
+    ],
+    "min_version": "1.0.0",
+    "requires_reboot": false
+  }
+}

@@ -1,37 +1,37 @@
 // Database types
-export * from './database'
+export * from "./database";
 
 // Device Manager types
-export * from './devices'
+export * from "./devices";
 
 // System Preferences types
-export * from './sysprefs'
+export * from "./sysprefs";
 
 // Application Manager types
-export * from './unapp'
+export * from "./unapp";
 
 // Game constants
 export const CRYSTAL_COLORS = [
-  'infrared',
-  'red',
-  'orange',
-  'yellow',
-  'green',
-  'blue',
-  'indigo',
-  'violet',
-  'gamma',
-] as const
+  "infrared",
+  "red",
+  "orange",
+  "yellow",
+  "green",
+  "blue",
+  "indigo",
+  "violet",
+  "gamma",
+] as const;
 
-export const VOLATILITY_TIERS = ['1', '2', '3', '4', '5'] as const
+export const VOLATILITY_TIERS = ["1", "2", "3", "4", "5"] as const;
 
-export const ROTATION_DIRECTIONS = ['CW', 'CCW'] as const
+export const ROTATION_DIRECTIONS = ["CW", "CCW"] as const;
 
-export const CRYSTAL_STATES = ['stable', 'volatile', 'hybrid'] as const
+export const CRYSTAL_STATES = ["stable", "volatile", "hybrid"] as const;
 
-export const CRYSTAL_ERAS = ['8-bit', '16-bit', '32-bit', '64-bit'] as const
+export const CRYSTAL_ERAS = ["8-bit", "16-bit", "32-bit", "64-bit"] as const;
 
-export const SLICES_PER_CRYSTAL = 30
+export const SLICES_PER_CRYSTAL = 30;
 
 // Color spectrum wavelengths (nm)
 export const COLOR_WAVELENGTHS: Record<string, { min: number; max: number }> = {
@@ -44,14 +44,9 @@ export const COLOR_WAVELENGTHS: Record<string, { min: number; max: number }> = {
   indigo: { min: 420, max: 450 },
   violet: { min: 380, max: 420 },
   gamma: { min: 0, max: 380 },
-}
+};
 
 // Tech tree categories
-export const TECH_CATEGORIES = [
-  'devices',
-  'optics',
-  'adapters',
-  'synthesizers',
-] as const
+export const TECH_CATEGORIES = ["devices", "optics", "adapters", "synthesizers"] as const;
 
-export type TechCategory = (typeof TECH_CATEGORIES)[number]
+export type TechCategory = (typeof TECH_CATEGORIES)[number];

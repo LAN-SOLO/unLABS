@@ -1,0 +1,25 @@
+{
+  "device_id": "SCA-001",
+  "device_name": "Supercomputer Array",
+  "tier": 3,
+  "firmware": {
+    "version": "5.2.0",
+    "build": "2026.01.28",
+    "checksum": "C8A5F2E7",
+    "features": [
+      "16-node-cluster",
+      "ecc-memory",
+      "job-scheduler",
+      "linpack-bench",
+      "interconnect-mesh"
+    ],
+    "securityPatch": "2026.01.20"
+  },
+  "power": {
+    "full": 45,
+    "idle": 15,
+    "standby": 3,
+    "category": "heavy",
+    "priority": 3
+  }
+}

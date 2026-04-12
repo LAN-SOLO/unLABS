@@ -1,90 +1,90 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { cn } from '@/lib/utils'
+import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 interface PushButtonProps {
-  onClick?: () => void
-  label?: string
-  color?: 'red' | 'green' | 'amber' | 'blue' | 'gray'
-  size?: 'sm' | 'md' | 'lg'
-  active?: boolean
-  disabled?: boolean
-  className?: string
+  onClick?: () => void;
+  label?: string;
+  color?: "red" | "green" | "amber" | "blue" | "gray";
+  size?: "sm" | "md" | "lg";
+  active?: boolean;
+  disabled?: boolean;
+  className?: string;
 }
 
 export function PushButton({
   onClick,
   label,
-  color = 'gray',
-  size = 'md',
+  color = "gray",
+  size = "md",
   active = false,
   disabled = false,
   className,
 }: PushButtonProps) {
-  const [isPressed, setIsPressed] = useState(false)
+  const [isPressed, setIsPressed] = useState(false);
 
   const sizePx = {
     sm: 24,
     md: 40,
     lg: 56,
-  }
+  };
 
   const colorStyles = {
     red: {
-      light: '#d44',
-      mid: '#a33',
-      dark: '#622',
-      glow: 'rgba(255, 51, 51, 0.7)',
-      highlight: 'rgba(255, 150, 150, 0.4)',
+      light: "#d44",
+      mid: "#a33",
+      dark: "#622",
+      glow: "rgba(255, 51, 51, 0.7)",
+      highlight: "rgba(255, 150, 150, 0.4)",
     },
     green: {
-      light: '#4d4',
-      mid: '#3a3',
-      dark: '#262',
-      glow: 'rgba(0, 255, 102, 0.7)',
-      highlight: 'rgba(150, 255, 150, 0.4)',
+      light: "#4d4",
+      mid: "#3a3",
+      dark: "#262",
+      glow: "rgba(0, 255, 102, 0.7)",
+      highlight: "rgba(150, 255, 150, 0.4)",
     },
     amber: {
-      light: '#da4',
-      mid: '#a83',
-      dark: '#642',
-      glow: 'rgba(255, 184, 0, 0.7)',
-      highlight: 'rgba(255, 220, 150, 0.4)',
+      light: "#da4",
+      mid: "#a83",
+      dark: "#642",
+      glow: "rgba(255, 184, 0, 0.7)",
+      highlight: "rgba(255, 220, 150, 0.4)",
     },
     blue: {
-      light: '#48d',
-      mid: '#36a',
-      dark: '#246',
-      glow: 'rgba(0, 102, 255, 0.7)',
-      highlight: 'rgba(150, 180, 255, 0.4)',
+      light: "#48d",
+      mid: "#36a",
+      dark: "#246",
+      glow: "rgba(0, 102, 255, 0.7)",
+      highlight: "rgba(150, 180, 255, 0.4)",
     },
     gray: {
-      light: '#666',
-      mid: '#444',
-      dark: '#222',
-      glow: 'rgba(255, 255, 255, 0.3)',
-      highlight: 'rgba(255, 255, 255, 0.2)',
+      light: "#666",
+      mid: "#444",
+      dark: "#222",
+      glow: "rgba(255, 255, 255, 0.3)",
+      highlight: "rgba(255, 255, 255, 0.2)",
     },
-  }
+  };
 
-  const colorConfig = colorStyles[color]
-  const buttonSize = sizePx[size]
+  const colorConfig = colorStyles[color];
+  const buttonSize = sizePx[size];
 
   const handleMouseDown = () => {
-    if (!disabled) setIsPressed(true)
-  }
+    if (!disabled) setIsPressed(true);
+  };
 
   const handleMouseUp = () => {
-    setIsPressed(false)
-  }
+    setIsPressed(false);
+  };
 
   const handleClick = () => {
-    if (!disabled) onClick?.()
-  }
+    if (!disabled) onClick?.();
+  };
 
   return (
-    <div className={cn('flex flex-col items-center gap-1', className)}>
+    <div className={cn("flex flex-col items-center gap-1", className)}>
       {/* Button container with shadow */}
       <div
         className="relative"
@@ -95,7 +95,7 @@ export function PushButton({
       >
         {/* Shadow element - always below (light from above) */}
         <div
-          className="absolute rounded-full pointer-events-none"
+          className="pointer-events-none absolute rounded-full"
           style={{
             width: buttonSize - 4,
             height: buttonSize - 4,
@@ -103,9 +103,9 @@ export function PushButton({
             top: isPressed ? 5 : 6, // Shadow moves up when button pressed
             background: active
               ? `radial-gradient(circle, ${colorConfig.glow} 0%, rgba(0,0,0,0.4) 60%)`
-              : 'rgba(0, 0, 0, 0.35)',
-            filter: isPressed ? 'blur(2px)' : 'blur(4px)',
-            transition: 'all 0.05s ease',
+              : "rgba(0, 0, 0, 0.35)",
+            filter: isPressed ? "blur(2px)" : "blur(4px)",
+            transition: "all 0.05s ease",
           }}
         />
         {/* Button body */}
@@ -116,8 +116,8 @@ export function PushButton({
           onMouseLeave={handleMouseUp}
           disabled={disabled}
           className={cn(
-            'absolute rounded-full border-2 border-[#1a1a1a]',
-            disabled && 'opacity-50 cursor-not-allowed',
+            "absolute rounded-full border-2 border-[#1a1a1a]",
+            disabled && "cursor-not-allowed opacity-50",
           )}
           style={{
             width: buttonSize,
@@ -144,29 +144,27 @@ export function PushButton({
                   inset 0 -2px 4px rgba(0, 0, 0, 0.25),
                   0 1px 0 rgba(255, 255, 255, 0.05)
                 `,
-            transition: 'top 0.05s ease, box-shadow 0.1s ease',
+            transition: "top 0.05s ease, box-shadow 0.1s ease",
           }}
         >
           {/* Specular highlight */}
           <div
-            className="absolute rounded-full pointer-events-none"
+            className="pointer-events-none absolute rounded-full"
             style={{
               width: buttonSize * 0.4,
               height: buttonSize * 0.25,
               top: buttonSize * 0.12,
               left: buttonSize * 0.2,
-              background: 'linear-gradient(180deg, rgba(255,255,255,0.35) 0%, transparent 100%)',
-              borderRadius: '50%',
-              filter: 'blur(1px)',
+              background: "linear-gradient(180deg, rgba(255,255,255,0.35) 0%, transparent 100%)",
+              borderRadius: "50%",
+              filter: "blur(1px)",
             }}
           />
         </button>
       </div>
       {label && (
-        <span className="font-mono text-[8px] uppercase tracking-wider text-white/60">
-          {label}
-        </span>
+        <span className="font-mono text-[8px] tracking-wider text-white/60 uppercase">{label}</span>
       )}
     </div>
-  )
+  );
 }

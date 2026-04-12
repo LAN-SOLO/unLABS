@@ -1,0 +1,19 @@
+{
+  "device_id": "PWD-001",
+  "device_name": "Power Display Panel",
+  "tier": 1,
+  "firmware": {
+    "version": "1.0.0",
+    "build": "2025.02.15",
+    "checksum": "P4W3D1S7",
+    "features": ["power-readout", "bus-monitor", "load-balance", "alert-display"],
+    "securityPatch": "2025.02.10"
+  },
+  "power": {
+    "full": 1,
+    "idle": 0.5,
+    "standby": 0.1,
+    "category": "light",
+    "priority": 3
+  }
+}

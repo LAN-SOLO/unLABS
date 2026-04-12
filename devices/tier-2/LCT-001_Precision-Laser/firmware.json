@@ -1,0 +1,38 @@
+{
+  "device_id": "LCT-001",
+  "device_name": "Precision Laser",
+  "tier": 2,
+  "firmware": {
+    "version": "2.1.0",
+    "build": "2025.07.20",
+    "checksum": "L4S3RCUT",
+    "features": [
+      "diode-array",
+      "optics-check",
+      "focus-calibrate",
+      "power-regulate",
+      "thermal-protect",
+      "precision-cut"
+    ],
+    "securityPatch": "2025.07.15"
+  },
+  "power": {
+    "full": 55,
+    "idle": 2,
+    "standby": 0.3,
+    "category": "heavy",
+    "priority": 3
+  },
+  "update": {
+    "version": "2.2.0",
+    "build": "2025.03.01",
+    "checksum": "C4E8B2F6",
+    "changelog": [
+      "Added adaptive beam focus with real-time surface distance compensation",
+      "Improved thermal compensator extends continuous cutting duration by 25%",
+      "New safety interlock protocol with dual-sensor beam path verification"
+    ],
+    "min_version": "2.1.0",
+    "requires_reboot": true
+  }
+}

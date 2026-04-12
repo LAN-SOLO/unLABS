@@ -1,6 +1,6 @@
-'use server'
+"use server";
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from "@/lib/supabase/server";
 import type {
   DbPlayerDisplayPrefs,
   DbPlayerSoundPrefs,
@@ -11,13 +11,13 @@ import type {
   DbDisplayFont,
   DbSoundProfile,
   DbUserSecurityPolicies,
-} from '@/types/database'
+} from "@/types/database";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyClient = Awaited<ReturnType<typeof createClient>> & { from: any; rpc: any }
+type AnyClient = Awaited<ReturnType<typeof createClient>> & { from: any; rpc: any };
 
 async function client() {
-  return (await createClient()) as AnyClient
+  return (await createClient()) as AnyClient;
 }
 
 // =================================
@@ -25,15 +25,15 @@ async function client() {
 // =================================
 
 export async function getDisplayPrefsServer(userId: string): Promise<DbPlayerDisplayPrefs> {
-  const sb = await client()
+  const sb = await client();
   const { data, error } = await sb
-    .from('player_display_prefs')
-    .upsert({ player_id: userId }, { onConflict: 'player_id' })
+    .from("player_display_prefs")
+    .upsert({ player_id: userId }, { onConflict: "player_id" })
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data as DbPlayerDisplayPrefs
+  if (error) throw error;
+  return data as DbPlayerDisplayPrefs;
 }
 
 // =================================
@@ -41,15 +41,15 @@ export async function getDisplayPrefsServer(userId: string): Promise<DbPlayerDis
 // =================================
 
 export async function getSoundPrefsServer(userId: string): Promise<DbPlayerSoundPrefs> {
-  const sb = await client()
+  const sb = await client();
   const { data, error } = await sb
-    .from('player_sound_prefs')
-    .upsert({ player_id: userId }, { onConflict: 'player_id' })
+    .from("player_sound_prefs")
+    .upsert({ player_id: userId }, { onConflict: "player_id" })
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data as DbPlayerSoundPrefs
+  if (error) throw error;
+  return data as DbPlayerSoundPrefs;
 }
 
 // =================================
@@ -57,15 +57,15 @@ export async function getSoundPrefsServer(userId: string): Promise<DbPlayerSound
 // =================================
 
 export async function getDatetimePrefsServer(userId: string): Promise<DbPlayerDatetimePrefs> {
-  const sb = await client()
+  const sb = await client();
   const { data, error } = await sb
-    .from('player_datetime_prefs')
-    .upsert({ player_id: userId }, { onConflict: 'player_id' })
+    .from("player_datetime_prefs")
+    .upsert({ player_id: userId }, { onConflict: "player_id" })
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data as DbPlayerDatetimePrefs
+  if (error) throw error;
+  return data as DbPlayerDatetimePrefs;
 }
 
 // =================================
@@ -73,15 +73,15 @@ export async function getDatetimePrefsServer(userId: string): Promise<DbPlayerDa
 // =================================
 
 export async function getNetworkPrefsServer(userId: string): Promise<DbPlayerNetworkPrefs> {
-  const sb = await client()
+  const sb = await client();
   const { data, error } = await sb
-    .from('player_network_prefs')
-    .upsert({ player_id: userId }, { onConflict: 'player_id' })
+    .from("player_network_prefs")
+    .upsert({ player_id: userId }, { onConflict: "player_id" })
     .select()
-    .single()
+    .single();
 
-  if (error) throw error
-  return data as DbPlayerNetworkPrefs
+  if (error) throw error;
+  return data as DbPlayerNetworkPrefs;
 }
 
 // =================================
@@ -89,56 +89,41 @@ export async function getNetworkPrefsServer(userId: string): Promise<DbPlayerNet
 // =================================
 
 export async function getSystemConfigServer(): Promise<DbSystemConfigCache> {
-  const sb = await client()
-  const { data, error } = await sb
-    .from('system_config_cache')
-    .select('*')
-    .single()
+  const sb = await client();
+  const { data, error } = await sb.from("system_config_cache").select("*").single();
 
-  if (error) throw error
-  return data as DbSystemConfigCache
+  if (error) throw error;
+  return data as DbSystemConfigCache;
 }
 
 export async function getThemesServer(): Promise<DbDisplayTheme[]> {
-  const sb = await client()
-  const { data, error } = await sb
-    .from('display_themes')
-    .select('*')
-    .order('sort_order')
+  const sb = await client();
+  const { data, error } = await sb.from("display_themes").select("*").order("sort_order");
 
-  if (error) throw error
-  return data as DbDisplayTheme[]
+  if (error) throw error;
+  return data as DbDisplayTheme[];
 }
 
 export async function getFontsServer(): Promise<DbDisplayFont[]> {
-  const sb = await client()
-  const { data, error } = await sb
-    .from('display_fonts')
-    .select('*')
-    .order('sort_order')
+  const sb = await client();
+  const { data, error } = await sb.from("display_fonts").select("*").order("sort_order");
 
-  if (error) throw error
-  return data as DbDisplayFont[]
+  if (error) throw error;
+  return data as DbDisplayFont[];
 }
 
 export async function getSoundProfilesServer(): Promise<DbSoundProfile[]> {
-  const sb = await client()
-  const { data, error } = await sb
-    .from('sound_profiles')
-    .select('*')
-    .order('sort_order')
+  const sb = await client();
+  const { data, error } = await sb.from("sound_profiles").select("*").order("sort_order");
 
-  if (error) throw error
-  return data as DbSoundProfile[]
+  if (error) throw error;
+  return data as DbSoundProfile[];
 }
 
 export async function getSecurityPoliciesServer(): Promise<DbUserSecurityPolicies> {
-  const sb = await client()
-  const { data, error } = await sb
-    .from('user_security_policies')
-    .select('*')
-    .single()
+  const sb = await client();
+  const { data, error } = await sb.from("user_security_policies").select("*").single();
 
-  if (error) throw error
-  return data as DbUserSecurityPolicies
+  if (error) throw error;
+  return data as DbUserSecurityPolicies;
 }

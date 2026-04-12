@@ -1,0 +1,37 @@
+{
+  "device_id": "BAT-001",
+  "device_name": "Battery Pack",
+  "tier": 1,
+  "firmware": {
+    "version": "1.8.0",
+    "build": "2024.01.20",
+    "checksum": "B4C7D9E2",
+    "features": [
+      "cell-monitor",
+      "auto-regen",
+      "capacity-track",
+      "thermal-protect",
+      "cdc-handshake"
+    ],
+    "securityPatch": "2024.01.15"
+  },
+  "power": {
+    "full": 0,
+    "idle": 0.5,
+    "standby": 0.1,
+    "category": "storage",
+    "priority": 0
+  },
+  "update": {
+    "version": "1.9.0",
+    "build": "2025.03.01",
+    "checksum": "C3A8F5D1",
+    "changelog": [
+      "Extended fast-charge cycle efficiency by 18% with adaptive current profiling",
+      "Improved cell balancing algorithm to reduce charge time variance across cells",
+      "Added deep-discharge recovery mode for critically depleted battery states"
+    ],
+    "min_version": "1.8.0",
+    "requires_reboot": false
+  }
+}

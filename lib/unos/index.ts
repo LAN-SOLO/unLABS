@@ -1,151 +1,151 @@
 // _unOS v2.0 — Main Orchestrator
 // Unified entry point for the _unOS operating system
 
-import { VirtualFS } from './filesystem'
-import { UserManager } from './users'
-import { DeviceManager } from './devices'
-import { PackageManager } from './packages'
-import { NetworkManager } from './network'
-import { InitSystem } from './init'
-import { ContainerRuntime } from './containers'
-import { UnShell } from './shell'
-import { Kernel } from './kernel'
-import { UNOS_VERSION, UNOS_CODENAME } from './constants'
-import type { BootResult, UnOSState } from './types'
+import { VirtualFS } from "./filesystem";
+import { UserManager } from "./users";
+import { DeviceManager } from "./devices";
+import { PackageManager } from "./packages";
+import { NetworkManager } from "./network";
+import { InitSystem } from "./init";
+import { ContainerRuntime } from "./containers";
+import { UnShell } from "./shell";
+import { Kernel } from "./kernel";
+import { UNOS_VERSION, UNOS_CODENAME } from "./constants";
+import type { BootResult, UnOSState } from "./types";
 
 export class UnOS {
-  readonly version = UNOS_VERSION
-  readonly codename = UNOS_CODENAME
+  readonly version = UNOS_VERSION;
+  readonly codename = UNOS_CODENAME;
 
-  fs: VirtualFS
-  users: UserManager
-  devices: DeviceManager
-  packages: PackageManager
-  network: NetworkManager
-  init: InitSystem
-  containers: ContainerRuntime
-  shell: UnShell
-  kernel: Kernel
+  fs: VirtualFS;
+  users: UserManager;
+  devices: DeviceManager;
+  packages: PackageManager;
+  network: NetworkManager;
+  init: InitSystem;
+  containers: ContainerRuntime;
+  shell: UnShell;
+  kernel: Kernel;
 
-  private _booted = false
-  private _bootTime = 0
+  private _booted = false;
+  private _bootTime = 0;
 
   constructor(state?: Partial<UnOSState>) {
     if (state?.filesystem) {
-      this.fs = VirtualFS.fromJSON(state.filesystem)
+      this.fs = VirtualFS.fromJSON(state.filesystem);
     } else {
-      this.fs = new VirtualFS()
+      this.fs = new VirtualFS();
     }
 
     if (state?.users) {
-      this.users = UserManager.fromJSON(state.users)
+      this.users = UserManager.fromJSON(state.users);
     } else {
-      this.users = new UserManager()
+      this.users = new UserManager();
     }
 
     if (state?.devices) {
-      this.devices = DeviceManager.fromJSON(state.devices)
+      this.devices = DeviceManager.fromJSON(state.devices);
     } else {
-      this.devices = new DeviceManager()
+      this.devices = new DeviceManager();
     }
 
     if (state?.packages) {
-      this.packages = PackageManager.fromJSON(state.packages)
+      this.packages = PackageManager.fromJSON(state.packages);
     } else {
-      this.packages = new PackageManager()
+      this.packages = new PackageManager();
     }
 
     if (state?.network) {
-      this.network = NetworkManager.fromJSON(state.network)
+      this.network = NetworkManager.fromJSON(state.network);
     } else {
-      this.network = new NetworkManager()
+      this.network = new NetworkManager();
     }
 
-    this.init = new InitSystem()
-    this.containers = new ContainerRuntime()
-    this.shell = new UnShell()
-    this.kernel = new Kernel()
+    this.init = new InitSystem();
+    this.containers = new ContainerRuntime();
+    this.shell = new UnShell();
+    this.kernel = new Kernel();
 
     // Restore kernel state if available
     if (state?.kernel) {
-      this.kernel.fromJSON(state.kernel)
+      this.kernel.fromJSON(state.kernel);
     }
 
     // Wire procfs into filesystem for dynamic /unproc content
-    this.fs.setProcFS((path) => this.kernel.procfs.generate(path))
-    this.fs.setProcFSListDir((path) => this.kernel.procfs.listDir(path))
+    this.fs.setProcFS((path) => this.kernel.procfs.generate(path));
+    this.fs.setProcFSListDir((path) => this.kernel.procfs.listDir(path));
 
     // Sync fs home user with user manager
-    this.fs.setHomeUser(this.users.currentUsername)
+    this.fs.setHomeUser(this.users.currentUsername);
 
     if (state?.bootTime) {
-      this._booted = true
-      this._bootTime = state.bootTime
+      this._booted = true;
+      this._bootTime = state.bootTime;
     }
   }
 
   get booted(): boolean {
-    return this._booted
+    return this._booted;
   }
 
   get bootTime(): number {
-    return this._bootTime
+    return this._bootTime;
   }
 
   get uptime(): number {
-    if (!this._booted) return 0
-    return Date.now() - this._bootTime
+    if (!this._booted) return 0;
+    return Date.now() - this._bootTime;
   }
 
   async boot(): Promise<BootResult> {
-    const start = Date.now()
-    const services: BootResult['services'] = []
-    const errors: string[] = []
+    const start = Date.now();
+    const services: BootResult["services"] = [];
+    const errors: string[] = [];
 
     // 1. Boot kernel first
-    if (this.kernel.state !== 'running') {
-      this.kernel.boot()
-      this.kernel.startTicking()
+    if (this.kernel.state !== "running") {
+      this.kernel.boot();
+      this.kernel.startTicking();
     }
 
     // 2. Start devices
-    this.devices.start()
+    this.devices.start();
 
     // 3. Start init services (with real PIDs from kernel)
-    const initResult = await this.init.startAll(this.kernel)
+    const initResult = await this.init.startAll(this.kernel);
     for (const name of initResult.started) {
-      services.push({ name, status: 'ok' })
+      services.push({ name, status: "ok" });
     }
     for (const name of initResult.failed) {
-      services.push({ name, status: 'failed' })
-      errors.push(`Service ${name} failed to start`)
+      services.push({ name, status: "failed" });
+      errors.push(`Service ${name} failed to start`);
     }
 
-    this._booted = true
-    this._bootTime = Date.now()
+    this._booted = true;
+    this._bootTime = Date.now();
 
     return {
       success: errors.length === 0,
       duration: Date.now() - start,
       services,
       errors,
-    }
+    };
   }
 
   shutdown() {
-    this.kernel.shutdown()
-    this.init.list().forEach(svc => this.init.stop(svc.name))
-    this.devices.stop()
-    this._booted = false
+    this.kernel.shutdown();
+    this.init.list().forEach((svc) => this.init.stop(svc.name));
+    this.devices.stop();
+    this._booted = false;
   }
 
   // Keep fs and users in sync when switching users
   switchUser(username: string, password?: string) {
-    const result = this.users.su(username, password)
+    const result = this.users.su(username, password);
     if (result.success) {
-      this.fs.setHomeUser(this.users.currentUsername)
+      this.fs.setHomeUser(this.users.currentUsername);
     }
-    return result
+    return result;
   }
 
   toJSON(): UnOSState {
@@ -158,29 +158,36 @@ export class UnOS {
       network: this.network.toJSON(),
       bootTime: this._bootTime,
       kernel: this.kernel.toJSON(),
-    }
+    };
   }
 
   static fromJSON(json: string): UnOS {
     try {
-      const state = JSON.parse(json) as UnOSState
-      return new UnOS(state)
+      const state = JSON.parse(json) as UnOSState;
+      return new UnOS(state);
     } catch {
-      return new UnOS()
+      return new UnOS();
     }
   }
 }
 
 // Re-export everything for convenient imports
-export { VirtualFS } from './filesystem'
-export { UserManager } from './users'
-export { DeviceManager } from './devices'
-export { PackageManager } from './packages'
-export { NetworkManager } from './network'
-export { InitSystem } from './init'
-export { ContainerRuntime } from './containers'
-export { UnShell } from './shell'
-export { Kernel } from './kernel'
-export { UNOS_PATHS, PATH_ALIASES, UNOS_VERSION, UNOS_CODENAME, DEVICE_IDS, DEVICE_CATEGORIES } from './constants'
-export type { DeviceCategory } from './constants'
-export type * from './types'
+export { VirtualFS } from "./filesystem";
+export { UserManager } from "./users";
+export { DeviceManager } from "./devices";
+export { PackageManager } from "./packages";
+export { NetworkManager } from "./network";
+export { InitSystem } from "./init";
+export { ContainerRuntime } from "./containers";
+export { UnShell } from "./shell";
+export { Kernel } from "./kernel";
+export {
+  UNOS_PATHS,
+  PATH_ALIASES,
+  UNOS_VERSION,
+  UNOS_CODENAME,
+  DEVICE_IDS,
+  DEVICE_CATEGORIES,
+} from "./constants";
+export type { DeviceCategory } from "./constants";
+export type * from "./types";

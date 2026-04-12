@@ -1,0 +1,31 @@
+{
+  "device_id": "AIC-001",
+  "device_name": "AI Assistant Core",
+  "tier": 3,
+  "firmware": {
+    "version": "2.4.0",
+    "build": "2024.02.20",
+    "checksum": "E7A9C3B5",
+    "features": ["neural-core", "task-queue", "auto-optimize", "learning-mode", "anomaly-detect"],
+    "securityPatch": "2024.02.15"
+  },
+  "power": {
+    "full": 35,
+    "idle": 12,
+    "standby": 2,
+    "category": "heavy",
+    "priority": 1
+  },
+  "update": {
+    "version": "2.5.0",
+    "build": "2025.03.01",
+    "checksum": "F8C2D6A4",
+    "changelog": [
+      "Upgraded neural core with expanded context window for complex multi-step task planning",
+      "Added self-optimizing learning mode that adapts to lab operational patterns",
+      "Improved anomaly detection with cross-device telemetry correlation analysis"
+    ],
+    "min_version": "2.4.0",
+    "requires_reboot": true
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "device_id": "DIM-001",
+  "device_name": "Dimension Monitor",
+  "tier": 2,
+  "firmware": {
+    "version": "1.0.0",
+    "build": "2025.12.01",
+    "checksum": "D1M3N501",
+    "features": ["d-space-probe", "rift-scan", "stability-lock", "halo-monitor", "auto-calibrate"],
+    "securityPatch": "2025.11.25"
+  },
+  "power": {
+    "full": 4,
+    "idle": 1.5,
+    "standby": 0.3,
+    "category": "light",
+    "priority": 2
+  },
+  "update": {
+    "version": "1.1.0",
+    "build": "2025.03.01",
+    "checksum": "F7D3A1C9",
+    "changelog": [
+      "Enhanced dimensional fold detection with sub-angstrom rift sensitivity",
+      "Added coordinate mapping system for charting stable dimensional corridors",
+      "Improved breach alert response time from 200ms to 50ms for critical events"
+    ],
+    "min_version": "1.0.0",
+    "requires_reboot": true
+  }
+}

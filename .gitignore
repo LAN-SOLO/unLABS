@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
 
 # next.js
 /.next/
@@ -43,5 +45,11 @@ next-env.d.ts
 
 # local development data (not synced)
 /.local/
+/.claude/
 supabase/.temp/
 supabase/dumps/
+
+# Electron desktop build
+/bin/
+/dist-electron/
+/.INSTALL/

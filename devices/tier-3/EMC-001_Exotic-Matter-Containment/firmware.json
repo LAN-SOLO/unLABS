@@ -1,0 +1,37 @@
+{
+  "device_id": "EMC-001",
+  "device_name": "Exotic Matter Containment",
+  "tier": 3,
+  "firmware": {
+    "version": "4.0.1",
+    "build": "2026.01.15",
+    "checksum": "E8X4M2C7",
+    "features": [
+      "containment-field",
+      "particle-tracking",
+      "stability-calc",
+      "matter-compress",
+      "field-harmonics"
+    ],
+    "securityPatch": "2026.01.10"
+  },
+  "power": {
+    "full": 40,
+    "idle": 18,
+    "standby": 3,
+    "category": "heavy",
+    "priority": 1
+  },
+  "update": {
+    "version": "4.1.0",
+    "build": "2025.03.01",
+    "checksum": "A3D7F1C5",
+    "changelog": [
+      "Enhanced containment field harmonics with triple-redundant breach prevention",
+      "Added real-time exotic particle trajectory prediction for safer sample extraction",
+      "Improved pressure regulation stability during high-density matter compression cycles"
+    ],
+    "min_version": "4.0.1",
+    "requires_reboot": true
+  }
+}

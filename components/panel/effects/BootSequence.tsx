@@ -1,93 +1,93 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from "react";
 
 interface BootSequenceProps {
-  active: boolean
-  onComplete: () => void
+  active: boolean;
+  onComplete: () => void;
   /** 'system' = full screen (fixed), 'os' = container-scoped (absolute) */
-  scope?: 'system' | 'os'
+  scope?: "system" | "os";
 }
 
 const BOOT_LINES = [
-  { text: '', delay: 200 },
-  { text: '_unOS v4.2.1 (quantum-core 6.1.0-_unSC)', delay: 300 },
-  { text: 'Copyright (c) UnstableLabs Research Division', delay: 200 },
-  { text: '', delay: 150 },
-  { text: '[  OK  ] Started quantum kernel', delay: 250 },
-  { text: '[  OK  ] Mounted /dev/crystal_cache', delay: 200 },
-  { text: '[  OK  ] Found block device unsda (64GB)', delay: 180 },
-  { text: '[  OK  ] Found block device unsdb (128GB)', delay: 180 },
-  { text: '[  OK  ] Mounted /unboot /unsys /unproc', delay: 220 },
-  { text: '[  OK  ] Started system journal', delay: 200 },
-  { text: '[  OK  ] Loaded shell environment (12 vars)', delay: 180 },
-  { text: '[  OK  ] Started network subsystem', delay: 220 },
-  { text: '[  OK  ] Configured uneth0: 10.0.0.100/24', delay: 200 },
-  { text: '[  OK  ] Configured DNS: 10.0.0.1, 1.1.1.1', delay: 180 },
-  { text: '[  OK  ] Started cron scheduler (5 jobs)', delay: 200 },
-  { text: '[  OK  ] Loading equipment drivers', delay: 250 },
-  { text: '[  OK  ] Calibrating oscilloscope array', delay: 220 },
-  { text: '[  OK  ] Started power management', delay: 200 },
-  { text: '[  OK  ] Started thermal controller', delay: 180 },
-  { text: '[  OK  ] Started 6 system services', delay: 220 },
-  { text: '[  OK  ] Reached target multi-user', delay: 200 },
-  { text: '[  OK  ] Started panel interface', delay: 300 },
-  { text: '', delay: 200 },
-  { text: 'System ready. Welcome back, operator.', delay: 400 },
-  { text: '', delay: 300 },
-]
+  { text: "", delay: 200 },
+  { text: "_unOS v4.2.1 (quantum-core 6.1.0-_unSC)", delay: 300 },
+  { text: "Copyright (c) UnstableLabs Research Division", delay: 200 },
+  { text: "", delay: 150 },
+  { text: "[  OK  ] Started quantum kernel", delay: 250 },
+  { text: "[  OK  ] Mounted /dev/crystal_cache", delay: 200 },
+  { text: "[  OK  ] Found block device unsda (64GB)", delay: 180 },
+  { text: "[  OK  ] Found block device unsdb (128GB)", delay: 180 },
+  { text: "[  OK  ] Mounted /unboot /unsys /unproc", delay: 220 },
+  { text: "[  OK  ] Started system journal", delay: 200 },
+  { text: "[  OK  ] Loaded shell environment (12 vars)", delay: 180 },
+  { text: "[  OK  ] Started network subsystem", delay: 220 },
+  { text: "[  OK  ] Configured uneth0: 10.0.0.100/24", delay: 200 },
+  { text: "[  OK  ] Configured DNS: 10.0.0.1, 1.1.1.1", delay: 180 },
+  { text: "[  OK  ] Started cron scheduler (5 jobs)", delay: 200 },
+  { text: "[  OK  ] Loading equipment drivers", delay: 250 },
+  { text: "[  OK  ] Calibrating oscilloscope array", delay: 220 },
+  { text: "[  OK  ] Started power management", delay: 200 },
+  { text: "[  OK  ] Started thermal controller", delay: 180 },
+  { text: "[  OK  ] Started 6 system services", delay: 220 },
+  { text: "[  OK  ] Reached target multi-user", delay: 200 },
+  { text: "[  OK  ] Started panel interface", delay: 300 },
+  { text: "", delay: 200 },
+  { text: "System ready. Welcome back, operator.", delay: 400 },
+  { text: "", delay: 300 },
+];
 
-export function BootSequence({ active, onComplete, scope = 'system' }: BootSequenceProps) {
-  const [visibleLines, setVisibleLines] = useState<string[]>([])
-  const [fading, setFading] = useState(false)
-  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([])
+export function BootSequence({ active, onComplete, scope = "system" }: BootSequenceProps) {
+  const [visibleLines, setVisibleLines] = useState<string[]>([]);
+  const [fading, setFading] = useState(false);
+  const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
     if (!active) {
-      setVisibleLines([])
-      setFading(false)
-      return
+      setVisibleLines([]);
+      setFading(false);
+      return;
     }
 
-    setVisibleLines([])
-    setFading(false)
+    setVisibleLines([]);
+    setFading(false);
 
-    let cumulativeDelay = 500 // initial pause before boot text
-    const timeouts: ReturnType<typeof setTimeout>[] = []
+    let cumulativeDelay = 500; // initial pause before boot text
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
 
     BOOT_LINES.forEach((line, i) => {
-      cumulativeDelay += line.delay
+      cumulativeDelay += line.delay;
       const t = setTimeout(() => {
-        setVisibleLines(prev => [...prev, line.text])
-      }, cumulativeDelay)
-      timeouts.push(t)
-    })
+        setVisibleLines((prev) => [...prev, line.text]);
+      }, cumulativeDelay);
+      timeouts.push(t);
+    });
 
     // Start fade after all lines
-    cumulativeDelay += 600
-    const fadeT = setTimeout(() => setFading(true), cumulativeDelay)
-    timeouts.push(fadeT)
+    cumulativeDelay += 600;
+    const fadeT = setTimeout(() => setFading(true), cumulativeDelay);
+    timeouts.push(fadeT);
 
     // Complete after fade
-    cumulativeDelay += 500
-    const doneT = setTimeout(() => onComplete(), cumulativeDelay)
-    timeouts.push(doneT)
+    cumulativeDelay += 500;
+    const doneT = setTimeout(() => onComplete(), cumulativeDelay);
+    timeouts.push(doneT);
 
-    timeoutsRef.current = timeouts
+    timeoutsRef.current = timeouts;
 
     return () => {
-      timeouts.forEach(t => clearTimeout(t))
-    }
-  }, [active, onComplete])
+      timeouts.forEach((t) => clearTimeout(t));
+    };
+  }, [active, onComplete]);
 
-  if (!active && visibleLines.length === 0) return null
+  if (!active && visibleLines.length === 0) return null;
 
   return (
     <div
-      className={`${scope === 'os' ? 'absolute' : 'fixed'} inset-0 z-[9999] bg-black flex items-start justify-center overflow-hidden`}
+      className={`${scope === "os" ? "absolute" : "fixed"} inset-0 z-[9999] flex items-start justify-center overflow-hidden bg-black`}
       style={{
         opacity: fading ? 0 : 1,
-        transition: 'opacity 500ms ease-out',
+        transition: "opacity 500ms ease-out",
       }}
     >
       <div className="w-full max-w-2xl p-8 pt-16 font-mono text-sm">
@@ -96,32 +96,30 @@ export function BootSequence({ active, onComplete, scope = 'system' }: BootSeque
             key={i}
             className="leading-6"
             style={{
-              color: line.startsWith('[  OK  ]')
-                ? 'var(--neon-green, #00ff66)'
-                : line.startsWith('_unOS') || line.startsWith('Copyright')
-                  ? 'var(--neon-amber, #ffb800)'
-                  : line.startsWith('System ready')
-                    ? 'var(--neon-cyan, #00e5ff)'
-                    : 'rgba(0, 255, 100, 0.7)',
-              textShadow: line.startsWith('[  OK  ]')
-                ? '0 0 6px rgba(0, 255, 100, 0.4)'
-                : 'none',
+              color: line.startsWith("[  OK  ]")
+                ? "var(--neon-green, #00ff66)"
+                : line.startsWith("_unOS") || line.startsWith("Copyright")
+                  ? "var(--neon-amber, #ffb800)"
+                  : line.startsWith("System ready")
+                    ? "var(--neon-cyan, #00e5ff)"
+                    : "rgba(0, 255, 100, 0.7)",
+              textShadow: line.startsWith("[  OK  ]") ? "0 0 6px rgba(0, 255, 100, 0.4)" : "none",
             }}
           >
-            {line || '\u00A0'}
+            {line || "\u00A0"}
           </div>
         ))}
         {/* Blinking cursor */}
         {!fading && visibleLines.length > 0 && (
           <span
-            className="inline-block w-2 h-4 mt-1"
+            className="mt-1 inline-block h-4 w-2"
             style={{
-              backgroundColor: 'var(--neon-green, #00ff66)',
-              animation: 'blink 1s step-end infinite',
+              backgroundColor: "var(--neon-green, #00ff66)",
+              animation: "blink 1s step-end infinite",
             }}
           />
         )}
       </div>
     </div>
-  )
+  );
 }

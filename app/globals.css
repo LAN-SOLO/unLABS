@@ -125,7 +125,8 @@
 }
 
 /* Disable all scrolling globally */
-html, body {
+html,
+body {
   overflow: hidden;
   height: 100vh;
   width: 100vw;
@@ -176,19 +177,19 @@ html, body {
   --glow-intense: 0 0 40px;
 }
 
-/* Panel Layout */
+/* Panel Layout — scales across 1K–4K in 4:3 and 3:2 */
 .game-panel {
   display: grid;
-  grid-template-columns: 200px minmax(400px, 1fr) 420px;
+  grid-template-columns: clamp(140px, 13vw, 240px) 1fr clamp(240px, 22vw, 480px);
   grid-template-rows: auto 1fr auto auto;
   grid-template-areas:
     "toolbar toolbar toolbar"
     "left main right"
     "left resources right"
     "bottom bottom bottom";
-  gap: 4px;
-  height: 100vh;
+  gap: clamp(2px, 0.25vw, 6px);
   width: 100vw;
+  height: 100vh;
   background:
     repeating-linear-gradient(
       0deg,
@@ -198,18 +199,19 @@ html, body {
       transparent 4px
     ),
     linear-gradient(180deg, #181a1e 0%, #141618 50%, #121416 100%);
-  padding: 4px;
+  padding: clamp(2px, 0.25vw, 6px);
   overflow: hidden;
 }
 
-/* Disable overflow on all panel areas */
+/* Allow each panel area to control its own overflow */
 .game-panel > * {
-  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
 }
 
 /* CRT Scanline Effect */
 .crt-scanlines::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   background: repeating-linear-gradient(
@@ -225,14 +227,10 @@ html, body {
 
 /* CRT Screen Glow */
 .crt-glow::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(0, 255, 100, 0.08) 0%,
-    transparent 70%
-  );
+  background: radial-gradient(ellipse at center, rgba(0, 255, 100, 0.08) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -276,12 +274,7 @@ html, body {
 
 /* Knob Base Style */
 .knob {
-  background: radial-gradient(
-    circle at 30% 30%,
-    #555 0%,
-    #333 50%,
-    #1a1a1a 100%
-  );
+  background: radial-gradient(circle at 30% 30%, #555 0%, #333 50%, #1a1a1a 100%);
   border-radius: 50%;
   border: 2px solid #222;
   box-shadow:
@@ -310,10 +303,19 @@ html, body {
 
 /* Phosphor Flicker Animation */
 @keyframes phosphor-flicker {
-  0%, 100% { opacity: 1; }
-  92% { opacity: 0.98; }
-  94% { opacity: 1; }
-  96% { opacity: 0.97; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 0.98;
+  }
+  94% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0.97;
+  }
 }
 
 .phosphor-flicker {
@@ -322,7 +324,8 @@ html, body {
 
 /* Glow Pulse Animation */
 @keyframes glow-pulse {
-  0%, 100% {
+  0%,
+  100% {
     filter: drop-shadow(0 0 8px currentColor);
     opacity: 1;
   }
@@ -338,89 +341,164 @@ html, body {
 
 /* Waveform Animation */
 @keyframes waveform-sweep {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 /* Scanner sweep animation */
 @keyframes scan-sweep {
-  0% { left: 0%; }
-  50% { left: 100%; }
-  100% { left: 0%; }
+  0% {
+    left: 0%;
+  }
+  50% {
+    left: 100%;
+  }
+  100% {
+    left: 0%;
+  }
 }
 
 /* Spin animation for reactors */
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Pulse animation */
 @keyframes pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.7; transform: scale(0.95); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(0.95);
+  }
 }
 
 /* Loading bar animation */
 @keyframes loading {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(200%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
 }
 
 /* Wave animation for detector */
 @keyframes wave {
-  0% { transform: scaleY(0.5); }
-  100% { transform: scaleY(1.5); }
+  0% {
+    transform: scaleY(0.5);
+  }
+  100% {
+    transform: scaleY(1.5);
+  }
 }
 
 /* Nano float animation */
 @keyframes nano-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
 }
 
 /* Exotic matter float */
 @keyframes exotic-float {
-  0%, 100% { transform: translate(0, 0); }
-  25% { transform: translate(2px, -2px); }
-  50% { transform: translate(0, -3px); }
-  75% { transform: translate(-2px, -1px); }
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(2px, -2px);
+  }
+  50% {
+    transform: translate(0, -3px);
+  }
+  75% {
+    transform: translate(-2px, -1px);
+  }
 }
 
 /* Containment pulse */
 @keyframes containment-pulse {
-  0%, 100% { box-shadow: 0 0 5px var(--neon-pink); }
-  50% { box-shadow: 0 0 15px var(--neon-pink); }
+  0%,
+  100% {
+    box-shadow: 0 0 5px var(--neon-pink);
+  }
+  50% {
+    box-shadow: 0 0 15px var(--neon-pink);
+  }
 }
 
 /* Warning pulse */
 @keyframes containment-warning {
-  0%, 100% { border-color: #ff0000; }
-  50% { border-color: #ff6600; }
+  0%,
+  100% {
+    border-color: #ff0000;
+  }
+  50% {
+    border-color: #ff6600;
+  }
 }
 
 /* Laser pulse */
 @keyframes laser-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 /* Print head movement */
 @keyframes print-head {
-  0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(5px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(5px);
+  }
 }
 
 /* Node blink for supercomputer */
 @keyframes node-blink {
-  0%, 100% { opacity: 0.8; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* Spark flicker for energy */
 @keyframes spark-flicker {
-  0%, 100% { opacity: 0.8; height: 8px; }
-  50% { opacity: 0.3; height: 4px; }
+  0%,
+  100% {
+    opacity: 0.8;
+    height: 8px;
+  }
+  50% {
+    opacity: 0.3;
+    height: 4px;
+  }
 }
 
 /* Terminal Fixed 4:3 Ratio - Never resize */
@@ -451,8 +529,13 @@ html, body {
 
 /* Boot Sequence Animations */
 @keyframes fade-out {
-  0% { opacity: 1; }
-  100% { opacity: 0; visibility: hidden; }
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    visibility: hidden;
+  }
 }
 
 .animate-fade-out {
@@ -460,8 +543,14 @@ html, body {
 }
 
 @keyframes boot-line {
-  0% { opacity: 0; transform: translateY(5px); }
-  100% { opacity: 1; transform: translateY(0); }
+  0% {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-boot-line {
@@ -470,29 +559,61 @@ html, body {
 
 /* CRT Shutdown Effect */
 @keyframes crt-surge {
-  0% { opacity: 0; }
-  50% { opacity: 0.4; }
-  100% { opacity: 0.3; }
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 0.3;
+  }
 }
 
 @keyframes crt-phosphor-fade {
-  0% { opacity: 1; transform: scale(1); }
-  100% { opacity: 0; transform: scale(0.5); }
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
 }
 
 /* OS-scoped CRT shutdown: plays ON the terminal screen element itself */
 @keyframes os-crt-shutdown {
   /* Brightness surge */
-  0% { filter: brightness(1); transform: scaleX(1) scaleY(1); }
-  8% { filter: brightness(1.8); transform: scaleX(1) scaleY(1); }
+  0% {
+    filter: brightness(1);
+    transform: scaleX(1) scaleY(1);
+  }
+  8% {
+    filter: brightness(1.8);
+    transform: scaleX(1) scaleY(1);
+  }
   /* Horizontal collapse to thin line */
-  30% { filter: brightness(1.2); transform: scaleX(1) scaleY(0.005); }
+  30% {
+    filter: brightness(1.2);
+    transform: scaleX(1) scaleY(0.005);
+  }
   /* Vertical collapse to dot */
-  50% { filter: brightness(1); transform: scaleX(0.01) scaleY(0.005); }
+  50% {
+    filter: brightness(1);
+    transform: scaleX(0.01) scaleY(0.005);
+  }
   /* Phosphor fade */
-  80% { filter: brightness(0.5); transform: scaleX(0.005) scaleY(0.005); opacity: 0.5; }
+  80% {
+    filter: brightness(0.5);
+    transform: scaleX(0.005) scaleY(0.005);
+    opacity: 0.5;
+  }
   /* Black */
-  100% { filter: brightness(0); transform: scaleX(0) scaleY(0); opacity: 0; }
+  100% {
+    filter: brightness(0);
+    transform: scaleX(0) scaleY(0);
+    opacity: 0;
+  }
 }
 
 .os-crt-shutting-down {
@@ -502,23 +623,43 @@ html, body {
 
 /* OS boot loading bar */
 @keyframes os-boot-bar {
-  0% { width: 0%; }
-  20% { width: 15%; }
-  50% { width: 45%; }
-  80% { width: 80%; }
-  100% { width: 100%; }
+  0% {
+    width: 0%;
+  }
+  20% {
+    width: 15%;
+  }
+  50% {
+    width: 45%;
+  }
+  80% {
+    width: 80%;
+  }
+  100% {
+    width: 100%;
+  }
 }
 
 /* Power Button Pulse */
 @keyframes power-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* Blink cursor for boot sequence */
 @keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
 }
 
 /* Screw Button LED Colors */
@@ -534,19 +675,39 @@ html, body {
 
 /* Screw Button LED Animations */
 @keyframes screw-led-charge {
-  0% { box-shadow: 0 0 2px var(--screw-led-red-glow); }
-  100% { box-shadow: 0 0 12px var(--screw-led-red-glow); }
+  0% {
+    box-shadow: 0 0 2px var(--screw-led-red-glow);
+  }
+  100% {
+    box-shadow: 0 0 12px var(--screw-led-red-glow);
+  }
 }
 
 @keyframes screw-led-transition {
-  0% { border-color: var(--screw-led-red); box-shadow: 0 0 8px var(--screw-led-red-glow); }
-  50% { border-color: var(--screw-led-amber); box-shadow: 0 0 12px var(--screw-led-amber-glow); }
-  100% { border-color: var(--screw-led-green); box-shadow: 0 0 8px var(--screw-led-green-glow); }
+  0% {
+    border-color: var(--screw-led-red);
+    box-shadow: 0 0 8px var(--screw-led-red-glow);
+  }
+  50% {
+    border-color: var(--screw-led-amber);
+    box-shadow: 0 0 12px var(--screw-led-amber-glow);
+  }
+  100% {
+    border-color: var(--screw-led-green);
+    box-shadow: 0 0 8px var(--screw-led-green-glow);
+  }
 }
 
 @keyframes screw-led-active {
-  0%, 100% { box-shadow: 0 0 6px var(--screw-led-green-glow); opacity: 0.9; }
-  50% { box-shadow: 0 0 10px var(--screw-led-green-glow); opacity: 1; }
+  0%,
+  100% {
+    box-shadow: 0 0 6px var(--screw-led-green-glow);
+    opacity: 0.9;
+  }
+  50% {
+    box-shadow: 0 0 10px var(--screw-led-green-glow);
+    opacity: 1;
+  }
 }
 
 .animate-screw-led-charge {

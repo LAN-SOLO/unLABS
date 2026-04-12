@@ -1,0 +1,38 @@
+{
+  "device_id": "P3D-001",
+  "device_name": "3D Fabricator",
+  "tier": 2,
+  "firmware": {
+    "version": "3.2.1",
+    "build": "2025.06.15",
+    "checksum": "F4BR1C8R",
+    "features": [
+      "bed-level",
+      "nozzle-calibrate",
+      "extrusion-ctrl",
+      "layer-track",
+      "thermal-manage",
+      "multi-material"
+    ],
+    "securityPatch": "2025.06.10"
+  },
+  "power": {
+    "full": 60,
+    "idle": 5,
+    "standby": 0.5,
+    "category": "heavy",
+    "priority": 3
+  },
+  "update": {
+    "version": "3.3.0",
+    "build": "2025.03.01",
+    "checksum": "D7A1F5C9",
+    "changelog": [
+      "Added auto-leveling mesh compensation for warped build surfaces",
+      "Improved multi-material switching with reduced purge waste by 60%",
+      "New quality inspection system detects layer defects during active prints"
+    ],
+    "min_version": "3.2.1",
+    "requires_reboot": true
+  }
+}

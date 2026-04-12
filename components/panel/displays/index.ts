@@ -1,5 +1,5 @@
-export { CRTScreen } from './CRTScreen'
-export { Waveform } from './Waveform'
-export { Oscilloscope } from './Oscilloscope'
-export { QuantumAnalyzer } from './QuantumAnalyzer'
-export { DiagnosticsConsole } from './DiagnosticsConsole'
+export { CRTScreen } from "./CRTScreen";
+export { Waveform } from "./Waveform";
+export { Oscilloscope } from "./Oscilloscope";
+export { QuantumAnalyzer } from "./QuantumAnalyzer";
+export { DiagnosticsConsole } from "./DiagnosticsConsole";

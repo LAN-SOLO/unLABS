@@ -1,6 +1,6 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from "react";
 import {
   getDeviceById,
   getDeviceState,
@@ -8,7 +8,7 @@ import {
   getDeviceCombinations,
   getDeviceTweaks,
   subscribeToDeviceState,
-} from '@/lib/api/devices'
+} from "@/lib/api/devices";
 import type {
   Device,
   DeviceRuntimeState,
@@ -16,67 +16,73 @@ import type {
   DeviceCombination,
   DeviceTweak,
   PlayerDeviceState,
-} from '@/types/devices'
+} from "@/types/devices";
 
 interface UseDeviceDetailProps {
-  deviceId: string
-  playerState?: PlayerDeviceState | null
+  deviceId: string;
+  playerState?: PlayerDeviceState | null;
 }
 
 export function useDeviceDetail({ deviceId, playerState }: UseDeviceDetailProps) {
-  const [device, setDevice] = useState<Device | null>(null)
-  const [state, setState] = useState<DeviceRuntimeState | null>(null)
-  const [dependencies, setDependencies] = useState<DeviceDependency[]>([])
-  const [combinations, setCombinations] = useState<DeviceCombination[]>([])
-  const [tweaks, setTweaks] = useState<DeviceTweak[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [device, setDevice] = useState<Device | null>(null);
+  const [state, setState] = useState<DeviceRuntimeState | null>(null);
+  const [dependencies, setDependencies] = useState<DeviceDependency[]>([]);
+  const [combinations, setCombinations] = useState<DeviceCombination[]>([]);
+  const [tweaks, setTweaks] = useState<DeviceTweak[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let cancelled = false
+    let cancelled = false;
 
     async function load() {
       try {
-        setLoading(true)
+        setLoading(true);
         const [dev, devState, deps, combos, tw] = await Promise.all([
           getDeviceById(deviceId),
           getDeviceState(deviceId),
           getDeviceDependencies(deviceId),
           getDeviceCombinations(deviceId),
           getDeviceTweaks(deviceId),
-        ])
-        if (cancelled) return
-        setDevice(dev)
-        setState(devState)
-        setDependencies(deps)
-        setCombinations(combos)
-        setTweaks(tw)
-        setError(null)
+        ]);
+        if (cancelled) return;
+        setDevice(dev);
+        setState(devState);
+        setDependencies(deps);
+        setCombinations(combos);
+        setTweaks(tw);
+        setError(null);
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load device')
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load device");
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled) setLoading(false);
       }
     }
 
-    load()
-    return () => { cancelled = true }
-  }, [deviceId])
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [deviceId]);
 
   // Real-time state updates
   useEffect(() => {
     const channel = subscribeToDeviceState(deviceId, (updated) => {
-      setState(updated)
-    })
-    return () => { channel.unsubscribe() }
-  }, [deviceId])
+      setState(updated);
+    });
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [deviceId]);
 
   const refresh = useCallback(async () => {
     try {
-      const devState = await getDeviceState(deviceId)
-      setState(devState)
-    } catch { /* ignore */ }
-  }, [deviceId])
+      const devState = await getDeviceState(deviceId);
+      setState(devState);
+    } catch {
+      /* ignore */
+    }
+  }, [deviceId]);
 
   return {
     device,
@@ -88,5 +94,5 @@ export function useDeviceDetail({ deviceId, playerState }: UseDeviceDetailProps)
     loading,
     error,
     refresh,
-  }
+  };
 }

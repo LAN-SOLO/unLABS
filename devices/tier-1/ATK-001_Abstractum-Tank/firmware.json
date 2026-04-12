@@ -1,0 +1,19 @@
+{
+  "device_id": "ATK-001",
+  "device_name": "Abstractum Tank",
+  "tier": 1,
+  "firmware": {
+    "version": "2.1.0",
+    "build": "2025.02.15",
+    "checksum": "A8T4K1D3",
+    "features": ["crystal-storage", "auto-sort", "capacity-track", "level-sense"],
+    "securityPatch": "2025.02.10"
+  },
+  "power": {
+    "full": 4,
+    "idle": 1,
+    "standby": 0.2,
+    "category": "light",
+    "priority": 3
+  }
+}

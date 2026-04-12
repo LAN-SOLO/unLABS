@@ -1,0 +1,31 @@
+{
+  "device_id": "CLK-001",
+  "device_name": "Lab Clock",
+  "tier": 1,
+  "firmware": {
+    "version": "2.4.0",
+    "build": "2025.12.15",
+    "checksum": "CL0CK241",
+    "features": ["crystal-osc", "ntp-sync", "drift-comp", "multi-mode", "stopwatch", "countdown"],
+    "securityPatch": "2025.12.10"
+  },
+  "power": {
+    "full": 1,
+    "idle": 0.5,
+    "standby": 0.1,
+    "category": "light",
+    "priority": 1
+  },
+  "update": {
+    "version": "2.5.0",
+    "build": "2025.03.01",
+    "checksum": "E8B1D4F7",
+    "changelog": [
+      "Reduced clock drift to under 0.5ppm with enhanced crystal oscillator compensation",
+      "Added lab event scheduling with automated countdown triggers",
+      "New multi-timezone display mode for coordinated cross-lab operations"
+    ],
+    "min_version": "2.4.0",
+    "requires_reboot": false
+  }
+}
