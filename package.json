@@ -1,6 +1,6 @@
 {
   "name": "unlabs",
-  "version": "0.1.3",
+  "version": "0.1.4-alpha",
   "private": true,
   "packageManager": "pnpm@9.15.0",
   "engines": {
