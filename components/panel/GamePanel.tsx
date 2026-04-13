@@ -15,7 +15,7 @@ export function PanelToolbar({ children, className }: GamePanelProps) {
   return (
     <div
       className={cn(
-        "flex items-center gap-2 bg-[var(--panel-surface)] px-2 py-1",
+        "flex items-center gap-2 overflow-hidden bg-[var(--panel-surface)] px-2 py-1",
         "border-b border-[rgba(255,184,0,0.15)]",
         className,
       )}

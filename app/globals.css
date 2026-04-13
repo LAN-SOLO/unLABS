@@ -203,6 +203,22 @@ body {
   overflow: hidden;
 }
 
+/* 1K resolution overrides (1024×768 / 1080×720) */
+@media (max-width: 1100px) {
+  .game-panel {
+    grid-template-columns: clamp(90px, 10vw, 140px) 1fr clamp(170px, 18vw, 240px);
+    gap: 2px;
+    padding: 2px;
+  }
+}
+
+@media (max-height: 780px) {
+  .game-panel {
+    gap: 1px;
+    padding: 1px;
+  }
+}
+
 /* Allow each panel area to control its own overflow */
 .game-panel > * {
   min-width: 0;

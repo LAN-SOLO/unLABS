@@ -384,7 +384,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                   {/* Top Toolbar */}
                                                                                   <PanelToolbar>
                                                                                     {/* Tools */}
-                                                                                    <div className="flex items-center gap-1">
+                                                                                    <div className="flex min-w-0 shrink items-center gap-1 overflow-hidden">
                                                                                       {[
                                                                                         "TOOL 1",
                                                                                         "TOOL 2",
@@ -398,7 +398,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                             key={
                                                                                               label
                                                                                             }
-                                                                                            className="flex h-7 items-center justify-center rounded border border-white/10 bg-[var(--panel-surface-light)] px-2"
+                                                                                            className="flex h-7 shrink-0 items-center justify-center rounded border border-white/10 bg-[var(--panel-surface-light)] px-2"
                                                                                           >
                                                                                             <span className="font-mono text-[8px] text-white/30">
                                                                                               {
@@ -411,7 +411,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                     </div>
 
                                                                                     {/* Buttons */}
-                                                                                    <div className="flex items-center gap-1">
+                                                                                    <div className="flex min-w-0 shrink items-center gap-1 overflow-hidden">
                                                                                       {[
                                                                                         "BTN 1",
                                                                                         "BTN 2",
@@ -423,7 +423,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                             key={
                                                                                               label
                                                                                             }
-                                                                                            className="flex h-7 items-center justify-center rounded border border-white/10 bg-[var(--panel-surface-light)] px-2"
+                                                                                            className="flex h-7 shrink-0 items-center justify-center rounded border border-white/10 bg-[var(--panel-surface-light)] px-2"
                                                                                           >
                                                                                             <span className="font-mono text-[8px] text-white/30">
                                                                                               {
@@ -436,7 +436,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                     </div>
 
                                                                                     {/* Applications */}
-                                                                                    <div className="flex items-center gap-1">
+                                                                                    <div className="flex min-w-0 shrink items-center gap-1 overflow-hidden">
                                                                                       {[
                                                                                         "APP 1",
                                                                                         "APP 2",
@@ -448,7 +448,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                             key={
                                                                                               label
                                                                                             }
-                                                                                            className="flex h-7 items-center justify-center rounded border border-white/10 bg-[var(--panel-surface-light)] px-2"
+                                                                                            className="flex h-7 shrink-0 items-center justify-center rounded border border-white/10 bg-[var(--panel-surface-light)] px-2"
                                                                                           >
                                                                                             <span className="font-mono text-[8px] text-white/30">
                                                                                               {
@@ -556,7 +556,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                         style={{
                                                                                           flex: "1 1 0%",
                                                                                           minHeight:
-                                                                                            "240px",
+                                                                                            "clamp(160px, 30vh, 240px)",
                                                                                         }}
                                                                                       >
                                                                                         <div
@@ -607,7 +607,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                           CORE
                                                                                           OPERATIONS
                                                                                         </div>
-                                                                                        <div className="grid grid-cols-5 gap-1">
+                                                                                        <div className="grid grid-cols-3 gap-1 min-[700px]:grid-cols-4 min-[900px]:grid-cols-5">
                                                                                           <AIAssistant />
                                                                                           <SupercomputerArray
                                                                                             flops={
@@ -649,7 +649,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                           SYSTEM
                                                                                           STATUS
                                                                                         </div>
-                                                                                        <div className="grid grid-cols-5 gap-1">
+                                                                                        <div className="grid grid-cols-3 gap-1 min-[700px]:grid-cols-4 min-[900px]:grid-cols-5">
                                                                                           <ExoticMatterContainment
                                                                                             units={
                                                                                               42
@@ -714,7 +714,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                           TOOLS &
                                                                                           MONITORS
                                                                                         </div>
-                                                                                        <div className="grid grid-cols-6 gap-1">
+                                                                                        <div className="grid grid-cols-3 gap-1 min-[700px]:grid-cols-4 min-[900px]:grid-cols-6">
                                                                                           <PortableWorkbench
                                                                                             queuedItems={
                                                                                               2
