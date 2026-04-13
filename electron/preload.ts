@@ -5,4 +5,5 @@ contextBridge.exposeInMainWorld("__ELECTRON_CONFIG__", {
   version: ipcRenderer.sendSync("get-version"),
   supabaseUrl: ipcRenderer.sendSync("get-supabase-url"),
   supabaseAnonKey: ipcRenderer.sendSync("get-supabase-anon-key"),
+  resizeWindow: (width: number, height: number) => ipcRenderer.send("resize-window", width, height),
 });

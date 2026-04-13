@@ -13,43 +13,75 @@ const WINDOW_PRESETS = [
   { label: "4K 3:2", w: 3840, h: 2560 },
 ] as const;
 
+interface ElectronConfig {
+  isDesktop?: boolean;
+  resizeWindow?: (width: number, height: number) => void;
+}
+
+function getElectronConfig(): ElectronConfig | undefined {
+  if (typeof window === "undefined") return undefined;
+  return (window as unknown as Record<string, unknown>).__ELECTRON_CONFIG__ as
+    | ElectronConfig
+    | undefined;
+}
+
 export function WindowSizeSelector() {
   const [idx, setIdx] = useState(-1);
   const panelRef = useRef<HTMLElement | null>(null);
+  const originalSizeRef = useRef<{ w: number; h: number } | null>(null);
 
   useEffect(() => {
     panelRef.current = document.querySelector(".game-panel") as HTMLElement | null;
+    // Store original window size for reset
+    originalSizeRef.current = { w: window.innerWidth, h: window.innerHeight };
   }, []);
 
   const apply = useCallback((i: number) => {
-    const panel = panelRef.current ?? (document.querySelector(".game-panel") as HTMLElement | null);
-    if (!panel) return;
+    const electron = getElectronConfig();
+    const isDesktop = electron?.isDesktop && typeof electron.resizeWindow === "function";
 
-    if (i < 0) {
-      // Reset
-      panel.style.transform = "";
-      panel.style.transformOrigin = "";
-      document.body.style.overflow = "";
-      document.body.style.background = "";
-      return;
+    if (isDesktop) {
+      // Desktop mode: actually resize the Electron window
+      if (i < 0) {
+        // Reset to original size
+        const orig = originalSizeRef.current;
+        if (orig) {
+          electron.resizeWindow!(orig.w, orig.h);
+        }
+        return;
+      }
+      const preset = WINDOW_PRESETS[i];
+      electron.resizeWindow!(preset.w, preset.h);
+    } else {
+      // Browser mode: use CSS transform scaling as fallback
+      const panel =
+        panelRef.current ?? (document.querySelector(".game-panel") as HTMLElement | null);
+      if (!panel) return;
+
+      if (i < 0) {
+        panel.style.transform = "";
+        panel.style.transformOrigin = "";
+        document.body.style.overflow = "";
+        document.body.style.background = "";
+        return;
+      }
+
+      const preset = WINDOW_PRESETS[i];
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      const scaleX = vw / preset.w;
+      const scaleY = vh / preset.h;
+      const scale = Math.min(scaleX, scaleY, 1);
+
+      panel.style.transform = `scale(${scale})`;
+      panel.style.transformOrigin = "center center";
+      document.body.style.overflow = "hidden";
+      document.body.style.background = "#000";
+      document.body.style.display = "flex";
+      document.body.style.alignItems = "center";
+      document.body.style.justifyContent = "center";
     }
-
-    const preset = WINDOW_PRESETS[i];
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-
-    // Scale the panel so the target resolution fits the viewport
-    const scaleX = vw / preset.w;
-    const scaleY = vh / preset.h;
-    const scale = Math.min(scaleX, scaleY, 1); // never scale up beyond 1:1
-
-    panel.style.transform = `scale(${scale})`;
-    panel.style.transformOrigin = "center center";
-    document.body.style.overflow = "hidden";
-    document.body.style.background = "#000";
-    document.body.style.display = "flex";
-    document.body.style.alignItems = "center";
-    document.body.style.justifyContent = "center";
   }, []);
 
   const cycle = useCallback(() => {

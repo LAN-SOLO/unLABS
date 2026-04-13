@@ -1,7 +1,7 @@
 import { app, ipcMain } from "electron";
 import { join } from "path";
 import { existsSync, writeFileSync, readFileSync, mkdirSync } from "fs";
-import { createMainWindow } from "./window";
+import { createMainWindow, getMainWindow } from "./window";
 import { getAppVersion } from "./version";
 import { startPostgres, stopPostgres, createDatabase } from "./services/postgres";
 import { startGoTrue, stopGoTrue } from "./services/gotrue";
@@ -101,6 +101,12 @@ function setupIpc(): void {
   });
   ipcMain.on("get-supabase-anon-key", (event) => {
     event.returnValue = anonKey;
+  });
+  ipcMain.on("resize-window", (_event, width: number, height: number) => {
+    const w = getMainWindow();
+    if (!w) return;
+    w.setSize(Math.round(width), Math.round(height));
+    w.center();
   });
 }
 
