@@ -67,7 +67,7 @@ export default function SetupPage() {
             UNSTABLE LABORATORIES
           </h1>
           <div className="mt-1 text-xs tracking-wider text-gray-500">
-            _unOS DESKTOP v0.1.3-alpha
+            _unOS DESKTOP v{process.env.NEXT_PUBLIC_APP_VERSION}
           </div>
         </div>
 

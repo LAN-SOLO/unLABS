@@ -101,7 +101,7 @@ export function LandingPageClient() {
 
       {/* Footer */}
       <footer className="p-4 text-center text-xs text-green-500/30">
-        <p>v0.1.0-alpha | SOLANA DEVNET</p>
+        <p>v{process.env.NEXT_PUBLIC_APP_VERSION} | SOLANA DEVNET</p>
       </footer>
     </div>
   );

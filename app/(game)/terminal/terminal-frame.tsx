@@ -95,7 +95,7 @@ export function TerminalFrame({
       {!isFullscreen && (
         <div className="mt-2 flex shrink-0 justify-between px-2 text-xs text-green-500/40">
           <span>SOLANA DEVNET</span>
-          <span>v0.1.0-alpha</span>
+          <span>v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
           <span>↑↓ HISTORY | ESC CLEAR | ENTER EXECUTE</span>
         </div>
       )}
