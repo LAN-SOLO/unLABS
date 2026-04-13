@@ -1309,7 +1309,7 @@ export function Oscilloscope({
           {/* Normal operational content */}
 
           {/* CRT Display */}
-          <CRTScreen className="min-h-[120px] w-full flex-1">
+          <CRTScreen className="aspect-[3/2] w-full flex-1">
             <div
               className="relative h-full w-full p-1"
               style={{ filter: focusBlur > 0.1 ? `blur(${focusBlur}px)` : "none" }}
