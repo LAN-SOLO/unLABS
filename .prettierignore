@@ -12,5 +12,6 @@ public
 bin
 dist-electron
 .INSTALL
+INSTALL
 .local
 .claude

@@ -34,6 +34,7 @@ const eslintConfig = defineConfig([
     "test-results/**",
     "dist-electron/**",
     ".INSTALL/**",
+    "INSTALL/**",
     "bin/**",
     ".local/**",
   ]),
