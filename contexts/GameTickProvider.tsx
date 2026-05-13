@@ -47,6 +47,15 @@ interface GameTickContextValue {
   lastTickAt: number;
   /** Seconds of offline progress applied on mount (for MCP welcome message). */
   offlineCatchUpSeconds: number;
+  /**
+   * Per-resource amount applied during offline catch-up. Keyed by ResourceId.
+   * Stable until `acknowledgeOfflineCatchUp()` is called, then cleared.
+   */
+  offlineDeltas: Partial<Record<ResourceId, number>>;
+  /** True while the WelcomeBackModal has not yet been dismissed. */
+  hasUnseenOfflineCatchUp: boolean;
+  /** Clear offline-delta state after the player dismisses the Welcome-Back modal. */
+  acknowledgeOfflineCatchUp: () => void;
   /** Add or remove units from a resource; clamps to [0, capacity]. */
   grant: (id: ResourceId, delta: number) => void;
   /** Replace the rate-per-second for a resource. */
@@ -86,6 +95,8 @@ export function GameTickProvider({
   // client produce different timestamps on the same render pass.
   const [lastTickAt, setLastTickAt] = useState(0);
   const [offlineCatchUpSeconds, setOfflineCatchUpSeconds] = useState(0);
+  const [offlineDeltas, setOfflineDeltas] = useState<Partial<Record<ResourceId, number>>>({});
+  const [hasUnseenOfflineCatchUp, setHasUnseenOfflineCatchUp] = useState(false);
 
   // Initialize lastTickAt on the client only.
   useEffect(() => {
@@ -107,10 +118,21 @@ export function GameTickProvider({
       const result = advanceResources(resourcesRef.current, elapsedSeconds);
       setResources(result.nextResources);
       setOfflineCatchUpSeconds(elapsedSeconds);
+      setOfflineDeltas(result.deltas);
+      // Only surface the modal when there's actually something worth showing:
+      // >60s offline AND at least one non-zero resource delta.
+      const anyDelta = Object.values(result.deltas).some((v) => (v ?? 0) > 0);
+      if (elapsedSeconds > 60 && anyDelta) {
+        setHasUnseenOfflineCatchUp(true);
+      }
     }
     // intentionally ignoring changes to initialLastTickAt after mount —
     // catch-up is a one-shot
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const acknowledgeOfflineCatchUp = useCallback(() => {
+    setHasUnseenOfflineCatchUp(false);
   }, []);
 
   // --- 1Hz tick loop ---
@@ -166,11 +188,25 @@ export function GameTickProvider({
       tickCount,
       lastTickAt,
       offlineCatchUpSeconds,
+      offlineDeltas,
+      hasUnseenOfflineCatchUp,
+      acknowledgeOfflineCatchUp,
       grant,
       setRate,
       setCapacity,
     }),
-    [resources, tickCount, lastTickAt, offlineCatchUpSeconds, grant, setRate, setCapacity],
+    [
+      resources,
+      tickCount,
+      lastTickAt,
+      offlineCatchUpSeconds,
+      offlineDeltas,
+      hasUnseenOfflineCatchUp,
+      acknowledgeOfflineCatchUp,
+      grant,
+      setRate,
+      setCapacity,
+    ],
   );
 
   return <GameTickContext.Provider value={value}>{children}</GameTickContext.Provider>;
