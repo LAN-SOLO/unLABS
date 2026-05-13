@@ -1,0 +1,31 @@
+{
+  "device_id": "NXS-01",
+  "device_name": "Nexus",
+  "tier": 2,
+  "firmware": {
+    "version": "1.0.0",
+    "build": "2026.04.24",
+    "checksum": "NX10A4F2",
+    "features": ["tech-graph-render", "research-queue", "prereq-resolver", "holo-projection"],
+    "securityPatch": "2026.04.24"
+  },
+  "power": {
+    "full": 45,
+    "idle": 12,
+    "standby": 2,
+    "category": "light",
+    "priority": 2
+  },
+  "update": {
+    "version": "1.1.0",
+    "build": "2026.05.10",
+    "checksum": "NX11B8D3",
+    "changelog": [
+      "Added prerequisite-chain highlighting on node hover",
+      "Added branch color legend and filter chips",
+      "Reduced graph re-layout jitter when nodes unlock mid-session"
+    ],
+    "min_version": "1.0.0",
+    "requires_reboot": false
+  }
+}
