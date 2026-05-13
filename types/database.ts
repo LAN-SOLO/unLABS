@@ -58,6 +58,8 @@ export interface Database {
           is_dev: boolean;
           current_episode: string;
           quest_state: Record<string, unknown>;
+          tutorial_state: Record<string, unknown>;
+          tech_tree_state: Record<string, unknown>;
           last_tick_at: string | null;
           created_at: string;
           updated_at: string;
@@ -71,6 +73,8 @@ export interface Database {
           is_dev?: boolean;
           current_episode?: string;
           quest_state?: Record<string, unknown>;
+          tutorial_state?: Record<string, unknown>;
+          tech_tree_state?: Record<string, unknown>;
           last_tick_at?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -84,6 +88,8 @@ export interface Database {
           is_dev?: boolean;
           current_episode?: string;
           quest_state?: Record<string, unknown>;
+          tutorial_state?: Record<string, unknown>;
+          tech_tree_state?: Record<string, unknown>;
           last_tick_at?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -326,6 +332,139 @@ export interface Database {
           description?: string | null;
           metadata?: Record<string, unknown>;
           created_at?: string;
+        };
+      };
+      unsc_reserve: {
+        Row: {
+          id: number;
+          available: number;
+          total_burned: number;
+          total_emitted: number;
+          updated_at: string;
+        };
+        Insert: {
+          id?: number;
+          available?: number;
+          total_burned?: number;
+          total_emitted?: number;
+          updated_at?: string;
+        };
+        Update: {
+          id?: number;
+          available?: number;
+          total_burned?: number;
+          total_emitted?: number;
+          updated_at?: string;
+        };
+      };
+      reserve_transactions: {
+        Row: {
+          id: number;
+          type: "burn" | "emit";
+          amount: number;
+          user_id: string | null;
+          source: string;
+          source_ref: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: number;
+          type: "burn" | "emit";
+          amount: number;
+          user_id?: string | null;
+          source: string;
+          source_ref?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: number;
+          type?: "burn" | "emit";
+          amount?: number;
+          user_id?: string | null;
+          source?: string;
+          source_ref?: string | null;
+          created_at?: string;
+        };
+      };
+      achievement_progress: {
+        Row: {
+          user_id: string;
+          achievement_id: string;
+          tier: number;
+          progress: number;
+          target: number;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          achievement_id: string;
+          tier: number;
+          progress?: number;
+          target: number;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          achievement_id?: string;
+          tier?: number;
+          progress?: number;
+          target?: number;
+          updated_at?: string;
+        };
+      };
+      research_jobs: {
+        Row: {
+          id: string;
+          user_id: string;
+          node_id: string;
+          started_at: string;
+          completes_at: string;
+          claimed_at: string | null;
+          cancelled_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          node_id: string;
+          started_at?: string;
+          completes_at: string;
+          claimed_at?: string | null;
+          cancelled_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          node_id?: string;
+          started_at?: string;
+          completes_at?: string;
+          claimed_at?: string | null;
+          cancelled_at?: string | null;
+        };
+      };
+      achievement_unlocks: {
+        Row: {
+          user_id: string;
+          achievement_id: string;
+          tier: number;
+          unlocked_at: string;
+          reward_claimed: boolean;
+          claimed_at: string | null;
+        };
+        Insert: {
+          user_id: string;
+          achievement_id: string;
+          tier: number;
+          unlocked_at?: string;
+          reward_claimed?: boolean;
+          claimed_at?: string | null;
+        };
+        Update: {
+          user_id?: string;
+          achievement_id?: string;
+          tier?: number;
+          unlocked_at?: string;
+          reward_claimed?: boolean;
+          claimed_at?: string | null;
         };
       };
       command_history: {
