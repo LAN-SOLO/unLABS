@@ -8,6 +8,9 @@
 
 import { EP0 } from "./ep0";
 import { EP1 } from "./ep1";
+import { EP2 } from "./ep2";
+import { EP3 } from "./ep3";
+import { EP4 } from "./ep4";
 import {
   createInitialQuestState,
   type Episode,
@@ -26,6 +29,9 @@ export * from "./types";
 const EPISODE_REGISTRY: Record<string, Episode> = {
   [EP0.id]: EP0,
   [EP1.id]: EP1,
+  [EP2.id]: EP2,
+  [EP3.id]: EP3,
+  [EP4.id]: EP4,
 };
 
 export function getEpisode(episodeId: string): Episode | null {

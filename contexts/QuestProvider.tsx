@@ -57,6 +57,17 @@ interface QuestContextValue {
    * server-side via an allow-list. Minigames call this to signal completion.
    */
   setFlag: (flag: string, value: boolean) => Promise<void>;
+  /**
+   * Apply a list of rewards directly. Used by the tutorial skip flow, which
+   * needs to bulk-apply EP0+EP1 rewards without walking the step engine.
+   */
+  applyRewards: (rewards: StepReward[]) => void;
+  /**
+   * Replace the active quest state optimistically. Used by tutorial skip /
+   * resume after a server mutation; the client otherwise cannot jump the
+   * cursor forward.
+   */
+  setStateOverride: (next: QuestState) => void;
 }
 
 const QuestContext = createContext<QuestContextValue | null>(null);
@@ -136,6 +147,10 @@ export function QuestProvider({
     }
   }, []);
 
+  const setStateOverride = useCallback((next: QuestState) => {
+    setState(next);
+  }, []);
+
   const episode = useMemo(() => getEpisode(state.episodeId), [state.episodeId]);
   const currentStep = useMemo(() => getCurrentStep(state), [state]);
 
@@ -148,8 +163,20 @@ export function QuestProvider({
       advance,
       reset,
       setFlag,
+      applyRewards,
+      setStateOverride,
     }),
-    [episode, state, currentStep, isAdvancing, advance, reset, setFlag],
+    [
+      episode,
+      state,
+      currentStep,
+      isAdvancing,
+      advance,
+      reset,
+      setFlag,
+      applyRewards,
+      setStateOverride,
+    ],
   );
 
   return <QuestContext.Provider value={value}>{children}</QuestContext.Provider>;

@@ -153,8 +153,24 @@ export interface QuestFlagResult {
   error?: string;
 }
 
-/** Allowed flags a client can set directly. Anything else is rejected. */
-const CLIENT_SETTABLE_FLAGS = new Set(["lissajous_locked"]);
+/**
+ * Allowed flags a client can set directly. Anything else is rejected.
+ *
+ * Additions here must correspond to a client-side signal that cannot be
+ * trivially forged without the player actually doing the thing — e.g.
+ * `abstractum_bottleneck_observed` requires holding a resource condition
+ * for 60 s, `first_production_run` requires a claimed job row.
+ */
+const CLIENT_SETTABLE_FLAGS = new Set([
+  "lissajous_locked",
+  "abstractum_bottleneck_observed",
+  "first_production_run",
+  // Phase 4/5 observer-set flags (see contexts/PhaseObservers.tsx)
+  "research_started",
+  "pick_path_done",
+  "pick_path_deep",
+  "welcome_back_seen",
+]);
 
 /**
  * Set a quest flag from the client. Used by minigames to report completion

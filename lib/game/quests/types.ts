@@ -24,6 +24,7 @@ export type VoiceId =
   | "mcp" // Master Control Program — dry sarcasm, lime-green
   | "jade" // The previous operator's margin notes — teal, italicized
   | "fridge" // Engineering log — amber, monospace
+  | "findr" // findr-unstables companion bot — pink, chatty/eager
   | "system"; // Unvoiced system/procfs prints — dim gray
 
 export interface VoiceLine {

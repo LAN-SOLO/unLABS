@@ -30,6 +30,7 @@ const VOICE_STYLE: Record<VoiceId, { label: string; color: string; italic?: bool
   mcp: { label: "MCP", color: "text-green-300" },
   jade: { label: "JADE", color: "text-teal-300", italic: true },
   fridge: { label: "FRIDGE", color: "text-amber-300" },
+  findr: { label: "FINDR", color: "text-pink-300" },
   system: { label: "SYS", color: "text-gray-400" },
 };
 

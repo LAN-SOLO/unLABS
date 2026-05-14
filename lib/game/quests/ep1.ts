@@ -138,4 +138,6 @@ export const EP1: Episode = {
     },
   ],
   completionRewards: [{ kind: "set_flag", flag: "missions_unlocked", value: true }],
+  // EP2 ("Foundation") picks up once EP1 completes.
+  nextEpisode: "EP2",
 };
