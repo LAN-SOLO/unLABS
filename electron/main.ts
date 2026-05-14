@@ -113,11 +113,25 @@ function setupIpc(): void {
 // ── Startup sequence ──────────────────────────────────────────────────
 
 async function startup(): Promise<void> {
-  const isFirstRun = !existsSync(getSentinelPath());
+  const sentinelExists = existsSync(getSentinelPath());
+  // If pgdata is already a valid Postgres cluster but the .initialized
+  // sentinel is gone, we're in an orphan-recovery state: a prior install's
+  // data is still there, but the app-level "first run done" marker has
+  // been wiped (uninstall/reinstall, manual edit, or a crash before
+  // sentinel was written). We must NOT re-run first-run setup — initdb
+  // refuses to write into a populated dir, and createDatabase/role
+  // creation against an existing cluster is mostly idempotent but
+  // unnecessary. Treat this as "not first run" so the code path matches.
+  const dataDirInitialized = existsSync(join(getDataDir(), "PG_VERSION"));
+  const isFirstRun = !sentinelExists && !dataDirInitialized;
+  const isOrphanRecovery = !sentinelExists && dataDirInitialized;
 
   console.log(`[electron] UnstableLabs v${getAppVersion()} starting...`);
   console.log(`[electron] Data dir: ${getUserDataPath()}`);
   console.log(`[electron] First run: ${isFirstRun}`);
+  if (isOrphanRecovery) {
+    console.log("[electron] Orphan recovery: existing pgdata, missing sentinel");
+  }
 
   // 1. Allocate ports
   ports = await allocatePorts();
@@ -136,26 +150,38 @@ async function startup(): Promise<void> {
   await startPostgres(binDir, dataDir, ports.postgres, isFirstRun);
   console.log(`[electron] PostgreSQL running on port ${ports.postgres}`);
 
-  // 4b. Create database on first run (must happen before GoTrue connects)
-  if (isFirstRun) {
+  // 4b. Create database on first run OR orphan recovery (idempotent — the
+  // helper swallows "database already exists"). Roles + auth schema are
+  // also re-applied here through executeIgnoringErrors-wrapped statements,
+  // so re-running them on an already-initialized cluster is safe.
+  if (isFirstRun || isOrphanRecovery) {
     await createDatabase(ports.postgres);
-    console.log('[electron] Database "unlabs" created');
+    console.log('[electron] Database "unlabs" ready');
 
-    // 4c. Create auth schema + roles (GoTrue expects the schema to exist)
     const migrationsDir = getMigrationsDir();
     await runMigrations(ports.postgres, migrationsDir, false); // schemas + roles only
-    console.log("[electron] Schemas and roles created");
+    console.log("[electron] Schemas and roles ready");
   }
 
   // 5. Start GoTrue (runs its own migrations to populate auth.users etc.)
   await startGoTrue(binDir, ports.gotrue, ports.postgres, jwtSecret);
   console.log(`[electron] GoTrue running on port ${ports.gotrue}`);
 
-  // 6. Run app migrations on first run (auth.users now exists)
-  if (isFirstRun) {
+  // 6. Run app migrations on every launch. The migrator tracks which files
+  // have already been applied via `public._unlabs_migrations`, so this is
+  // safe to call repeatedly. New migrations bundled with each build are
+  // picked up automatically — no more "first run only" gap that left old
+  // installs missing newly-added columns.
+  {
     const migrationsDir = getMigrationsDir();
-    await runMigrations(ports.postgres, migrationsDir, true); // SQL files
-    writeFileSync(getSentinelPath(), new Date().toISOString(), "utf-8");
+    const sentinelPath = getSentinelPath();
+    await runMigrations(ports.postgres, migrationsDir, true, sentinelPath, isOrphanRecovery);
+    // Write the sentinel after first run AND after orphan recovery — both
+    // states are now considered "initialized" so the next launch takes the
+    // fast non-first-run path.
+    if (isFirstRun || isOrphanRecovery) {
+      writeFileSync(sentinelPath, new Date().toISOString(), "utf-8");
+    }
     console.log("[electron] Migrations complete");
   }
 

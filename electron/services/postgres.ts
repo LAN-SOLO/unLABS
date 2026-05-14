@@ -19,10 +19,17 @@ export async function startPostgres(
   const pgCtlPath = pgBin(binDir, "pg_ctl");
   const createdbPath = pgBin(binDir, "createdb");
 
-  // Initialize data directory on first run
-  if (isFirstRun || !existsSync(join(dataDir, "PG_VERSION"))) {
+  // Initialize data directory only when there's no PG_VERSION marker. This
+  // keeps initdb from blowing up when the user has a leftover, populated
+  // pgdata from a prior install (e.g. they deleted the .initialized
+  // sentinel but pgdata stayed) — in that case the cluster is already
+  // initialized and we should reuse it. The `isFirstRun` flag in main.ts
+  // tracks the *app-level* first run (no sentinel), which is independent
+  // of whether postgres itself has been initialized.
+  const pgInitialized = existsSync(join(dataDir, "PG_VERSION"));
+  if (!pgInitialized) {
     // Remove any leftover partial data dir from a previous failed init
-    if (existsSync(dataDir) && !existsSync(join(dataDir, "PG_VERSION"))) {
+    if (existsSync(dataDir)) {
       const { rmSync } = require("fs") as typeof import("fs");
       rmSync(dataDir, { recursive: true, force: true });
     }
@@ -46,6 +53,8 @@ export async function startPostgres(
       },
     );
   }
+  // Suppress unused-param lint without changing the public signature.
+  void isFirstRun;
 
   // Start PostgreSQL
   const libDir = join(binDir, "postgres", "lib");

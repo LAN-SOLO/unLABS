@@ -1,6 +1,6 @@
 {
   "name": "unlabs",
-  "version": "0.1.6-alpha",
+  "version": "0.1.9-alpha",
   "private": true,
   "packageManager": "pnpm@9.15.0",
   "engines": {
@@ -29,10 +29,10 @@
     "db:types": "supabase gen types typescript --local > types/database.ts",
     "electron:dev": "concurrently \"next dev\" \"npx tsc -p electron/tsconfig.json -w\" \"npx wait-on http://localhost:3000 && electron dist-electron/main.js\"",
     "electron:compile": "npx tsc -p electron/tsconfig.json",
-    "download:binaries": "npx ts-node scripts/download-binaries.ts",
-    "build:mac": "npx ts-node scripts/build-desktop.ts --mac",
-    "build:win": "npx ts-node scripts/build-desktop.ts --win",
-    "build:all": "npx ts-node scripts/build-desktop.ts --all",
+    "download:binaries": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\"}' npx ts-node scripts/download-binaries.ts",
+    "build:mac": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\"}' npx ts-node scripts/build-desktop.ts --mac",
+    "build:win": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\"}' npx ts-node scripts/build-desktop.ts --win",
+    "build:all": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"CommonJS\"}' npx ts-node scripts/build-desktop.ts --all",
     "preinstall": "npx only-allow pnpm"
   },
   "dependencies": {

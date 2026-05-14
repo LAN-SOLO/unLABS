@@ -59,7 +59,7 @@ const config: Configuration = {
   mac: {
     target: [
       {
-        target: "dir",
+        target: "dmg",
         arch: ["arm64"],
       },
     ],
