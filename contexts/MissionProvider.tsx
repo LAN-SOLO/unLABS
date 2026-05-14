@@ -33,6 +33,7 @@ import {
 
 import { useGameTick } from "@/contexts/GameTickProvider";
 import { useQuest } from "@/contexts/QuestProvider";
+import { useJournalOptional } from "@/contexts/JournalProvider";
 import {
   computeWhatNext,
   getActiveDeviceIds,
@@ -101,6 +102,8 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
   const [isBusy, startTransition] = useTransition();
   const tick = useGameTick();
   const quest = useQuest();
+  // Optional so MissionProvider still boots outside game-shell (e.g. in tests)
+  const journal = useJournalOptional();
 
   const stateRef = useRef(state);
   useEffect(() => {
@@ -248,6 +251,19 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
         if (result.ok && result.state) {
           applyRewards(result.rewards);
           setState(result.state);
+
+          // Narrative breadcrumb: write completion voice lines to the
+          // journal so the player can re-read them from JournalPanel later.
+          if (journal) {
+            const mission = listAllMissions().find((m) => m.id === id);
+            journal.write("mission", 5, `[ ${id} ] claimed: ${mission?.title ?? id}`);
+            if (mission?.completionVoice && mission.completionVoice.length > 0) {
+              for (const line of mission.completionVoice) {
+                journal.write(`voice/${line.voice}`, 6, line.text);
+              }
+            }
+          }
+
           // Auto-track the next mission in the chain if there is one
           if (result.nextMissionId) {
             setState((s) => trackMissionEngine(result.nextMissionId!, s));
@@ -256,7 +272,7 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
         }
       });
     },
-    [applyRewards],
+    [applyRewards, journal],
   );
 
   const updateProgress = useCallback((objectiveId: string, value: number) => {
@@ -352,4 +368,13 @@ export function useMission(): MissionContextValue {
     throw new Error("useMission must be used inside <MissionProvider>");
   }
   return ctx;
+}
+
+/**
+ * Variant that returns null instead of throwing when MissionProvider is not
+ * mounted. Used by surfaces that may render outside the provider boundary
+ * (tutorial overlay, debug shells).
+ */
+export function useMissionOptional(): MissionContextValue | null {
+  return useContext(MissionContext);
 }

@@ -12,6 +12,7 @@
 import { useState, useMemo } from "react";
 import { useMission } from "@/contexts/MissionProvider";
 import { useGameTick } from "@/contexts/GameTickProvider";
+import { useHintEscalationOptional } from "@/contexts/HintEscalationProvider";
 import { MissionProgressBar } from "./MissionProgressBar";
 import { TaskChecklist } from "./TaskChecklist";
 import { getActiveTip } from "@/lib/game/tips";
@@ -30,11 +31,16 @@ export function MissionPanel() {
   } = useMission();
 
   const tick = useGameTick();
+  const hint = useHintEscalationOptional();
 
   const [isExpanded, setIsExpanded] = useState(true);
   const [showAvailable, setShowAvailable] = useState(false);
 
   const tip = useMemo(() => getActiveTip(questFlags, tick.resources), [questFlags, tick.resources]);
+  // When the hint engine has escalated to level 2+, override the rotating tip
+  // with a concrete `whatNext` suggestion so the stalled operator gets
+  // something specific to do instead of ambient flavor text.
+  const elevated = hint?.elevatedSuggestion ?? null;
 
   const activeMissions = availableMissions.filter(
     (m) => m.status === "active" || m.status === "completed",
@@ -80,8 +86,19 @@ export function MissionPanel() {
             />
           ))}
 
+          {/* Elevated hint from the escalation engine wins over the ambient tip */}
+          {elevated && (
+            <div className="border-t border-amber-500/30 bg-amber-500/5 px-1 py-1 text-center font-mono">
+              <span className="text-[9px] tracking-wider text-amber-300/70 uppercase">
+                Suggestion
+              </span>
+              <p className="text-[10px] text-amber-200">{elevated.action}</p>
+              {elevated.reason && <p className="text-[8px] text-amber-500/60">{elevated.reason}</p>}
+            </div>
+          )}
+
           {/* Contextual tip */}
-          {tip && activeMissions.length === 0 && (
+          {!elevated && tip && activeMissions.length === 0 && (
             <div className="border-t border-green-500/10 py-1 text-center font-mono text-[8px]">
               <span
                 className={

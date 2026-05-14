@@ -9,6 +9,7 @@
  */
 
 import type { TaskWithStatus } from "@/lib/game/missions/types";
+import { useTutorialDifficulty } from "@/contexts/TutorialProvider";
 
 interface TaskChecklistProps {
   tasks: TaskWithStatus[];
@@ -33,6 +34,12 @@ function StatusIndicator({ status }: { status: string }) {
 }
 
 export function TaskChecklist({ tasks, hintLevels }: TaskChecklistProps) {
+  // Hard mode (and pre-difficulty default behavior) gates the basic hint
+  // behind the 60s stall timer. Easy mode and the explicit "hard" choice
+  // both reveal it immediately so a fresh player isn't staring at a bare
+  // objective with no how-to.
+  const difficulty = useTutorialDifficulty();
+  const revealHintImmediately = difficulty !== null;
   return (
     <div className="space-y-1.5">
       {tasks.map((task) => (
@@ -59,10 +66,11 @@ export function TaskChecklist({ tasks, hintLevels }: TaskChecklistProps) {
               {task.objectives.map((obj) => {
                 const showProgress = obj.targetValue > 1 && obj.status !== "locked";
                 const hintLevel = hintLevels[obj.id] ?? 0;
+                const effectiveHintLevel = revealHintImmediately && hintLevel < 1 ? 1 : hintLevel;
                 const hintText =
-                  hintLevel >= 2
+                  effectiveHintLevel >= 2
                     ? (obj.deepDiveHint ?? obj.hint)
-                    : hintLevel >= 1
+                    : effectiveHintLevel >= 1
                       ? obj.hint
                       : null;
 

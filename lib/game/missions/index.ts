@@ -16,6 +16,13 @@ import { M003 } from "./catalog/m003-signal-hunter";
 import { M004 } from "./catalog/m004-first-resonance";
 import { M005 } from "./catalog/m005-reactor-genesis";
 import { M006 } from "./catalog/m006-anomaly-deepens";
+import { M007 } from "./catalog/m007-three-chains";
+import { M008 } from "./catalog/m008-first-production-run";
+import { M009 } from "./catalog/m009-abstractum-bottleneck";
+import { M010 } from "./catalog/m010-first-research";
+import { M011 } from "./catalog/m011-drone-protocol";
+import { M012 } from "./catalog/m012-cross-pollinator";
+import { M013 } from "./catalog/m013-deep-research";
 import {
   createInitialMissionState,
   type Mission,
@@ -41,6 +48,13 @@ const MISSION_REGISTRY: Record<string, Mission> = {
   [M004.id]: M004,
   [M005.id]: M005,
   [M006.id]: M006,
+  [M007.id]: M007,
+  [M008.id]: M008,
+  [M009.id]: M009,
+  [M010.id]: M010,
+  [M011.id]: M011,
+  [M012.id]: M012,
+  [M013.id]: M013,
 };
 
 export function getMission(id: string): Mission | null {
