@@ -5,7 +5,7 @@ import { createMainWindow, getMainWindow } from "./window";
 import { getAppVersion } from "./version";
 import { startPostgres, stopPostgres, createDatabase } from "./services/postgres";
 import { startGoTrue, stopGoTrue } from "./services/gotrue";
-import { startPostgREST, stopPostgREST } from "./services/postgrest";
+import { notifyPostgrestSchemaReload, startPostgREST, stopPostgREST } from "./services/postgrest";
 import { startGateway, stopGateway } from "./services/gateway";
 import { startNextServer, stopNextServer } from "./services/nextServer";
 import { runMigrations } from "./services/migrator";
@@ -188,6 +188,12 @@ async function startup(): Promise<void> {
   // 7. Start PostgREST
   await startPostgREST(binDir, getUserDataPath(), ports.postgrest, ports.postgres, jwtSecret);
   console.log(`[electron] PostgREST running on port ${ports.postgrest}`);
+  // Prime the schema cache. PostgREST may have introspected before the
+  // migrator's columns were visible, or its initial cache may simply be
+  // stale on first boot. A second NOTIFY now that the LISTEN connection
+  // is established guarantees the renderer sees the current schema.
+  await notifyPostgrestSchemaReload(ports.postgres);
+  console.log("[electron] PostgREST schema cache primed");
 
   // 8. Start API Gateway
   await startGateway(ports.gateway, ports.gotrue, ports.postgrest);

@@ -67,3 +67,42 @@ export function stopPostgREST(): void {
     postgrestProcess = null;
   }
 }
+
+/**
+ * Force PostgREST to reload its schema cache. Called after startPostgREST
+ * because the migrator's own NOTIFY (sent earlier in the boot sequence)
+ * lands in an empty channel — PostgREST isn't listening yet. Without a
+ * post-startup nudge, a fresh boot can end up with a stale cache that
+ * misses columns added by the migrations that just ran.
+ *
+ * Sends NOTIFY pgrst 'reload schema' then briefly waits so PostgREST has
+ * time to process the signal before the renderer issues its first query.
+ * Failures are swallowed and logged — a stale-cache boot is recoverable
+ * (the user can retry; the runMigrations boot-time NOTIFY will catch it
+ * next launch).
+ */
+export async function notifyPostgrestSchemaReload(pgPort: number): Promise<void> {
+  try {
+    const { Client } = await import("pg");
+    const client = new Client({
+      host: "127.0.0.1",
+      port: pgPort,
+      user: "postgres",
+      database: "unlabs",
+    });
+    await client.connect();
+    try {
+      await client.query(`NOTIFY pgrst, 'reload schema'`);
+    } finally {
+      await client.end();
+    }
+    // Give PostgREST time to process the LISTEN payload and refresh the
+    // cache before any subsequent HTTP query hits the new schema.
+    await new Promise((r) => setTimeout(r, 300));
+  } catch (err) {
+    console.warn(
+      "[postgrest] Failed to NOTIFY pgrst reload schema:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
