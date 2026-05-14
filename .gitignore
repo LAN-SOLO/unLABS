@@ -53,3 +53,4 @@ supabase/dumps/
 /bin/
 /dist-electron/
 /.INSTALL/
+/INSTALL/
