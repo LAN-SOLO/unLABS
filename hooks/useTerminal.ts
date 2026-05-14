@@ -54,6 +54,7 @@ import { useThermalManagerOptional } from "@/contexts/ThermalManager";
 import { executeCommand, getWelcomeMessage } from "@/lib/terminal/commands";
 import { savePanelState } from "@/lib/panel/panelState";
 import type { PanelSaveData } from "@/lib/panel/panelState";
+import { isDeviceUnlocked as checkDeviceUnlocked } from "@/lib/game/devices/unlocks";
 import {
   fetchBalance,
   fetchCrystals,
@@ -130,6 +131,10 @@ interface UseTerminalProps {
   firmwareActions?: import("@/lib/firmware/types").FirmwareActions;
   missionActions?: import("@/lib/terminal/types").MissionTerminalActions;
   resonanceActions?: import("@/lib/terminal/types").ResonanceTerminalActions;
+  tutorialActions?: import("@/lib/terminal/types").TutorialTerminalActions;
+  achievementActions?: import("@/lib/terminal/types").AchievementTerminalActions;
+  researchActions?: import("@/lib/terminal/types").ResearchTerminalActions;
+  questFlags?: Record<string, boolean>;
 }
 
 export function useTerminal({
@@ -182,6 +187,10 @@ export function useTerminal({
   firmwareActions,
   missionActions,
   resonanceActions,
+  tutorialActions,
+  achievementActions,
+  researchActions,
+  questFlags,
 }: UseTerminalProps) {
   const router = useRouter();
   const [state, setState] = useState<TerminalState>(() => {
@@ -592,6 +601,8 @@ export function useTerminal({
       renameCrystal,
       // Panel state save
       saveAllDeviceState,
+      // Device unlock check — drives terminal/UI gating against quest flags
+      isDeviceUnlocked: (deviceId: string) => checkDeviceUnlocked(deviceId, questFlags ?? {}),
       // Device actions for bidirectional sync
       cdcDevice: cdcDeviceActions,
       uecDevice: uecDeviceActions,
@@ -640,6 +651,9 @@ export function useTerminal({
       thermalDevice: thermalDeviceActions,
       missionActions,
       resonanceActions,
+      tutorialActions,
+      achievementActions,
+      researchActions,
     }),
     [
       cdcDeviceActions,
@@ -689,6 +703,10 @@ export function useTerminal({
       thermalDeviceActions,
       missionActions,
       resonanceActions,
+      tutorialActions,
+      achievementActions,
+      researchActions,
+      questFlags,
     ],
   );
 

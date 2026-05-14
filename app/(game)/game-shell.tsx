@@ -20,10 +20,23 @@ import { ProductionProvider } from "@/contexts/ProductionProvider";
 import { MissionProvider } from "@/contexts/MissionProvider";
 import { NotificationProvider } from "@/contexts/NotificationProvider";
 import { ResonanceProvider } from "@/contexts/ResonanceProvider";
+import { JournalProvider } from "@/contexts/JournalProvider";
+import { HintEscalationProvider } from "@/contexts/HintEscalationProvider";
+import { AchievementProvider } from "@/contexts/AchievementProvider";
+import { PhaseObservers } from "@/contexts/PhaseObservers";
+import { NexusProvider } from "@/contexts/NexusManager";
+import { TechTreeProvider } from "@/contexts/TechTreeProvider";
+import { TutorialProvider, useTutorial } from "@/contexts/TutorialProvider";
 import { NotificationStack } from "@/components/notifications/NotificationStack";
+import { WelcomeBackModal } from "@/components/onboarding/WelcomeBackModal";
+import { DifficultyPicker } from "@/components/onboarding/DifficultyPicker";
+import { TutorialOverlay } from "@/components/onboarding/TutorialOverlay";
+import { JournalPanel } from "@/components/journal/JournalPanel";
 import { cancelScheduledSave, flushSave, scheduleSave } from "@/lib/game/saveSync";
 import type { ResourceMap } from "@/lib/game/tickEngine";
 import type { ProductionJob } from "@/lib/game/production";
+import type { AchievementLoadResult } from "@/app/(game)/actions/achievement";
+import type { ListResearchResult } from "@/app/(game)/actions/research";
 
 interface GameShellProps {
   children: ReactNode;
@@ -35,6 +48,9 @@ interface GameShellProps {
   initialJobs: ProductionJob[];
   initialBalance: number;
   initialMissionState: unknown;
+  initialAchievementState: AchievementLoadResult | null;
+  initialResearchState: ListResearchResult | null;
+  initialTutorialState: unknown;
 }
 
 export function GameShell({
@@ -47,25 +63,57 @@ export function GameShell({
   initialJobs,
   initialBalance,
   initialMissionState,
+  initialAchievementState,
+  initialResearchState,
+  initialTutorialState,
 }: GameShellProps) {
   return (
-    <GameTickProvider initialResources={initialResources} initialLastTickAt={initialLastTickAt}>
-      <QuestProvider initialEpisodeId={initialEpisodeId} initialQuestState={initialQuestState}>
-        <ProductionProvider initialJobs={initialJobs} initialBalance={initialBalance}>
-          <MissionProvider initialMissionState={initialMissionState}>
-            <NotificationProvider>
-              <ResonanceProvider>
-                <SaveSyncBridge initialSave={initialSave}>
-                  {children}
-                  <NotificationStack />
-                </SaveSyncBridge>
-              </ResonanceProvider>
-            </NotificationProvider>
-          </MissionProvider>
-        </ProductionProvider>
-      </QuestProvider>
-    </GameTickProvider>
+    <JournalProvider>
+      <GameTickProvider initialResources={initialResources} initialLastTickAt={initialLastTickAt}>
+        <QuestProvider initialEpisodeId={initialEpisodeId} initialQuestState={initialQuestState}>
+          <ProductionProvider initialJobs={initialJobs} initialBalance={initialBalance}>
+            <MissionProvider initialMissionState={initialMissionState}>
+              <NotificationProvider>
+                <HintEscalationProvider>
+                  <ResonanceProvider>
+                    <AchievementProvider initialState={initialAchievementState}>
+                      <NexusProvider>
+                        <TechTreeProvider initialState={initialResearchState}>
+                          <TutorialProvider initialTutorialState={initialTutorialState}>
+                            <SaveSyncBridge initialSave={initialSave}>
+                              <PhaseObservers />
+                              {children}
+                              <NotificationStack />
+                              <WelcomeBackModal />
+                              <DifficultyPickerGate />
+                              <TutorialOverlay />
+                              <JournalPanel />
+                            </SaveSyncBridge>
+                          </TutorialProvider>
+                        </TechTreeProvider>
+                      </NexusProvider>
+                    </AchievementProvider>
+                  </ResonanceProvider>
+                </HintEscalationProvider>
+              </NotificationProvider>
+            </MissionProvider>
+          </ProductionProvider>
+        </QuestProvider>
+      </GameTickProvider>
+    </JournalProvider>
   );
+}
+
+/**
+ * Gates the DifficultyPicker on `tutorial.needsDifficultyChoice`. Splitting
+ * this out keeps the modal mounted only when needed (no DOM cost otherwise)
+ * and lets us read TutorialProvider context without lifting it above its
+ * own boundary.
+ */
+function DifficultyPickerGate() {
+  const tutorial = useTutorial();
+  if (!tutorial.needsDifficultyChoice) return null;
+  return <DifficultyPicker onChosen={tutorial.setStateOverride} />;
 }
 
 /**

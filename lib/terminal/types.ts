@@ -1630,6 +1630,9 @@ export interface DataFetchers {
   renameCrystal: (oldName: string, newName: string) => Promise<RenameResult>;
   // Panel state save/restore
   saveAllDeviceState?: () => void;
+  // Device unlock check — returns true if the player has earned this device.
+  // Resolved against the live quest-flag map; missing implies "not yet unlocked".
+  isDeviceUnlocked?: (deviceId: string) => boolean;
   // Device actions for bidirectional sync
   cdcDevice?: CDCDeviceActions;
   uecDevice?: UECDeviceActions;
@@ -1707,6 +1710,100 @@ export interface DataFetchers {
   missionActions?: MissionTerminalActions;
   // Resonance discovery system
   resonanceActions?: ResonanceTerminalActions;
+  // Tutorial / onboarding control
+  tutorialActions?: TutorialTerminalActions;
+  // Achievement system
+  achievementActions?: AchievementTerminalActions;
+  // Research / tech tree (NXS-01)
+  researchActions?: ResearchTerminalActions;
+}
+
+/**
+ * Terminal-facing research actions. Kept minimal — the terminal wraps
+ * the same provider methods the Nexus graph UI uses, plus a boolean for
+ * gating ("research" should behave like "missions" before EP1 unlock and
+ * just explain what to do).
+ */
+export interface ResearchTerminalActions {
+  available: () => boolean;
+  listNodes: () => Array<{
+    id: string;
+    title: string;
+    description: string;
+    tree: string;
+    tier: number;
+    status: string;
+    durationSec: number;
+    unscBurn: number;
+    requires: string[];
+  }>;
+  activeJob: () => {
+    jobId: string;
+    nodeId: string;
+    title: string;
+    startedAt: number;
+    completesAt: number;
+    ready: boolean;
+  } | null;
+  start: (nodeId: string) => Promise<{ ok: boolean; error?: string }>;
+  claim: () => Promise<{ ok: boolean; error?: string }>;
+  cancel: () => Promise<{ ok: boolean; error?: string }>;
+}
+
+/**
+ * Terminal-facing achievement actions. Kept minimal: list + claim cover
+ * every command the `achieve` shell exposes.
+ */
+export interface AchievementTerminalActions {
+  list: () => Array<{
+    id: string;
+    title: string;
+    description: string;
+    branch: string;
+    tier: number;
+    target: number;
+    unit: string;
+    progress: number;
+    status: string;
+    rewardUnsc: number;
+    rewardClaimed: boolean;
+  }>;
+  summary: () => { total: number; unlocked: number; claimed: number };
+  claim: (id: string) => Promise<{ ok: boolean; error?: string }>;
+}
+
+/**
+ * Terminal-facing tutorial actions. The command layer needs read + the three
+ * mutations (skip, resume, ack) but nothing else. Server sync happens inside
+ * each method so callers treat them as atomic.
+ */
+export interface TutorialTerminalActions {
+  getStatus: () => Promise<{
+    ok: boolean;
+    state: {
+      completed: boolean;
+      skipped: boolean;
+      currentPhase: number;
+      welcomeBackAckAt: string | null;
+      difficulty: "easy" | "hard" | null;
+      overlayStepIndex: number;
+    } | null;
+    episodeId: string | null;
+    stepIndex: number | null;
+    error?: string;
+  }>;
+  skip: () => Promise<{ ok: boolean; alreadySkipped: boolean; error?: string }>;
+  resume: () => Promise<{ ok: boolean; error?: string }>;
+  getOfflineCatchUp: () => {
+    seconds: number;
+    hasUnseen: boolean;
+    deltas: Partial<Record<string, number>>;
+  };
+  acknowledgeOfflineCatchUp: () => void;
+  /** Read the live difficulty (synchronous — backed by client state). */
+  getDifficulty: () => "easy" | "hard" | null;
+  /** Persist a new difficulty choice. */
+  setDifficulty: (difficulty: "easy" | "hard") => Promise<{ ok: boolean; error?: string }>;
 }
 
 /**

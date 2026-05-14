@@ -226,6 +226,8 @@ const helpCommand: Command = {
       "|  help      - display this help message                     |",
       "|  clear     - clear terminal screen                         |",
       "|  status    - display system status                         |",
+      "|  tutorial  - onboarding: status / skip / resume            |",
+      "|  achieve   - list / info / claim achievements              |",
       "+------------------------------------------------------------+",
       "|                      crystals                              |",
       "+------------------------------------------------------------+",
@@ -237,7 +239,8 @@ const helpCommand: Command = {
       "|                      economy                               |",
       "+------------------------------------------------------------+",
       "|  balance   - check _unSC token balance                     |",
-      "|  research  - view tech tree progress                       |",
+      "|  research  - tech tree browser (NXS-01: list/start/claim)  |",
+      "|  nexus     - launch the tech-tree graph app                |",
       "|  scan      - scan for volatility data                      |",
       "|  res       - manage resource containers                     |",
       "+------------------------------------------------------------+",
@@ -782,51 +785,154 @@ const balanceCommand: Command = {
 const researchCommand: Command = {
   name: "research",
   aliases: ["tech", "r"],
-  description: "View tech tree progress",
-  execute: async (_args, ctx) => {
-    ctx.setTyping(true);
-    const progress = await ctx.data.fetchResearchProgress();
-    ctx.setTyping(false);
-
-    if (progress.length === 0) {
-      return { success: true, output: ["No research progress found."] };
+  description: "Tech tree browser + research queue (requires NXS-01)",
+  usage: "research [list|status|start <node>|claim|cancel|help]",
+  execute: async (args, ctx) => {
+    const actions = ctx.data.researchActions;
+    if (!actions) {
+      return {
+        success: false,
+        error: "Research subsystem not available. Build the NXS-01 Nexus first.",
+      };
+    }
+    if (!actions.available()) {
+      return {
+        success: false,
+        error: "NXS-01 offline or not built. See 'achieve info' / EP2 for details.",
+      };
     }
 
-    // Group by category
-    const categories: Record<string, typeof progress> = {};
-    progress.forEach((p) => {
-      if (!categories[p.category]) {
-        categories[p.category] = [];
+    const sub = (args[0] ?? "list").toLowerCase();
+
+    if (sub === "help" || sub === "-h" || sub === "--help") {
+      return {
+        success: true,
+        output: [
+          "",
+          "  research list               Show every node with status + ETA",
+          "  research status             Show the active research job",
+          "  research start <node-id>    Begin research on an available node",
+          "  research claim              Claim the active job once complete",
+          "  research cancel             Cancel the active job (no refund)",
+          "",
+          "  Tip: 'nexus' launches the graph UI for clickable navigation.",
+          "",
+        ],
+      };
+    }
+
+    if (sub === "status") {
+      const job = actions.activeJob();
+      if (!job) {
+        return { success: true, output: ["", "> No active research.", ""] };
       }
-      categories[p.category].push(p);
-    });
+      const remaining = Math.max(0, Math.ceil((job.completesAt - Date.now()) / 1000));
+      const m = Math.floor(remaining / 60);
+      const s = remaining % 60;
+      return {
+        success: true,
+        output: [
+          "",
+          `  Active: ${job.title}  (${job.nodeId})`,
+          `  Remaining: ${job.ready ? "READY TO CLAIM" : `${m}m ${String(s).padStart(2, "0")}s`}`,
+          "",
+          `  Run 'research claim' to unlock${job.ready ? "." : " once complete."}`,
+          "",
+        ],
+      };
+    }
 
-    const output = [
-      "",
-      "+---------------------------------------------------------------+",
-      "|                     TECH TREE PROGRESS                        |",
-      "+---------------------------------------------------------------+",
-    ];
+    if (sub === "list") {
+      const rows = actions.listNodes();
+      if (rows.length === 0) return { success: true, output: ["", "  No nodes in catalog.", ""] };
 
-    const tierBar = (tier: number) => {
-      const filled = "#".repeat(tier);
-      const empty = "-".repeat(5 - tier);
-      return `[${filled}${empty}]`;
+      const byTree = new Map<string, typeof rows>();
+      for (const r of rows) {
+        const list = byTree.get(r.tree) ?? [];
+        list.push(r);
+        byTree.set(r.tree, list);
+      }
+
+      const output: string[] = [
+        "",
+        "+-- TECH TREE ---------------------------------------------------+",
+      ];
+      for (const [tree, nodes] of byTree) {
+        output.push(`|  [${tree.toUpperCase()}]`.padEnd(65) + "|");
+        for (const n of nodes.sort((a, b) => a.tier - b.tier)) {
+          const chip =
+            n.status === "unlocked"
+              ? "DONE"
+              : n.status === "in_progress"
+                ? "WIP "
+                : n.status === "available"
+                  ? "OK  "
+                  : "LOCK";
+          const dur = `${Math.floor(n.durationSec / 60)}m`;
+          output.push(
+            `|  ${chip}  T${n.tier}  ${n.title.padEnd(26)}  ${dur.padStart(5)}  ${n.id}`.padEnd(
+              65,
+            ) + "|",
+          );
+        }
+      }
+      output.push("+----------------------------------------------------------------+");
+      output.push("");
+      output.push("  'research start <node-id>' to begin. 'nexus' for graph view.");
+      output.push("");
+      return { success: true, output };
+    }
+
+    if (sub === "start") {
+      const id = args[1];
+      if (!id) return { success: false, error: "Usage: research start <node-id>" };
+      ctx.setTyping(true);
+      const result = await actions.start(id);
+      ctx.setTyping(false);
+      if (!result.ok) return { success: false, error: result.error ?? "Start failed." };
+      return { success: true, output: ["", `> Research started: ${id}`, ""] };
+    }
+
+    if (sub === "claim") {
+      ctx.setTyping(true);
+      const result = await actions.claim();
+      ctx.setTyping(false);
+      if (!result.ok) return { success: false, error: result.error ?? "Claim failed." };
+      return { success: true, output: ["", "> Research unlocked. Effects applied.", ""] };
+    }
+
+    if (sub === "cancel") {
+      ctx.setTyping(true);
+      const result = await actions.cancel();
+      ctx.setTyping(false);
+      if (!result.ok) return { success: false, error: result.error ?? "Cancel failed." };
+      return { success: true, output: ["", "> Research cancelled (no refund).", ""] };
+    }
+
+    return {
+      success: false,
+      error: `Unknown subcommand '${sub}'. Try 'research help'.`,
     };
+  },
+};
 
-    Object.entries(categories).forEach(([category, items]) => {
-      output.push(`|  ${category.toUpperCase().padEnd(60)} |`);
-      items.forEach((item) => {
-        const bar = tierBar(item.current_tier);
-        const name = item.tech_tree_name.padEnd(20);
-        output.push(`|    - ${name} ${bar} Tier ${item.current_tier}/5                   |`);
-      });
-    });
-
-    output.push("+---------------------------------------------------------------+");
-    output.push("");
-
-    return { success: true, output };
+const nexusCommand: Command = {
+  name: "nexus",
+  aliases: ["nxs", "tree"],
+  description: "Launch the NXS-01 tech-tree graph app",
+  execute: async (_args, ctx) => {
+    const actions = ctx.data.researchActions;
+    if (!actions || !actions.available()) {
+      return {
+        success: false,
+        error: "NXS-01 Nexus not available. Complete EP2 to build the Nexus.",
+      };
+    }
+    return {
+      success: true,
+      output: ["[nexus] launching holo-graph..."],
+      appMode: "nexus",
+    };
   },
 };
 
@@ -2629,6 +2735,14 @@ const deviceCommand: Command = {
             skipped++;
             continue;
           }
+          // Unlock gate (bulk on only) — locked devices stay off, listed as
+          // such so the player can see what's pending. Bulk off ignores the
+          // gate so an already-on locked device can still be turned off.
+          if (bulkAction === "on" && ctx.data.isDeviceUnlocked && !ctx.data.isDeviceUnlocked(id)) {
+            lines.push(`  ${id}  ${name.padEnd(24)} — LOCKED (mission/quest required)`);
+            skipped++;
+            continue;
+          }
           const powered = ctrl.isPowered();
           if (bulkAction === "off" && !powered) {
             lines.push(`  ${id}  ${name.padEnd(24)} — already OFF`);
@@ -2695,6 +2809,15 @@ const deviceCommand: Command = {
       }
 
       if (powerAction === "on") {
+        // Unlock gate — devices behind a quest/mission flag refuse to power on
+        // until the player has earned them. Fail closed if the unlock fetcher
+        // is unavailable (defensive: prefer "still locked" over "always allow").
+        if (ctx.data.isDeviceUnlocked && !ctx.data.isDeviceUnlocked(resolvedId)) {
+          return {
+            success: false,
+            error: `[device] ${resolvedId} is LOCKED — complete the required mission/quest to unlock it.`,
+          };
+        }
         if (ctrl.isPowered())
           return {
             success: true,
@@ -25364,6 +25487,405 @@ const discoveriesCommand: Command = {
   },
 };
 
+const achieveCommand: Command = {
+  name: "achieve",
+  aliases: ["achievement", "achievements"],
+  description: "Browse achievements, view progress, claim rewards",
+  usage: "achieve [list|progress|info <id>|claim <id>|help]",
+  execute: async (args, ctx) => {
+    const actions = ctx.data.achievementActions;
+    if (!actions) {
+      return { success: false, error: "Achievement subsystem not available." };
+    }
+
+    const sub = (args[0] ?? "list").toLowerCase();
+
+    if (sub === "help" || sub === "--help" || sub === "-h") {
+      return {
+        success: true,
+        output: [
+          "",
+          "  achieve list            List all achievements grouped by branch",
+          "  achieve progress        Show only in-progress + unlocked",
+          "  achieve info <id>       Show details for one achievement",
+          "  achieve claim <id>      Claim reward for an unlocked achievement",
+          "",
+        ],
+      };
+    }
+
+    if (sub === "list" || sub === "progress") {
+      const rows = actions.list();
+      const summary = actions.summary();
+      const filtered =
+        sub === "progress"
+          ? rows.filter((r) => r.status !== "locked" && r.status !== "claimed")
+          : rows;
+      const output: string[] = [
+        "",
+        "+-- ACHIEVEMENTS -------------------------------------------------+",
+        `|  ${summary.unlocked}/${summary.total} unlocked · ${summary.claimed} claimed`.padEnd(65) +
+          "|",
+        "+-----------------------------------------------------------------+",
+      ];
+
+      const byBranch = new Map<string, typeof rows>();
+      for (const r of filtered) {
+        const list = byBranch.get(r.branch) ?? [];
+        list.push(r);
+        byBranch.set(r.branch, list);
+      }
+
+      if (filtered.length === 0) {
+        output.push("|  Nothing to show.".padEnd(65) + "|");
+      }
+
+      for (const [branch, items] of byBranch) {
+        output.push("|".padEnd(65) + "|");
+        output.push(`|  [${branch.toUpperCase()}]`.padEnd(65) + "|");
+        for (const r of items) {
+          const pct = Math.min(100, Math.floor((r.progress / r.target) * 100));
+          const statusChip =
+            r.status === "claimed"
+              ? "CLAIMED"
+              : r.status === "unlocked"
+                ? "READY"
+                : r.status === "locked"
+                  ? "LOCKED"
+                  : `${pct}%`;
+          output.push(
+            `|  ${statusChip.padEnd(7)}  T${r.tier}  ${r.title.padEnd(26)}  ${r.id}`.padEnd(65) +
+              "|",
+          );
+          output.push(
+            `|           ${r.progress.toFixed(1)}/${r.target} ${r.unit}`.padEnd(65) + "|",
+          );
+        }
+      }
+
+      output.push("+-----------------------------------------------------------------+");
+      output.push("");
+      output.push("  use 'achieve info <id>' for details  ·  'achieve claim <id>' to claim");
+      output.push("");
+      return { success: true, output };
+    }
+
+    if (sub === "info") {
+      const id = args[1];
+      if (!id) {
+        return { success: false, error: "Usage: achieve info <id>" };
+      }
+      const row = actions.list().find((r) => r.id === id);
+      if (!row) {
+        return { success: false, error: `Unknown achievement '${id}'.` };
+      }
+      return {
+        success: true,
+        output: [
+          "",
+          `  [${row.branch.toUpperCase()}]  T${row.tier}  ${row.title}`,
+          `  ${row.description}`,
+          "",
+          `  Progress : ${row.progress.toFixed(2)} / ${row.target} ${row.unit}`,
+          `  Status   : ${row.status.toUpperCase()}`,
+          `  Reward   : +${row.rewardUnsc} _unSC${row.rewardClaimed ? " (claimed)" : ""}`,
+          "",
+        ],
+      };
+    }
+
+    if (sub === "claim") {
+      const id = args[1];
+      if (!id) {
+        return { success: false, error: "Usage: achieve claim <id>" };
+      }
+      ctx.setTyping(true);
+      const result = await actions.claim(id);
+      ctx.setTyping(false);
+      if (!result.ok) {
+        return { success: false, error: result.error ?? "Claim failed." };
+      }
+      return {
+        success: true,
+        output: ["", `> Claimed ${id}. Reserve burn recorded, balance updated.`, ""],
+      };
+    }
+
+    return {
+      success: false,
+      error: `Unknown subcommand '${sub}'. Try 'achieve help'.`,
+    };
+  },
+};
+
+/**
+ * `guide` prints the active mission's full walkthrough — every objective, in
+ * order, with its hint text inline. Designed for the "hard" difficulty mode
+ * where hints are otherwise passive: when the player wants help, they ask.
+ *
+ * Falls back gracefully when there's no active mission (early-game / tutorial
+ * still in progress) by pointing at `whatnext` instead.
+ */
+const guideCommand: Command = {
+  name: "guide",
+  aliases: ["walkthrough", "howto"],
+  description: "Print the active mission's full walkthrough with all hints",
+  usage: "guide",
+  execute: async (_args, ctx) => {
+    const missions = ctx.data.missionActions;
+    if (!missions) {
+      return {
+        success: false,
+        error: "Mission system not available yet — finish the onboarding first.",
+      };
+    }
+
+    const active = missions.getAllMissions().find((m) => m.status === "active");
+    if (!active) {
+      return {
+        success: true,
+        output: [
+          "",
+          "  No active mission. Try one of:",
+          "    whatnext           — pick a next action based on global state",
+          "    missions --active  — list active missions",
+          "    tutorial status    — onboarding progress",
+          "",
+        ],
+      };
+    }
+
+    const lines: string[] = ["", `\x1b[36m▶ ${active.title}\x1b[0m  [${active.category}]`, ""];
+    if (active.flavor) {
+      // Wrap flavor at ~64 chars so it stays readable in narrow terminals.
+      const words = active.flavor.split(/\s+/);
+      let row = "";
+      for (const word of words) {
+        if ((row + " " + word).trim().length > 64) {
+          lines.push(`  \x1b[90m${row.trim()}\x1b[0m`);
+          row = word;
+        } else {
+          row = (row + " " + word).trim();
+        }
+      }
+      if (row) lines.push(`  \x1b[90m${row}\x1b[0m`);
+      lines.push("");
+    }
+
+    for (const task of active.tasks) {
+      const taskIcon =
+        task.status === "completed"
+          ? "\x1b[32m✓\x1b[0m"
+          : task.status === "in_progress"
+            ? "\x1b[33m~\x1b[0m"
+            : task.status === "locked"
+              ? "\x1b[90m•\x1b[0m"
+              : "\x1b[33m○\x1b[0m";
+      lines.push(`  ${taskIcon} \x1b[37m${task.label}\x1b[0m`);
+
+      for (const obj of task.objectives) {
+        const completed = obj.status === "completed";
+        const locked = obj.status === "locked";
+        const progress =
+          obj.targetValue > 1 && !completed
+            ? ` (${Math.min(obj.currentValue, obj.targetValue)}/${obj.targetValue})`
+            : "";
+        const dim = completed ? "\x1b[90m" : locked ? "\x1b[90m" : "";
+        const reset = "\x1b[0m";
+        const tick = completed ? "✓" : locked ? "✗" : "○";
+        lines.push(`      ${dim}${tick} ${obj.description}${progress}${reset}`);
+        // Always surface the hint for incomplete, available objectives. This
+        // is the whole point of `guide` — it's the player asking for help.
+        if (!completed && !locked && obj.hint) {
+          lines.push(`        \x1b[36m↳ ${obj.hint}\x1b[0m`);
+        }
+        if (!completed && !locked && obj.deepDiveHint) {
+          lines.push(`        \x1b[35m↳↳ ${obj.deepDiveHint}\x1b[0m`);
+        }
+      }
+    }
+
+    lines.push("");
+    lines.push("  Run \x1b[36mwhatnext\x1b[0m for a contextual next-action suggestion.");
+    lines.push("");
+    return { success: true, output: lines };
+  },
+};
+
+const tutorialCommand: Command = {
+  name: "tutorial",
+  aliases: ["onboarding"],
+  description: "Control the onboarding flow (status | skip | resume | welcomeback | difficulty)",
+  usage: "tutorial [status|skip|resume|welcomeback|difficulty|help]",
+  execute: async (args, ctx) => {
+    const actions = ctx.data.tutorialActions;
+    if (!actions) {
+      return { success: false, error: "Tutorial subsystem not available." };
+    }
+
+    const sub = (args[0] ?? "status").toLowerCase();
+
+    if (sub === "help" || sub === "--help" || sub === "-h") {
+      return {
+        success: true,
+        output: [
+          "",
+          "  tutorial status            Show current onboarding progress",
+          "  tutorial skip              Hard-skip the tutorial (irreversible grants)",
+          "  tutorial resume            Restart from Phase 0 (EP0)",
+          "  tutorial welcomeback       Show the last offline catch-up summary",
+          "  tutorial difficulty <m>    Switch guidance mode (easy | hard)",
+          "",
+          "  guide                      Print active mission's full walkthrough",
+          "",
+        ],
+      };
+    }
+
+    if (sub === "difficulty" || sub === "mode") {
+      const choice = (args[1] ?? "").toLowerCase();
+      if (choice !== "easy" && choice !== "hard") {
+        const current = actions.getDifficulty();
+        return {
+          success: true,
+          output: [
+            "",
+            `  Current difficulty: ${current ?? "(not chosen yet)"}`,
+            "",
+            "  tutorial difficulty easy   Interactive overlay walks you through commands",
+            "  tutorial difficulty hard   Inline hints + 'guide' command on demand",
+            "",
+          ],
+        };
+      }
+      const res = await actions.setDifficulty(choice);
+      if (!res.ok) {
+        return { success: false, error: res.error ?? "Failed to save difficulty." };
+      }
+      return {
+        success: true,
+        output: [
+          "",
+          `> Guidance mode switched to ${choice.toUpperCase()}.`,
+          choice === "easy"
+            ? "> Interactive overlay will engage on the next mission step."
+            : "> Inline hints active. Type 'guide' for the active mission walkthrough.",
+          "",
+        ],
+      };
+    }
+
+    if (sub === "status") {
+      const res = await actions.getStatus();
+      if (!res.ok || !res.state) {
+        return { success: false, error: res.error ?? "Failed to load tutorial status." };
+      }
+      const s = res.state;
+      const phase = s.currentPhase;
+      const phaseLabels = [
+        "0  Discovery",
+        "1  Bootstrap",
+        "2  Ignition",
+        "3  Foundation",
+        "4  Expansion",
+        "5  Autonomy",
+      ];
+      const stateLabel = s.completed ? (s.skipped ? "SKIPPED" : "COMPLETED") : "IN PROGRESS";
+      return {
+        success: true,
+        output: [
+          "",
+          "+-- TUTORIAL STATUS --------------------+",
+          `|  State    : ${stateLabel.padEnd(24)} |`,
+          `|  Phase    : ${(phaseLabels[phase] ?? String(phase)).padEnd(24)} |`,
+          `|  Episode  : ${(res.episodeId ?? "-").padEnd(24)} |`,
+          `|  Step idx : ${String(res.stepIndex ?? "-").padEnd(24)} |`,
+          "+---------------------------------------+",
+          "",
+          "  Run 'tutorial skip' to jump to open-world.",
+          "  Run 'tutorial resume' to restart from the beginning.",
+          "",
+        ],
+      };
+    }
+
+    if (sub === "skip") {
+      ctx.setTyping(true);
+      const res = await actions.skip();
+      ctx.setTyping(false);
+      if (!res.ok) {
+        return { success: false, error: res.error ?? "Tutorial skip failed." };
+      }
+      if (res.alreadySkipped) {
+        return {
+          success: true,
+          output: ["", "> Tutorial is already skipped. Nothing to do.", ""],
+        };
+      }
+      return {
+        success: true,
+        output: [
+          "",
+          "> Tutorial skipped.",
+          "> UEC-001 + OSC-001 online · Abstractum seep @ 1/min · +5 Abstractum · +1 research",
+          "> Missions unlocked. Run 'whatnext' for a suggestion.",
+          "",
+        ],
+      };
+    }
+
+    if (sub === "resume" || sub === "restart" || sub === "start") {
+      ctx.setTyping(true);
+      const res = await actions.resume();
+      ctx.setTyping(false);
+      if (!res.ok) {
+        return { success: false, error: res.error ?? "Tutorial resume failed." };
+      }
+      return {
+        success: true,
+        output: [
+          "",
+          "> Tutorial reset to EP0 'Cold Boot'. Rewards from prior play were retained.",
+          "",
+        ],
+      };
+    }
+
+    if (sub === "welcomeback" || sub === "offline" || sub === "wb") {
+      const wb = actions.getOfflineCatchUp();
+      if (wb.seconds <= 0) {
+        return {
+          success: true,
+          output: ["", "> No offline progress since last session.", ""],
+        };
+      }
+      const hours = Math.floor(wb.seconds / 3600);
+      const minutes = Math.floor((wb.seconds % 3600) / 60);
+      const lines: string[] = [
+        "",
+        `> Offline duration: ${hours}h ${minutes}m (capped at 8h)`,
+        "> Resource gains:",
+      ];
+      for (const [id, delta] of Object.entries(wb.deltas)) {
+        if ((delta ?? 0) > 0) {
+          lines.push(`  + ${(delta as number).toFixed(2).padStart(10)}  ${id}`);
+        }
+      }
+      if (wb.hasUnseen) {
+        lines.push("");
+        lines.push("  (run 'tutorial welcomeback' again or dismiss the modal to clear)");
+      }
+      lines.push("");
+      return { success: true, output: lines };
+    }
+
+    return {
+      success: false,
+      error: `Unknown tutorial subcommand '${sub}'. Try 'tutorial help'.`,
+    };
+  },
+};
+
 export const commands: Command[] = [
   helpCommand,
   clearCommand,
@@ -25547,6 +26069,13 @@ export const commands: Command[] = [
   whatnextCommand,
   missionsCommand,
   discoveriesCommand,
+  // Tutorial / onboarding
+  tutorialCommand,
+  guideCommand,
+  // Achievements
+  achieveCommand,
+  // Nexus (tech tree graph app)
+  nexusCommand,
 ];
 
 // Find command by name or alias

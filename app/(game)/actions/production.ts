@@ -23,7 +23,7 @@ import { createClient } from "@/lib/supabase/server";
 import { burnUnsc } from "@/lib/game/economy";
 import { getRecipe } from "@/lib/game/recipes";
 import { fromRow, type ProductionJob, type ProductionJobRow } from "@/lib/game/production";
-import type { StepReward } from "@/lib/game/quests/types";
+import type { QuestState, StepReward } from "@/lib/game/quests/types";
 
 export interface StartJobResult {
   ok: boolean;
@@ -164,6 +164,37 @@ export async function claimJob(jobId: string): Promise<ClaimJobResult> {
 
   if (updateError) {
     return { ok: false, rewards: [], error: updateError.message };
+  }
+
+  // Persist set_flag rewards into quest_state. This is the single
+  // server-authoritative path for recipe-induced flags — without it, any
+  // downstream mission/quest that gates on e.g. `smt_01_online` would
+  // never fire. Non-flag rewards are still applied client-side (resources,
+  // capacities) via the returned `rewards` array.
+  const flagRewards = recipe.outputs.filter(
+    (r): r is Extract<StepReward, { kind: "set_flag" }> => r.kind === "set_flag",
+  );
+  if (flagRewards.length > 0) {
+    const profile = await supabase
+      .from("profiles")
+      .select("quest_state")
+      .eq("id", user.id)
+      .maybeSingle();
+    const profileRow = profile.data as { quest_state: Record<string, unknown> } | null;
+    const qs = (profileRow?.quest_state ?? {}) as Partial<QuestState>;
+    const existingFlags = (qs.flags ?? {}) as Record<string, boolean>;
+    const nextFlags = { ...existingFlags };
+    for (const fr of flagRewards) nextFlags[fr.flag] = fr.value;
+    const nextState: QuestState = {
+      episodeId: typeof qs.episodeId === "string" ? qs.episodeId : "EP0",
+      currentStepIndex: typeof qs.currentStepIndex === "number" ? qs.currentStepIndex : 0,
+      completedStepIds: Array.isArray(qs.completedStepIds) ? qs.completedStepIds : [],
+      flags: nextFlags,
+    };
+    await supabase
+      .from("profiles")
+      .update({ quest_state: nextState as unknown as Record<string, unknown> } as never)
+      .eq("id", user.id);
   }
 
   return {

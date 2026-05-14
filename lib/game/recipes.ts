@@ -114,6 +114,90 @@ export const RECIPES: Recipe[] = [
     outputs: [{ kind: "grant_resource", resourceId: "nanomaterial", amount: 1 }],
     unlockRequires: ["anomaly_mode"],
   },
+  // ── Phase 3 production-chain devices ──────────────────────────────
+  // These three stub recipes gate the EP2 "Three Chains" beat. They're
+  // intentionally cheap so the mission is reachable by a player who just
+  // finished EP1 with the base resource rates. The outputs set a flag per
+  // device; the flag unlocks downstream missions. Panel modules for these
+  // devices can ship in a later polish pass without changing any IDs.
+  {
+    id: "smt_01_build",
+    label: "Smelter (SMT-01)",
+    flavor: "Routes raw Abstractum into the alloy chain. Hums in C-sharp when warm.",
+    tier: 1,
+    category: "device",
+    costs: [
+      { resourceId: "abstractum", amount: 15 },
+      { resourceId: "energy", amount: 100 },
+    ],
+    unscBurn: 10,
+    durationSec: 180,
+    outputs: [
+      { kind: "set_flag", flag: "smt_01_online", value: true },
+      // Small permanent Abstractum rate bump as a tangible reward.
+      { kind: "set_resource_rate", resourceId: "abstractum", ratePerSecond: 2 / 60 },
+    ],
+    unlockRequires: ["missions_unlocked"],
+  },
+  {
+    id: "cnd_01_build",
+    label: "Condenser (CND-01)",
+    flavor: "Compresses loose energy into something you can ship in a box.",
+    tier: 1,
+    category: "device",
+    costs: [
+      { resourceId: "abstractum", amount: 15 },
+      { resourceId: "energy", amount: 150 },
+    ],
+    unscBurn: 10,
+    durationSec: 180,
+    outputs: [
+      { kind: "set_flag", flag: "cnd_01_online", value: true },
+      { kind: "set_resource_capacity", resourceId: "energy", capacity: 750 },
+    ],
+    unlockRequires: ["smt_01_online"],
+  },
+  {
+    id: "mix_01_build",
+    label: "Mixer (MIX-01)",
+    flavor: "Stirs reagents at frequencies the chemistry department considered irresponsible.",
+    tier: 1,
+    category: "device",
+    costs: [
+      { resourceId: "abstractum", amount: 20 },
+      { resourceId: "energy", amount: 200 },
+      { resourceId: "base_alloy", amount: 2 },
+    ],
+    unscBurn: 10,
+    durationSec: 240,
+    outputs: [
+      { kind: "set_flag", flag: "mix_01_online", value: true },
+      { kind: "set_flag", flag: "three_chains_online", value: true },
+    ],
+    unlockRequires: ["cnd_01_online"],
+  },
+  // NXS-01 Nexus — gate for the research subsystem. Workstream #6 expands
+  // this device with a panel module, firmware lifecycle, and graph UI;
+  // the recipe ships here so EP2's final step has a real mechanical anchor.
+  {
+    id: "nxs_01_build",
+    label: "Nexus (NXS-01)",
+    flavor:
+      "A salvaged holo-projector rebuilt as a research visualizer. The map you have to build before you can read the map.",
+    tier: 2,
+    category: "device",
+    costs: [
+      { resourceId: "base_alloy", amount: 10 },
+      { resourceId: "energy", amount: 400 },
+    ],
+    unscBurn: 40,
+    durationSec: 600,
+    outputs: [
+      { kind: "set_flag", flag: "nexus_built", value: true },
+      { kind: "grant_resource", resourceId: "research", amount: 5 },
+    ],
+    unlockRequires: ["three_chains_online"],
+  },
   {
     id: "mfr_001_build",
     label: "Microfusion Reactor (MFR-001)",

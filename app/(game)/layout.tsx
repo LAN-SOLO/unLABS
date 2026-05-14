@@ -3,6 +3,9 @@ import { loadQuestState } from "./actions/quest";
 import { loadMissionState } from "./actions/mission";
 import { listJobs } from "./actions/production";
 import { getBalance } from "./actions/economy";
+import { loadAchievementState } from "./actions/achievement";
+import { listResearch } from "./actions/research";
+import { getTutorialStatus } from "./actions/tutorial";
 import { GameShell } from "./game-shell";
 import type { ResourceMap } from "@/lib/game/tickEngine";
 
@@ -17,13 +20,17 @@ import type { ResourceMap } from "@/lib/game/tickEngine";
  * layout, `user` is guaranteed to be authenticated.
  */
 export default async function GameLayout({ children }: { children: React.ReactNode }) {
-  const [save, quest, missions, jobs, balance] = await Promise.all([
-    loadPlayerSave(),
-    loadQuestState(),
-    loadMissionState(),
-    listJobs(),
-    getBalance(),
-  ]);
+  const [save, quest, missions, jobs, balance, achievements, research, tutorial] =
+    await Promise.all([
+      loadPlayerSave(),
+      loadQuestState(),
+      loadMissionState(),
+      listJobs(),
+      getBalance(),
+      loadAchievementState(),
+      listResearch(),
+      getTutorialStatus(),
+    ]);
 
   // Extract the resource slice of the save blob if present. Anything else in
   // the blob is passed through verbatim and consumed by device managers /
@@ -41,6 +48,9 @@ export default async function GameLayout({ children }: { children: React.ReactNo
       initialJobs={jobs.ok ? jobs.jobs : []}
       initialBalance={balance.ok && balance.balance ? balance.balance.available : 0}
       initialMissionState={missions.ok ? missions.state : null}
+      initialAchievementState={achievements}
+      initialResearchState={research}
+      initialTutorialState={tutorial.ok ? tutorial.state : null}
     >
       {children}
     </GameShell>

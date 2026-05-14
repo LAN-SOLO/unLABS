@@ -25,6 +25,7 @@ import { TerminalOutput } from "./TerminalOutput";
 import { TerminalInput } from "./TerminalInput";
 import { MidnightCommander } from "./MidnightCommander";
 import { SysprefApp } from "@/components/sysprefs/SysprefApp";
+import { TechGraph } from "@/components/nexus/TechGraph";
 import { ScreensaverOverlay } from "@/components/screensaver/ScreensaverOverlay";
 import type { ScreensaverPattern } from "@/components/screensaver/types";
 import { TetrisOverlay } from "@/components/tetris/TetrisOverlay";
@@ -65,7 +66,27 @@ import { useSystemPowerOptional } from "@/contexts/SystemPowerManager";
 import { useFirmwareManagerOptional } from "@/contexts/FirmwareManager";
 import { useMission } from "@/contexts/MissionProvider";
 import { useResonance } from "@/contexts/ResonanceProvider";
-import type { MissionTerminalActions, ResonanceTerminalActions } from "@/lib/terminal/types";
+import { useQuest } from "@/contexts/QuestProvider";
+import { useGameTick } from "@/contexts/GameTickProvider";
+import { useJournalOptional } from "@/contexts/JournalProvider";
+import { useAchievementsOptional } from "@/contexts/AchievementProvider";
+import { useTechTreeOptional } from "@/contexts/TechTreeProvider";
+import { useNexusOptional } from "@/contexts/NexusManager";
+import { useTutorialOptional } from "@/contexts/TutorialProvider";
+import { getTechNode } from "@/lib/game/techTree";
+import {
+  getTutorialStatus,
+  skipTutorial,
+  resumeTutorial,
+  ackWelcomeBack,
+} from "@/app/(game)/actions/tutorial";
+import type {
+  AchievementTerminalActions,
+  MissionTerminalActions,
+  ResearchTerminalActions,
+  ResonanceTerminalActions,
+  TutorialTerminalActions,
+} from "@/lib/terminal/types";
 import type {
   CDCDeviceActions,
   UECDeviceActions,
@@ -204,6 +225,156 @@ export function Terminal({
     };
   }, [missionCtx]);
 
+  // Quest + tick hooks are always mounted inside the game layout, so these
+  // can be called unconditionally (unlike mission/resonance which are optional).
+  const quest = useQuest();
+  const tick = useGameTick();
+  // Journal provider is optional so Terminal keeps working in isolated dev
+  // views. When mounted, we share its Journal instance so writes from both
+  // sides land in the same buffer and the JournalPanel sees terminal
+  // activity.
+  const sharedJournal = useJournalOptional();
+  const achievementsCtx = useAchievementsOptional();
+  const techTreeCtx = useTechTreeOptional();
+  const nexusCtx = useNexusOptional();
+  const tutorialCtx = useTutorialOptional();
+
+  const tutorialTerminalActions: TutorialTerminalActions = useMemo(
+    () => ({
+      getStatus: () => getTutorialStatus(),
+      skip: async () => {
+        const result = await skipTutorial();
+        if (!result.ok || !result.state) {
+          return { ok: false, alreadySkipped: false, error: result.error };
+        }
+        const alreadySkipped = result.rewards.length === 0;
+        if (!alreadySkipped) {
+          quest.applyRewards(result.rewards);
+          quest.setStateOverride({
+            episodeId: "SKIPPED",
+            currentStepIndex: 0,
+            completedStepIds: [],
+            flags: {
+              ...quest.state.flags,
+              ep0_complete: true,
+              osc_001_online: true,
+              lissajous_locked: true,
+              anomaly_mode: true,
+              missions_unlocked: true,
+            },
+          });
+        }
+        return { ok: true, alreadySkipped };
+      },
+      resume: async () => {
+        const result = await resumeTutorial();
+        if (!result.ok) return { ok: false, error: result.error };
+        quest.setStateOverride({
+          episodeId: "EP0",
+          currentStepIndex: 0,
+          completedStepIds: [],
+          flags: {},
+        });
+        return { ok: true };
+      },
+      getOfflineCatchUp: () => ({
+        seconds: tick.offlineCatchUpSeconds,
+        hasUnseen: tick.hasUnseenOfflineCatchUp,
+        deltas: tick.offlineDeltas,
+      }),
+      acknowledgeOfflineCatchUp: () => {
+        tick.acknowledgeOfflineCatchUp();
+        void ackWelcomeBack();
+      },
+      getDifficulty: () => tutorialCtx?.state.difficulty ?? null,
+      setDifficulty: async (difficulty) => {
+        if (!tutorialCtx) {
+          return { ok: false, error: "Tutorial provider not mounted." };
+        }
+        try {
+          await tutorialCtx.chooseDifficulty(difficulty);
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : "save failed" };
+        }
+      },
+    }),
+    [
+      quest,
+      tick.offlineCatchUpSeconds,
+      tick.hasUnseenOfflineCatchUp,
+      tick.offlineDeltas,
+      tick.acknowledgeOfflineCatchUp,
+      tutorialCtx,
+    ],
+  );
+
+  const achievementTerminalActions: AchievementTerminalActions | undefined = useMemo(() => {
+    if (!achievementsCtx) return undefined;
+    const ctx = achievementsCtx;
+    return {
+      list: () =>
+        ctx.all.map((a) => ({
+          id: a.id,
+          title: a.title,
+          description: a.description,
+          branch: a.branch,
+          tier: a.tier,
+          target: a.target,
+          unit: a.unit,
+          progress: a.progress,
+          status: a.status,
+          rewardUnsc: a.reward.unsc,
+          rewardClaimed: a.rewardClaimed,
+        })),
+      summary: () => ctx.summary,
+      claim: (id) => ctx.claim(id),
+    };
+  }, [achievementsCtx]);
+
+  const researchTerminalActions: ResearchTerminalActions | undefined = useMemo(() => {
+    if (!techTreeCtx || !nexusCtx) return undefined;
+    const tree = techTreeCtx;
+    const nexus = nexusCtx;
+    return {
+      available: () => nexus.isBuilt && nexus.isOnline,
+      listNodes: () =>
+        tree.nodes.map((n) => ({
+          id: n.id,
+          title: n.title,
+          description: n.description,
+          tree: n.tree,
+          tier: n.tier,
+          status: n.status,
+          durationSec: n.durationSec,
+          unscBurn: n.unscBurn,
+          requires: n.requires,
+        })),
+      activeJob: () => {
+        const job = tree.activeJob;
+        if (!job) return null;
+        const node = getTechNode(job.nodeId);
+        return {
+          jobId: job.id,
+          nodeId: job.nodeId,
+          title: node?.title ?? job.nodeId,
+          startedAt: job.startedAt,
+          completesAt: job.completesAt,
+          ready: job.completesAt <= Date.now(),
+        };
+      },
+      start: (nodeId) => tree.startNode(nodeId),
+      claim: async () => {
+        if (!tree.activeJob) return { ok: false, error: "no_active_job" };
+        return tree.claimNode(tree.activeJob.id);
+      },
+      cancel: async () => {
+        if (!tree.activeJob) return { ok: false, error: "no_active_job" };
+        return tree.cancelNode(tree.activeJob.id);
+      },
+    };
+  }, [techTreeCtx, nexusCtx]);
+
   const resonanceTerminalActions: ResonanceTerminalActions | undefined = useMemo(() => {
     if (!resonanceCtx) return undefined;
     const ctx = resonanceCtx;
@@ -263,8 +434,14 @@ export function Terminal({
     networkMgrRef.current = new NetworkManager();
   }
   if (!journalRef.current) {
-    const saved = loadPanelState();
-    journalRef.current = saved?.journal ? Journal.fromJSON(saved.journal) : new Journal();
+    // Prefer the shared provider instance so writes from terminal commands
+    // land in the same buffer as hint-engine + mission entries.
+    if (sharedJournal) {
+      journalRef.current = sharedJournal.journal;
+    } else {
+      const saved = loadPanelState();
+      journalRef.current = saved?.journal ? Journal.fromJSON(saved.journal) : new Journal();
+    }
   }
   if (!cronRef.current) {
     const saved = loadPanelState();
@@ -518,16 +695,22 @@ export function Terminal({
     [],
   );
 
-  // Build journal actions (stable ref)
+  // Build journal actions. When the provider is mounted, route writes
+  // through its `write()` so `version` bumps and the JournalPanel updates.
   const journalActions: JournalActions = useMemo(
     () => ({
       query: (opts) => journalRef.current!.query(opts),
-      write: (unit, priority, message, pid) =>
-        journalRef.current!.write(unit, priority, message, pid),
+      write: (unit, priority, message, pid) => {
+        if (sharedJournal) {
+          sharedJournal.write(unit, priority, message, pid);
+        } else {
+          journalRef.current!.write(unit, priority, message, pid);
+        }
+      },
       formatEntry: (entry) => Journal.formatEntry(entry),
       priorityFromName: (name) => Journal.priorityFromName(name),
     }),
-    [],
+    [sharedJournal],
   );
 
   // Build cron actions (stable ref)
@@ -2572,6 +2755,10 @@ export function Terminal({
     firmwareActions: firmwareManager ?? undefined,
     missionActions: missionTerminalActions,
     resonanceActions: resonanceTerminalActions,
+    tutorialActions: tutorialTerminalActions,
+    achievementActions: achievementTerminalActions,
+    researchActions: researchTerminalActions,
+    questFlags: quest.state.flags,
   });
 
   const handleAutocomplete = useCallback((input: string): string[] => {
@@ -2670,6 +2857,14 @@ export function Terminal({
         overridePattern={appModeData?.pattern as ScreensaverPattern | undefined}
       />,
       document.body,
+    );
+  }
+
+  if (appMode === "nexus") {
+    return (
+      <div className="flex h-full flex-col">
+        <TechGraph onExit={exitAppMode} />
+      </div>
     );
   }
 
