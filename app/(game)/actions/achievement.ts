@@ -278,7 +278,7 @@ export async function claimAchievement(achievementId: string): Promise<ClaimAchi
   if (writeErr) {
     // Money already moved; log the inconsistency but return ok=true so
     // the client doesn't double-claim. Dev tooling can reconcile.
-     
+
     console.warn(
       `[ach] award succeeded but unlock write failed for ${achievement.id}: ${writeErr.message}`,
     );
