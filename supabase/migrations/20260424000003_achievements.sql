@@ -55,13 +55,19 @@ create index if not exists idx_achievement_unlocks_user_unclaimed
 alter table public.achievement_progress enable row level security;
 alter table public.achievement_unlocks  enable row level security;
 
+-- `drop ... if exists` wraps keep this migration idempotent so the
+-- self-heal re-run can replay it without "policy already exists".
+drop policy if exists "Users can read own achievement progress" on public.achievement_progress;
 create policy "Users can read own achievement progress"
   on public.achievement_progress for select using (auth.uid() = user_id);
+drop policy if exists "Users can upsert own achievement progress" on public.achievement_progress;
 create policy "Users can upsert own achievement progress"
   on public.achievement_progress for insert with check (auth.uid() = user_id);
+drop policy if exists "Users can update own achievement progress" on public.achievement_progress;
 create policy "Users can update own achievement progress"
   on public.achievement_progress for update using (auth.uid() = user_id);
 
+drop policy if exists "Users can read own achievement unlocks" on public.achievement_unlocks;
 create policy "Users can read own achievement unlocks"
   on public.achievement_unlocks for select using (auth.uid() = user_id);
 -- Writes to achievement_unlocks go exclusively through the server-side

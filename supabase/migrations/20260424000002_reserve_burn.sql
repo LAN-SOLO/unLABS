@@ -62,6 +62,9 @@ alter table public.reserve_transactions enable row level security;
 -- No public read of the reserve itself; surface values only through the
 -- `reserve_status()` RPC below (dev-gated).
 -- Users can view their own reserve transactions (for transparency).
+-- `drop ... if exists` wraps keep this migration idempotent so the
+-- self-heal re-run can replay it without "policy already exists".
+drop policy if exists "Users can view own reserve transactions" on public.reserve_transactions;
 create policy "Users can view own reserve transactions"
   on public.reserve_transactions
   for select

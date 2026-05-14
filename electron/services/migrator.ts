@@ -24,12 +24,20 @@ import { join } from "path";
  * even on orphan recovery — that's how new releases reach users whose
  * data dir survived an uninstall/reinstall.
  *
- * Bump this with each release: set it to the timestamp prefix of the LAST
- * migration that shipped in the previous build. For 0.1.8 that's the
- * latest 20260424 migration (from 0.1.6/0.1.7); 20260429000001_tutorial_difficulty
- * is genuinely new and must run.
+ * Bump policy: set this to the timestamp prefix of the LAST migration
+ * that shipped in the PREVIOUS build (i.e. the build users may be
+ * upgrading FROM). Any migrations added in the CURRENT build must be
+ * strictly greater than this value so they actually run on upgrade.
+ *
+ * Current value (0.1.9-alpha): last 0.1.6/0.1.7 migration was
+ * 20260412000001_missions_and_discoveries. The 20260424xxx + 20260429xxx
+ * migrations are new in this release and must run.
+ *
+ * Backstop: the self-heal pass below detects tracked migrations whose
+ * declared tables/columns don't actually exist and untracks them, so
+ * even a wrong cutoff can be recovered from on a subsequent boot.
  */
-const ORPHAN_RECOVERY_CUTOFF = "20260424999999";
+const ORPHAN_RECOVERY_CUTOFF = "20260412999999";
 
 /**
  * @param runSqlFiles If false, only creates schemas and roles. If true, runs SQL migration files.
@@ -256,6 +264,39 @@ export async function runMigrations(
       }
     }
 
+    // Self-heal: detect tracked migrations whose declared schema isn't
+    // actually present. This catches the case where a prior boot's
+    // orphan-recovery or sentinel-based seeding marked migrations as
+    // applied that hadn't truly run (e.g. the cutoff was set wrong in an
+    // earlier release, or the user upgraded from a build that didn't
+    // include them).
+    //
+    // The probe parses each migration for `create table public.X` and
+    // `alter table public.X add column Y` declarations and checks if those
+    // exist. Migrations that declare only functions / policies / indexes
+    // are left alone (no table or column to probe).
+    if (applied.size > 0) {
+      const selfHealed: Array<{ file: string; missing: string[] }> = [];
+      for (const file of files) {
+        if (!applied.has(file)) continue;
+        const sql = readFileSync(join(migrationsDir, file), "utf-8");
+        const missing = await detectMissingArtifacts(client, sql);
+        if (missing.length > 0) {
+          await client.query(`delete from public._unlabs_migrations where name = $1`, [file]);
+          applied.delete(file);
+          selfHealed.push({ file, missing });
+        }
+      }
+      if (selfHealed.length > 0) {
+        console.log(
+          `[migrator] Self-heal: untracked ${selfHealed.length} migration(s) with missing schema:`,
+        );
+        for (const { file, missing } of selfHealed) {
+          console.log(`  - ${file} → missing: ${missing.join(", ")}`);
+        }
+      }
+    }
+
     let appliedThisRun = 0;
     for (const file of files) {
       if (applied.has(file)) continue;
@@ -293,13 +334,16 @@ export async function runMigrations(
     `,
     );
 
-    // PostgREST caches schema; nudge it to refresh so columns added in this
-    // run become visible without an app restart.
+    // Always nudge PostgREST. Even on a no-op run, a prior boot's NOTIFY
+    // might never have landed (PostgREST not yet listening, mismatched
+    // channel name in an older build, partial migration apply, etc.).
+    // The reload is cheap and idempotent — sending it every boot avoids
+    // sticky "schema cache" errors with no functional downside.
+    await executeIgnoringErrors(client, `NOTIFY pgrst, 'reload schema'`);
     if (appliedThisRun > 0) {
-      await executeIgnoringErrors(client, `NOTIFY pgrst, 'reload schema'`);
       console.log(`[migrator] Applied ${appliedThisRun} new migration(s); PostgREST notified`);
     } else {
-      console.log("[migrator] All migrations already applied");
+      console.log("[migrator] All migrations already applied; PostgREST notified");
     }
   } finally {
     await client.end();
@@ -327,4 +371,57 @@ async function executeIgnoringErrors(
   } catch {
     // Ignore errors (role already exists, etc.)
   }
+}
+
+/**
+ * Heuristic schema probe for the self-heal pass. Parses a migration's SQL
+ * for `create table public.X` and `alter table public.X add column Y`
+ * declarations and checks whether each declared artifact actually exists
+ * in the live schema. Returns the list of missing artifacts; an empty
+ * array means either everything is in place or the migration declares
+ * only objects we don't track here (functions, policies, indexes, RLS,
+ * grants, comments, data-only).
+ *
+ * Comments are stripped before scanning so prose like "Tables: foo, bar"
+ * inside a doc block doesn't produce false positives.
+ */
+async function detectMissingArtifacts(
+  client: InstanceType<typeof import("pg").Client>,
+  sql: string,
+): Promise<string[]> {
+  const code = sql.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*--.*$/gm, "");
+  const missing: string[] = [];
+
+  // create table [if not exists] public.<name>
+  const tableRe = /create\s+table\s+(?:if\s+not\s+exists\s+)?public\.([a-z_][a-z0-9_]*)/gi;
+  const tables = new Set<string>();
+  for (const m of code.matchAll(tableRe)) tables.add(m[1].toLowerCase());
+  for (const t of tables) {
+    const r = await client.query(
+      `select 1 from pg_tables where schemaname = 'public' and tablename = $1`,
+      [t],
+    );
+    if (r.rowCount === 0) missing.push(`table ${t}`);
+  }
+
+  // alter table [only] public.<table> ... add column [if not exists] <col>
+  // ALTER TABLE statements terminate at the next semicolon; multiple
+  // ADD COLUMN clauses inside one statement are matched independently.
+  const alterRe = /alter\s+table\s+(?:only\s+)?public\.([a-z_][a-z0-9_]*)([\s\S]*?);/gi;
+  for (const m of code.matchAll(alterRe)) {
+    const table = m[1].toLowerCase();
+    const body = m[2];
+    const colRe = /add\s+column\s+(?:if\s+not\s+exists\s+)?([a-z_][a-z0-9_]*)/gi;
+    for (const cm of body.matchAll(colRe)) {
+      const col = cm[1].toLowerCase();
+      const r = await client.query(
+        `select 1 from information_schema.columns
+         where table_schema = 'public' and table_name = $1 and column_name = $2`,
+        [table, col],
+      );
+      if (r.rowCount === 0) missing.push(`column ${table}.${col}`);
+    }
+  }
+
+  return missing;
 }

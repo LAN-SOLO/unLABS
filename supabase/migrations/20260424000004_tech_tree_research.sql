@@ -37,10 +37,15 @@ create index if not exists idx_research_user_recent
 
 alter table public.research_jobs enable row level security;
 
+-- `drop ... if exists` wraps keep this migration idempotent so the
+-- self-heal re-run can replay it without "policy already exists".
+drop policy if exists "Users can read own research jobs" on public.research_jobs;
 create policy "Users can read own research jobs"
   on public.research_jobs for select using (auth.uid() = user_id);
+drop policy if exists "Users can insert own research jobs" on public.research_jobs;
 create policy "Users can insert own research jobs"
   on public.research_jobs for insert with check (auth.uid() = user_id);
+drop policy if exists "Users can update own research jobs" on public.research_jobs;
 create policy "Users can update own research jobs"
   on public.research_jobs for update using (auth.uid() = user_id);
 
