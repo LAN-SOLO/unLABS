@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // AND Device States
 type ANDDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -94,6 +95,7 @@ interface ANDManagerProviderProps {
 }
 
 export function ANDManagerProvider({ children, initialState }: ANDManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("AND-001");
   const startPowered = initialState?.isPowered ?? false;
   const startExpanded = initialState?.isExpanded ?? startPowered;
   const [isExpanded, setIsExpanded] = useState(startExpanded);
@@ -171,11 +173,12 @@ export function ANDManagerProvider({ children, initialState }: ANDManagerProvide
   }, []);
 
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   const powerOff = useCallback(async () => {
     if (deviceState !== "online") return;

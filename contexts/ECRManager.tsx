@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // ECR Device States
 type ECRDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -84,6 +85,7 @@ interface ECRManagerProviderProps {
 }
 
 export function ECRManagerProvider({ children, initialState }: ECRManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("ECR-001");
   const startPowered = initialState?.isPowered ?? false;
   const [deviceState, setDeviceState] = useState<ECRDeviceState>(
     startPowered ? "booting" : "standby",
@@ -185,11 +187,12 @@ export function ECRManagerProvider({ children, initialState }: ECRManagerProvide
 
   // Power ON
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   // Power OFF
   const powerOff = useCallback(async () => {

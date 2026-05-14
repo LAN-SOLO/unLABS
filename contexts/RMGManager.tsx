@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // RMG Device States
 type RMGDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -68,6 +69,7 @@ interface RMGManagerProviderProps {
 }
 
 export function RMGManagerProvider({ children, initialState }: RMGManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("RMG-001");
   const startPowered = initialState?.isPowered ?? false;
   const [deviceState, setDeviceState] = useState<RMGDeviceState>(
     startPowered ? "booting" : "standby",
@@ -146,11 +148,12 @@ export function RMGManagerProvider({ children, initialState }: RMGManagerProvide
   }, []);
 
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   const powerOff = useCallback(async () => {
     if (deviceState !== "online") return;

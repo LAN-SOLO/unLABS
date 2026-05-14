@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // TMP Device States
 type TMPDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -76,6 +77,7 @@ interface TMPManagerProviderProps {
 }
 
 export function TMPManagerProvider({ children, initialState }: TMPManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("TMP-001");
   const startPowered = initialState?.isPowered ?? false;
   const startExpanded = initialState?.isExpanded ?? startPowered;
   const [isExpanded, setIsExpanded] = useState(startExpanded);
@@ -150,11 +152,12 @@ export function TMPManagerProvider({ children, initialState }: TMPManagerProvide
   }, []);
 
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   const powerOff = useCallback(async () => {
     if (deviceState !== "online") return;

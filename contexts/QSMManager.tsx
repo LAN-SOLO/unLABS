@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // QSM Device States
 type QSMDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -77,6 +78,7 @@ interface QSMManagerProviderProps {
 }
 
 export function QSMManagerProvider({ children, initialState }: QSMManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("QSM-001");
   const startPowered = initialState?.isPowered ?? false;
   const startExpanded = initialState?.isExpanded ?? startPowered;
 
@@ -203,11 +205,12 @@ export function QSMManagerProvider({ children, initialState }: QSMManagerProvide
   }, []);
 
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   const powerOff = useCallback(async () => {
     if (deviceState !== "online") return;

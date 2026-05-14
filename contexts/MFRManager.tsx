@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // MFR Device States
 type MFRDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -75,6 +76,7 @@ interface MFRManagerProviderProps {
 }
 
 export function MFRManagerProvider({ children, initialState }: MFRManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("MFR-001");
   const startPowered = initialState?.isPowered ?? false;
   const [deviceState, setDeviceState] = useState<MFRDeviceState>(
     startPowered ? "booting" : "standby",
@@ -191,11 +193,12 @@ export function MFRManagerProvider({ children, initialState }: MFRManagerProvide
 
   // Power ON
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   // Power OFF (SCRAM)
   const powerOff = useCallback(async () => {

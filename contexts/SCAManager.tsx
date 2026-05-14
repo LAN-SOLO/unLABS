@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // SCA Device States
 type SCADeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -100,6 +101,7 @@ interface SCAManagerProviderProps {
 }
 
 export function SCAManagerProvider({ children, initialState }: SCAManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("SCA-001");
   const startPowered = initialState?.isPowered ?? false;
   const startExpanded = initialState?.isExpanded ?? startPowered;
   const [isExpanded, setIsExpanded] = useState(startExpanded);
@@ -249,11 +251,12 @@ export function SCAManagerProvider({ children, initialState }: SCAManagerProvide
 
   // Power ON
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   // Power OFF
   const powerOff = useCallback(async () => {

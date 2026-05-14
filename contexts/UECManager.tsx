@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // UEC Device States
 type UECDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -72,6 +73,7 @@ interface UECManagerProviderProps {
 }
 
 export function UECManagerProvider({ children, initialState }: UECManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("UEC-001");
   const startPowered = initialState?.isPowered ?? false;
   const startExpanded = initialState?.isExpanded ?? startPowered;
   const [deviceState, setDeviceState] = useState<UECDeviceState>(
@@ -162,11 +164,12 @@ export function UECManagerProvider({ children, initialState }: UECManagerProvide
 
   // Power ON
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   // Power OFF
   const powerOff = useCallback(async () => {

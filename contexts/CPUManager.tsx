@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // CPU Device States
 type CPUDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -79,6 +80,7 @@ interface CPUManagerProviderProps {
 }
 
 export function CPUManagerProvider({ children, initialState }: CPUManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("CPU-001");
   const startPowered = initialState?.isPowered ?? false;
   const startExpanded = initialState?.isExpanded ?? startPowered;
   const [isExpanded, setIsExpanded] = useState(startExpanded);
@@ -159,11 +161,12 @@ export function CPUManagerProvider({ children, initialState }: CPUManagerProvide
   }, []);
 
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [isUnlocked, deviceState, runBootSequence]);
 
   const powerOff = useCallback(async () => {
     if (deviceState !== "online") return;

@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // LCT Device States
 type LCTDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -94,6 +95,7 @@ interface LCTManagerProviderProps {
 }
 
 export function LCTManagerProvider({ children, initialState }: LCTManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("LCT-001");
   const startPowered = initialState?.isPowered ?? false;
   const startExpanded = initialState?.isExpanded ?? startPowered;
   const [isExpanded, setIsExpanded] = useState(startExpanded);
@@ -171,11 +173,12 @@ export function LCTManagerProvider({ children, initialState }: LCTManagerProvide
   }, []);
 
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   const powerOff = useCallback(async () => {
     if (deviceState !== "online") return;

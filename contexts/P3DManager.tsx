@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // P3D Device States
 type P3DDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -90,6 +91,7 @@ interface P3DManagerProviderProps {
 }
 
 export function P3DManagerProvider({ children, initialState }: P3DManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("P3D-001");
   const startPowered = initialState?.isPowered ?? false;
   const [deviceState, setDeviceState] = useState<P3DDeviceState>(
     startPowered ? "booting" : "standby",
@@ -169,11 +171,12 @@ export function P3DManagerProvider({ children, initialState }: P3DManagerProvide
   }, []);
 
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   const powerOff = useCallback(async () => {
     if (deviceState !== "online") return;

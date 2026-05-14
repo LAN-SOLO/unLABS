@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // MSC Device States
 type MSCDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -67,6 +68,7 @@ interface MSCManagerProviderProps {
 }
 
 export function MSCManagerProvider({ children, initialState }: MSCManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("MSC-001");
   const startPowered = initialState?.isPowered ?? false;
   const [deviceState, setDeviceState] = useState<MSCDeviceState>(
     startPowered ? "booting" : "standby",
@@ -138,11 +140,12 @@ export function MSCManagerProvider({ children, initialState }: MSCManagerProvide
   }, []);
 
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   const powerOff = useCallback(async () => {
     if (deviceState !== "online") return;

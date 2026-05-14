@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // EXD Device States
 type EXDDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -81,6 +82,7 @@ interface EXDManagerProviderProps {
 }
 
 export function EXDManagerProvider({ children, initialState }: EXDManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("EXD-001");
   const startPowered = initialState?.isPowered ?? false;
   const startDeployed = initialState?.isDeployed ?? true;
   const startExpanded = initialState?.isExpanded ?? startPowered;
@@ -218,11 +220,12 @@ export function EXDManagerProvider({ children, initialState }: EXDManagerProvide
 
   // Power ON
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   // Power OFF
   const powerOff = useCallback(async () => {

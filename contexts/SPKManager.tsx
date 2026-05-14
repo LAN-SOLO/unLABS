@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // SPK Device States
 type SPKDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -101,6 +102,7 @@ interface SPKManagerProviderProps {
 }
 
 export function SPKManagerProvider({ children, initialState }: SPKManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("SPK-001");
   const startPowered = initialState?.isPowered ?? false;
   const [deviceState, setDeviceState] = useState<SPKDeviceState>(
     startPowered ? "booting" : "standby",
@@ -198,11 +200,12 @@ export function SPKManagerProvider({ children, initialState }: SPKManagerProvide
 
   // Power ON
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   // Power OFF
   const powerOff = useCallback(async () => {

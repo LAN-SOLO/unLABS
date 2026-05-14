@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // QUA Device States
 type QUADeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -85,6 +86,7 @@ interface QUAManagerProviderProps {
 }
 
 export function QUAManagerProvider({ children, initialState }: QUAManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("QAN-001");
   const startPowered = initialState?.isPowered ?? false;
   const startExpanded = initialState?.isExpanded ?? startPowered;
 
@@ -182,11 +184,12 @@ export function QUAManagerProvider({ children, initialState }: QUAManagerProvide
   }, []);
 
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   const powerOff = useCallback(async () => {
     if (deviceState !== "online") return;

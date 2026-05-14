@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // HMS Device States
 type HMSDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -91,6 +92,7 @@ interface HMSManagerProviderProps {
 }
 
 export function HMSManagerProvider({ children, initialState }: HMSManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("HMS-001");
   const startPowered = initialState?.isPowered ?? false;
   const startExpanded = initialState?.isExpanded ?? startPowered;
   const [deviceState, setDeviceState] = useState<HMSDeviceState>(
@@ -187,11 +189,12 @@ export function HMSManagerProvider({ children, initialState }: HMSManagerProvide
 
   // Power ON
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   // Power OFF
   const powerOff = useCallback(async () => {

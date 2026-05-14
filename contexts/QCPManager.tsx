@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // QCP Device States
 type QCPDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -101,6 +102,7 @@ interface QCPManagerProviderProps {
 }
 
 export function QCPManagerProvider({ children, initialState }: QCPManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("QCP-001");
   const startPowered = initialState?.isPowered ?? false;
   const startExpanded = initialState?.isExpanded ?? startPowered;
   const [isExpanded, setIsExpanded] = useState(startExpanded);
@@ -178,11 +180,12 @@ export function QCPManagerProvider({ children, initialState }: QCPManagerProvide
   }, []);
 
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   const powerOff = useCallback(async () => {
     if (deviceState !== "online") return;

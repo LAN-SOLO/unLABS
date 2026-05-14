@@ -44,6 +44,7 @@ import {
   LabClock,
   MemoryMonitor,
 } from "@/components/panel/modules/EquipmentTile";
+import { GatedTile } from "@/components/panel/modules/GatedTile";
 import { ResourceBar } from "@/components/panel/modules/ResourceBar";
 import { PowerButton } from "@/components/panel/modules/PowerButton";
 import { SaveManager } from "@/components/panel/modules/SaveManager";
@@ -481,14 +482,19 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                         crystals.totalPower
                                                                                       }
                                                                                     />
-                                                                                    <EnergyCore
-                                                                                      volatilityTier={
-                                                                                        volatility.currentTier
-                                                                                      }
-                                                                                      tps={
-                                                                                        volatility.tps
-                                                                                      }
-                                                                                    />
+                                                                                    <GatedTile
+                                                                                      deviceId="UEC-001"
+                                                                                      label="Unstable Energy Core"
+                                                                                    >
+                                                                                      <EnergyCore
+                                                                                        volatilityTier={
+                                                                                          volatility.currentTier
+                                                                                        }
+                                                                                        tps={
+                                                                                          volatility.tps
+                                                                                        }
+                                                                                      />
+                                                                                    </GatedTile>
                                                                                     <BatteryPack
                                                                                       available={
                                                                                         balanceData.available
@@ -500,23 +506,43 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                         balanceData.locked
                                                                                       }
                                                                                     />
-                                                                                    <MicrofusionReactor />
+                                                                                    <GatedTile
+                                                                                      deviceId="MFR-001"
+                                                                                      label="Microfusion Reactor"
+                                                                                    >
+                                                                                      <MicrofusionReactor />
+                                                                                    </GatedTile>
                                                                                     <ResourceGrid />
-                                                                                    <HandmadeSynthesizer
-                                                                                      progress={
-                                                                                        techTrees?.synthesizers
-                                                                                      }
-                                                                                    />
-                                                                                    <EchoRecorder
-                                                                                      progress={
-                                                                                        techTrees?.adapters
-                                                                                      }
-                                                                                    />
-                                                                                    <Interpolator
-                                                                                      progress={
-                                                                                        techTrees?.optics
-                                                                                      }
-                                                                                    />
+                                                                                    <GatedTile
+                                                                                      deviceId="HMS-001"
+                                                                                      label="Handmade Synthesizer"
+                                                                                    >
+                                                                                      <HandmadeSynthesizer
+                                                                                        progress={
+                                                                                          techTrees?.synthesizers
+                                                                                        }
+                                                                                      />
+                                                                                    </GatedTile>
+                                                                                    <GatedTile
+                                                                                      deviceId="ECR-001"
+                                                                                      label="Echo Recorder"
+                                                                                    >
+                                                                                      <EchoRecorder
+                                                                                        progress={
+                                                                                          techTrees?.adapters
+                                                                                        }
+                                                                                      />
+                                                                                    </GatedTile>
+                                                                                    <GatedTile
+                                                                                      deviceId="INT-001"
+                                                                                      label="Interpolator"
+                                                                                    >
+                                                                                      <Interpolator
+                                                                                        progress={
+                                                                                          techTrees?.optics
+                                                                                        }
+                                                                                      />
+                                                                                    </GatedTile>
                                                                                     <div className="flex min-h-0 flex-1 gap-1">
                                                                                       <VentilationFan
                                                                                         label="CPU"
@@ -587,7 +613,12 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                             minHeight: 0,
                                                                                           }}
                                                                                         >
-                                                                                          <QuantumAnalyzer className="h-full" />
+                                                                                          <GatedTile
+                                                                                            deviceId="QAN-001"
+                                                                                            label="Quantum Analyzer"
+                                                                                          >
+                                                                                            <QuantumAnalyzer className="h-full" />
+                                                                                          </GatedTile>
                                                                                         </div>
                                                                                         <div
                                                                                           className="overflow-hidden"
@@ -597,7 +628,12 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                             minHeight: 0,
                                                                                           }}
                                                                                         >
-                                                                                          <DiagnosticsConsole className="h-full" />
+                                                                                          <GatedTile
+                                                                                            deviceId="DGN-001"
+                                                                                            label="Diagnostics Console"
+                                                                                          >
+                                                                                            <DiagnosticsConsole className="h-full" />
+                                                                                          </GatedTile>
                                                                                         </div>
                                                                                       </div>
 
@@ -608,38 +644,63 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                           OPERATIONS
                                                                                         </div>
                                                                                         <div className="grid grid-cols-3 gap-1 min-[700px]:grid-cols-4 min-[900px]:grid-cols-5">
-                                                                                          <AIAssistant />
-                                                                                          <SupercomputerArray
-                                                                                            flops={
-                                                                                              2.4
-                                                                                            }
-                                                                                            utilization={
-                                                                                              87
-                                                                                            }
-                                                                                            isOnline={
-                                                                                              true
-                                                                                            }
-                                                                                          />
-                                                                                          <ExplorerDrone
-                                                                                            range={
-                                                                                              2.4
-                                                                                            }
-                                                                                            battery={
-                                                                                              78
-                                                                                            }
-                                                                                            isDeployed={
-                                                                                              true
-                                                                                            }
-                                                                                          />
-                                                                                          <ResourceMagnet
-                                                                                            magnetStrength={
-                                                                                              45
-                                                                                            }
-                                                                                            isActive={
-                                                                                              true
-                                                                                            }
-                                                                                          />
-                                                                                          <AnomalyDetector />
+                                                                                          <GatedTile
+                                                                                            deviceId="AIC-001"
+                                                                                            label="AI Assistant Core"
+                                                                                          >
+                                                                                            <AIAssistant />
+                                                                                          </GatedTile>
+                                                                                          <GatedTile
+                                                                                            deviceId="SCA-001"
+                                                                                            label="Supercomputer Array"
+                                                                                          >
+                                                                                            <SupercomputerArray
+                                                                                              flops={
+                                                                                                2.4
+                                                                                              }
+                                                                                              utilization={
+                                                                                                87
+                                                                                              }
+                                                                                              isOnline={
+                                                                                                true
+                                                                                              }
+                                                                                            />
+                                                                                          </GatedTile>
+                                                                                          <GatedTile
+                                                                                            deviceId="EXD-001"
+                                                                                            label="Explorer Drone"
+                                                                                          >
+                                                                                            <ExplorerDrone
+                                                                                              range={
+                                                                                                2.4
+                                                                                              }
+                                                                                              battery={
+                                                                                                78
+                                                                                              }
+                                                                                              isDeployed={
+                                                                                                true
+                                                                                              }
+                                                                                            />
+                                                                                          </GatedTile>
+                                                                                          <GatedTile
+                                                                                            deviceId="RMG-001"
+                                                                                            label="Resource Magnet"
+                                                                                          >
+                                                                                            <ResourceMagnet
+                                                                                              magnetStrength={
+                                                                                                45
+                                                                                              }
+                                                                                              isActive={
+                                                                                                true
+                                                                                              }
+                                                                                            />
+                                                                                          </GatedTile>
+                                                                                          <GatedTile
+                                                                                            deviceId="AND-001"
+                                                                                            label="Anomaly Detector"
+                                                                                          >
+                                                                                            <AnomalyDetector />
+                                                                                          </GatedTile>
                                                                                         </div>
                                                                                       </div>
 
@@ -650,28 +711,38 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                           STATUS
                                                                                         </div>
                                                                                         <div className="grid grid-cols-3 gap-1 min-[700px]:grid-cols-4 min-[900px]:grid-cols-5">
-                                                                                          <ExoticMatterContainment
-                                                                                            units={
-                                                                                              42
-                                                                                            }
-                                                                                            stability={
-                                                                                              76
-                                                                                            }
-                                                                                            isContained={
-                                                                                              true
-                                                                                            }
-                                                                                          />
-                                                                                          <QuantumStateMonitor
-                                                                                            coherence={
-                                                                                              94
-                                                                                            }
-                                                                                            qubits={
-                                                                                              127
-                                                                                            }
-                                                                                            isEntangled={
-                                                                                              true
-                                                                                            }
-                                                                                          />
+                                                                                          <GatedTile
+                                                                                            deviceId="EMC-001"
+                                                                                            label="Exotic Matter Containment"
+                                                                                          >
+                                                                                            <ExoticMatterContainment
+                                                                                              units={
+                                                                                                42
+                                                                                              }
+                                                                                              stability={
+                                                                                                76
+                                                                                              }
+                                                                                              isContained={
+                                                                                                true
+                                                                                              }
+                                                                                            />
+                                                                                          </GatedTile>
+                                                                                          <GatedTile
+                                                                                            deviceId="QSM-001"
+                                                                                            label="Quantum State Monitor"
+                                                                                          >
+                                                                                            <QuantumStateMonitor
+                                                                                              coherence={
+                                                                                                94
+                                                                                              }
+                                                                                              qubits={
+                                                                                                127
+                                                                                              }
+                                                                                              isEntangled={
+                                                                                                true
+                                                                                              }
+                                                                                            />
+                                                                                          </GatedTile>
                                                                                           <NetworkMonitor
                                                                                             bandwidth={
                                                                                               2.4
@@ -683,28 +754,38 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                               true
                                                                                             }
                                                                                           />
-                                                                                          <TemperatureMonitor
-                                                                                            temperature={
-                                                                                              28.4
-                                                                                            }
-                                                                                            minTemp={
-                                                                                              15
-                                                                                            }
-                                                                                            maxTemp={
-                                                                                              85
-                                                                                            }
-                                                                                          />
-                                                                                          <DimensionMonitor
-                                                                                            dimension={
-                                                                                              3.14
-                                                                                            }
-                                                                                            stability={
-                                                                                              98
-                                                                                            }
-                                                                                            riftActivity={
-                                                                                              0.02
-                                                                                            }
-                                                                                          />
+                                                                                          <GatedTile
+                                                                                            deviceId="TMP-001"
+                                                                                            label="Temperature Monitor"
+                                                                                          >
+                                                                                            <TemperatureMonitor
+                                                                                              temperature={
+                                                                                                28.4
+                                                                                              }
+                                                                                              minTemp={
+                                                                                                15
+                                                                                              }
+                                                                                              maxTemp={
+                                                                                                85
+                                                                                              }
+                                                                                            />
+                                                                                          </GatedTile>
+                                                                                          <GatedTile
+                                                                                            deviceId="DIM-001"
+                                                                                            label="Dimension Monitor"
+                                                                                          >
+                                                                                            <DimensionMonitor
+                                                                                              dimension={
+                                                                                                3.14
+                                                                                              }
+                                                                                              stability={
+                                                                                                98
+                                                                                              }
+                                                                                              riftActivity={
+                                                                                                0.02
+                                                                                              }
+                                                                                            />
+                                                                                          </GatedTile>
                                                                                         </div>
                                                                                       </div>
 
@@ -724,16 +805,26 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                             }
                                                                                           />
                                                                                           <BasicToolkit />
-                                                                                          <MaterialScanner
-                                                                                            scanProgress={
-                                                                                              78
-                                                                                            }
-                                                                                            detectedMaterials={
-                                                                                              5
-                                                                                            }
-                                                                                          />
+                                                                                          <GatedTile
+                                                                                            deviceId="MSC-001"
+                                                                                            label="Material Scanner"
+                                                                                          >
+                                                                                            <MaterialScanner
+                                                                                              scanProgress={
+                                                                                                78
+                                                                                              }
+                                                                                              detectedMaterials={
+                                                                                                5
+                                                                                              }
+                                                                                            />
+                                                                                          </GatedTile>
                                                                                           <LabClock />
-                                                                                          <CpuMonitor />
+                                                                                          <GatedTile
+                                                                                            deviceId="CPU-001"
+                                                                                            label="CPU Monitor"
+                                                                                          >
+                                                                                            <CpuMonitor />
+                                                                                          </GatedTile>
                                                                                           <MemoryMonitor />
                                                                                         </div>
                                                                                       </div>
@@ -1130,44 +1221,64 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
 
                                                                                   {/* Right Panel - Displays & Scanning */}
                                                                                   <PanelRight>
-                                                                                    <div className="flex h-full flex-col gap-1">
+                                                                                    <div className="flex flex-col gap-1">
                                                                                       {/* Top: Oscilloscope + Speaker */}
-                                                                                      <div
-                                                                                        className="flex gap-1"
-                                                                                        style={{
-                                                                                          flex: "55 1 0%",
-                                                                                        }}
-                                                                                      >
-                                                                                        <Oscilloscope
-                                                                                          walletAddress={`${userId.slice(0, 4)}....${userId.slice(-4)}`}
-                                                                                          balance={
-                                                                                            balance
-                                                                                          }
-                                                                                          frequency1={
-                                                                                            2.91
-                                                                                          }
-                                                                                          frequency2={
-                                                                                            2.501
-                                                                                          }
-                                                                                          className="flex-1"
-                                                                                        />
-                                                                                        <NarrowSpeaker className="h-full" />
+                                                                                      <div className="flex items-stretch gap-1">
+                                                                                        <GatedTile
+                                                                                          deviceId="OSC-001"
+                                                                                          label="Oscilloscope"
+                                                                                        >
+                                                                                          <Oscilloscope
+                                                                                            walletAddress={`${userId.slice(0, 4)}....${userId.slice(-4)}`}
+                                                                                            balance={
+                                                                                              balance
+                                                                                            }
+                                                                                            frequency1={
+                                                                                              2.91
+                                                                                            }
+                                                                                            frequency2={
+                                                                                              2.501
+                                                                                            }
+                                                                                            className="flex-1"
+                                                                                          />
+                                                                                        </GatedTile>
+                                                                                        <GatedTile
+                                                                                          deviceId="SPK-001"
+                                                                                          label="Narrow Speaker"
+                                                                                        >
+                                                                                          <NarrowSpeaker />
+                                                                                        </GatedTile>
                                                                                       </div>
                                                                                       {/* Bottom: Scanning & Transport */}
-                                                                                      <div
-                                                                                        className="flex flex-col gap-1"
-                                                                                        style={{
-                                                                                          flex: "45 1 0%",
-                                                                                        }}
-                                                                                      >
+                                                                                      <div className="flex flex-col gap-1">
                                                                                         <div className="px-1 font-mono text-[7px] text-white/40">
                                                                                           SCANNING &
                                                                                           TRANSPORT
                                                                                         </div>
-                                                                                        <QuantumCompass />
-                                                                                        <TeleportPad />
-                                                                                        <LaserCutter />
-                                                                                        <Printer3D />
+                                                                                        <GatedTile
+                                                                                          deviceId="QCP-001"
+                                                                                          label="Quantum Compass"
+                                                                                        >
+                                                                                          <QuantumCompass />
+                                                                                        </GatedTile>
+                                                                                        <GatedTile
+                                                                                          deviceId="TLP-001"
+                                                                                          label="Teleport Pad"
+                                                                                        >
+                                                                                          <TeleportPad />
+                                                                                        </GatedTile>
+                                                                                        <GatedTile
+                                                                                          deviceId="LCT-001"
+                                                                                          label="Precision Laser"
+                                                                                        >
+                                                                                          <LaserCutter />
+                                                                                        </GatedTile>
+                                                                                        <GatedTile
+                                                                                          deviceId="P3D-001"
+                                                                                          label="3D Fabricator"
+                                                                                        >
+                                                                                          <Printer3D />
+                                                                                        </GatedTile>
                                                                                       </div>
                                                                                     </div>
                                                                                   </PanelRight>

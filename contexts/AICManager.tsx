@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // AIC Device States
 type AICDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -76,6 +77,7 @@ interface AICManagerProviderProps {
 }
 
 export function AICManagerProvider({ children, initialState }: AICManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("AIC-001");
   const startPowered = initialState?.isPowered ?? false;
   const [deviceState, setDeviceState] = useState<AICDeviceState>(
     startPowered ? "booting" : "standby",
@@ -193,11 +195,12 @@ export function AICManagerProvider({ children, initialState }: AICManagerProvide
 
   // Power ON
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   // Power OFF
   const powerOff = useCallback(async () => {

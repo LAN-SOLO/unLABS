@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // DGN Device States
 type DGNDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -100,6 +101,7 @@ interface DGNManagerProviderProps {
 }
 
 export function DGNManagerProvider({ children, initialState }: DGNManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("DGN-001");
   const startPowered = initialState?.isPowered ?? false;
   const [deviceState, setDeviceState] = useState<DGNDeviceState>(
     startPowered ? "booting" : "standby",
@@ -179,11 +181,12 @@ export function DGNManagerProvider({ children, initialState }: DGNManagerProvide
 
   // Power ON
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   // Power OFF
   const powerOff = useCallback(async () => {

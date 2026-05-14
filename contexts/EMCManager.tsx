@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // EMC Device States
 type EMCDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -77,6 +78,7 @@ interface EMCManagerProviderProps {
 }
 
 export function EMCManagerProvider({ children, initialState }: EMCManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("EMC-001");
   const startPowered = initialState?.isPowered ?? false;
   const startExpanded = initialState?.isExpanded ?? startPowered;
 
@@ -202,11 +204,12 @@ export function EMCManagerProvider({ children, initialState }: EMCManagerProvide
   }, []);
 
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   const powerOff = useCallback(async () => {
     if (deviceState !== "online" && deviceState !== "testing") return;

@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
 
 // IPL Device States
 type IPLDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -75,6 +76,7 @@ interface IPLManagerProviderProps {
 }
 
 export function IPLManagerProvider({ children, initialState }: IPLManagerProviderProps) {
+  const isUnlocked = useDeviceUnlocked("INT-001");
   const startPowered = initialState?.isPowered ?? false;
   const [deviceState, setDeviceState] = useState<IPLDeviceState>(
     startPowered ? "booting" : "standby",
@@ -168,11 +170,12 @@ export function IPLManagerProvider({ children, initialState }: IPLManagerProvide
 
   // Power ON
   const powerOn = useCallback(async () => {
+    if (!isUnlocked) return;
     if (deviceState !== "standby") return;
     setIsPowered(true);
     setIsExpanded(true);
     await runBootSequence();
-  }, [deviceState, runBootSequence]);
+  }, [deviceState, runBootSequence, isUnlocked]);
 
   // Power OFF
   const powerOff = useCallback(async () => {
