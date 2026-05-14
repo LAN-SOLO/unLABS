@@ -180,7 +180,7 @@ body {
 /* Panel Layout — scales across 1K–4K in 4:3 and 3:2 */
 .game-panel {
   display: grid;
-  grid-template-columns: clamp(140px, 13vw, 240px) 1fr clamp(240px, 22vw, 480px);
+  grid-template-columns: clamp(140px, 13vw, 320px) 1fr clamp(240px, 22vw, 640px);
   grid-template-rows: auto 1fr auto auto;
   grid-template-areas:
     "toolbar toolbar toolbar"

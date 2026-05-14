@@ -126,7 +126,7 @@ export default function RegisterPage() {
               {isLoading ? (
                 <span className="animate-pulse">&gt; PROCESSING...</span>
               ) : (
-                "&gt; REQUEST ACCESS"
+                "> REQUEST ACCESS"
               )}
             </button>
           </form>

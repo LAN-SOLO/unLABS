@@ -91,7 +91,7 @@ export default function LoginPage() {
             {isLoading ? (
               <span className="animate-pulse">&gt; AUTHENTICATING...</span>
             ) : (
-              "&gt; INITIALIZE CONNECTION"
+              "> INITIALIZE CONNECTION"
             )}
           </button>
         </form>

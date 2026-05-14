@@ -1081,7 +1081,7 @@ export function Oscilloscope({
   return (
     <div
       className={cn(
-        "flex h-full w-full flex-col gap-1 overflow-hidden rounded-lg p-1.5",
+        "flex w-full flex-col gap-1 rounded-lg p-1.5",
         "border transition-colors duration-500",
         isDeviceOff
           ? "border-[#3a3a3a] bg-gradient-to-b from-[#2a2a2a] to-[#1a1a1a]"
@@ -1309,7 +1309,7 @@ export function Oscilloscope({
           {/* Normal operational content */}
 
           {/* CRT Display */}
-          <CRTScreen className="aspect-[3/2] w-full flex-1">
+          <CRTScreen className="aspect-[3/2] w-full">
             <div
               className="relative h-full w-full p-1"
               style={{ filter: focusBlur > 0.1 ? `blur(${focusBlur}px)` : "none" }}
