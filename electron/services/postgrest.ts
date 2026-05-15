@@ -68,41 +68,79 @@ export function stopPostgREST(): void {
   }
 }
 
-/**
- * Force PostgREST to reload its schema cache. Called after startPostgREST
- * because the migrator's own NOTIFY (sent earlier in the boot sequence)
- * lands in an empty channel — PostgREST isn't listening yet. Without a
- * post-startup nudge, a fresh boot can end up with a stale cache that
- * misses columns added by the migrations that just ran.
- *
- * Sends NOTIFY pgrst 'reload schema' then briefly waits so PostgREST has
- * time to process the signal before the renderer issues its first query.
- * Failures are swallowed and logged — a stale-cache boot is recoverable
- * (the user can retry; the runMigrations boot-time NOTIFY will catch it
- * next launch).
- */
-export async function notifyPostgrestSchemaReload(pgPort: number): Promise<void> {
+async function sendNotifyReload(pgPort: number): Promise<void> {
+  const { Client } = await import("pg");
+  const client = new Client({
+    host: "127.0.0.1",
+    port: pgPort,
+    user: "postgres",
+    database: "unlabs",
+  });
+  await client.connect();
   try {
-    const { Client } = await import("pg");
-    const client = new Client({
-      host: "127.0.0.1",
-      port: pgPort,
-      user: "postgres",
-      database: "unlabs",
-    });
-    await client.connect();
-    try {
-      await client.query(`NOTIFY pgrst, 'reload schema'`);
-    } finally {
-      await client.end();
-    }
-    // Give PostgREST time to process the LISTEN payload and refresh the
-    // cache before any subsequent HTTP query hits the new schema.
-    await new Promise((r) => setTimeout(r, 300));
-  } catch (err) {
-    console.warn(
-      "[postgrest] Failed to NOTIFY pgrst reload schema:",
-      err instanceof Error ? err.message : err,
-    );
+    await client.query(`NOTIFY pgrst, 'reload schema'`);
+  } finally {
+    await client.end();
   }
+}
+
+/**
+ * Block until PostgREST's schema cache resolves the canary column. The
+ * migrator's boot-time NOTIFY (sent before startPostgREST) lands in an
+ * empty channel, and PostgREST's initial introspect can race with the
+ * just-applied migrations, leaving the cache out of date. Empirically
+ * a single post-start NOTIFY isn't enough to win every race.
+ *
+ * Strategy: probe PostgREST for `profiles.tutorial_state` (the canary
+ * column added by the newest migration). If absent, send another NOTIFY
+ * and back off. Repeat until visible or the timeout expires.
+ *
+ * On timeout we log loudly but let boot continue — the app may still
+ * work for non-tutorial flows, and the renderer can retry on user
+ * interaction.
+ *
+ * Update the canary if a future migration adds a column users will hit
+ * earlier than tutorial_state.
+ */
+export async function ensurePostgrestSchemaReady(
+  pgPort: number,
+  postgrestPort: number,
+  timeoutMs: number = 10_000,
+): Promise<void> {
+  const probeUrl = `http://127.0.0.1:${postgrestPort}/profiles?select=tutorial_state&limit=0`;
+  const start = Date.now();
+  let attempts = 0;
+  let lastDetail = "";
+
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(probeUrl);
+      if (res.ok) {
+        if (attempts > 0) {
+          console.log(
+            `[postgrest] Schema cache ready after ${attempts} NOTIFY retry(s) in ${Date.now() - start}ms`,
+          );
+        }
+        return;
+      }
+      lastDetail = `${res.status} ${(await res.text()).slice(0, 200)}`;
+    } catch (err) {
+      lastDetail = err instanceof Error ? err.message : String(err);
+    }
+
+    try {
+      await sendNotifyReload(pgPort);
+      attempts++;
+    } catch (err) {
+      console.warn(
+        "[postgrest] NOTIFY pgrst failed during cache-readiness probe:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+
+  console.error(
+    `[postgrest] Schema cache not ready after ${timeoutMs}ms (sent ${attempts} NOTIFY); last response: ${lastDetail}`,
+  );
 }
