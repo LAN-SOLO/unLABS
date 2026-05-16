@@ -63,14 +63,56 @@ function getJwtSecretPath(): string {
 
 // ── Port allocation ───────────────────────────────────────────────────
 
+/**
+ * The bundled gateway port (54321) is hard-pinned: the Next.js production
+ * build inlines `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321` from
+ * .env.local, and that value is frozen into the server JS bundle —
+ * `process.env` overrides at runtime have no effect. If the gateway runs
+ * on any other port (because 54321 was taken by Docker-Supabase, the
+ * Supabase CLI, or a leftover app instance), Next.js silently hits the
+ * wrong stack and you get baffling schema-cache errors against a
+ * different database.
+ *
+ * Fail loudly here instead of falling back to a random port. The remaining
+ * services (postgres / gotrue / postgrest / next) can still dynamic-port
+ * because they're only addressed internally by the bundled processes.
+ */
 async function allocatePorts(): Promise<ServicePorts> {
-  // Dynamic import for ESM package
   const { default: getPort } = await import("get-port");
+
+  // Verify 54321 is actually free. getPort would silently allocate
+  // something else, which would land us in the broken-by-config trap.
+  const { createServer } = await import("net");
+  const gatewayPort = 54321;
+  await new Promise<void>((resolve, reject) => {
+    const probe = createServer();
+    probe.once("error", (err: NodeJS.ErrnoException) => {
+      probe.close();
+      if (err.code === "EADDRINUSE") {
+        reject(
+          new Error(
+            `Port ${gatewayPort} is already in use.\n\n` +
+              "UnstableLabs needs this port for its bundled Supabase gateway. " +
+              "Likely culprits:\n" +
+              "  • Docker-Supabase (run: `supabase stop`)\n" +
+              "  • Another UnstableLabs instance still running\n" +
+              "  • A standalone Postgres/Kong on this port\n\n" +
+              "Free port 54321 and relaunch the app.",
+          ),
+        );
+      } else {
+        reject(err);
+      }
+    });
+    probe.once("listening", () => probe.close(() => resolve()));
+    probe.listen(gatewayPort, "127.0.0.1");
+  });
+
   return {
     postgres: await getPort({ port: 54322 }),
     gotrue: await getPort({ port: 9999 }),
     postgrest: await getPort({ port: 3001 }),
-    gateway: await getPort({ port: 54321 }),
+    gateway: gatewayPort,
     next: await getPort({ port: 3000 }),
   };
 }
@@ -232,8 +274,26 @@ async function shutdown(): Promise<void> {
 app
   .whenReady()
   .then(startup)
-  .catch((err) => {
-    console.error("[electron] Startup failed:", err);
+  .catch(async (err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[electron] Startup failed:", message);
+    // Surface the failure to the user — `app.quit()` alone leaves them
+    // staring at a dock icon that quietly disappears. The dialog
+    // includes the full message so the port-in-use guidance from
+    // allocatePorts() is visible.
+    try {
+      const { dialog } = await import("electron");
+      await dialog.showMessageBox({
+        type: "error",
+        title: "UnstableLabs could not start",
+        message: "Startup failed",
+        detail: message,
+        buttons: ["Quit"],
+      });
+    } catch {
+      // dialog unavailable (headless? early-fail before app.ready?) —
+      // we already logged to console, nothing more to do.
+    }
     app.quit();
   });
 
