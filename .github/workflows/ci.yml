@@ -20,9 +20,11 @@ jobs:
       NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v4
+      # No `version:` here — action-setup@v4 errors when both a `version`
+      # input AND a `packageManager` field in package.json are set. The
+      # action reads `packageManager: "pnpm@9.15.0"` from package.json
+      # instead, which keeps CI in lockstep with what the project pins.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -57,9 +59,11 @@ jobs:
       NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v4
+      # No `version:` here — action-setup@v4 errors when both a `version`
+      # input AND a `packageManager` field in package.json are set. The
+      # action reads `packageManager: "pnpm@9.15.0"` from package.json
+      # instead, which keeps CI in lockstep with what the project pins.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9
       - uses: actions/setup-node@v4
         with:
           node-version: 20
