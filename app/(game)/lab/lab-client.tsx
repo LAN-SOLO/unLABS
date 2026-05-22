@@ -28,7 +28,7 @@ import { useMemo } from "react";
 import { useGameTick } from "@/contexts/GameTickProvider";
 import { useQuest } from "@/contexts/QuestProvider";
 import { useProduction } from "@/contexts/ProductionProvider";
-import { RECIPES, visibleRecipes, type Recipe } from "@/lib/game/recipes";
+import { RECIPES, isRecipeBuilt, visibleRecipes, type Recipe } from "@/lib/game/recipes";
 import {
   computeJobProgress,
   isJobClaimable,
@@ -55,16 +55,21 @@ export function LabClient({ username }: { username: string }) {
 
   const availableRecipes = useMemo(() => visibleRecipes(questState.flags), [questState.flags]);
 
+  // Locked = not visible AND not already built. We exclude built one-shot
+  // devices so the "N locked" hint doesn't double-count permanent completions.
   const lockedRecipes = useMemo(
-    () => RECIPES.filter((r) => !availableRecipes.some((a) => a.id === r.id)),
-    [availableRecipes],
+    () =>
+      RECIPES.filter(
+        (r) => !availableRecipes.some((a) => a.id === r.id) && !isRecipeBuilt(r, questState.flags),
+      ),
+    [availableRecipes, questState.flags],
   );
 
   const pendingJobs = jobs.filter((j) => j.status === "pending");
   const historyJobs = jobs.filter((j) => j.status !== "pending").slice(0, 10);
 
   return (
-    <div className="min-h-screen bg-black p-6 font-mono text-green-400">
+    <div className="h-screen overflow-y-auto bg-black p-6 font-mono text-green-400">
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-green-500/30 pb-4">
         <div>
           <h1 className="text-2xl text-green-300">&#47;&#47; _unLAB · PRODUCTION</h1>

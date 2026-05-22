@@ -4,7 +4,7 @@
  * JournalPanel
  * ============
  *
- * Right-edge slide-out drawer rendering the _unOS journal. Exists so the
+ * Left-edge slide-out drawer rendering the _unOS journal. Exists so the
  * narrative breadcrumbs written by quests, missions, and the hint engine
  * have somewhere to live outside the scrolling terminal.
  *
@@ -110,7 +110,7 @@ export function JournalPanel() {
   return (
     <aside
       aria-label="Journal"
-      className={`pointer-events-auto fixed top-1/2 right-0 z-30 -translate-y-1/2 font-mono text-xs text-green-400 transition-all ${
+      className={`pointer-events-auto fixed top-1/2 left-0 z-50 -translate-y-1/2 font-mono text-xs text-green-400 transition-all ${
         isOpen ? "w-[min(22rem,calc(100vw-2rem))]" : "w-8"
       }`}
     >
@@ -118,10 +118,10 @@ export function JournalPanel() {
       <button
         type="button"
         onClick={() => setIsOpen((o) => !o)}
-        className="absolute top-1/2 -left-0 flex h-32 w-8 -translate-y-1/2 flex-col items-center justify-between border border-green-500/50 bg-black/90 py-2 text-[10px] tracking-wider text-green-300 transition-colors hover:bg-green-500/10"
+        className="absolute top-1/2 right-0 flex h-32 w-8 -translate-y-1/2 flex-col items-center justify-between border border-green-500/50 bg-black/90 py-2 text-[10px] tracking-wider text-green-300 transition-colors hover:bg-green-500/10"
         aria-label={isOpen ? "Close journal" : "Open journal"}
       >
-        <span className="rotate-180 [writing-mode:vertical-rl]">JOURNAL</span>
+        <span className="[writing-mode:vertical-rl]">JOURNAL</span>
         {unreadCount > 0 && !isOpen && (
           <span className="rounded-full bg-amber-500/80 px-1 text-[9px] text-black">
             {unreadCount > 99 ? "99+" : unreadCount}
@@ -130,7 +130,7 @@ export function JournalPanel() {
       </button>
 
       {isOpen && (
-        <div className="ml-8 flex h-[min(36rem,calc(100vh-6rem))] flex-col border border-green-500/60 bg-black/95 shadow-[0_0_30px_rgba(34,197,94,0.25)]">
+        <div className="mr-8 flex h-[min(36rem,calc(100vh-6rem))] flex-col border border-green-500/60 bg-black/95 shadow-[0_0_30px_rgba(34,197,94,0.25)]">
           {/* Header */}
           <header className="flex items-center justify-between border-b border-green-500/40 px-3 py-2">
             <span className="text-green-300">[ JOURNAL ]</span>

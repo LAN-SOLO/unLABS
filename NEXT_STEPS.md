@@ -1,6 +1,6 @@
 # NEXT STEPS — UnstableLabs
 
-**Generated:** 2026-05-13 · **Branch:** `main` · **Version:** `0.1.9-alpha`
+**Generated:** 2026-05-13 · **Branch:** `main` · **Version:** `0.1.10-beta`
 
 This doc captures the working agenda after the project-status audit. It is self-contained so the context window can be cleared between steps; pick up by re-reading this file.
 

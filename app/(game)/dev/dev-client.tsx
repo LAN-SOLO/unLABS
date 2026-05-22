@@ -53,6 +53,7 @@ export function DevClient({
   const [isPending, startTransition] = useTransition();
   const [resetting, setResetting] = useState(false);
   const [granting, setGranting] = useState(false);
+  const [cascading, setCascading] = useState(false);
 
   const resourceRows = useMemo(() => {
     return RESOURCES.map((id) => {
@@ -92,6 +93,15 @@ export function DevClient({
     }
   };
 
+  const handleCascadeAdvance = async () => {
+    setCascading(true);
+    try {
+      await quest.cascade();
+    } finally {
+      setCascading(false);
+    }
+  };
+
   const handleResetEpisode = async () => {
     setResetting(true);
     try {
@@ -107,7 +117,7 @@ export function DevClient({
   };
 
   return (
-    <div className="min-h-screen bg-black p-6 font-mono text-green-400">
+    <div className="h-screen overflow-y-auto bg-black p-6 font-mono text-green-400">
       <header className="mb-6 border-b border-green-500/30 pb-4">
         <div className="flex items-center justify-between">
           <div>
@@ -282,10 +292,50 @@ export function DevClient({
         </p>
       </section>
 
+      <section className="mb-6">
+        <h2 className="mb-2 text-sm text-green-300">&#47;&#47; QUEST FLAGS</h2>
+        <div className="border border-green-500/30 p-3 text-xs">
+          {Object.keys(quest.state.flags).length === 0 ? (
+            <p className="text-green-500/50">(no flags set)</p>
+          ) : (
+            <table className="w-full">
+              <tbody>
+                {Object.entries(quest.state.flags)
+                  .sort(([a], [b]) => a.localeCompare(b))
+                  .map(([flag, value]) => (
+                    <tr key={flag} className="border-t border-green-500/10 first:border-t-0">
+                      <td className="py-1 pr-4 text-green-300">{flag}</td>
+                      <td className="py-1 text-right">
+                        <span className={value ? "text-green-400" : "text-red-400/70"}>
+                          {String(value)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          )}
+          <p className="mt-2 text-[10px] text-green-500/50">
+            completed steps:{" "}
+            {quest.state.completedStepIds.length === 0
+              ? "(none)"
+              : quest.state.completedStepIds.join(", ")}
+          </p>
+          <button
+            onClick={handleCascadeAdvance}
+            disabled={cascading}
+            className="mt-3 border border-cyan-500/50 px-3 py-1 text-xs text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-50"
+            title="Walk the quest engine through every step whose trigger is currently satisfied (incl. out-of-order skips). Heals stuck saves."
+          >
+            {cascading ? "cascading..." : "> CASCADE ADVANCE"}
+          </button>
+        </div>
+      </section>
+
       <section>
         <h2 className="mb-2 text-sm text-green-300">&#47;&#47; LIVE STATE DUMP</h2>
         <pre className="overflow-x-auto border border-green-500/30 p-3 text-[10px] text-green-500/80">
-          {JSON.stringify({ resources, tickCount, lastTickAt }, null, 2)}
+          {JSON.stringify({ resources, tickCount, lastTickAt, quest: quest.state }, null, 2)}
         </pre>
       </section>
     </div>

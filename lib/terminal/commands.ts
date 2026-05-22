@@ -1759,6 +1759,48 @@ const killCommand: Command = {
   },
 };
 
+const labCommand: Command = {
+  name: "lab",
+  aliases: ["production", "unlab"],
+  description: "Open the Lab production hub",
+  usage: "lab",
+  execute: async () => {
+    return {
+      success: true,
+      output: ["", "[unlab] opening production hub...", ""],
+      navigate: "/lab",
+    };
+  },
+};
+
+const panelCommand: Command = {
+  name: "unpanel",
+  aliases: ["panel"],
+  description: "Open the hardware Panel",
+  usage: "unpanel",
+  execute: async () => {
+    return {
+      success: true,
+      output: ["", "[unpanel] opening hardware panel...", ""],
+      navigate: "/panel",
+    };
+  },
+};
+
+const undevCommand: Command = {
+  name: "undev",
+  aliases: ["devconsole"],
+  description: "Open the Dev console (gated to dev users)",
+  usage: "undev",
+  execute: async () => {
+    return {
+      success: true,
+      output: ["", "[undev] opening dev console...", ""],
+      navigate: "/dev",
+    };
+  },
+};
+
 const runCommand: Command = {
   name: "run",
   aliases: ["exec", "launch"],
@@ -1881,7 +1923,7 @@ const unhistoryCommand: Command = {
 // Device control command
 const deviceCommand: Command = {
   name: "device",
-  aliases: ["dev", "devices", "undev"],
+  aliases: ["dev", "devices"],
   description: "Control and monitor lab devices",
   usage: "device [name] [command]",
   execute: async (args, ctx) => {
@@ -25640,15 +25682,22 @@ const guideCommand: Command = {
       };
     }
 
-    const active = missions.getAllMissions().find((m) => m.status === "active");
+    // Prefer an explicitly-tracked active mission; otherwise fall back to
+    // the highest-priority available one so a fresh player who never ran
+    // `missions --track` still gets a useful walkthrough.
+    const all = missions.getAllMissions();
+    const active =
+      all.find((m) => m.status === "active") ?? all.find((m) => m.status === "available");
     if (!active) {
       return {
         success: true,
         output: [
           "",
-          "  No active mission. Try one of:",
+          "  No mission available right now — progress the current quest first.",
+          "",
+          "  Try:",
           "    whatnext           — pick a next action based on global state",
-          "    missions --active  — list active missions",
+          "    missions           — list all missions",
           "    tutorial status    — onboarding progress",
           "",
         ],
@@ -25917,6 +25966,9 @@ export const commands: Command[] = [
   aboutCommand,
   historyCommand,
   unhistoryCommand,
+  labCommand,
+  panelCommand,
+  undevCommand,
   runCommand,
   killCommand,
   unsystemctlCommand,

@@ -23,11 +23,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 
 import { useGameTick } from "@/contexts/GameTickProvider";
+import { useQuest } from "@/contexts/QuestProvider";
 import {
   claimJob as claimJobAction,
   listJobs as listJobsAction,
@@ -70,11 +72,12 @@ export function ProductionProvider({
   const [lastError, setLastError] = useState<string | null>(null);
 
   const tick = useGameTick();
+  const quest = useQuest();
 
-  // Apply a list of rewards to the tick engine. Kept internal to match
-  // QuestProvider's behavior. Flags are not handled here — no production
-  // reward currently needs to interact with quest flags, but adding that
-  // surface later is a one-line change.
+  // Apply a list of rewards to the tick engine + quest flags. Flag rewards
+  // drive recipe unlocks (e.g. smt_01_online → cnd_01_build becomes
+  // available), so without this wiring the whole EP2 production chain
+  // stalls after the first device claim.
   const applyRewards = useCallback(
     (rewards: StepReward[]) => {
       for (const reward of rewards) {
@@ -89,13 +92,12 @@ export function ProductionProvider({
             tick.grant(reward.resourceId as ResourceId, reward.amount);
             break;
           case "set_flag":
-            // Production rewards can set flags, but we don't own QuestState
-            // here. Phase 5 can plumb a `questSetFlag` callback through.
+            void quest.setFlag(reward.flag, reward.value);
             break;
         }
       }
     },
-    [tick],
+    [tick, quest],
   );
 
   const refresh = useCallback(async () => {
@@ -105,6 +107,32 @@ export function ProductionProvider({
       setBalance(balanceResult.balance.available);
     }
   }, []);
+
+  // Backfill quest flags from already-claimed jobs. Players who claimed
+  // recipes before set_flag rewards were wired up have flag-gated recipes
+  // (Condenser, Mixer, Nexus) stuck behind progress they already earned.
+  // setFlag is idempotent so this is safe to run every mount, but we skip
+  // flags already set in QuestState to keep the network quiet.
+  const backfilledRef = useRef(false);
+  useEffect(() => {
+    if (backfilledRef.current) return;
+    backfilledRef.current = true;
+
+    const flags = quest.state.flags;
+    for (const job of jobs) {
+      if (job.status !== "claimed") continue;
+      const recipe = getRecipe(job.recipeId);
+      if (!recipe) continue;
+      for (const reward of recipe.outputs) {
+        if (reward.kind !== "set_flag") continue;
+        if (flags[reward.flag] === reward.value) continue;
+        void quest.setFlag(reward.flag, reward.value);
+      }
+    }
+    // Only run when jobs first arrive — quest.state.flags intentionally
+    // omitted so the effect doesn't re-fire when we set them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobs]);
 
   const startJob = useCallback(
     async (recipeId: string) => {

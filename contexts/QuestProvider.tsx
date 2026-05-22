@@ -41,6 +41,7 @@ import {
 } from "@/lib/game/quests";
 import {
   advanceQuestStep,
+  cascadeAdvanceCurrent,
   resetCurrentEpisode,
   setQuestFlagAction,
 } from "@/app/(game)/actions/quest";
@@ -51,6 +52,12 @@ interface QuestContextValue {
   currentStep: Step | null;
   isAdvancing: boolean;
   advance: () => void;
+  /**
+   * Force-walk the engine through every step whose trigger is currently
+   * satisfied — including out-of-order skips when a later step is live but
+   * the active one isn't. Heals saves stuck behind an unfired observer.
+   */
+  cascade: () => Promise<void>;
   reset: (episodeId?: string) => Promise<void>;
   /**
    * Flip a client-settable quest flag (e.g. `lissajous_locked`). Persisted
@@ -131,6 +138,18 @@ export function QuestProvider({
     });
   }, [applyRewards]);
 
+  const cascade = useCallback(async () => {
+    const result = await cascadeAdvanceCurrent();
+    if (!result.ok || !result.state) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("[quest] cascade failed:", result.error);
+      }
+      return;
+    }
+    if (result.rewards.length > 0) applyRewards(result.rewards);
+    setState(result.state);
+  }, [applyRewards]);
+
   const reset = useCallback(async (episodeId?: string) => {
     const result = await resetCurrentEpisode(episodeId);
     if (result.ok && result.state) {
@@ -138,14 +157,22 @@ export function QuestProvider({
     }
   }, []);
 
-  const setFlag = useCallback(async (flag: string, value: boolean) => {
-    const result = await setQuestFlagAction(flag, value);
-    if (result.ok && result.state) {
-      setState(result.state);
-    } else if (process.env.NODE_ENV !== "production") {
-      console.warn("[quest] setFlag failed:", result.error);
-    }
-  }, []);
+  const setFlag = useCallback(
+    async (flag: string, value: boolean) => {
+      const result = await setQuestFlagAction(flag, value);
+      if (result.ok && result.state) {
+        // Server cascade-advances when a flag unblocks one or more steps —
+        // apply any returned rewards (resource grants, rate changes) before
+        // committing the new state so the tick engine and overlay stay in
+        // sync.
+        if (result.rewards.length > 0) applyRewards(result.rewards);
+        setState(result.state);
+      } else if (process.env.NODE_ENV !== "production") {
+        console.warn("[quest] setFlag failed:", result.error);
+      }
+    },
+    [applyRewards],
+  );
 
   const setStateOverride = useCallback((next: QuestState) => {
     setState(next);
@@ -161,6 +188,7 @@ export function QuestProvider({
       currentStep,
       isAdvancing,
       advance,
+      cascade,
       reset,
       setFlag,
       applyRewards,
@@ -172,6 +200,7 @@ export function QuestProvider({
       currentStep,
       isAdvancing,
       advance,
+      cascade,
       reset,
       setFlag,
       applyRewards,

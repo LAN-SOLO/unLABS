@@ -18,7 +18,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import {
-  advanceStep,
+  cascadeAdvance,
   getEpisode,
   hydrateQuestState,
   resetEpisodeState,
@@ -113,7 +113,7 @@ export async function advanceQuestStep(): Promise<QuestAdvanceResult> {
     };
   }
 
-  const advanced = advanceStep(loaded.state);
+  const advanced = cascadeAdvance(loaded.state);
 
   // The pure engine already computes the correct next episode id (honoring
   // Episode.nextEpisode when the current episode completes).
@@ -150,6 +150,14 @@ export async function advanceQuestStep(): Promise<QuestAdvanceResult> {
 export interface QuestFlagResult {
   ok: boolean;
   state: QuestState | null;
+  /**
+   * Rewards produced by any cascade-advance triggered by the flag set.
+   * Empty when the flag didn't unblock any step. Client applies them to
+   * the tick engine just like advance rewards.
+   */
+  rewards: StepReward[];
+  nextEpisodeId: string | null;
+  episodeCompleted: boolean;
   error?: string;
 }
 
@@ -179,7 +187,14 @@ const CLIENT_SETTABLE_FLAGS = new Set([
  */
 export async function setQuestFlagAction(flag: string, value: boolean): Promise<QuestFlagResult> {
   if (!CLIENT_SETTABLE_FLAGS.has(flag)) {
-    return { ok: false, state: null, error: "flag_not_allowed" };
+    return {
+      ok: false,
+      state: null,
+      rewards: [],
+      nextEpisodeId: null,
+      episodeCompleted: false,
+      error: "flag_not_allowed",
+    };
   }
 
   const supabase = await createClient();
@@ -187,25 +202,130 @@ export async function setQuestFlagAction(flag: string, value: boolean): Promise<
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
-    return { ok: false, state: null, error: "not_authenticated" };
+    return {
+      ok: false,
+      state: null,
+      rewards: [],
+      nextEpisodeId: null,
+      episodeCompleted: false,
+      error: "not_authenticated",
+    };
   }
 
   const loaded = await loadQuestState();
   if (!loaded.ok || !loaded.state) {
-    return { ok: false, state: null, error: loaded.error ?? "load_failed" };
+    return {
+      ok: false,
+      state: null,
+      rewards: [],
+      nextEpisodeId: null,
+      episodeCompleted: false,
+      error: loaded.error ?? "load_failed",
+    };
   }
 
-  const nextState = setQuestFlag(loaded.state, flag, value);
+  const flaggedState = setQuestFlag(loaded.state, flag, value);
+
+  // Opportunistic cascade: setting a flag may have just unblocked the
+  // current or a later step. Walk the engine forward as far as the new
+  // flag set allows so the player isn't stranded behind an out-of-order
+  // trigger.
+  const cascade = cascadeAdvance(flaggedState);
 
   const { error } = await supabase
     .from("profiles")
     .update({
-      quest_state: nextState as unknown as Record<string, unknown>,
+      current_episode: cascade.nextEpisodeId,
+      quest_state: cascade.state as unknown as Record<string, unknown>,
     } as never)
     .eq("id", user.id);
 
-  if (error) return { ok: false, state: null, error: error.message };
-  return { ok: true, state: nextState };
+  if (error) {
+    return {
+      ok: false,
+      state: null,
+      rewards: [],
+      nextEpisodeId: null,
+      episodeCompleted: false,
+      error: error.message,
+    };
+  }
+  return {
+    ok: true,
+    state: cascade.state,
+    rewards: cascade.rewards,
+    nextEpisodeId: cascade.nextEpisodeId,
+    episodeCompleted: cascade.episodeCompleted,
+  };
+}
+
+/**
+ * Force a cascade-advance on the currently persisted state. Heals saves
+ * that got stuck behind an out-of-order trigger (e.g. player built the
+ * Nexus before the abstractum-bottleneck observer tripped, so EP2 step 3
+ * sits unsatisfied even though step 4's trigger is live). Same return
+ * shape as advanceQuestStep so the client can apply rewards uniformly.
+ *
+ * Intentionally not gated on is_dev — the operation is idempotent and
+ * never advances past a step whose trigger isn't satisfied, so a regular
+ * player invoking it can't skip content they shouldn't.
+ */
+export async function cascadeAdvanceCurrent(): Promise<QuestAdvanceResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return {
+      ok: false,
+      state: null,
+      rewards: [],
+      nextEpisodeId: null,
+      episodeCompleted: false,
+      error: "not_authenticated",
+    };
+  }
+
+  const loaded = await loadQuestState();
+  if (!loaded.ok || !loaded.state) {
+    return {
+      ok: false,
+      state: null,
+      rewards: [],
+      nextEpisodeId: null,
+      episodeCompleted: false,
+      error: loaded.error ?? "load_failed",
+    };
+  }
+
+  const cascade = cascadeAdvance(loaded.state);
+
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({
+      current_episode: cascade.nextEpisodeId,
+      quest_state: cascade.state as unknown as Record<string, unknown>,
+    } as never)
+    .eq("id", user.id);
+
+  if (updateError) {
+    return {
+      ok: false,
+      state: null,
+      rewards: [],
+      nextEpisodeId: null,
+      episodeCompleted: false,
+      error: updateError.message,
+    };
+  }
+
+  return {
+    ok: true,
+    state: cascade.state,
+    rewards: cascade.rewards,
+    nextEpisodeId: cascade.nextEpisodeId,
+    episodeCompleted: cascade.episodeCompleted,
+  };
 }
 
 export interface QuestResetResult {

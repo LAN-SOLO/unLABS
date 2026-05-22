@@ -17,6 +17,7 @@ import {
   type QuestState,
   type Step,
   type StepReward,
+  type StepTrigger,
 } from "./types";
 
 export * from "./types";
@@ -71,6 +72,24 @@ export interface AdvanceResult {
 }
 
 /**
+ * Pure helper: is the given trigger satisfied by the given flag map? Used by
+ * canAdvanceStep and by the cascade look-ahead (cascadeAdvance) which has to
+ * inspect *future* steps without advancing through them first.
+ */
+export function isTriggerSatisfied(trigger: StepTrigger, flags: Record<string, boolean>): boolean {
+  switch (trigger.kind) {
+    case "continue":
+      return true;
+    case "flag":
+      return flags[trigger.flag] === true;
+    case "command":
+      // Command triggers are set by the terminal integration (Phase 4). For
+      // now they behave like flags keyed on the command id.
+      return flags[`cmd:${trigger.command}`] === true;
+  }
+}
+
+/**
  * Check whether the current step is eligible to advance right now. A
  * continue-triggered step is always eligible; a flag-triggered step only
  * becomes eligible after the flag has been set (by a minigame, a command,
@@ -79,16 +98,7 @@ export interface AdvanceResult {
 export function canAdvanceStep(state: QuestState): boolean {
   const step = getCurrentStep(state);
   if (!step) return false;
-  switch (step.trigger.kind) {
-    case "continue":
-      return true;
-    case "flag":
-      return state.flags[step.trigger.flag] === true;
-    case "command":
-      // Command triggers are set by the terminal integration (Phase 4). For
-      // now they behave like flags keyed on the command id.
-      return state.flags[`cmd:${step.trigger.command}`] === true;
-  }
+  return isTriggerSatisfied(step.trigger, state.flags);
 }
 
 /**
@@ -96,9 +106,12 @@ export function canAdvanceStep(state: QuestState): boolean {
  * rewards that the caller should apply to the game state (rates, flags,
  * grants). Idempotent on "already complete" — a double-advance at the end
  * is a no-op rather than an error. Refuses to advance if the current step's
- * trigger is not yet satisfied (e.g. a flag-gated step whose flag is unset).
+ * trigger is not yet satisfied (e.g. a flag-gated step whose flag is unset),
+ * unless `force` is set — used by the cascade walker when we've already
+ * proven a *later* step is satisfiable and want to apply the in-between
+ * steps' rewards on the way through.
  */
-export function advanceStep(state: QuestState): AdvanceResult {
+export function advanceStep(state: QuestState, opts?: { force?: boolean }): AdvanceResult {
   const episode = getEpisode(state.episodeId);
   if (!episode) {
     return {
@@ -119,7 +132,7 @@ export function advanceStep(state: QuestState): AdvanceResult {
     };
   }
 
-  if (!canAdvanceStep(state)) {
+  if (!opts?.force && !canAdvanceStep(state)) {
     return {
       state,
       rewards: [],
@@ -176,6 +189,66 @@ export function advanceStep(state: QuestState): AdvanceResult {
     episodeCompleted: justCompleted,
     nextEpisodeId,
   };
+}
+
+/**
+ * Walk the engine forward as far as the current flag set allows. Differs
+ * from `advanceStep` in that it tolerates out-of-order triggers: if the
+ * current step's trigger isn't satisfied but a *later* step's trigger is,
+ * we force-advance through the intervening steps (applying their rewards)
+ * so the player isn't stranded.
+ *
+ * Real-world failure mode this fixes:
+ *   EP2 step 3 gates on `abstractum_bottleneck_observed` (a slow runtime
+ *   observer). Step 4 gates on `nexus_built` (set by a recipe claim).
+ *   A player who builds the Nexus before the observer trips would
+ *   otherwise be stuck on step 3 indefinitely.
+ *
+ * Cascades across episode boundaries via `nextEpisode` so a fully-
+ * satisfied EP2 can fall straight into EP3.
+ */
+export function cascadeAdvance(state: QuestState): AdvanceResult {
+  let cur = state;
+  const allRewards: StepReward[] = [];
+  let episodeCompleted = false;
+  let nextEpisodeId = state.episodeId;
+
+  // Hard bound — the registry has < 50 steps total; 200 covers any
+  // future expansion and prevents an infinite loop on a malformed registry.
+  for (let iter = 0; iter < 200; iter++) {
+    const episode = getEpisode(cur.episodeId);
+    if (!episode) break;
+    if (cur.currentStepIndex >= episode.steps.length) break;
+
+    // Find the furthest step index from `currentStepIndex` whose trigger
+    // is satisfied under the current flag map. Anything between current
+    // and that index becomes a force-skip with rewards applied.
+    let furthest = -1;
+    for (let i = cur.currentStepIndex; i < episode.steps.length; i++) {
+      if (isTriggerSatisfied(episode.steps[i].trigger, cur.flags)) {
+        furthest = i;
+      }
+    }
+    if (furthest < cur.currentStepIndex) break;
+
+    // Drive the engine through each step in [currentStepIndex .. furthest].
+    // Intermediate triggers may be unsatisfied — that's exactly what the
+    // force path is for.
+    while (cur.currentStepIndex <= furthest && cur.currentStepIndex < episode.steps.length) {
+      const result = advanceStep(cur, { force: true });
+      if (result.state === cur) break; // belt-and-suspenders against engine no-op
+      cur = result.state;
+      allRewards.push(...result.rewards);
+      episodeCompleted = result.episodeCompleted;
+      nextEpisodeId = result.nextEpisodeId;
+      // If we crossed an episode boundary mid-cascade, restart the outer
+      // loop so we evaluate the NEW episode's first step against the
+      // already-accumulated flags.
+      if (cur.episodeId !== episode.id) break;
+    }
+  }
+
+  return { state: cur, rewards: allRewards, episodeCompleted, nextEpisodeId };
 }
 
 /**

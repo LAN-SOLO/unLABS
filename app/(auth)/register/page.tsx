@@ -78,7 +78,7 @@ export default function RegisterPage() {
                 name="username"
                 required
                 disabled={isLoading}
-                pattern="^[a-zA-Z0-9_-]{3,20}$"
+                pattern="^[-a-zA-Z0-9_]{3,20}$"
                 title="3-20 characters, letters, numbers, underscores, hyphens only"
                 className="w-full border border-green-500/50 bg-black px-3 py-2 font-mono text-sm text-green-400 focus:border-green-400 focus:shadow-[0_0_10px_rgba(34,197,94,0.3)] focus:outline-none disabled:opacity-50"
                 placeholder="operator_name"

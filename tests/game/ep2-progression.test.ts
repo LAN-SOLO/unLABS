@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   advanceStep,
+  cascadeAdvance,
   createInitialQuestState,
   getCurrentStep,
   getEpisode,
@@ -9,7 +10,7 @@ import {
   setQuestFlag,
   type QuestState,
 } from "@/lib/game/quests";
-import { getRecipe, RECIPES } from "@/lib/game/recipes";
+import { getRecipe, isRecipeBuilt, RECIPES, visibleRecipes } from "@/lib/game/recipes";
 import { listAllMissions, getMission } from "@/lib/game/missions";
 
 describe("EP2 Foundation — episode registration", () => {
@@ -118,6 +119,66 @@ describe("EP2 step advancement (flag triggers)", () => {
   });
 });
 
+describe("cascadeAdvance — out-of-order triggers", () => {
+  it("is a no-op when the current step is not satisfiable and no later step is either", () => {
+    const initial = createInitialQuestState("EP2");
+    const result = cascadeAdvance(initial);
+    expect(result.state.currentStepIndex).toBe(0);
+    expect(result.rewards).toEqual([]);
+    expect(result.episodeCompleted).toBe(false);
+  });
+
+  it("advances normally when the current step's trigger is satisfied", () => {
+    let state = createInitialQuestState("EP2");
+    state = setQuestFlag(state, "three_chains_online", true);
+    const result = cascadeAdvance(state);
+    expect(result.state.currentStepIndex).toBe(1);
+    // Step 1's reward set_flag first_chain_built isn't in EP2 step 0, but
+    // any rewards there would be applied — main expectation is movement.
+  });
+
+  it("skips a stuck step when a later step's trigger is already satisfied", () => {
+    // Real-world scenario: player has built the Nexus (nexus_built=true)
+    // but the abstractum-bottleneck observer hasn't tripped yet. Engine
+    // should cascade through step 3 + step 4 and complete EP2.
+    let state = createInitialQuestState("EP2");
+    state = setQuestFlag(state, "three_chains_online", true);
+    state = advanceStep(state).state; // step 0 → 1
+    state = setQuestFlag(state, "first_production_run", true);
+    state = advanceStep(state).state; // step 1 → 2 (on step 3 "bottleneck")
+    expect(state.currentStepIndex).toBe(2);
+
+    // Now jump straight to "nexus_built" without setting the bottleneck flag.
+    state = setQuestFlag(state, "nexus_built", true);
+    const result = cascadeAdvance(state);
+    // Should have skipped past step 3 AND completed step 4 → EP2 complete.
+    expect(result.episodeCompleted).toBe(true);
+    expect(result.state.flags.ep2_complete).toBe(true);
+    expect(result.state.flags.nexus_blueprint_visible).toBe(true); // step 3 reward
+    expect(result.state.flags.research_unlocked).toBe(true); // step 4 reward
+    expect(result.nextEpisodeId).toBe("EP3");
+    expect(result.state.episodeId).toBe("EP3");
+  });
+
+  it("cascades across episode boundaries when the next episode's first step is also satisfied", () => {
+    // Walk EP2 to its last step, then set EVERY needed flag at once.
+    let state = createInitialQuestState("EP2");
+    state = setQuestFlag(state, "three_chains_online", true);
+    state = setQuestFlag(state, "first_production_run", true);
+    state = setQuestFlag(state, "abstractum_bottleneck_observed", true);
+    state = setQuestFlag(state, "nexus_built", true);
+    // And the EP3 step-0 trigger too.
+    state = setQuestFlag(state, "research_started", true);
+
+    const result = cascadeAdvance(state);
+    expect(result.state.episodeId).toBe("EP3");
+    // We should have advanced past EP3's first step (research_started),
+    // landing on EP3's second step.
+    expect(result.state.currentStepIndex).toBeGreaterThan(0);
+    expect(result.state.flags.ep2_complete).toBe(true);
+  });
+});
+
 describe("Phase 3 recipes", () => {
   it.each([
     ["smt_01_build", "device", 1],
@@ -154,6 +215,47 @@ describe("Phase 3 recipes", () => {
     // Pre-existing: energy_cell, base_alloy_ingot, advanced_alloy_ingot,
     // nanomaterial_block, mfr_001_build (5). After EP2: 9.
     expect(RECIPES.length).toBeGreaterThanOrEqual(9);
+  });
+});
+
+describe("one-shot device recipes — hide once built", () => {
+  it("isRecipeBuilt is true for a device recipe whose set_flag output is set", () => {
+    const nxs = getRecipe("nxs_01_build")!;
+    expect(isRecipeBuilt(nxs, {})).toBe(false);
+    expect(isRecipeBuilt(nxs, { nexus_built: true })).toBe(true);
+  });
+
+  it("isRecipeBuilt stays false for repeatable material recipes even with random flags", () => {
+    const ingot = getRecipe("base_alloy_ingot")!;
+    expect(isRecipeBuilt(ingot, { smt_01_online: true })).toBe(false);
+  });
+
+  it("visibleRecipes hides a device once its set_flag output is true", () => {
+    const baselineFlags = {
+      ep0_complete: true,
+      anomaly_mode: true,
+      missions_unlocked: true,
+      smt_01_online: true,
+      cnd_01_online: true,
+      three_chains_online: true,
+    };
+    const beforeBuild = visibleRecipes(baselineFlags);
+    expect(beforeBuild.some((r) => r.id === "nxs_01_build")).toBe(true);
+
+    const afterBuild = visibleRecipes({ ...baselineFlags, nexus_built: true });
+    expect(afterBuild.some((r) => r.id === "nxs_01_build")).toBe(false);
+  });
+
+  it("visibleRecipes keeps repeatable material recipes visible regardless of device flags", () => {
+    const flags = {
+      ep0_complete: true,
+      anomaly_mode: true,
+      smt_01_online: true,
+      nexus_built: true,
+    };
+    const visible = visibleRecipes(flags);
+    expect(visible.some((r) => r.id === "base_alloy_ingot")).toBe(true);
+    expect(visible.some((r) => r.id === "energy_cell")).toBe(true);
   });
 });
 

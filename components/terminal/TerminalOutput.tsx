@@ -3,6 +3,14 @@
 import { useEffect, useRef, useCallback } from "react";
 import type { TerminalLine } from "@/lib/terminal/types";
 
+// Strip ANSI SGR escape sequences (\x1b[..m). Commands embed colors via
+// \x1b[32m...\x1b[0m, but the renderer prints raw text — without stripping,
+// the leading ESC byte is invisible but the trailing `[..m` shows literally.
+// Color rendering can be added later; for now, drop them.
+ 
+const ANSI_SGR = /\x1b\[[0-9;]*m/g;
+const stripAnsi = (s: string): string => s.replace(ANSI_SGR, "");
+
 interface TerminalOutputProps {
   lines: TerminalLine[];
   isTyping: boolean;
@@ -72,7 +80,7 @@ export function TerminalOutput({ lines, isTyping }: TerminalOutputProps) {
       <pre className="whitespace-pre">
         {lines.map((line) => (
           <div key={line.id} className={getLineClass(line.type)}>
-            {line.content || " "}
+            {stripAnsi(line.content) || " "}
           </div>
         ))}
 

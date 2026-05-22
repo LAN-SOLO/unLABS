@@ -231,14 +231,35 @@ export function getRecipe(id: string): Recipe | null {
 }
 
 /**
+ * A device-category recipe is "one-shot": once any of its set_flag outputs
+ * has flipped true (e.g. nxs_01_build → nexus_built), the device exists and
+ * cannot be built again from the lab. Future re-roll/upgrade flows would
+ * ship as separate recipes (e.g. `nxs_01_upgrade_t3`).
+ *
+ * Returns false for non-device categories so material/energy recipes stay
+ * repeatable indefinitely.
+ */
+export function isRecipeBuilt(recipe: Recipe, flags: Record<string, boolean>): boolean {
+  if (recipe.category !== "device") return false;
+  for (const out of recipe.outputs) {
+    if (out.kind === "set_flag" && out.value === true && flags[out.flag] === true) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Filter the catalog to recipes visible given the current flag set. Used
  * by the /lab UI to hide gated recipes without hard-deleting them.
+ * Excludes one-shot device recipes that have already been built.
  */
 export function visibleRecipes(flags: Record<string, boolean>): Recipe[] {
   return RECIPES.filter((recipe) => {
-    if (!recipe.unlockRequires || recipe.unlockRequires.length === 0) {
-      return true;
+    if (recipe.unlockRequires && recipe.unlockRequires.length > 0) {
+      if (!recipe.unlockRequires.every((f) => flags[f] === true)) return false;
     }
-    return recipe.unlockRequires.every((f) => flags[f] === true);
+    if (isRecipeBuilt(recipe, flags)) return false;
+    return true;
   });
 }

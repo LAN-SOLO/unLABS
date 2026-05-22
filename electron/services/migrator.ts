@@ -29,9 +29,9 @@ import { join } from "path";
  * upgrading FROM). Any migrations added in the CURRENT build must be
  * strictly greater than this value so they actually run on upgrade.
  *
- * Current value (0.1.9-alpha): last 0.1.6/0.1.7 migration was
- * 20260412000001_missions_and_discoveries. The 20260424xxx + 20260429xxx
- * migrations are new in this release and must run.
+ * Current value (0.1.10-beta): last 0.1.9-alpha migration was
+ * 20260429000001_tutorial_difficulty. The 20260521xxx migration adding the
+ * balances UPDATE RLS policy is new in this release and must run.
  *
  * Backstop: the self-heal pass below detects tracked migrations whose
  * declared tables/columns don't actually exist and untracks them, so

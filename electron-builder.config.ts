@@ -12,7 +12,7 @@ const config: Configuration = {
   npmRebuild: false,
   asar: false,
   directories: {
-    output: "INSTALL",
+    output: ".INSTALL",
   },
   files: [
     "dist-electron/**/*",

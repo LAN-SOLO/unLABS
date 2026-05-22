@@ -34,6 +34,7 @@ import {
 import { useGameTick } from "@/contexts/GameTickProvider";
 import { useQuest } from "@/contexts/QuestProvider";
 import { useJournalOptional } from "@/contexts/JournalProvider";
+import { useProduction } from "@/contexts/ProductionProvider";
 import {
   computeWhatNext,
   getActiveDeviceIds,
@@ -102,6 +103,7 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
   const [isBusy, startTransition] = useTransition();
   const tick = useGameTick();
   const quest = useQuest();
+  const production = useProduction();
   // Optional so MissionProvider still boots outside game-shell (e.g. in tests)
   const journal = useJournalOptional();
 
@@ -204,22 +206,56 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick.tickCount, tick.resources, state.activeMissionIds]);
 
-  // Merge resource threshold progress into the state object used for
-  // evaluation, without triggering an effect-based setState.
+  // ── Craft-count objective evaluation ────────────────────────────────
+  // Derived from the production jobs list: for each active mission's
+  // craft_count objective, count claimed jobs whose recipe matches the
+  // objective's target. Same derive-don't-store pattern as
+  // resourceThresholdProgress — keeps the server objectiveProgress out
+  // of the loop (production_jobs is the source of truth) and makes the
+  // tutorial overlay's objectiveStatus check fire correctly.
+  const craftCountProgress = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const job of production.jobs) {
+      if (job.status !== "claimed") continue;
+      counts.set(job.recipeId, (counts.get(job.recipeId) ?? 0) + 1);
+    }
+
+    const updates: Record<string, number> = {};
+    for (const missionId of state.activeMissionIds) {
+      const mission = listAllMissions().find((m) => m.id === missionId);
+      if (!mission) continue;
+      for (const task of mission.tasks) {
+        for (const obj of task.objectives) {
+          if (obj.type !== "craft_count") continue;
+          const count = counts.get(obj.target) ?? 0;
+          if (count > 0) updates[obj.id] = count;
+        }
+      }
+    }
+    return updates;
+  }, [production.jobs, state.activeMissionIds]);
+
+  // Merge resource threshold + craft count progress into the state object
+  // used for evaluation, without triggering an effect-based setState.
   const effectiveState = useMemo<MissionPlayerState>(() => {
-    const merged = { ...state.objectiveProgress, ...resourceThresholdProgress };
+    const merged = {
+      ...state.objectiveProgress,
+      ...resourceThresholdProgress,
+      ...craftCountProgress,
+    };
     // Only create a new object if something actually changed
-    const keys = Object.keys(resourceThresholdProgress);
-    const anyChanged = keys.some(
-      (k) => state.objectiveProgress[k] !== resourceThresholdProgress[k],
-    );
+    const derivedKeys = [
+      ...Object.keys(resourceThresholdProgress),
+      ...Object.keys(craftCountProgress),
+    ];
+    const anyChanged = derivedKeys.some((k) => state.objectiveProgress[k] !== merged[k]);
     if (!anyChanged) return { ...state, hintLevel: computedHintLevels };
     return {
       ...state,
       objectiveProgress: merged,
       hintLevel: computedHintLevels,
     };
-  }, [state, resourceThresholdProgress, computedHintLevels]);
+  }, [state, resourceThresholdProgress, craftCountProgress, computedHintLevels]);
 
   // ── Actions ─────────────────────────────────────────────────────────
 
@@ -320,6 +356,56 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
     () => effectiveState.completedMissionIds.length,
     [effectiveState.completedMissionIds],
   );
+
+  // ── Mission visibility hooks into the journal ───────────────────────
+  // The overlay is one-way dismissible, so players who close it lose all
+  // sense of what's next. Mirror two transitions into the journal so they
+  // can scroll back to find "what should I do":
+  //   - A mission first becomes available (unlocked).
+  //   - An objective transitions to completed.
+  // First-render is treated as the baseline — pre-existing state isn't
+  // back-filled so the journal doesn't spam on every page load.
+  const journalSeenMissionsRef = useRef<Set<string> | null>(null);
+  const journalSeenObjectivesRef = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    if (!journal) return;
+
+    const seenMissions = journalSeenMissionsRef.current;
+    const seenObjectives = journalSeenObjectivesRef.current;
+    const nextMissions = new Set<string>();
+    const nextObjectives = new Set<string>();
+
+    for (const m of allMissions) {
+      if (m.status === "available" || m.status === "active") {
+        nextMissions.add(m.id);
+        if (seenMissions && !seenMissions.has(m.id)) {
+          const firstTask = m.tasks[0];
+          const hint = firstTask?.objectives[0]?.hint;
+          journal.write(
+            "mission",
+            6,
+            hint
+              ? `New mission available — ${m.title}: ${hint}`
+              : `New mission available — ${m.title}`,
+          );
+        }
+      }
+      for (const task of m.tasks) {
+        for (const obj of task.objectives) {
+          if (obj.status === "completed") {
+            const key = `${m.id}.${obj.id}`;
+            nextObjectives.add(key);
+            if (seenObjectives && !seenObjectives.has(key)) {
+              journal.write("mission", 6, `Objective complete — ${obj.description}`);
+            }
+          }
+        }
+      }
+    }
+
+    journalSeenMissionsRef.current = nextMissions;
+    journalSeenObjectivesRef.current = nextObjectives;
+  }, [allMissions, journal]);
 
   const activeDeviceIds = useMemo(
     () => getActiveDeviceIds(effectiveState, flags),

@@ -401,7 +401,7 @@ function CreateOperator({
             autoFocus
             placeholder="operator"
             maxLength={24}
-            pattern="[a-zA-Z0-9_-]+"
+            pattern="[-a-zA-Z0-9_]+"
             title="Letters, numbers, dashes, and underscores only"
             className="w-full rounded border border-gray-700 bg-black/50 px-3 py-2 text-sm text-white placeholder-gray-600 transition-all focus:border-[var(--neon-green,#00ff66)]/50 focus:ring-1 focus:ring-[var(--neon-green,#00ff66)]/30 focus:outline-none"
           />
@@ -517,7 +517,7 @@ function ImportSave({
             required
             placeholder="operator"
             maxLength={24}
-            pattern="[a-zA-Z0-9_-]+"
+            pattern="[-a-zA-Z0-9_]+"
             className="w-full rounded border border-gray-700 bg-black/50 px-3 py-2 text-sm text-white placeholder-gray-600 transition-all focus:border-[var(--neon-amber,#ffb800)]/50 focus:outline-none"
           />
         </div>
