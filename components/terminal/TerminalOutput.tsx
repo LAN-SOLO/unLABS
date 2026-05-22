@@ -7,7 +7,7 @@ import type { TerminalLine } from "@/lib/terminal/types";
 // \x1b[32m...\x1b[0m, but the renderer prints raw text — without stripping,
 // the leading ESC byte is invisible but the trailing `[..m` shows literally.
 // Color rendering can be added later; for now, drop them.
- 
+
 const ANSI_SGR = /\x1b\[[0-9;]*m/g;
 const stripAnsi = (s: string): string => s.replace(ANSI_SGR, "");
 
