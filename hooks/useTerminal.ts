@@ -134,6 +134,7 @@ interface UseTerminalProps {
   tutorialActions?: import("@/lib/terminal/types").TutorialTerminalActions;
   achievementActions?: import("@/lib/terminal/types").AchievementTerminalActions;
   researchActions?: import("@/lib/terminal/types").ResearchTerminalActions;
+  nexusActions?: import("@/lib/terminal/types").NexusTerminalActions;
   questFlags?: Record<string, boolean>;
 }
 
@@ -190,6 +191,7 @@ export function useTerminal({
   tutorialActions,
   achievementActions,
   researchActions,
+  nexusActions,
   questFlags,
 }: UseTerminalProps) {
   const router = useRouter();
@@ -654,6 +656,7 @@ export function useTerminal({
       tutorialActions,
       achievementActions,
       researchActions,
+      nexusActions,
     }),
     [
       cdcDeviceActions,
@@ -706,6 +709,7 @@ export function useTerminal({
       tutorialActions,
       achievementActions,
       researchActions,
+      nexusActions,
       questFlags,
     ],
   );

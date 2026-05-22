@@ -14,14 +14,14 @@
  * Intentionally styled minimally — this is a debug console, not a showpiece.
  */
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 
 import { useGameTick } from "@/contexts/GameTickProvider";
 import { useQuest } from "@/contexts/QuestProvider";
 import { useProduction } from "@/contexts/ProductionProvider";
 import { flushSave } from "@/lib/game/saveSync";
-import { grantDevUnsc, setDevEpisode } from "./actions";
+import { grantDevUnsc } from "./actions";
 import type { ResourceId } from "@/lib/game/tickEngine";
 
 const EPISODES = ["EP0", "EP1", "EP2", "EP3", "EP4", "EP5", "EP6"] as const;
@@ -50,7 +50,6 @@ export function DevClient({
 
   const [episode, setEpisode] = useState(currentEpisode);
   const [flushing, setFlushing] = useState(false);
-  const [isPending, startTransition] = useTransition();
   const [resetting, setResetting] = useState(false);
   const [granting, setGranting] = useState(false);
   const [cascading, setCascading] = useState(false);
@@ -76,11 +75,12 @@ export function DevClient({
     }
   };
 
+  // Episode buttons select a target locally; the actual reset is applied by
+  // RESET EPISODE so an accidental click doesn't nuke quest_state. Previous
+  // behaviour wrote `current_episode` immediately and left `quest_state`
+  // untouched, which split header/active labels apart and confused testing.
   const handleEpisodeChange = (next: string) => {
     setEpisode(next);
-    startTransition(async () => {
-      await setDevEpisode(next);
-    });
   };
 
   const handleGrantUnsc = async (amount: number) => {
@@ -123,7 +123,7 @@ export function DevClient({
           <div>
             <h1 className="text-2xl text-green-300">&#47;&#47; DEV CONSOLE</h1>
             <p className="text-xs text-green-500/60">
-              operator: {username} · episode: {episode} · ticks: {tickCount}
+              operator: {username} · active: {quest.episode?.id ?? "(none)"} · ticks: {tickCount}
             </p>
           </div>
           <nav className="flex gap-4 text-sm">
@@ -265,12 +265,11 @@ export function DevClient({
             <button
               key={ep}
               onClick={() => handleEpisodeChange(ep)}
-              disabled={isPending}
               className={`border px-3 py-1 text-xs ${
                 episode === ep
                   ? "border-green-400 bg-green-500/20 text-green-200"
                   : "border-green-500/40 hover:bg-green-500/10"
-              } disabled:opacity-50`}
+              }`}
             >
               {ep}
             </button>

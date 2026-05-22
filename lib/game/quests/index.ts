@@ -192,20 +192,29 @@ export function advanceStep(state: QuestState, opts?: { force?: boolean }): Adva
 }
 
 /**
- * Walk the engine forward as far as the current flag set allows. Differs
- * from `advanceStep` in that it tolerates out-of-order triggers: if the
- * current step's trigger isn't satisfied but a *later* step's trigger is,
- * we force-advance through the intervening steps (applying their rewards)
- * so the player isn't stranded.
+ * Walk the engine forward as far as the current flag set legitimately
+ * allows. Two cases per iteration:
+ *
+ *   1. Current step's trigger IS satisfied → normal `advanceStep`, loop.
+ *   2. Current's trigger NOT satisfied, but the *immediately next* step's
+ *      trigger IS satisfied → force-skip current (apply its rewards), let
+ *      the next iteration handle the now-current satisfiable step.
+ *
+ * Critically, we look **at most one step ahead**. Multi-step look-ahead
+ * would silently mark steps the player never engaged with as "done",
+ * burning their voice-line beats and granting milestone flags they didn't
+ * earn. The +1 skip is enough to unstuck the real failure mode (an
+ * observer-set passive flag that didn't fire because the player's
+ * gameplay went past it) without rewriting their history.
  *
  * Real-world failure mode this fixes:
- *   EP2 step 3 gates on `abstractum_bottleneck_observed` (a slow runtime
+ *   EP2 step 3 gates on `abstractum_bottleneck_observed` (passive
  *   observer). Step 4 gates on `nexus_built` (set by a recipe claim).
- *   A player who builds the Nexus before the observer trips would
- *   otherwise be stuck on step 3 indefinitely.
+ *   A player who builds the Nexus before the observer trips ends up on
+ *   step 3 with step 4's trigger already live — exactly one skip fixes
+ *   them.
  *
- * Cascades across episode boundaries via `nextEpisode` so a fully-
- * satisfied EP2 can fall straight into EP3.
+ * Cascades across episode boundaries via `nextEpisode`.
  */
 export function cascadeAdvance(state: QuestState): AdvanceResult {
   let cur = state;
@@ -220,32 +229,35 @@ export function cascadeAdvance(state: QuestState): AdvanceResult {
     if (!episode) break;
     if (cur.currentStepIndex >= episode.steps.length) break;
 
-    // Find the furthest step index from `currentStepIndex` whose trigger
-    // is satisfied under the current flag map. Anything between current
-    // and that index becomes a force-skip with rewards applied.
-    let furthest = -1;
-    for (let i = cur.currentStepIndex; i < episode.steps.length; i++) {
-      if (isTriggerSatisfied(episode.steps[i].trigger, cur.flags)) {
-        furthest = i;
-      }
-    }
-    if (furthest < cur.currentStepIndex) break;
+    const currentStep = episode.steps[cur.currentStepIndex];
+    const currentSatisfied = isTriggerSatisfied(currentStep.trigger, cur.flags);
 
-    // Drive the engine through each step in [currentStepIndex .. furthest].
-    // Intermediate triggers may be unsatisfied — that's exactly what the
-    // force path is for.
-    while (cur.currentStepIndex <= furthest && cur.currentStepIndex < episode.steps.length) {
-      const result = advanceStep(cur, { force: true });
-      if (result.state === cur) break; // belt-and-suspenders against engine no-op
+    if (currentSatisfied) {
+      const result = advanceStep(cur);
+      if (result.state === cur) break;
       cur = result.state;
       allRewards.push(...result.rewards);
       episodeCompleted = result.episodeCompleted;
       nextEpisodeId = result.nextEpisodeId;
-      // If we crossed an episode boundary mid-cascade, restart the outer
-      // loop so we evaluate the NEW episode's first step against the
-      // already-accumulated flags.
-      if (cur.episodeId !== episode.id) break;
+      continue;
     }
+
+    // Look at most one step ahead for a satisfied trigger. Anything further
+    // would skip steps the player never actually engaged with.
+    const nextIdx = cur.currentStepIndex + 1;
+    if (nextIdx >= episode.steps.length) break;
+    const nextStep = episode.steps[nextIdx];
+    if (!isTriggerSatisfied(nextStep.trigger, cur.flags)) break;
+
+    // Force-skip the current (unsatisfied) step. Next iteration will see
+    // the now-current step (= old nextStep) as satisfied and advance it
+    // through the normal path.
+    const result = advanceStep(cur, { force: true });
+    if (result.state === cur) break;
+    cur = result.state;
+    allRewards.push(...result.rewards);
+    episodeCompleted = result.episodeCompleted;
+    nextEpisodeId = result.nextEpisodeId;
   }
 
   return { state: cur, rewards: allRewards, episodeCompleted, nextEpisodeId };

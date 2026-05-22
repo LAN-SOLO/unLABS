@@ -1944,7 +1944,14 @@ const deviceCommand: Command = {
 
       const appCol = (id: string) => (installedAppIds.has(id) ? "[✓]" : "[○]");
 
-      // Get actual device status from managers
+      // Get actual device status from managers. NXS-001 is a special case:
+      // it doesn't exist until the player claims the recipe, so we surface
+      // LOCKED before the build and STANDBY/ONLINE after.
+      const nexusStatus = ((): string => {
+        const n = ctx.data.nexusActions;
+        if (!n || !n.isBuilt) return "LOCKED";
+        return n.isOnline ? "ONLINE" : "STANDBY";
+      })();
       const getStatus = (deviceKey: string): string => {
         const deviceMap: Record<string, { getState: () => { isPowered?: boolean } } | undefined> = {
           "P3D-001": ctx.data.p3dDevice,
@@ -2018,6 +2025,7 @@ const deviceCommand: Command = {
           `  MFR-001   Microfusion Reactor     v2.3.0    T3    ${s("MFR-001")}${appCol("MFR-001")}`,
           `  SPK-001   Narrow Speaker          v1.0.0    T1    ${s("SPK-001")}${appCol("SPK-001")}`,
           `  NET-001   Network Monitor         v2.1.0    T1    ${s("NET-001")}${appCol("NET-001")}`,
+          `  NXS-001   Nexus                   v1.0.0    T2    ${nexusStatus.padEnd(10)}${appCol("NXS-001")}`,
           `  OSC-001   Oscilloscope Array      v4.6.0    T2    ONLINE      ${appCol("OSC-001")}`,
           `  PWB-001   Portable Workbench      v1.1.0    T1    ${s("PWB-001")}${appCol("PWB-001")}`,
           `  PWD-001   Power Display Panel     v1.0.0    T1    ONLINE      ${appCol("PWD-001")}`,
@@ -2144,6 +2152,9 @@ const deviceCommand: Command = {
           "  System",
           "  DGN-001   Diagnostics Console        T2    Diagnostics",
           "  CLK-001   Lab Clock                  T1    Utility",
+          "",
+          "  Research",
+          "  NXS-001   Nexus                      T2    Research",
           "",
           "───────────────────────────────────────────────────────────────",
           "COMMANDS",

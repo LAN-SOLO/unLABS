@@ -1716,6 +1716,20 @@ export interface DataFetchers {
   achievementActions?: AchievementTerminalActions;
   // Research / tech tree (NXS-01)
   researchActions?: ResearchTerminalActions;
+  // Nexus device state (NXS-01). Separate from researchActions because the
+  // `device list` UI needs to distinguish "not built" from "built but offline"
+  // — researchActions.available() collapses both into false.
+  nexusActions?: NexusTerminalActions;
+}
+
+/**
+ * Terminal-facing nexus state. Tiny on purpose: the device manager itself is
+ * minimal (gate flag + online toggle), so we just expose the booleans the
+ * device-list renderer needs to pick LOCKED / STANDBY / ONLINE.
+ */
+export interface NexusTerminalActions {
+  isBuilt: boolean;
+  isOnline: boolean;
 }
 
 /**

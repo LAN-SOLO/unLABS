@@ -375,6 +375,11 @@ export function Terminal({
     };
   }, [techTreeCtx, nexusCtx]);
 
+  const nexusTerminalActions = useMemo(() => {
+    if (!nexusCtx) return undefined;
+    return { isBuilt: nexusCtx.isBuilt, isOnline: nexusCtx.isOnline };
+  }, [nexusCtx]);
+
   const resonanceTerminalActions: ResonanceTerminalActions | undefined = useMemo(() => {
     if (!resonanceCtx) return undefined;
     const ctx = resonanceCtx;
@@ -2758,6 +2763,7 @@ export function Terminal({
     tutorialActions: tutorialTerminalActions,
     achievementActions: achievementTerminalActions,
     researchActions: researchTerminalActions,
+    nexusActions: nexusTerminalActions,
     questFlags: quest.state.flags,
   });
 

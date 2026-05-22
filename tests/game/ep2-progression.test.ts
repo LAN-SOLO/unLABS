@@ -160,6 +160,19 @@ describe("cascadeAdvance — out-of-order triggers", () => {
     expect(result.state.episodeId).toBe("EP3");
   });
 
+  it("does NOT skip multiple unsatisfied steps to reach a later satisfied one", () => {
+    // Real-world overreach we caught in 0.1.14-beta: EP3 player on step 1
+    // (research_started) with welcome_back_seen=true from a return visit.
+    // Old cascade would have skipped step 1 AND step 2 to reach step 3 —
+    // burning voice lines and granting bogus "done" milestone flags.
+    let state = createInitialQuestState("EP3");
+    state = setQuestFlag(state, "welcome_back_seen", true);
+    const result = cascadeAdvance(state);
+    expect(result.state.currentStepIndex).toBe(0); // stayed put
+    expect(result.state.flags.ep3_first_research_done).not.toBe(true);
+    expect(result.state.flags.ep3_drone_done).not.toBe(true);
+  });
+
   it("cascades across episode boundaries when the next episode's first step is also satisfied", () => {
     // Walk EP2 to its last step, then set EVERY needed flag at once.
     let state = createInitialQuestState("EP2");

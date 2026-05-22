@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.1.15-beta (2026-05-22)
+
+Follow-up tuning after 0.1.14-beta live-testing.
+
+### Fixed
+
+- **Cascade was too aggressive.** Original implementation walked through
+  every unsatisfied step up to the furthest satisfied trigger, which on
+  a returning EP3 player (`welcome_back_seen=true`, no research started)
+  silently completed steps 1 & 2 and granted their milestone flags. New
+  rule: cascade looks at most **one** step ahead — enough to unstick the
+  EP2 "Nexus before bottleneck observer" case, not enough to fabricate
+  milestones.
+- **Episode Jumper write was misleading.** Clicking an EPx button used
+  to immediately update `profiles.current_episode` while leaving the
+  active quest_state untouched, so the header read "EP1" while the
+  footer still read "active: EP2 step 3". Buttons now select locally
+  only; **RESET EPISODE** remains the single mutator and applies the
+  selection.
+- **NXS-001 Nexus missing from `device list`.** The Nexus was wired
+  through `NexusManager` but never added to the device-registry
+  terminal output, so players who built it couldn't find it in `device`
+  / `device list` / `device unman`. Added registry row + man-page
+  entry. Status surfaces as `LOCKED` (not built), `STANDBY` (built but
+  offline), or `ONLINE`.
+
 ## v0.1.14-beta (2026-05-22)
 
 Quest-engine resilience pass + dev-tooling cleanup. Triggered by a stuck EP2
