@@ -15,8 +15,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.CI_SUPABASE_ANON_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.CI_SUPABASE_SERVICE_ROLE_KEY }}
+      # Fallback placeholders keep the build green when repo secrets are
+      # not configured. `lib/env.ts` validates min(1); `next build`
+      # prerenders pages that import the env so an empty string fails the
+      # whole build. The real values matter only when the e2e job actually
+      # talks to Supabase — until then a non-empty placeholder is enough.
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.CI_SUPABASE_ANON_KEY || 'ci-placeholder-anon-key' }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.CI_SUPABASE_SERVICE_ROLE_KEY || 'ci-placeholder-service-role-key' }}
       NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v4
@@ -54,8 +59,13 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.CI_SUPABASE_ANON_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.CI_SUPABASE_SERVICE_ROLE_KEY }}
+      # Fallback placeholders keep the build green when repo secrets are
+      # not configured. `lib/env.ts` validates min(1); `next build`
+      # prerenders pages that import the env so an empty string fails the
+      # whole build. The real values matter only when the e2e job actually
+      # talks to Supabase — until then a non-empty placeholder is enough.
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.CI_SUPABASE_ANON_KEY || 'ci-placeholder-anon-key' }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.CI_SUPABASE_SERVICE_ROLE_KEY || 'ci-placeholder-service-role-key' }}
       NEXT_PUBLIC_APP_URL: http://localhost:3000
     steps:
       - uses: actions/checkout@v4
