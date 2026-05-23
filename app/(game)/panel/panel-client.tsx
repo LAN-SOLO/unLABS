@@ -44,6 +44,7 @@ import {
   LabClock,
   MemoryMonitor,
 } from "@/components/panel/modules/EquipmentTile";
+import { NexusModule } from "@/components/panel/modules/NexusModule";
 import { GatedTile } from "@/components/panel/modules/GatedTile";
 import { ResourceBar } from "@/components/panel/modules/ResourceBar";
 import { PowerButton } from "@/components/panel/modules/PowerButton";
@@ -700,6 +701,12 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                             label="Anomaly Detector"
                                                                                           >
                                                                                             <AnomalyDetector />
+                                                                                          </GatedTile>
+                                                                                          <GatedTile
+                                                                                            deviceId="NXS-01"
+                                                                                            label="Nexus"
+                                                                                          >
+                                                                                            <NexusModule />
                                                                                           </GatedTile>
                                                                                         </div>
                                                                                       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Terminal } from "@/components/terminal";
 import { SystemPowerManagerProvider, useSystemPowerInternal } from "@/contexts/SystemPowerManager";
@@ -31,7 +31,22 @@ export function TerminalPowerWrapper({ userId, username, balance }: Props) {
 }
 
 function TerminalWithEffects({ userId, username, balance }: Props) {
-  const { systemState, powerScope, finishBoot, onShutdownComplete } = useSystemPowerInternal();
+  const { systemState, powerScope, finishBoot, onShutdownComplete, powerOn } =
+    useSystemPowerInternal();
+
+  // Cold boot on fresh session — show the BIOS/POST sequence once
+  const coldBootFired = useRef(false);
+  useEffect(() => {
+    if (coldBootFired.current) return;
+    coldBootFired.current = true;
+    try {
+      if (!sessionStorage.getItem("unlabs_booted")) {
+        powerOn("system");
+      }
+    } catch {
+      /* SSR / incognito guard */
+    }
+  }, [powerOn]);
 
   const isSystemReboot =
     powerScope === "system" && (systemState === "rebooting" || systemState === "booting");
@@ -49,6 +64,11 @@ function TerminalWithEffects({ userId, username, balance }: Props) {
   }, [systemState, powerScope, onShutdownComplete]);
 
   const handleBootComplete = useCallback(() => {
+    try {
+      sessionStorage.setItem("unlabs_booted", "1");
+    } catch {
+      /* incognito guard */
+    }
     finishBoot();
   }, [finishBoot]);
 

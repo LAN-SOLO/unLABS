@@ -1,5 +1,39 @@
 # Changelog
 
+## v0.1.16-beta (2026-05-23)
+
+### Added
+
+- **NexusModule visual redesign.** Full retro-industrial device surface
+  with 3D fold/unfold animation, LED status indicators, power toggle,
+  animated tech-graph SVG (6 nodes, prerequisite edges, holo-sweep
+  scan, CRT flicker), data-stream progress bar for active research,
+  pulsing amber claim button, CRT scanline overlay, and mini node-status
+  LED dots in the footer. Five CSS animations: sweep, flicker,
+  research-pulse, data-stream, claim-glow.
+- **Cold-boot startup sequence.** BIOS POST with hardware checks,
+  hex memory scan, \_unOS kernel boot messages, and a freaky anomaly
+  intercept (screen glitch + cryptic hex dump) before "SYSTEM READY."
+  Plays once per session on first terminal load (~4.5 s), uses
+  `sessionStorage` flag so reboots via terminal commands also trigger it.
+
+### Fixed
+
+- **NXS-01 Nexus now appears as a real tile in the panel.** The
+  `NexusModule` component existed but was never mounted in
+  `panel-client.tsx`, so players who built the Nexus could see it in
+  `device list` but couldn't interact with it on the hardware panel.
+  Added to the CORE OPERATIONS row, gated through `GatedTile`.
+- **Unlock flag**: `NXS-01` was gated on `nexus_blueprint_visible`
+  (lab-visibility) which meant a player past EP2 step 3 but without an
+  actual built Nexus would see a blank tile (the module self-hides on
+  `!nexus.isBuilt`). Switched to `nexus_built` so LOCKED stays until
+  the device actually exists.
+- **Device-ID consistency**: the terminal `device list` and man page
+  used `NXS-001` (3-digit) while the canonical ID in
+  `DEVICE_UNLOCK_FLAGS` and the module display is `NXS-01` (2-digit,
+  matching SMT-01 / CND-01 / MIX-01). Aligned to `NXS-01` everywhere.
+
 ## v0.1.15-beta (2026-05-22)
 
 Follow-up tuning after 0.1.14-beta live-testing.

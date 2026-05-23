@@ -53,7 +53,7 @@ export const DEVICE_UNLOCK_FLAGS: Readonly<Record<string, string>> = {
   "INT-001": "first_resonance",
   "DIM-001": "anomaly_depth",
   "EXD-001": "research_explorer_drone",
-  "NXS-01": "nexus_blueprint_visible",
+  "NXS-01": "nexus_built",
   "LCT-001": "nexus_built",
   "P3D-001": "nexus_built",
 
