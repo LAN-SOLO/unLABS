@@ -91,7 +91,7 @@ import { P3DManagerProvider, type P3DMode } from "@/contexts/P3DManager";
 import { SPKManagerProvider } from "@/contexts/SPKManager";
 import { DGNManagerProvider } from "@/contexts/DGNManager";
 import { ScrewButtonManagerProvider } from "@/contexts/ScrewButtonManager";
-import { ResourceManagerProvider, useResourceManagerOptional } from "@/contexts/ResourceManager";
+import { ResourceManagerProvider } from "@/contexts/ResourceManager";
 import { useGameTick } from "@/contexts/GameTickProvider";
 import { FirmwareManagerProvider } from "@/contexts/FirmwareManager";
 import { WalletProvider } from "@/contexts/WalletContext";
