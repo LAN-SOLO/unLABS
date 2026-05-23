@@ -23,11 +23,12 @@
  */
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { useGameTick } from "@/contexts/GameTickProvider";
 import { useQuest } from "@/contexts/QuestProvider";
 import { useProduction } from "@/contexts/ProductionProvider";
+import { Terminal } from "@/components/terminal";
 import { RECIPES, isRecipeBuilt, visibleRecipes, type Recipe } from "@/lib/game/recipes";
 import {
   computeJobProgress,
@@ -48,10 +49,19 @@ const RESOURCE_LABEL: Record<ResourceId, string> = {
   research: "Research",
 };
 
-export function LabClient({ username }: { username: string }) {
+export function LabClient({
+  userId,
+  username,
+  balance: initialBalance,
+}: {
+  userId: string;
+  username: string;
+  balance: number;
+}) {
   const { resources, tickCount } = useGameTick();
   const { state: questState } = useQuest();
   const { jobs, balance, busy, lastError, startJob, claimJob } = useProduction();
+  const [showTerminal, setShowTerminal] = useState(false);
 
   const availableRecipes = useMemo(() => visibleRecipes(questState.flags), [questState.flags]);
 
@@ -146,6 +156,22 @@ export function LabClient({ username }: { username: string }) {
             &gt; {lockedRecipes.length} recipe(s) locked behind quest progress
           </div>
         ) : null}
+      </section>
+
+      {/* ── Embedded Terminal ── */}
+      <section className="mb-6">
+        <button
+          type="button"
+          onClick={() => setShowTerminal((t) => !t)}
+          className="mb-2 border border-green-500/40 bg-green-500/10 px-3 py-1 text-xs text-green-300 hover:bg-green-500/20"
+        >
+          {showTerminal ? "> HIDE TERMINAL" : "> OPEN TERMINAL"}
+        </button>
+        {showTerminal && (
+          <div className="h-[400px] overflow-hidden border border-green-500/30 bg-black">
+            <Terminal userId={userId} username={username} balance={initialBalance} />
+          </div>
+        )}
       </section>
 
       {historyJobs.length > 0 ? (

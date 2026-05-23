@@ -92,6 +92,7 @@ import { SPKManagerProvider } from "@/contexts/SPKManager";
 import { DGNManagerProvider } from "@/contexts/DGNManager";
 import { ScrewButtonManagerProvider } from "@/contexts/ScrewButtonManager";
 import { ResourceManagerProvider, useResourceManagerOptional } from "@/contexts/ResourceManager";
+import { useGameTick } from "@/contexts/GameTickProvider";
 import { FirmwareManagerProvider } from "@/contexts/FirmwareManager";
 import { WalletProvider } from "@/contexts/WalletContext";
 import { ResourceGrid } from "@/components/panel/modules/ResourceGrid";
@@ -1343,34 +1344,34 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
   );
 }
 
-/** Top resource summary bars - reads live data from ResourceManager */
+/** Top resource summary bars - reads live data from GameTickProvider */
 function TopResourceBars() {
-  const rm = useResourceManagerOptional();
-  const [, setTick] = useState(0);
+  const { resources } = useGameTick();
 
-  useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const bars = [
-    { name: "Abstractum", label: "RES-1", color: "var(--neon-green)", type: "Abstractum" },
-    { name: "Energy", label: "RES-2", color: "var(--neon-cyan)", type: "Energy" },
-    { name: "Alloys", label: "RES-3", color: "var(--neon-amber)", type: "Base Alloy" },
-    { name: "Nano", label: "RES-4", color: "#b388ff", type: "Nanomaterial" },
+  const bars: Array<{
+    name: string;
+    id: import("@/lib/game/tickEngine").ResourceId;
+    color: string;
+  }> = [
+    { name: "Abstractum", id: "abstractum", color: "var(--neon-green)" },
+    { name: "Energy", id: "energy", color: "var(--neon-cyan)" },
+    { name: "Alloys", id: "base_alloy", color: "var(--neon-amber)" },
+    { name: "Nano", id: "nanomaterial", color: "#b388ff" },
   ];
 
   return (
     <div className="mb-1 grid grid-cols-4 gap-1">
       {bars.map((res) => {
-        const agg = rm?.getAggregated(res.type) ?? { amount: 0, capacity: 1 };
-        const pct = agg.capacity > 0 ? agg.amount / agg.capacity : 0;
+        const r = resources[res.id];
+        const amount = r?.amount ?? 0;
+        const capacity = r?.capacity ?? 0;
+        const pct = capacity > 0 ? Math.min(1, amount / capacity) : 0;
         return (
-          <PanelFrame key={res.label} variant="default" className="p-1.5">
+          <PanelFrame key={res.id} variant="default" className="p-1.5">
             <div className="flex items-center justify-between">
               <span className="font-mono text-[9px] text-white/80">{res.name}</span>
               <span className="font-mono text-[8px] text-white/40">
-                {Math.floor(agg.amount)}/{agg.capacity}
+                {Math.floor(amount)}/{capacity}
               </span>
             </div>
             <div className="mt-1 h-1.5 overflow-hidden rounded bg-black/50">
@@ -1386,27 +1387,30 @@ function TopResourceBars() {
   );
 }
 
-/** Bottom resource bar - shows first 12 unlocked containers */
+/** Bottom resource bar - live data from GameTickProvider */
 function BottomResourceBar() {
-  const rm = useResourceManagerOptional();
-  const [, setTick] = useState(0);
+  const { resources } = useGameTick();
 
-  useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 3000);
-    return () => clearInterval(interval);
-  }, []);
+  const ids: Array<{ id: import("@/lib/game/tickEngine").ResourceId; label: string }> = [
+    { id: "abstractum", label: "ABS" },
+    { id: "energy", label: "E" },
+    { id: "base_alloy", label: "B.ALY" },
+    { id: "advanced_alloy", label: "A.ALY" },
+    { id: "nanomaterial", label: "NANO" },
+    { id: "exotic_matter", label: "EXO" },
+    { id: "antimatter", label: "ANTI" },
+    { id: "research", label: "RES" },
+  ];
 
-  if (!rm) return <ResourceBar />;
+  const mapped = ids
+    .map(({ id, label }) => {
+      const r = resources[id];
+      if (!r) return null;
+      return { id, label, value: r.amount, max: r.capacity > 0 ? r.capacity : r.amount + 1 };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
 
-  const unlocked = rm.getUnlockedContainers().slice(0, 12);
-  const resources = unlocked.map(([id, cs]) => ({
-    id,
-    label: id,
-    value: cs.amount,
-    max: cs.capacity,
-  }));
-
-  return <ResourceBar resources={resources.length > 0 ? resources : undefined} />;
+  return <ResourceBar resources={mapped.length > 0 ? mapped : undefined} />;
 }
 
 /** Inner component that reads SystemPower context for CRT/boot effects + CLK-001 sync */

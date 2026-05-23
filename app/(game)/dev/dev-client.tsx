@@ -20,6 +20,7 @@ import Link from "next/link";
 import { useGameTick } from "@/contexts/GameTickProvider";
 import { useQuest } from "@/contexts/QuestProvider";
 import { useProduction } from "@/contexts/ProductionProvider";
+import { Terminal } from "@/components/terminal";
 import { flushSave } from "@/lib/game/saveSync";
 import { grantDevUnsc } from "./actions";
 import type { ResourceId } from "@/lib/game/tickEngine";
@@ -37,10 +38,14 @@ const RESOURCES: ResourceId[] = [
 ];
 
 export function DevClient({
+  userId,
   username,
+  balance: initialBalance,
   currentEpisode,
 }: {
+  userId: string;
   username: string;
+  balance: number;
   currentEpisode: string;
 }) {
   const { resources, tickCount, lastTickAt, offlineCatchUpSeconds, grant, setRate, setCapacity } =
@@ -53,6 +58,7 @@ export function DevClient({
   const [resetting, setResetting] = useState(false);
   const [granting, setGranting] = useState(false);
   const [cascading, setCascading] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
 
   const resourceRows = useMemo(() => {
     return RESOURCES.map((id) => {
@@ -331,11 +337,27 @@ export function DevClient({
         </div>
       </section>
 
-      <section>
+      <section className="mb-6">
         <h2 className="mb-2 text-sm text-green-300">&#47;&#47; LIVE STATE DUMP</h2>
         <pre className="overflow-x-auto border border-green-500/30 p-3 text-[10px] text-green-500/80">
           {JSON.stringify({ resources, tickCount, lastTickAt, quest: quest.state }, null, 2)}
         </pre>
+      </section>
+
+      {/* ── Embedded Terminal ── */}
+      <section className="mb-6">
+        <button
+          type="button"
+          onClick={() => setShowTerminal((t) => !t)}
+          className="mb-2 border border-green-500/40 bg-green-500/10 px-3 py-1 text-xs text-green-300 hover:bg-green-500/20"
+        >
+          {showTerminal ? "> HIDE TERMINAL" : "> OPEN TERMINAL"}
+        </button>
+        {showTerminal && (
+          <div className="h-[400px] overflow-hidden border border-green-500/30 bg-black">
+            <Terminal userId={userId} username={username} balance={initialBalance} />
+          </div>
+        )}
       </section>
     </div>
   );
