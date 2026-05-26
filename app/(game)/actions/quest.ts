@@ -173,6 +173,13 @@ const CLIENT_SETTABLE_FLAGS = new Set([
   "lissajous_locked",
   "abstractum_bottleneck_observed",
   "first_production_run",
+  // Production recipe flags (set by ProductionProvider.applyRewards on claim)
+  "smt_01_online",
+  "cnd_01_online",
+  "mix_01_online",
+  "three_chains_online",
+  "nexus_built",
+  "mfr_001_online",
   // Phase 4/5 observer-set flags (see contexts/PhaseObservers.tsx)
   "research_started",
   "pick_path_done",

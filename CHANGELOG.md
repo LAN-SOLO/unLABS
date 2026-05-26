@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.1.17-beta (2026-05-26)
+
+### Fixed
+
+- **Quest stuck at EP2 step 4 "Build NXS-01".** Production recipe flags
+  (`nexus_built`, `smt_01_online`, `cnd_01_online`, `mix_01_online`,
+  `three_chains_online`, `mfr_001_online`) were missing from the
+  `CLIENT_SETTABLE_FLAGS` whitelist in `setQuestFlagAction`. The server
+  silently returned `flag_not_allowed`, so the cascade-advance never
+  fired after claiming a device recipe. The client set the flag locally
+  (GatedTile showed the module) but the quest engine never advanced.
+
 ## v0.1.16-beta (2026-05-23)
 
 ### Added
