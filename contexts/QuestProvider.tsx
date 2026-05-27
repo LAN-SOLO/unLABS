@@ -57,7 +57,7 @@ interface QuestContextValue {
    * satisfied — including out-of-order skips when a later step is live but
    * the active one isn't. Heals saves stuck behind an unfired observer.
    */
-  cascade: () => Promise<void>;
+  cascade: () => void;
   reset: (episodeId?: string) => Promise<void>;
   /**
    * Flip a client-settable quest flag (e.g. `lissajous_locked`). Persisted
@@ -138,16 +138,18 @@ export function QuestProvider({
     });
   }, [applyRewards]);
 
-  const cascade = useCallback(async () => {
-    const result = await cascadeAdvanceCurrent();
-    if (!result.ok || !result.state) {
-      if (process.env.NODE_ENV !== "production") {
-        console.warn("[quest] cascade failed:", result.error);
+  const cascade = useCallback(() => {
+    startTransition(async () => {
+      const result = await cascadeAdvanceCurrent();
+      if (!result.ok || !result.state) {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn("[quest] cascade failed:", result.error);
+        }
+        return;
       }
-      return;
-    }
-    if (result.rewards.length > 0) applyRewards(result.rewards);
-    setState(result.state);
+      if (result.rewards.length > 0) applyRewards(result.rewards);
+      setState(result.state);
+    });
   }, [applyRewards]);
 
   const reset = useCallback(async (episodeId?: string) => {

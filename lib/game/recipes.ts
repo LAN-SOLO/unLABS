@@ -224,6 +224,163 @@ export const RECIPES: Recipe[] = [
     ],
     unlockRequires: ["anomaly_mode"],
   },
+
+  // ── Tier 3: Science Devices ────────────────────────────────────────
+
+  {
+    id: "emc_001_build",
+    label: "Exotic Matter Containment (EMC-001)",
+    flavor:
+      "A containment vessel for exotic matter. Previous containment method: hoping it would stay put.",
+    tier: 3,
+    category: "device",
+    costs: [
+      { resourceId: "nanomaterial", amount: 2 },
+      { resourceId: "exotic_matter", amount: 3 },
+      { resourceId: "energy", amount: 800 },
+    ],
+    unscBurn: 50,
+    durationSec: 2400,
+    outputs: [
+      { kind: "set_flag", flag: "emc_001_online", value: true },
+      { kind: "set_resource_capacity", resourceId: "exotic_matter", capacity: 25 },
+    ],
+    unlockRequires: ["ENDGAME_UNLOCKED", "forge_mastered"],
+  },
+  {
+    id: "qan_001_build",
+    label: "Quantum Analyzer (QAN-001)",
+    flavor:
+      "Measures quantum states with uncomfortable precision. The heaviest draw in the quantum pair.",
+    tier: 3,
+    category: "device",
+    costs: [
+      { resourceId: "nanomaterial", amount: 3 },
+      { resourceId: "exotic_matter", amount: 2 },
+      { resourceId: "energy", amount: 1200 },
+      { resourceId: "advanced_alloy", amount: 5 },
+    ],
+    unscBurn: 80,
+    durationSec: 3600,
+    outputs: [{ kind: "set_flag", flag: "qan_001_online", value: true }],
+    unlockRequires: ["emc_001_online"],
+  },
+  {
+    id: "qsm_001_build",
+    label: "Quantum State Monitor (QSM-001)",
+    flavor:
+      "Observes without collapsing. The lighter half of the quantum pair. Nervous but dependable.",
+    tier: 3,
+    category: "device",
+    costs: [
+      { resourceId: "nanomaterial", amount: 1 },
+      { resourceId: "exotic_matter", amount: 1 },
+      { resourceId: "energy", amount: 600 },
+      { resourceId: "advanced_alloy", amount: 3 },
+    ],
+    unscBurn: 40,
+    durationSec: 1800,
+    outputs: [{ kind: "set_flag", flag: "qsm_001_online", value: true }],
+    unlockRequires: ["emc_001_online"],
+  },
+
+  // ── Tier 3: Compute & Teleportation ────────────────────────────────
+
+  {
+    id: "aic_001_build",
+    label: "AI Assistant Core (AIC-001)",
+    flavor: "A neural compute core. MCP has opinions about this one. Strong opinions.",
+    tier: 3,
+    category: "device",
+    costs: [
+      { resourceId: "nanomaterial", amount: 4 },
+      { resourceId: "exotic_matter", amount: 3 },
+      { resourceId: "antimatter", amount: 1 },
+      { resourceId: "energy", amount: 1500 },
+    ],
+    unscBurn: 100,
+    durationSec: 3600,
+    outputs: [
+      { kind: "set_flag", flag: "aic_001_online", value: true },
+      { kind: "grant_resource", resourceId: "research", amount: 15 },
+    ],
+    unlockRequires: ["ep5_complete"],
+  },
+  {
+    id: "sca_001_build",
+    label: "Supercomputer Array (SCA-001)",
+    flavor:
+      "Petascale compute in a rack-mount form factor. Cooling: aggressive. Power draw: concerning.",
+    tier: 3,
+    category: "device",
+    costs: [
+      { resourceId: "nanomaterial", amount: 5 },
+      { resourceId: "exotic_matter", amount: 5 },
+      { resourceId: "antimatter", amount: 2 },
+      { resourceId: "energy", amount: 2000 },
+    ],
+    unscBurn: 150,
+    durationSec: 5400,
+    outputs: [{ kind: "set_flag", flag: "sca_001_online", value: true }],
+    unlockRequires: ["ENDGAME_UNLOCKED", "aic_001_online"],
+  },
+  {
+    id: "tlp_001_build",
+    label: "Teleport Pad (TLP-001)",
+    flavor:
+      "Quantum teleportation platform. 100W continuous. Operator survival rate during testing: not disclosed.",
+    tier: 3,
+    category: "device",
+    costs: [
+      { resourceId: "nanomaterial", amount: 6 },
+      { resourceId: "exotic_matter", amount: 8 },
+      { resourceId: "antimatter", amount: 3 },
+      { resourceId: "energy", amount: 2500 },
+    ],
+    unscBurn: 200,
+    durationSec: 7200,
+    outputs: [
+      { kind: "set_flag", flag: "tlp_001_online", value: true },
+      { kind: "set_resource_rate", resourceId: "exotic_matter", ratePerSecond: 1 / 60 },
+    ],
+    unlockRequires: ["ep4_complete", "sca_001_online"],
+  },
+
+  // ── Tier 3: Material Recipes ───────────────────────────────────────
+
+  {
+    id: "exotic_matter_crystal",
+    label: "Exotic Matter Crystal",
+    flavor:
+      "Crystallized exotic matter. The containment vessel makes this possible. The lab's opinion of it is divided.",
+    tier: 3,
+    category: "material",
+    costs: [
+      { resourceId: "nanomaterial", amount: 1 },
+      { resourceId: "energy", amount: 1000 },
+      { resourceId: "advanced_alloy", amount: 2 },
+    ],
+    unscBurn: 15,
+    durationSec: 2400,
+    outputs: [{ kind: "grant_resource", resourceId: "exotic_matter", amount: 2 }],
+    unlockRequires: ["emc_001_online"],
+  },
+  {
+    id: "antimatter_vial",
+    label: "Antimatter Vial",
+    flavor: "One microgram of antihydrogen, suspended in a magnetic trap. Do not shake.",
+    tier: 3,
+    category: "material",
+    costs: [
+      { resourceId: "exotic_matter", amount: 4 },
+      { resourceId: "energy", amount: 1500 },
+      { resourceId: "nanomaterial", amount: 2 },
+    ],
+    unscBurn: 25,
+    durationSec: 3600,
+    outputs: [{ kind: "grant_resource", resourceId: "antimatter", amount: 1 }],
+    unlockRequires: ["emc_001_online", "anomaly_topology_mapped"],
+  },
 ];
 
 export function getRecipe(id: string): Recipe | null {

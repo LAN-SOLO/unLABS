@@ -9,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { usePowerManagerOptional } from "@/contexts/PowerManager";
 
 // BAT Device States
 type BATDeviceState =
@@ -90,6 +91,7 @@ interface BATManagerProviderProps {
 }
 
 export function BATManagerProvider({ children, initialState }: BATManagerProviderProps) {
+  const powerManager = usePowerManagerOptional();
   const startPowered = initialState?.isPowered ?? false;
   const startExpanded = initialState?.isExpanded ?? startPowered;
   const [deviceState, setDeviceState] = useState<BATDeviceState>(
@@ -116,6 +118,28 @@ export function BATManagerProvider({ children, initialState }: BATManagerProvide
   useEffect(() => {
     setChargePercent(Math.round((currentCharge / BAT_POWER_SPECS.capacity) * 100));
   }, [currentCharge]);
+
+  // Sync battery display from PowerManager's authoritative state
+  useEffect(() => {
+    if (!powerManager || !isPowered || deviceState === "standby" || deviceState === "shutdown")
+      return;
+    const bat = powerManager.storage.find((s) => s.id === "BAT-001");
+    if (!bat) return;
+    setCurrentCharge(bat.stored);
+    setIsCharging(bat.status === "charging");
+    setIsDischarging(bat.status === "discharging");
+    if (bat.status === "charging" && deviceState === "online") {
+      setDeviceState("charging");
+    } else if (bat.status === "discharging" && deviceState === "online") {
+      setDeviceState("discharging");
+    } else if (
+      (deviceState === "charging" || deviceState === "discharging") &&
+      bat.status !== "charging" &&
+      bat.status !== "discharging"
+    ) {
+      setDeviceState("online");
+    }
+  }, [powerManager?.storage, isPowered, deviceState]);
 
   // Boot sequence
   const runBootSequence = useCallback(async () => {

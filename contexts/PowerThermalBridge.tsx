@@ -1,36 +1,27 @@
 "use client";
 
 /**
- * PowerThermalBridge — couples the PowerManager to the ThermalManager.
+ * PowerThermalBridge — bidirectional coupling between PowerManager and ThermalManager.
  *
- * Every time a power consumer changes state (full / idle / standby / offline),
- * this component pushes the matching watts into the thermal model. The
- * thermal subsystem then drives the per-device sub-zone temperatures and the
- * VentilationFan displays automatically.
+ * Direction 1 (Power → Thermal): When a power consumer changes state, push the
+ * matching watts into the thermal model as waste heat. The thermal subsystem
+ * then drives per-device sub-zone temperatures and fan auto-control.
  *
- * Almost all electrical power consumed by an electronic device becomes waste
- * heat in the chassis, so we feed `currentDraw` (E/s, treated as watts) into
- * `syncDevicePower` directly without an extra fudge factor.
+ * Direction 2 (Thermal → Power): When ThermalManager computes a performance
+ * throttle (due to overheating), feed it back into PowerManager so effective
+ * consumer draw is reduced. This creates a self-stabilizing loop:
+ *   heat → throttle → reduced draw → less heat → throttle lifts
  *
- * Exception: `'standby'` and `'offline'` both contribute zero waste heat. From
- * the player's point of view, "powered off" should cool the chassis down.
- * Standby draw still counts toward the energy economy via PowerManager — we
- * just don't dissipate it inside the chassis (think: the power is held in
- * containment fields, vented externally, or simply too small to model).
- *
- * Mount this component once, as a child of both `<PowerManagerProvider>` and
- * `<ThermalManagerProvider>`. It renders nothing.
+ * Mount this component once, as a child of both providers. It renders nothing.
  */
 
 import { useEffect, useMemo, useRef } from "react";
 import { useThermalManagerOptional } from "@/contexts/ThermalManager";
 import { usePowerManagerOptional } from "@/contexts/PowerManager";
 
-// PowerManager IDs use 3-letter prefixes that don't always match the
-// 3-letter device ids the thermal catalog uses. Map the exceptions here.
 const POWER_PREFIX_TO_THERMAL_ID: Record<string, string> = {
-  INT: "ipl", // Interpolator
-  QAN: "qua", // Quantum Analyzer
+  INT: "ipl",
+  QAN: "qua",
 };
 
 function powerIdToThermalId(powerId: string): string {
@@ -42,38 +33,51 @@ export function PowerThermalBridge() {
   const thermal = useThermalManagerOptional();
   const power = usePowerManagerOptional();
 
-  // Only re-sync when something that actually affects heat changes:
-  // device id, current state, or its rated draw values. Avoids spamming
-  // setState every render of PowerManagerProvider.
-  const fingerprint = useMemo(() => {
-    if (!power) return "";
-    return power.consumers
-      .map((c) => `${c.id}:${c.currentState}:${c.draw.full}:${c.draw.idle}:${c.draw.standby}`)
-      .join("|");
-  }, [power]);
-
-  // Hold the latest contexts in refs so the sync effect only fires when the
-  // fingerprint actually changes. Depending on `thermal`/`power` directly
-  // would loop: calling syncDevicePower → ThermalManager setState → new
-  // context value → effect re-runs → infinite update loop.
   const thermalRef = useRef(thermal);
   thermalRef.current = thermal;
   const powerRef = useRef(power);
   powerRef.current = power;
 
+  // ── Power → Thermal: sync consumer watts as waste heat ───────────
+
+  const fingerprint = useMemo(() => {
+    if (!power) return "";
+    const throttle = power.performanceThrottle ?? 1;
+    return (
+      power.consumers
+        .map((c) => `${c.id}:${c.currentState}:${c.draw.full}:${c.draw.idle}:${c.draw.standby}`)
+        .join("|") + `|t:${throttle.toFixed(2)}`
+    );
+  }, [power]);
+
   useEffect(() => {
     const t = thermalRef.current;
     const p = powerRef.current;
     if (!t || !p) return;
+    const throttle = p.performanceThrottle ?? 1;
     for (const c of p.consumers) {
       const id = powerIdToThermalId(c.id);
       const peakW = c.draw.full;
-      // Both 'offline' and 'standby' contribute zero waste heat — see header.
       const currentW =
-        c.currentState === "offline" || c.currentState === "standby" ? 0 : c.draw[c.currentState];
+        c.currentState === "offline" || c.currentState === "standby"
+          ? 0
+          : c.draw[c.currentState] * throttle;
       t.syncDevicePower(id, currentW, peakW, c.name);
     }
   }, [fingerprint]);
+
+  // ── Thermal → Power: feed performanceThrottle back ───────────────
+
+  const thermalThrottle = thermal?.state.performanceThrottle;
+  const lastThrottleRef = useRef(thermalThrottle);
+
+  useEffect(() => {
+    const p = powerRef.current;
+    if (!p || thermalThrottle === undefined) return;
+    if (thermalThrottle === lastThrottleRef.current) return;
+    lastThrottleRef.current = thermalThrottle;
+    p.setPerformanceThrottle(thermalThrottle);
+  }, [thermalThrottle]);
 
   return null;
 }

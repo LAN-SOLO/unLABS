@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
+import { usePowerManagerOptional } from "@/contexts/PowerManager";
 
 // MFR Device States
 type MFRDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -77,6 +78,7 @@ interface MFRManagerProviderProps {
 
 export function MFRManagerProvider({ children, initialState }: MFRManagerProviderProps) {
   const isUnlocked = useDeviceUnlocked("MFR-001");
+  const powerManager = usePowerManagerOptional();
   const startPowered = initialState?.isPowered ?? false;
   const [deviceState, setDeviceState] = useState<MFRDeviceState>(
     startPowered ? "booting" : "standby",
@@ -113,6 +115,23 @@ export function MFRManagerProvider({ children, initialState }: MFRManagerProvide
       return () => clearInterval(interval);
     }
   }, [deviceState, isPowered]);
+
+  // Sync reactor state to PowerManager source
+  useEffect(() => {
+    if (!powerManager) return;
+    if (deviceState === "online" && isPowered) {
+      powerManager.setSourceState("MFR-001", "full");
+    } else if (
+      deviceState === "standby" ||
+      deviceState === "booting" ||
+      deviceState === "testing" ||
+      deviceState === "rebooting"
+    ) {
+      powerManager.setSourceState("MFR-001", "standby");
+    } else {
+      powerManager.setSourceState("MFR-001", "offline");
+    }
+  }, [deviceState, isPowered, powerManager]);
 
   // Boot sequence
   const runBootSequence = useCallback(async () => {

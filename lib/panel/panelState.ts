@@ -15,6 +15,23 @@ export interface PanelSaveData {
   };
   journal?: { entries: import("@/lib/unos/journal").JournalEntry[]; bootTime: number };
   cron?: { entries: import("@/lib/unos/cron").CronEntry[]; nextId: number };
+  power?: {
+    sources: { id: string; currentState: string }[];
+    storage: { id: string; stored: number }[];
+    consumers: { id: string; currentState: string }[];
+  };
+  thermal?: {
+    panelTemperature: number;
+    zones: {
+      cpu: { temperature: number };
+      gpu: { temperature: number };
+      panel: { temperature: number };
+    };
+    fans: {
+      cpu: { speed: number; mode: string };
+      gpu: { speed: number; mode: string };
+    };
+  };
   firmware?: {
     [deviceId: string]: {
       installedVersion: {

@@ -847,7 +847,9 @@ export function useTerminal({
           );
         }
         setTimeout(() => {
-          router.push(result.navigate!);
+          // Use window.location for reliable navigation in Electron builds
+          // where Next.js client-side router can fail silently
+          window.location.href = result.navigate!;
         }, 1500); // Delay to let user see the output
       }
 

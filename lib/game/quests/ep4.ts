@@ -121,6 +121,5 @@ export const EP4: Episode = {
     },
   ],
   completionRewards: [{ kind: "set_flag", flag: "ep4_complete", value: true }],
-  // EP4 is the terminal tutorial episode. Post-MVP workstreams (prestige,
-  // seasons) can add nextEpisode: "EP5-Seasonal" without changing EP4.
+  nextEpisode: "EP5",
 };

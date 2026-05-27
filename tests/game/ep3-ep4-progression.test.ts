@@ -107,8 +107,8 @@ describe("EP4 Autonomy — registry + flow", () => {
     expect(final.state.flags.ep4_complete).toBe(true);
   });
 
-  it("EP4 has no nextEpisode (terminal tutorial episode)", () => {
-    expect(getEpisode("EP4")!.nextEpisode).toBeUndefined();
+  it("EP4 chains to EP5", () => {
+    expect(getEpisode("EP4")!.nextEpisode).toBe("EP5");
   });
 });
 

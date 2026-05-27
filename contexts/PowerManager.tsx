@@ -1,13 +1,19 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type ReactNode,
+} from "react";
 
 // Power units are E/s (Energy per second) as per GD_SPEC_device-power_v1_0.md
 
-// Power states
 type PowerState = "full" | "idle" | "standby" | "offline";
 
-// Power source definition
 interface PowerSource {
   id: string;
   name: string;
@@ -18,7 +24,6 @@ interface PowerSource {
   startupCost: number;
 }
 
-// Power storage definition
 interface PowerStorage {
   id: string;
   name: string;
@@ -30,49 +35,48 @@ interface PowerStorage {
   status: "charging" | "discharging" | "full" | "empty" | "idle";
 }
 
-// Power consumer definition
 interface PowerConsumer {
   id: string;
   name: string;
   category: "heavy" | "medium" | "light";
   draw: { full: number; idle: number; standby: number };
   currentState: PowerState;
-  priority: 1 | 2 | 3 | 4; // 1=Critical, 2=Standard, 3=Non-essential, 4=High-power
+  priority: 1 | 2 | 3 | 4;
 }
 
-// Overall power state
 interface PowerSystemState {
-  // Calculated values (E/s)
   totalGeneration: number;
   totalMaxGeneration: number;
   totalConsumption: number;
   powerBalance: number;
   loadPercent: number;
-  // Storage (E)
   storageE: number;
   storageCapacity: number;
   storagePercent: number;
-  // Status
   status: "optimal" | "caution" | "critical" | "emergency";
-  // Voltage (calculated from balance)
   voltage: number;
-  // Raw data
   sources: PowerSource[];
   storage: PowerStorage[];
   consumers: PowerConsumer[];
   activeDeviceCount: number;
   totalDeviceCount: number;
+  performanceThrottle: number;
+  loadSheddingActive: boolean;
+  shedDeviceIds: string[];
 }
 
 interface PowerManagerContextType extends PowerSystemState {
   setDevicePower: (deviceId: string, state: PowerState) => void;
+  setSourceState: (sourceId: string, state: PowerState) => void;
+  setPerformanceThrottle: (throttle: number) => void;
   emergencyShutdown: () => void;
   refreshPowerData: () => void;
 }
 
 const PowerManagerContext = createContext<PowerManagerContextType | null>(null);
 
-// Power sources from GD_SPEC_device-power_v1_0.md
+// ── Default data ─────────────────────────────────────────────────────
+
 const defaultSources: PowerSource[] = [
   {
     id: "UEC-001",
@@ -94,23 +98,20 @@ const defaultSources: PowerSource[] = [
   },
 ];
 
-// Power storage from GD_SPEC_device-power_v1_0.md
 const defaultStorage: PowerStorage[] = [
   {
     id: "BAT-001",
     name: "Battery Pack",
     capacity: 5000,
-    stored: 4250, // 85%
+    stored: 4250,
     chargeRate: 100,
     dischargeRate: 150,
     selfDischarge: 0.5,
-    status: "charging",
+    status: "idle",
   },
 ];
 
-// Power consumers from GD_SPEC_device-power_v1_0.md (Complete Device Power Summary)
 const defaultConsumers: PowerConsumer[] = [
-  // Heavy Consumers
   {
     id: "SCA-001",
     name: "Supercomputer Array",
@@ -175,8 +176,6 @@ const defaultConsumers: PowerConsumer[] = [
     currentState: "idle",
     priority: 1,
   },
-
-  // Medium Consumers
   {
     id: "QSM-001",
     name: "Quantum State Monitor",
@@ -241,8 +240,6 @@ const defaultConsumers: PowerConsumer[] = [
     currentState: "idle",
     priority: 2,
   },
-
-  // Light Consumers
   {
     id: "VNT-001",
     name: "Ventilation System",
@@ -389,77 +386,36 @@ const defaultConsumers: PowerConsumer[] = [
   },
 ];
 
-export function PowerManagerProvider({ children }: { children: ReactNode }) {
-  const [sources, setSources] = useState<PowerSource[]>(defaultSources);
-  const [storage, setStorage] = useState<PowerStorage[]>(defaultStorage);
-  const [consumers, setConsumers] = useState<PowerConsumer[]>(defaultConsumers);
+// ── Initial state computation ────────────────────────────────────────
 
-  // Calculate generation based on current state
+function computeInitialState(
+  sources: PowerSource[],
+  storage: PowerStorage[],
+  consumers: PowerConsumer[],
+): PowerSystemState {
   const totalGeneration = sources.reduce((sum, s) => {
     if (s.currentState === "offline") return sum;
-    return sum + s.output[s.currentState];
+    return sum + s.output[s.currentState] * (s.efficiency / 100);
   }, 0);
-
-  const totalMaxGeneration = sources.reduce((sum, s) => sum + s.output.full, 0);
-
-  // Calculate consumption based on current state
+  const totalMaxGeneration = sources.reduce(
+    (sum, s) => sum + s.output.full * (s.efficiency / 100),
+    0,
+  );
   const totalConsumption = consumers.reduce((sum, c) => {
     if (c.currentState === "offline") return sum;
     return sum + c.draw[c.currentState];
   }, 0);
-
   const powerBalance = totalGeneration - totalConsumption;
   const loadPercent =
     totalGeneration > 0 ? Math.round((totalConsumption / totalGeneration) * 100) : 0;
-
-  // Storage calculations
   const storageE = storage.reduce((sum, s) => sum + s.stored, 0);
   const storageCapacity = storage.reduce((sum, s) => sum + s.capacity, 0);
   const storagePercent = storageCapacity > 0 ? Math.round((storageE / storageCapacity) * 100) : 0;
-
-  // Count devices
   const activeDeviceCount = consumers.filter(
     (c) => c.currentState !== "offline" && c.currentState !== "standby",
   ).length;
-  const totalDeviceCount = consumers.length;
 
-  // Calculate voltage from power balance
-  // Base 120V, scales based on balance percentage (±30V range)
-  const voltage = (() => {
-    if (totalGeneration === 0) return 0;
-    const balancePercent = powerBalance / totalGeneration;
-    // Clamp between 80V and 150V
-    return Math.max(80, Math.min(150, 120 + balancePercent * 30));
-  })();
-
-  // Determine system status per GD_SPEC_device-power_v1_0.md thresholds
-  const status: PowerSystemState["status"] = (() => {
-    const surplusPercent = (powerBalance / totalGeneration) * 100;
-    if (surplusPercent > 20) return "optimal"; // >20% surplus
-    if (surplusPercent >= 0) return "caution"; // 0-20% surplus
-    if (surplusPercent > -20) return "critical"; // <0% (deficit)
-    return "emergency"; // Sustained deficit
-  })();
-
-  // Actions
-  const setDevicePower = useCallback((deviceId: string, state: PowerState) => {
-    setConsumers((prev) =>
-      prev.map((c) => (c.id === deviceId ? { ...c, currentState: state } : c)),
-    );
-  }, []);
-
-  const emergencyShutdown = useCallback(() => {
-    // Shut down all non-critical (P2, P3, P4) devices per priority
-    setConsumers((prev) =>
-      prev.map((c) => (c.priority > 1 ? { ...c, currentState: "offline" } : c)),
-    );
-  }, []);
-
-  const refreshPowerData = useCallback(() => {
-    setSources([...sources]);
-  }, [sources]);
-
-  const value: PowerManagerContextType = {
+  return {
     totalGeneration,
     totalMaxGeneration,
     totalConsumption,
@@ -468,14 +424,266 @@ export function PowerManagerProvider({ children }: { children: ReactNode }) {
     storageE,
     storageCapacity,
     storagePercent,
-    status,
-    voltage,
+    status: "optimal",
+    voltage: 120,
     sources,
     storage,
     consumers,
     activeDeviceCount,
-    totalDeviceCount,
+    totalDeviceCount: consumers.length,
+    performanceThrottle: 1,
+    loadSheddingActive: false,
+    shedDeviceIds: [],
+  };
+}
+
+// ── Provider ─────────────────────────────────────────────────────────
+
+export interface PowerManagerProviderProps {
+  children: ReactNode;
+  initialPowerState?: {
+    sources?: { id: string; currentState: string }[];
+    storage?: { id: string; stored: number }[];
+    consumers?: { id: string; currentState: string }[];
+  };
+}
+
+export function PowerManagerProvider({ children, initialPowerState }: PowerManagerProviderProps) {
+  const [state, setState] = useState<PowerSystemState>(() => {
+    let sources = defaultSources;
+    let storage = defaultStorage;
+    let consumers = defaultConsumers;
+
+    if (initialPowerState?.sources) {
+      sources = sources.map((s) => {
+        const saved = initialPowerState.sources!.find((sv) => sv.id === s.id);
+        return saved ? { ...s, currentState: saved.currentState as PowerState } : s;
+      });
+    }
+    if (initialPowerState?.storage) {
+      storage = storage.map((s) => {
+        const saved = initialPowerState.storage!.find((sv) => sv.id === s.id);
+        return saved ? { ...s, stored: saved.stored } : s;
+      });
+    }
+    if (initialPowerState?.consumers) {
+      consumers = consumers.map((c) => {
+        const saved = initialPowerState.consumers!.find((sv) => sv.id === c.id);
+        return saved ? { ...c, currentState: saved.currentState as PowerState } : c;
+      });
+    }
+
+    return computeInitialState(sources, storage, consumers);
+  });
+
+  const throttleRef = useRef(1.0);
+
+  // ── Tick loop (1s) ───────────────────────────────────────────────
+
+  useEffect(() => {
+    const TICK_MS = 1000;
+    const dt = TICK_MS / 1000;
+
+    const interval = setInterval(() => {
+      setState((prev) => {
+        const throttle = throttleRef.current;
+
+        // 1. Generation (sources × efficiency)
+        const totalGeneration = prev.sources.reduce((sum, s) => {
+          if (s.currentState === "offline") return sum;
+          return sum + s.output[s.currentState] * (s.efficiency / 100);
+        }, 0);
+        const totalMaxGeneration = prev.sources.reduce(
+          (sum, s) => sum + s.output.full * (s.efficiency / 100),
+          0,
+        );
+
+        // 2. Consumption (consumers × throttle for non-standby)
+        let totalConsumption = 0;
+        for (const c of prev.consumers) {
+          if (c.currentState === "offline") continue;
+          const raw = c.draw[c.currentState];
+          totalConsumption += c.currentState === "standby" ? raw : raw * throttle;
+        }
+
+        // 3. Balance
+        const balance = totalGeneration - totalConsumption;
+
+        // 4. Battery update
+        const bat = prev.storage[0];
+        let newStored = bat.stored;
+        if (balance > 0) {
+          const chargeAmount = Math.min(balance, bat.chargeRate) * dt;
+          newStored = Math.min(bat.capacity, newStored + chargeAmount);
+        } else if (balance < 0) {
+          const dischargeAmount = Math.min(Math.abs(balance), bat.dischargeRate) * dt;
+          newStored = Math.max(0, newStored - dischargeAmount);
+        }
+        newStored = Math.max(0, newStored - bat.selfDischarge * dt);
+
+        const batStatus: PowerStorage["status"] =
+          newStored >= bat.capacity
+            ? "full"
+            : balance > 0
+              ? "charging"
+              : balance < 0 && newStored > 0
+                ? "discharging"
+                : newStored <= 0
+                  ? "empty"
+                  : "idle";
+
+        const newStorage: PowerStorage[] = [
+          { ...bat, stored: newStored, status: batStatus },
+          ...prev.storage.slice(1),
+        ];
+
+        // 5. Load shedding (battery empty AND deficit)
+        let newConsumers = prev.consumers;
+        let shedDeviceIds: string[] = [];
+        let loadSheddingActive = false;
+
+        if (newStored <= 0 && balance < 0) {
+          loadSheddingActive = true;
+          const sheddable = prev.consumers
+            .filter(
+              (c) => c.priority > 1 && c.currentState !== "offline" && c.currentState !== "standby",
+            )
+            .sort((a, b) => {
+              const aState = a.currentState as "full" | "idle" | "standby";
+              const bState = b.currentState as "full" | "idle" | "standby";
+              return b.priority - a.priority || b.draw[bState] - a.draw[aState];
+            });
+
+          let deficit = Math.abs(balance);
+          const shedIds = new Set<string>();
+          for (const c of sheddable) {
+            if (deficit <= 0) break;
+            const cState = c.currentState as "full" | "idle" | "standby";
+            deficit -= c.draw[cState] * throttle;
+            shedIds.add(c.id);
+          }
+
+          if (shedIds.size > 0) {
+            shedDeviceIds = Array.from(shedIds);
+            newConsumers = prev.consumers.map((c) =>
+              shedIds.has(c.id) ? { ...c, currentState: "standby" as PowerState } : c,
+            );
+            // Recalculate consumption after shedding
+            totalConsumption = 0;
+            for (const c of newConsumers) {
+              if (c.currentState === "offline") continue;
+              const raw = c.draw[c.currentState];
+              totalConsumption += c.currentState === "standby" ? raw : raw * throttle;
+            }
+          }
+        }
+
+        // 6. Voltage (sag above 80% load, extra sag if battery empty)
+        let voltage = 120;
+        if (totalGeneration > 0) {
+          const loadFraction = totalConsumption / totalGeneration;
+          if (loadFraction > 0.8) {
+            const overloadFactor = Math.min(1, (loadFraction - 0.8) / 0.4);
+            voltage = 120 * (1 - overloadFactor * 0.33);
+          }
+        } else {
+          voltage = 0;
+        }
+        if (newStored <= 0) voltage *= 0.85;
+        voltage = Math.max(60, Math.min(150, voltage));
+
+        // 7. Status
+        const powerBalance = totalGeneration - totalConsumption;
+        const loadPercent =
+          totalGeneration > 0 ? Math.round((totalConsumption / totalGeneration) * 100) : 0;
+        let status: PowerSystemState["status"];
+        if (loadSheddingActive) {
+          status = "emergency";
+        } else if (totalGeneration === 0) {
+          status = "emergency";
+        } else {
+          const surplusPercent = (powerBalance / totalGeneration) * 100;
+          if (surplusPercent > 20) status = "optimal";
+          else if (surplusPercent >= 0) status = "caution";
+          else if (surplusPercent > -20) status = "critical";
+          else status = "emergency";
+        }
+
+        const storageE = newStored;
+        const storageCapacity = bat.capacity;
+        const storagePercent =
+          storageCapacity > 0 ? Math.round((storageE / storageCapacity) * 100) : 0;
+        const activeDeviceCount = newConsumers.filter(
+          (c) => c.currentState !== "offline" && c.currentState !== "standby",
+        ).length;
+
+        return {
+          ...prev,
+          sources: prev.sources,
+          storage: newStorage,
+          consumers: newConsumers,
+          totalGeneration,
+          totalMaxGeneration,
+          totalConsumption,
+          powerBalance,
+          loadPercent,
+          storageE,
+          storageCapacity,
+          storagePercent,
+          status,
+          voltage,
+          activeDeviceCount,
+          totalDeviceCount: newConsumers.length,
+          performanceThrottle: throttle,
+          loadSheddingActive,
+          shedDeviceIds,
+        };
+      });
+    }, TICK_MS);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // ── Actions ────────────────────────────────────────────────────────
+
+  const setDevicePower = useCallback((deviceId: string, newState: PowerState) => {
+    setState((prev) => ({
+      ...prev,
+      consumers: prev.consumers.map((c) =>
+        c.id === deviceId ? { ...c, currentState: newState } : c,
+      ),
+    }));
+  }, []);
+
+  const setSourceState = useCallback((sourceId: string, newState: PowerState) => {
+    setState((prev) => ({
+      ...prev,
+      sources: prev.sources.map((s) => (s.id === sourceId ? { ...s, currentState: newState } : s)),
+    }));
+  }, []);
+
+  const setPerformanceThrottle = useCallback((throttle: number) => {
+    throttleRef.current = Math.max(0, Math.min(1, throttle));
+  }, []);
+
+  const emergencyShutdown = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      consumers: prev.consumers.map((c) =>
+        c.priority > 1 ? { ...c, currentState: "offline" as PowerState } : c,
+      ),
+    }));
+  }, []);
+
+  const refreshPowerData = useCallback(() => {
+    setState((prev) => ({ ...prev }));
+  }, []);
+
+  const value: PowerManagerContextType = {
+    ...state,
     setDevicePower,
+    setSourceState,
+    setPerformanceThrottle,
     emergencyShutdown,
     refreshPowerData,
   };
@@ -491,7 +699,6 @@ export function usePowerManager() {
   return context;
 }
 
-// Optional hook for components that can work without power manager
 export function usePowerManagerOptional() {
   return useContext(PowerManagerContext);
 }

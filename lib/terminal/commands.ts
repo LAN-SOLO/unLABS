@@ -1789,7 +1789,7 @@ const panelCommand: Command = {
 
 const undevCommand: Command = {
   name: "undev",
-  aliases: ["devconsole"],
+  aliases: ["devconsole", "dev"],
   description: "Open the Dev console (gated to dev users)",
   usage: "undev",
   execute: async () => {
@@ -1814,7 +1814,7 @@ const runCommand: Command = {
     if (!module) {
       return {
         success: false,
-        error: "usage: run <module> <mode> [flags]\navailable modules: panel",
+        error: "usage: run <module> <mode> [flags]\navailable modules: panel, nexus",
       };
     }
 
@@ -1836,9 +1836,24 @@ const runCommand: Command = {
       return { success: true, output: PANEL_BOOT_SEQUENCE, navigate: "/panel" };
     }
 
+    if (module === "nexus" || module === "nxs") {
+      const actions = _ctx.data.researchActions;
+      if (!actions || !actions.available()) {
+        return {
+          success: false,
+          error: "NXS-01 Nexus not available. Complete EP2 to build the Nexus.",
+        };
+      }
+      return {
+        success: true,
+        output: ["[nexus] launching holo-graph..."],
+        appMode: "nexus",
+      };
+    }
+
     return {
       success: false,
-      error: `Unknown module: ${module}\nAvailable modules: panel`,
+      error: `Unknown module: ${module}\nAvailable modules: panel, nexus`,
     };
   },
 };
@@ -1923,7 +1938,7 @@ const unhistoryCommand: Command = {
 // Device control command
 const deviceCommand: Command = {
   name: "device",
-  aliases: ["dev", "devices"],
+  aliases: ["devices"],
   description: "Control and monitor lab devices",
   usage: "device [name] [command]",
   execute: async (args, ctx) => {

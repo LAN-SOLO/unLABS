@@ -185,6 +185,17 @@ const CLIENT_SETTABLE_FLAGS = new Set([
   "pick_path_done",
   "pick_path_deep",
   "welcome_back_seen",
+  // EP5/EP6 device recipe flags (set by ProductionProvider on claim)
+  "emc_001_online",
+  "qan_001_online",
+  "qsm_001_online",
+  "aic_001_online",
+  "sca_001_online",
+  "tlp_001_online",
+  // EP5/EP6 mission reward flags
+  "quantum_pair_online",
+  "deep_scan_complete",
+  "singularity_achieved",
 ]);
 
 /**

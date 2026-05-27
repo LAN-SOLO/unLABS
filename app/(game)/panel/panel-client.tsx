@@ -152,8 +152,9 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
     import("@/app/(game)/terminal/actions/panel-access").then(({ revokePanelAccess }) =>
       revokePanelAccess(),
     );
-    router.replace("/terminal");
-  }, [router]);
+    // Use window.location for reliable navigation in Electron builds
+    window.location.href = "/terminal";
+  }, []);
 
   // Show nothing while checking access
   if (!hasAccess) {
@@ -180,7 +181,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
           // saveAllDeviceState is wired via the terminal — trigger from context
         }}
       >
-        <PowerManagerProvider>
+        <PowerManagerProvider initialPowerState={savedStateRef.current?.power}>
           <ThermalManagerProvider>
             <PowerThermalBridge />
             <CDCManagerProvider initialState={saved?.cdc}>
