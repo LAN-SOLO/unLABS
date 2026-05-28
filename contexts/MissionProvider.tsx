@@ -116,6 +116,10 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
     stateRef.current = state;
   }, [state]);
 
+  // Holds the merged effective state so server-bound callbacks can read
+  // the latest derived progress without depending on it in their deps.
+  const effectiveStateRef = useRef<MissionPlayerState>(state);
+
   // Quest flags from the quest provider
   const flags = quest.state.flags;
 
@@ -278,6 +282,11 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
     };
   }, [state, resourceThresholdProgress, craftCountProgress, flagProgress, computedHintLevels]);
 
+  // Keep the ref in sync so claim/track callbacks can read derived progress.
+  useEffect(() => {
+    effectiveStateRef.current = effectiveState;
+  }, [effectiveState]);
+
   // ── Actions ─────────────────────────────────────────────────────────
 
   const trackMission = useCallback((id: string) => {
@@ -304,6 +313,26 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
   const claimMission = useCallback(
     (id: string) => {
       startTransition(async () => {
+        // Persist any client-derived progress (craft_count, resource_threshold,
+        // flag) before the server validates the claim — the server only sees
+        // what's in objectiveProgress, not the merged effective state.
+        const mission = listAllMissions().find((m) => m.id === id);
+        if (mission) {
+          const effective = effectiveStateRef.current.objectiveProgress;
+          const stored = stateRef.current.objectiveProgress;
+          const pending: Array<Promise<unknown>> = [];
+          for (const task of mission.tasks) {
+            for (const obj of task.objectives) {
+              const eff = effective[obj.id] ?? 0;
+              const cur = stored[obj.id] ?? 0;
+              if (eff !== cur) {
+                pending.push(updateObjectiveProgressAction(obj.id, eff));
+              }
+            }
+          }
+          if (pending.length > 0) await Promise.all(pending);
+        }
+
         const result = await claimMissionAction(id);
         if (result.ok && result.state) {
           applyRewards(result.rewards);
