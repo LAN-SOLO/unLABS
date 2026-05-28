@@ -27,6 +27,7 @@ export const M003: Mission = {
           type: "device_action",
           target: "AND-001",
           targetValue: 1,
+          property: "powered",
           hint: "Find AND-001 in the Core Operations section of the panel and toggle it on.",
           deepDiveHint:
             "The Anomaly Detector (AND-001) is in the Core Operations row, middle section. Click its power indicator or toggle to bring it online. It draws moderate power.",
@@ -50,6 +51,7 @@ export const M003: Mission = {
           type: "device_action",
           target: "AND-001",
           targetValue: 70,
+          property: "sensitivity",
           hint: "Adjust the sensitivity slider on AND-001. Higher sensitivity means more noise — but also more signal.",
           deepDiveHint:
             "On the AND-001 tile, find the sensitivity control. Drag it above 70. At high sensitivity the detector picks up faint anomaly signatures that would otherwise be lost in the thermal noise floor.",

@@ -222,6 +222,7 @@ export function Terminal({
       trackMission: (id: string) => ctx.trackMission(id),
       untrackMission: (id: string) => ctx.untrackMission(id),
       claimMission: (id: string) => ctx.claimMission(id),
+      reportCommand: (commandInput: string) => ctx.reportCommand(commandInput),
     };
   }, [missionCtx]);
 

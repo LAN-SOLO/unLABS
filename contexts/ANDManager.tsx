@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useDeviceUnlocked } from "@/hooks/useDeviceUnlocked";
+import { useMissionOptional } from "@/contexts/MissionProvider";
 
 // AND Device States
 type ANDDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -96,6 +97,7 @@ interface ANDManagerProviderProps {
 
 export function ANDManagerProvider({ children, initialState }: ANDManagerProviderProps) {
   const isUnlocked = useDeviceUnlocked("AND-001");
+  const mission = useMissionOptional();
   const startPowered = initialState?.isPowered ?? false;
   const startExpanded = initialState?.isExpanded ?? startPowered;
   const [isExpanded, setIsExpanded] = useState(startExpanded);
@@ -117,6 +119,7 @@ export function ANDManagerProvider({ children, initialState }: ANDManagerProvide
   const [anomaliesFound, setAnomaliesFoundState] = useState(initialState?.anomaliesFound ?? 3);
   const [waveOffset, setWaveOffset] = useState(0);
 
+  const [sensitivityTarget, setSensitivityTarget] = useState(initialState?.signalStrength ?? 67);
   const signalTargetRef = useRef(initialState?.signalStrength ?? 67);
 
   const runBootSequence = useCallback(async () => {
@@ -274,7 +277,9 @@ export function ANDManagerProvider({ children, initialState }: ANDManagerProvide
   );
 
   const setSignalStrength = useCallback((value: number) => {
-    signalTargetRef.current = Math.max(0, Math.min(100, value));
+    const clamped = Math.max(0, Math.min(100, value));
+    signalTargetRef.current = clamped;
+    setSensitivityTarget(clamped);
   }, []);
 
   const setAnomaliesFound = useCallback((value: number) => {
@@ -306,6 +311,15 @@ export function ANDManagerProvider({ children, initialState }: ANDManagerProvide
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Report device state to mission system (uses target, not fluctuating display value)
+  useEffect(() => {
+    if (!mission) return;
+    mission.reportDeviceState("AND-001", {
+      powered: isPowered && deviceState === "online" ? 1 : 0,
+      sensitivity: sensitivityTarget,
+    });
+  }, [mission, isPowered, deviceState, sensitivityTarget]);
 
   const value: ANDManagerContextType = {
     deviceState,

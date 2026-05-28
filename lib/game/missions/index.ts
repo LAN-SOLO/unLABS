@@ -97,7 +97,16 @@ function areRequirementsMet(
 /**
  * Evaluate the status of a single objective.
  */
-function evaluateObjectiveStatus(currentValue: number, targetValue: number): TaskStatus {
+function evaluateObjectiveStatus(
+  currentValue: number,
+  targetValue: number,
+  comparison: "gte" | "lte" = "gte",
+): TaskStatus {
+  if (comparison === "lte") {
+    if (currentValue > 0 && currentValue <= targetValue) return "completed";
+    if (currentValue > 0) return "in_progress";
+    return "available";
+  }
   if (currentValue >= targetValue) return "completed";
   if (currentValue > 0) return "in_progress";
   return "available";
@@ -120,7 +129,7 @@ export function evaluateTask(
       return { ...obj, currentValue, status: "locked" as const };
     }
 
-    const status = evaluateObjectiveStatus(currentValue, obj.targetValue);
+    const status = evaluateObjectiveStatus(currentValue, obj.targetValue, obj.comparison);
     return { ...obj, currentValue, status };
   });
 

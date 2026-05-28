@@ -1858,6 +1858,7 @@ export interface MissionTerminalActions {
   trackMission: (id: string) => void;
   untrackMission: (id: string) => void;
   claimMission: (id: string) => void;
+  reportCommand: (commandInput: string) => void;
 }
 
 /**

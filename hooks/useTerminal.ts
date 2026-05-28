@@ -826,6 +826,11 @@ export function useTerminal({
         kernelActions.finishCommand(kernelPid, result.success ? 0 : 1);
       }
 
+      // Report command to mission system for command-type objectives
+      if (result.success && missionActions?.reportCommand) {
+        missionActions.reportCommand(input);
+      }
+
       // Output results
       if (result.error) {
         addLine(result.error, "error");

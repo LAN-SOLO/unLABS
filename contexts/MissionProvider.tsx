@@ -77,6 +77,10 @@ interface MissionContextValue {
   updateProgress: (objectiveId: string, value: number) => void;
   /** Increment objective progress by delta. */
   incrementProgress: (objectiveId: string, delta: number) => void;
+  /** Report device state for device_action objectives. */
+  reportDeviceState: (deviceId: string, properties: Record<string, number>) => void;
+  /** Report a terminal command execution for command objectives. */
+  reportCommand: (commandInput: string) => void;
   /** Get the current whatnext suggestion. */
   whatNext: () => MissionSuggestion;
   /** Device IDs that have active mission objectives. */
@@ -235,18 +239,35 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
     return updates;
   }, [production.jobs, state.activeMissionIds]);
 
-  // Merge resource threshold + craft count progress into the state object
-  // used for evaluation, without triggering an effect-based setState.
+  // ── Flag objective evaluation ────────────────────────────────────────
+  const flagProgress = useMemo(() => {
+    const updates: Record<string, number> = {};
+    for (const missionId of state.activeMissionIds) {
+      const mission = listAllMissions().find((m) => m.id === missionId);
+      if (!mission) continue;
+      for (const task of mission.tasks) {
+        for (const obj of task.objectives) {
+          if (obj.type !== "flag") continue;
+          updates[obj.id] = flags[obj.target] ? 1 : 0;
+        }
+      }
+    }
+    return updates;
+  }, [flags, state.activeMissionIds]);
+
+  // Merge resource threshold + craft count + flag progress into the state
+  // object used for evaluation, without triggering an effect-based setState.
   const effectiveState = useMemo<MissionPlayerState>(() => {
     const merged = {
       ...state.objectiveProgress,
       ...resourceThresholdProgress,
       ...craftCountProgress,
+      ...flagProgress,
     };
-    // Only create a new object if something actually changed
     const derivedKeys = [
       ...Object.keys(resourceThresholdProgress),
       ...Object.keys(craftCountProgress),
+      ...Object.keys(flagProgress),
     ];
     const anyChanged = derivedKeys.some((k) => state.objectiveProgress[k] !== merged[k]);
     if (!anyChanged) return { ...state, hintLevel: computedHintLevels };
@@ -255,7 +276,7 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
       objectiveProgress: merged,
       hintLevel: computedHintLevels,
     };
-  }, [state, resourceThresholdProgress, craftCountProgress, computedHintLevels]);
+  }, [state, resourceThresholdProgress, craftCountProgress, flagProgress, computedHintLevels]);
 
   // ── Actions ─────────────────────────────────────────────────────────
 
@@ -334,6 +355,52 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
       updateProgress(objectiveId, current + delta);
     },
     [updateProgress],
+  );
+
+  const reportDeviceState = useCallback(
+    (deviceId: string, properties: Record<string, number>) => {
+      const s = stateRef.current;
+      for (const missionId of s.activeMissionIds) {
+        const mission = listAllMissions().find((m) => m.id === missionId);
+        if (!mission) continue;
+        for (const task of mission.tasks) {
+          for (const obj of task.objectives) {
+            if (obj.type !== "device_action" || obj.target !== deviceId) continue;
+            if (!obj.property || !(obj.property in properties)) continue;
+            const value = properties[obj.property];
+            const prev = s.objectiveProgress[obj.id] ?? 0;
+            if (value !== prev) {
+              updateProgress(obj.id, value);
+            }
+          }
+        }
+      }
+    },
+    [updateProgress],
+  );
+
+  const reportCommand = useCallback(
+    (commandInput: string) => {
+      const normalized = commandInput.trim().toLowerCase();
+      const s = stateRef.current;
+      for (const missionId of s.activeMissionIds) {
+        const mission = listAllMissions().find((m) => m.id === missionId);
+        if (!mission) continue;
+        for (const task of mission.tasks) {
+          for (const obj of task.objectives) {
+            if (obj.type !== "command") continue;
+            const target = obj.target.toLowerCase();
+            if (normalized === target || normalized.startsWith(target + " ")) {
+              const prev = s.objectiveProgress[obj.id] ?? 0;
+              if (prev < obj.targetValue) {
+                incrementProgress(obj.id, 1);
+              }
+            }
+          }
+        }
+      }
+    },
+    [incrementProgress],
   );
 
   const whatNext = useCallback(() => {
@@ -423,6 +490,8 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
       claimMission,
       updateProgress,
       incrementProgress,
+      reportDeviceState,
+      reportCommand,
       whatNext,
       activeDeviceIds,
       missionState: effectiveState,
@@ -438,6 +507,8 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
       claimMission,
       updateProgress,
       incrementProgress,
+      reportDeviceState,
+      reportCommand,
       whatNext,
       activeDeviceIds,
       effectiveState,

@@ -51,6 +51,10 @@ export interface TaskObjective {
   target: string;
   /** Completion threshold. 1 for flags/commands, N for craft counts, amount for resources. */
   targetValue: number;
+  /** Comparison direction. Default "gte" (>=). Use "lte" for "drop below" objectives. */
+  comparison?: "gte" | "lte";
+  /** For device_action objectives: the device property to read (e.g. "powered", "sensitivity"). */
+  property?: string;
   /** Gentle nudge shown after 60s of no progress. */
   hint?: string;
   /** Explicit walkthrough shown after 5min or on `whatnext --verbose`. */

@@ -59,6 +59,7 @@ export const M001: Mission = {
           type: "resource_threshold",
           target: "energy",
           targetValue: 40,
+          comparison: "lte",
           hint: "Powering on devices reduces your net energy rate. Try enabling more equipment.",
           deepDiveHint:
             "Your current energy rate is +32 E/s after OSC-001 came online. Power on additional devices from the panel — each one draws power and reduces your net rate. Watch the energy bar to see the effect.",
