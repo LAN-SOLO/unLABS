@@ -117,6 +117,14 @@ export function BootSequence({ active, onComplete, scope = "system" }: BootSeque
   const [fading, setFading] = useState(false);
   const [glitching, setGlitching] = useState(false);
   const timeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll the inner container so newest lines stay visible
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [visibleLines.length]);
 
   useEffect(() => {
     if (!active) {
@@ -165,7 +173,7 @@ export function BootSequence({ active, onComplete, scope = "system" }: BootSeque
 
   return (
     <div
-      className={`${scope === "os" ? "absolute" : "fixed"} inset-0 z-[9999] flex items-start justify-center overflow-hidden bg-black`}
+      className={`${scope === "os" ? "absolute" : "fixed"} inset-0 z-[9999] overflow-hidden bg-black`}
       style={{
         opacity: fading ? 0 : 1,
         transition: "opacity 500ms ease-out",
@@ -194,7 +202,10 @@ export function BootSequence({ active, onComplete, scope = "system" }: BootSeque
         />
       )}
 
-      <div className="relative z-10 w-full max-w-2xl p-8 pt-16 font-mono text-sm">
+      <div
+        ref={scrollRef}
+        className="boot-scroll relative z-10 mx-auto h-full w-full max-w-2xl overflow-y-auto p-8 pt-16 font-mono text-sm"
+      >
         {visibleLines.map((line, i) => (
           <div key={i} className="leading-6" style={getLineStyle(line.color)}>
             {line.text || " "}
@@ -213,6 +224,12 @@ export function BootSequence({ active, onComplete, scope = "system" }: BootSeque
       </div>
 
       <style jsx global>{`
+        .boot-scroll {
+          scrollbar-width: none;
+        }
+        .boot-scroll::-webkit-scrollbar {
+          display: none;
+        }
         @keyframes boot-glitch {
           0% {
             transform: translate(0, 0) skewX(0deg);
