@@ -2828,6 +2828,7 @@ export function Terminal({
       <div className="flex h-full flex-col">
         <MidnightCommander
           filesystemActions={filesystemActions}
+          missionActions={missionTerminalActions}
           onExit={exitAppMode}
           initialEditFile={appMode === "mcedit" ? appModeData?.editFile : undefined}
         />

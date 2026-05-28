@@ -8,10 +8,11 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import type { FilesystemActions } from "@/lib/terminal/types";
+import type { FilesystemActions, MissionTerminalActions } from "@/lib/terminal/types";
 
 interface MCProps {
   filesystemActions: FilesystemActions;
+  missionActions?: MissionTerminalActions;
   onExit: () => void;
   initialEditFile?: string; // If set, open editor immediately on this file
 }
@@ -90,7 +91,12 @@ function getEntries(fs: FilesystemActions, path: string): MCEntry[] {
   }
 }
 
-export function MidnightCommander({ filesystemActions: fs, onExit, initialEditFile }: MCProps) {
+export function MidnightCommander({
+  filesystemActions: fs,
+  missionActions,
+  onExit,
+  initialEditFile,
+}: MCProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [leftPath, setLeftPath] = useState(() => {
     try {
@@ -202,7 +208,7 @@ export function MidnightCommander({ filesystemActions: fs, onExit, initialEditFi
     (path: string) => {
       setActivePath(path);
       setActiveCursor(0);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+       
     },
     [activePane],
   );
@@ -230,6 +236,10 @@ export function MidnightCommander({ filesystemActions: fs, onExit, initialEditFi
       const content = fs.cat(fullPath, "operator", ["operator"]);
       if (content !== null) {
         setDialog({ type: "view", path: fullPath, lines: content.split("\n"), scroll: 0 });
+        // Mirror the read into the mission system so "cat <path>" objectives
+        // complete regardless of whether the player opened the file via cat
+        // or via MC's file viewer.
+        missionActions?.reportCommand(`cat ${fullPath}`);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -624,7 +634,7 @@ export function MidnightCommander({ filesystemActions: fs, onExit, initialEditFi
         default:
           break;
       }
-      // eslint-disable-next-line react-hooks/exhaustive-deps
+       
     },
     [
       dialog,
