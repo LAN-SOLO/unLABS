@@ -25555,6 +25555,87 @@ const discoveriesCommand: Command = {
   },
 };
 
+const harmonizeCommand: Command = {
+  name: "harmonize",
+  aliases: ["harmonic", "sing"],
+  description: "Tune HMS, ECR, and SPK to the same value — three devices, one note.",
+  usage: "harmonize <0-100>",
+  execute: async (args, ctx) => {
+    if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
+      return {
+        success: true,
+        output: [
+          "",
+          "  HARMONIZE — three devices, one note",
+          "  ─────────────────────────────────────",
+          "  Sets HMS-001 frequency, ECR-001 pulse, and SPK-001 volume",
+          "  to the same value in a single shot. The lab listens for",
+          "  resonance — if the chosen value matches a known harmonic,",
+          "  a protocol is recorded.",
+          "",
+          "  Usage:   harmonize <value>    (0-100)",
+          "  Example: harmonize 37",
+          "",
+          "  All three devices must be online.",
+          "",
+        ],
+      };
+    }
+
+    const value = parseInt(args[0], 10);
+    if (isNaN(value) || value < 0 || value > 100) {
+      return {
+        success: false,
+        error: "[harmonize] value must be a number between 0 and 100",
+      };
+    }
+
+    const hms = ctx.data.hmsDevice;
+    const ecr = ctx.data.ecrDevice;
+    const spk = ctx.data.spkDevice;
+
+    if (!hms || !ecr || !spk) {
+      return {
+        success: false,
+        error:
+          "[harmonize] requires HMS-001, ECR-001, and SPK-001 (one or more devices not available)",
+      };
+    }
+
+    const hmsState = hms.getState();
+    const ecrState = ecr.getState();
+    const spkState = spk.getState();
+
+    const issues: string[] = [];
+    if (!hmsState.isPowered || hmsState.deviceState !== "online")
+      issues.push("HMS-001 must be ONLINE (try: hms power on)");
+    if (!ecrState.isPowered || ecrState.deviceState !== "online")
+      issues.push("ECR-001 must be ONLINE (try: ecr power on)");
+    if (!spkState.isPowered) issues.push("SPK-001 must be powered on (try: spk power on)");
+
+    if (issues.length > 0) {
+      return {
+        success: false,
+        error: `[harmonize] cannot tune devices:\n  ${issues.join("\n  ")}`,
+      };
+    }
+
+    hms.setKnobValue("freq", value);
+    ecr.setKnobValue("pulse", value);
+    spk.setVolume(value);
+
+    return {
+      success: true,
+      output: [
+        `[harmonize] HMS-001 freq   -> ${value}`,
+        `[harmonize] ECR-001 pulse  -> ${value}`,
+        `[harmonize] SPK-001 volume -> ${value}`,
+        `[harmonize] three devices, one note. listening for resonance...`,
+      ],
+    };
+  },
+};
+
 const achieveCommand: Command = {
   name: "achieve",
   aliases: ["achievement", "achievements"],
@@ -26147,6 +26228,7 @@ export const commands: Command[] = [
   whatnextCommand,
   missionsCommand,
   discoveriesCommand,
+  harmonizeCommand,
   // Tutorial / onboarding
   tutorialCommand,
   guideCommand,

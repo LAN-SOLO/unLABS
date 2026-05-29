@@ -57,9 +57,9 @@ export const M004: Mission = {
           type: "discovery",
           target: "HARMONIC-7",
           targetValue: 1,
-          hint: 'Jade mentioned "three singing the same note". Which devices can produce sound or signals?',
+          hint: 'Jade mentioned "three singing the same note". Try `harmonize 37` in the terminal — or tune HMS, ECR, and SPK by hand.',
           deepDiveHint:
-            "Set HMS (Handmade Synthesizer) to sine wave at 37 Hz, ECR (Echo Recorder) pulse value to 37, and SPK (Speaker) volume to 37. All three values must be set to 37 within a 30-second window.",
+            "Power on HMS-001 (Handmade Synthesizer), ECR-001 (Echo Recorder), and SPK-001 (Speaker), then run `harmonize 37` in the terminal — that sets all three to the same value at once. Manual path: `hms knob f 37`, `ecr knob p 37`, `spk volume 37` — all within a 30-second window.",
           relatedDeviceIds: ["HMS-001", "ECR-001", "SPK-001"],
         },
       ],
