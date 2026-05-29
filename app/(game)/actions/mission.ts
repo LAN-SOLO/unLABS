@@ -169,7 +169,10 @@ export async function updateObjectiveProgressAction(
   return { ok: true, state: nextState };
 }
 
-export async function claimMissionAction(missionId: string): Promise<MissionClaimResult> {
+export async function claimMissionAction(
+  missionId: string,
+  clientProgress?: Record<string, number>,
+): Promise<MissionClaimResult> {
   const { user, supabase, profile } = await loadProfileState();
   if (!user) {
     return {
@@ -190,8 +193,21 @@ export async function claimMissionAction(missionId: string): Promise<MissionClai
     };
   }
 
-  const state = hydrateMissionState(profile.mission_state);
+  let state = hydrateMissionState(profile.mission_state);
   const flags = extractFlags(profile.quest_state);
+
+  // Merge client-derived progress (craft_count, resource_threshold, flag,
+  // device_action, command) into the state before evaluation. These are
+  // computed/tracked client-side and the persisted objectiveProgress can
+  // lag behind due to debouncing or concurrent writes. Trusting the client
+  // for this single-player game is acceptable; the alternative is racing
+  // multiple writes and silently failing the claim.
+  if (clientProgress && Object.keys(clientProgress).length > 0) {
+    state = {
+      ...state,
+      objectiveProgress: { ...state.objectiveProgress, ...clientProgress },
+    };
+  }
 
   const result = claimMissionPure(missionId, state, flags);
   if (!result) {

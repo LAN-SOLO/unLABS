@@ -195,7 +195,7 @@ function MissionCard({
             disabled={isBusy}
             className="rounded border border-green-400/50 px-1.5 py-0.5 text-[9px] text-green-300 transition-colors hover:bg-green-500/20 disabled:opacity-50"
           >
-            CLAIM
+            {isBusy ? "CLAIMING…" : "CLAIM"}
           </button>
         )}
         {!isComplete && (

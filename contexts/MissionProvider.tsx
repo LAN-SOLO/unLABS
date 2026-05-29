@@ -313,35 +313,36 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
   const claimMission = useCallback(
     (id: string) => {
       startTransition(async () => {
-        // Persist any client-derived progress (craft_count, resource_threshold,
-        // flag) before the server validates the claim — the server only sees
-        // what's in objectiveProgress, not the merged effective state.
+        // Build a snapshot of client-derived progress for this mission's
+        // objectives and send it atomically to the server. Avoids the race
+        // condition of pushing each objective separately (concurrent writes
+        // to the same row clobber each other).
         const mission = listAllMissions().find((m) => m.id === id);
+        const clientProgress: Record<string, number> = {};
         if (mission) {
           const effective = effectiveStateRef.current.objectiveProgress;
-          const stored = stateRef.current.objectiveProgress;
-          const pending: Array<Promise<unknown>> = [];
           for (const task of mission.tasks) {
             for (const obj of task.objectives) {
-              const eff = effective[obj.id] ?? 0;
-              const cur = stored[obj.id] ?? 0;
-              if (eff !== cur) {
-                pending.push(updateObjectiveProgressAction(obj.id, eff));
-              }
+              clientProgress[obj.id] = effective[obj.id] ?? 0;
             }
           }
-          if (pending.length > 0) await Promise.all(pending);
         }
 
-        const result = await claimMissionAction(id);
-        if (result.ok && result.state) {
+        const result = await claimMissionAction(id, clientProgress);
+        if (!result.ok) {
+          if (process.env.NODE_ENV !== "production") {
+            console.warn("[mission claim failed]", id, result.error);
+          }
+          journal?.write("mission", 4, `[ ${id} ] claim failed: ${result.error ?? "unknown"}`);
+          return;
+        }
+        if (result.state) {
           applyRewards(result.rewards);
           setState(result.state);
 
           // Narrative breadcrumb: write completion voice lines to the
           // journal so the player can re-read them from JournalPanel later.
           if (journal) {
-            const mission = listAllMissions().find((m) => m.id === id);
             journal.write("mission", 5, `[ ${id} ] claimed: ${mission?.title ?? id}`);
             if (mission?.completionVoice && mission.completionVoice.length > 0) {
               for (const line of mission.completionVoice) {
