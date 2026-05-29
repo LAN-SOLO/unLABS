@@ -8694,6 +8694,7 @@ export function AnomalyDetector({ className }: AnomalyDetectorProps) {
   const andManager = useANDManagerOptional();
   const deviceState = andManager?.deviceState ?? "online";
   const signalStrength = andManager?.signalStrength ?? 67;
+  const sensitivityTarget = andManager?.sensitivityTarget ?? 67;
   const anomaliesFound = andManager?.anomaliesFound ?? 3;
   const isPowered = andManager?.isPowered ?? true;
   const testResult = andManager?.testResult ?? null;
@@ -9055,6 +9056,25 @@ export function AnomalyDetector({ className }: AnomalyDetectorProps) {
               </span>
             </div>
           )}
+        </div>
+
+        {/* Sensitivity slider */}
+        <div className="mt-1 flex items-center gap-1.5 font-mono text-[6px]">
+          <span className="text-[var(--neon-magenta,#e91e8c)]/70">SENS</span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round(sensitivityTarget)}
+            onChange={(e) => andManager?.setSignalStrength(Number(e.target.value))}
+            disabled={!isActive}
+            className="and-sens-slider h-1 flex-1 disabled:opacity-30"
+            style={{ ["--and-sens-pct" as string]: `${Math.round(sensitivityTarget)}%` }}
+            title="Sensitivity"
+          />
+          <span className="w-5 text-right text-[var(--neon-magenta,#e91e8c)]">
+            {Math.round(sensitivityTarget)}
+          </span>
         </div>
 
         {/* Status bar */}

@@ -61,6 +61,7 @@ interface ANDState {
   isPowered: boolean;
   currentDraw: number;
   signalStrength: number;
+  sensitivityTarget: number;
   anomaliesFound: number;
   displayMode: ANDMode;
   waveOffset: number;
@@ -331,6 +332,7 @@ export function ANDManagerProvider({ children, initialState }: ANDManagerProvide
     isPowered,
     currentDraw,
     signalStrength,
+    sensitivityTarget,
     anomaliesFound,
     displayMode,
     waveOffset,

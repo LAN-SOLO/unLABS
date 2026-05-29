@@ -737,3 +737,58 @@ body {
 .animate-screw-led-active {
   animation: screw-led-active 2s ease-in-out infinite;
 }
+
+/* AND-001 sensitivity slider — slim magenta neon */
+.and-sens-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(233, 30, 140, 0.15);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+.and-sens-slider::-webkit-slider-runnable-track {
+  height: 4px;
+  background: linear-gradient(
+    to right,
+    rgba(233, 30, 140, 0.6) 0%,
+    rgba(233, 30, 140, 0.6) var(--and-sens-pct, 50%),
+    rgba(233, 30, 140, 0.12) var(--and-sens-pct, 50%),
+    rgba(233, 30, 140, 0.12) 100%
+  );
+  border-radius: 2px;
+}
+.and-sens-slider::-moz-range-track {
+  height: 4px;
+  background: rgba(233, 30, 140, 0.12);
+  border-radius: 2px;
+}
+.and-sens-slider::-moz-range-progress {
+  height: 4px;
+  background: rgba(233, 30, 140, 0.6);
+  border-radius: 2px;
+}
+.and-sens-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff66cc;
+  border: 1px solid #e91e8c;
+  box-shadow: 0 0 4px #e91e8c;
+  cursor: pointer;
+  margin-top: -2px;
+}
+.and-sens-slider::-moz-range-thumb {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff66cc;
+  border: 1px solid #e91e8c;
+  box-shadow: 0 0 4px #e91e8c;
+  cursor: pointer;
+}
+.and-sens-slider:disabled {
+  cursor: not-allowed;
+}

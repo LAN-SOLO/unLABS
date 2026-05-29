@@ -52,9 +52,9 @@ export const M003: Mission = {
           target: "AND-001",
           targetValue: 70,
           property: "sensitivity",
-          hint: "Adjust the sensitivity slider on AND-001. Higher sensitivity means more noise — but also more signal.",
+          hint: "Adjust the SENS slider on AND-001 (or run `and signal 75` in the terminal). Higher sensitivity means more noise — but also more signal.",
           deepDiveHint:
-            "On the AND-001 tile, find the sensitivity control. Drag it above 70. At high sensitivity the detector picks up faint anomaly signatures that would otherwise be lost in the thermal noise floor.",
+            "On the AND-001 tile (Core Operations row), the SENS slider sits between the waveform and the SIG/DETECTED row — drag it above 70. Or from the terminal, run `and signal 75` (aliases: `anomaly`, `detector`). The device must be online. At high sensitivity the detector picks up faint anomaly signatures that would otherwise be lost in the thermal noise floor.",
           relatedDeviceIds: ["AND-001"],
         },
       ],
