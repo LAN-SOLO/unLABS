@@ -24,6 +24,8 @@ export function MissionPanel() {
     availableMissions,
     completedCount,
     isBusy,
+    claimingId,
+    claimError,
     trackMission,
     untrackMission,
     claimMission,
@@ -35,6 +37,7 @@ export function MissionPanel() {
 
   const [isExpanded, setIsExpanded] = useState(true);
   const [showAvailable, setShowAvailable] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const tip = useMemo(() => getActiveTip(questFlags, tick.resources), [questFlags, tick.resources]);
   // When the hint engine has escalated to level 2+, override the rotating tip
@@ -46,6 +49,7 @@ export function MissionPanel() {
     (m) => m.status === "active" || m.status === "completed",
   );
   const untracked = availableMissions.filter((m) => m.status === "available");
+  const claimed = allMissions.filter((m) => m.status === "claimed");
 
   // Don't render if missions aren't unlocked yet
   const hasMissions = allMissions.some((m) => m.status !== "locked");
@@ -81,6 +85,8 @@ export function MissionPanel() {
               key={mission.id}
               mission={mission}
               isBusy={isBusy}
+              claimingId={claimingId}
+              claimError={claimError?.missionId === mission.id ? claimError.message : null}
               onClaim={claimMission}
               onUntrack={untrackMission}
             />
@@ -141,6 +147,41 @@ export function MissionPanel() {
               )}
             </div>
           )}
+
+          {/* Completed (claimed) missions — kept reviewable after they
+              leave the active list. Full details live in the journal. */}
+          {claimed.length > 0 && (
+            <div>
+              <button
+                onClick={() => setShowCompleted((s) => !s)}
+                className="w-full py-0.5 text-center text-[9px] text-green-500/60 transition-colors hover:text-green-400"
+              >
+                {showCompleted ? "▲ Hide" : "▼ Show"} {claimed.length} completed mission
+                {claimed.length !== 1 ? "s" : ""}
+              </button>
+
+              {showCompleted && (
+                <div className="mt-1 space-y-1">
+                  {claimed.map((mission) => (
+                    <div
+                      key={mission.id}
+                      className="flex items-center justify-between rounded border border-green-500/15 bg-black/40 px-1.5 py-1"
+                    >
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        <span className="shrink-0 text-[10px] text-green-400">✓</span>
+                        <span className="truncate text-[10px] text-green-500/70 line-through">
+                          {mission.title}
+                        </span>
+                      </div>
+                      <span className="ml-1 shrink-0 text-[8px] text-green-500/30 uppercase">
+                        {mission.category}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -152,16 +193,21 @@ export function MissionPanel() {
 function MissionCard({
   mission,
   isBusy,
+  claimingId,
+  claimError,
   onClaim,
   onUntrack,
 }: {
   mission: MissionWithStatus;
   isBusy: boolean;
+  claimingId: string | null;
+  claimError: string | null;
   onClaim: (id: string) => void;
   onUntrack: (id: string) => void;
 }) {
   const { missionState } = useMission();
   const isComplete = mission.status === "completed";
+  const isClaiming = claimingId === mission.id;
 
   return (
     <div
@@ -187,15 +233,20 @@ function MissionCard({
       {/* Tasks */}
       <TaskChecklist tasks={mission.tasks} hintLevels={missionState.hintLevel} />
 
+      {/* Claim error — shown until the next attempt */}
+      {claimError && (
+        <p className="text-[8px] text-red-400/80">claim failed: {claimError} — try again</p>
+      )}
+
       {/* Action buttons */}
       <div className="flex justify-end gap-1 pt-0.5">
         {isComplete && (
           <button
             onClick={() => onClaim(mission.id)}
-            disabled={isBusy}
+            disabled={claimingId !== null}
             className="rounded border border-green-400/50 px-1.5 py-0.5 text-[9px] text-green-300 transition-colors hover:bg-green-500/20 disabled:opacity-50"
           >
-            {isBusy ? "CLAIMING…" : "CLAIM"}
+            {isClaiming ? "CLAIMING…" : "CLAIM"}
           </button>
         )}
         {!isComplete && (

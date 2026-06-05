@@ -65,8 +65,12 @@ interface MissionContextValue {
   availableMissions: MissionWithStatus[];
   /** Number of completed (claimed) missions. */
   completedCount: number;
-  /** True while any server action is in flight. */
+  /** True while a track/untrack server action is in flight. */
   isBusy: boolean;
+  /** Mission id whose claim is currently in flight, or null. */
+  claimingId: string | null;
+  /** Last failed claim (cleared on the next attempt). */
+  claimError: { missionId: string; message: string } | null;
   /** Track a mission (add to active list). */
   trackMission: (id: string) => void;
   /** Untrack a mission (remove from active list). */
@@ -93,6 +97,27 @@ interface MissionContextValue {
 
 const MissionContext = createContext<MissionContextValue | null>(null);
 
+/** Human-readable summary of claim rewards for journal entries. */
+function describeRewards(rewards: StepReward[]): string {
+  const parts: string[] = [];
+  for (const r of rewards) {
+    switch (r.kind) {
+      case "grant_resource":
+        parts.push(`+${r.amount} ${r.resourceId}`);
+        break;
+      case "set_resource_rate":
+        parts.push(`${r.resourceId} rate → ${r.ratePerSecond}/s`);
+        break;
+      case "set_resource_capacity":
+        parts.push(`${r.resourceId} capacity → ${r.capacity}`);
+        break;
+      case "set_flag":
+        break;
+    }
+  }
+  return parts.join(", ");
+}
+
 // ── Provider ──────────────────────────────────────────────────────────
 
 export interface MissionProviderProps {
@@ -105,6 +130,13 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
     hydrateMissionState(initialMissionState),
   );
   const [isBusy, startTransition] = useTransition();
+  // Background progress syncs get their own transition so their (near
+  // constant) pending state never disables the panel's action buttons —
+  // sharing one transition kept every CLAIM button stuck on "CLAIMING…".
+  const [, startSyncTransition] = useTransition();
+  const [claimingId, setClaimingId] = useState<string | null>(null);
+  const claimingIdRef = useRef<string | null>(null);
+  const [claimError, setClaimError] = useState<{ missionId: string; message: string } | null>(null);
   const tick = useGameTick();
   const quest = useQuest();
   const production = useProduction();
@@ -312,52 +344,73 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
 
   const claimMission = useCallback(
     (id: string) => {
-      startTransition(async () => {
-        // Build a snapshot of client-derived progress for this mission's
-        // objectives and send it atomically to the server. Avoids the race
-        // condition of pushing each objective separately (concurrent writes
-        // to the same row clobber each other).
-        const mission = listAllMissions().find((m) => m.id === id);
-        const clientProgress: Record<string, number> = {};
-        if (mission) {
-          const effective = effectiveStateRef.current.objectiveProgress;
-          for (const task of mission.tasks) {
-            for (const obj of task.objectives) {
-              clientProgress[obj.id] = effective[obj.id] ?? 0;
-            }
-          }
-        }
+      // One claim at a time; ignore double-clicks while in flight.
+      if (claimingIdRef.current) return;
+      claimingIdRef.current = id;
+      setClaimingId(id);
+      setClaimError(null);
 
-        const result = await claimMissionAction(id, clientProgress);
-        if (!result.ok) {
-          if (process.env.NODE_ENV !== "production") {
-            console.warn("[mission claim failed]", id, result.error);
-          }
-          journal?.write("mission", 4, `[ ${id} ] claim failed: ${result.error ?? "unknown"}`);
-          return;
-        }
-        if (result.state) {
-          applyRewards(result.rewards);
-          setState(result.state);
-
-          // Narrative breadcrumb: write completion voice lines to the
-          // journal so the player can re-read them from JournalPanel later.
-          if (journal) {
-            journal.write("mission", 5, `[ ${id} ] claimed: ${mission?.title ?? id}`);
-            if (mission?.completionVoice && mission.completionVoice.length > 0) {
-              for (const line of mission.completionVoice) {
-                journal.write(`voice/${line.voice}`, 6, line.text);
+      void (async () => {
+        try {
+          // Build a snapshot of client-derived progress for this mission's
+          // objectives and send it atomically to the server. Avoids the race
+          // condition of pushing each objective separately (concurrent writes
+          // to the same row clobber each other).
+          const mission = listAllMissions().find((m) => m.id === id);
+          const clientProgress: Record<string, number> = {};
+          if (mission) {
+            const effective = effectiveStateRef.current.objectiveProgress;
+            for (const task of mission.tasks) {
+              for (const obj of task.objectives) {
+                clientProgress[obj.id] = effective[obj.id] ?? 0;
               }
             }
           }
 
-          // Auto-track the next mission in the chain if there is one
-          if (result.nextMissionId) {
-            setState((s) => trackMissionEngine(result.nextMissionId!, s));
-            void trackMissionAction(result.nextMissionId);
+          const result = await claimMissionAction(id, clientProgress);
+          if (!result.ok) {
+            if (process.env.NODE_ENV !== "production") {
+              console.warn("[mission claim failed]", id, result.error);
+            }
+            setClaimError({ missionId: id, message: result.error ?? "unknown" });
+            journal?.write("mission", 4, `[ ${id} ] claim failed: ${result.error ?? "unknown"}`);
+            return;
           }
+          if (result.state) {
+            applyRewards(result.rewards);
+            setState(result.state);
+
+            // Narrative breadcrumb: write completion + rewards to the
+            // journal so the player can re-read them from JournalPanel later.
+            if (journal) {
+              const rewardText = describeRewards(result.rewards);
+              journal.write(
+                "mission",
+                5,
+                `[ ${id} ] claimed: ${mission?.title ?? id}${rewardText ? ` — rewards: ${rewardText}` : ""}`,
+              );
+              if (mission?.completionVoice && mission.completionVoice.length > 0) {
+                for (const line of mission.completionVoice) {
+                  journal.write(`voice/${line.voice}`, 6, line.text);
+                }
+              }
+            }
+
+            // Auto-track the next mission in the chain if there is one
+            if (result.nextMissionId) {
+              setState((s) => trackMissionEngine(result.nextMissionId!, s));
+              void trackMissionAction(result.nextMissionId);
+            }
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "network_error";
+          setClaimError({ missionId: id, message });
+          journal?.write("mission", 4, `[ ${id} ] claim failed: ${message}`);
+        } finally {
+          claimingIdRef.current = null;
+          setClaimingId(null);
         }
-      });
+      })();
     },
     [applyRewards, journal],
   );
@@ -373,8 +426,9 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
         hintLevel: { ...s.hintLevel, [objectiveId]: 0 },
       };
     });
-    // Debounce server sync — progress updates happen frequently
-    startTransition(async () => {
+    // Background server sync — progress updates happen frequently, so they
+    // run on their own transition (see startSyncTransition above).
+    startSyncTransition(async () => {
       await updateObjectiveProgressAction(objectiveId, value);
     });
   }, []);
@@ -515,6 +569,8 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
       availableMissions,
       completedCount,
       isBusy,
+      claimingId,
+      claimError,
       trackMission,
       untrackMission,
       claimMission,
@@ -532,6 +588,8 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
       availableMissions,
       completedCount,
       isBusy,
+      claimingId,
+      claimError,
       trackMission,
       untrackMission,
       claimMission,

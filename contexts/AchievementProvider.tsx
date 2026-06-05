@@ -224,9 +224,16 @@ export function AchievementProvider({ children, initialState }: AchievementProvi
         `Claimed: ${target.title}`,
         6000,
       );
+      // Permanent breadcrumb — claimed achievements stay reviewable in the
+      // journal next to claimed missions.
+      journal?.write(
+        "achievement",
+        5,
+        `Claimed [${id}] ${target.title} — +${result.unscAwarded} _unSC`,
+      );
       return { ok: true };
     },
-    [all, notif],
+    [all, notif, journal],
   );
 
   const refresh = useCallback(async () => {

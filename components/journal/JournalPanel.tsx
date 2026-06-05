@@ -29,6 +29,7 @@ const FILTERS = [
   { id: "all", label: "ALL" },
   { id: "hint", label: "HINT" },
   { id: "mission", label: "MISS" },
+  { id: "achievement", label: "ACHV" },
   { id: "voice", label: "VOICE" },
   { id: "session", label: "SYS" },
 ] as const;
