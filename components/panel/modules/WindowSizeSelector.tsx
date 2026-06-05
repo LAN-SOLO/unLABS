@@ -2,6 +2,8 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 
+import { getElectronConfig } from "@/lib/desktop";
+
 const WINDOW_PRESETS = [
   { label: "1K 4:3", w: 1024, h: 768 },
   { label: "1K 3:2", w: 1080, h: 720 },
@@ -12,18 +14,6 @@ const WINDOW_PRESETS = [
   { label: "4K 4:3", w: 3840, h: 2880 },
   { label: "4K 3:2", w: 3840, h: 2560 },
 ] as const;
-
-interface ElectronConfig {
-  isDesktop?: boolean;
-  resizeWindow?: (width: number, height: number) => void;
-}
-
-function getElectronConfig(): ElectronConfig | undefined {
-  if (typeof window === "undefined") return undefined;
-  return (window as unknown as Record<string, unknown>).__ELECTRON_CONFIG__ as
-    | ElectronConfig
-    | undefined;
-}
 
 export function WindowSizeSelector() {
   const [idx, setIdx] = useState(-1);
@@ -98,7 +88,7 @@ export function WindowSizeSelector() {
   const cur = idx >= 0 ? WINDOW_PRESETS[idx] : null;
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex shrink-0 items-center gap-1">
       <button
         onClick={cycle}
         className="flex h-7 cursor-pointer items-center gap-1.5 rounded border border-[var(--neon-green)]/30 bg-[var(--panel-surface-light)] px-2.5 transition-all hover:border-[var(--neon-green)]/60 hover:bg-[var(--neon-green)]/5 active:bg-[var(--neon-green)]/10"

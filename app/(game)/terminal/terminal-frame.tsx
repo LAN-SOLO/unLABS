@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { isDesktopApp } from "@/lib/desktop";
+
 interface TerminalFrameProps {
   username: string | null;
   availableBalance: number;
@@ -16,6 +18,13 @@ export function TerminalFrame({
   children,
 }: TerminalFrameProps) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // In the desktop app the Electron window already is "the window" — start
+  // in fullscreen mode so the terminal fills it instead of rendering a fake
+  // 800×600 window inside it. Set after mount to avoid a hydration mismatch.
+  useEffect(() => {
+    if (isDesktopApp()) setIsFullscreen(true);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -32,7 +41,7 @@ export function TerminalFrame({
       className={
         isFullscreen
           ? "flex h-screen w-screen flex-col"
-          : "flex h-screen items-center justify-center p-4"
+          : "flex h-screen flex-col items-center justify-center p-4"
       }
     >
       {/* Terminal window */}
@@ -44,12 +53,10 @@ export function TerminalFrame({
           isFullscreen
             ? undefined
             : {
-                width: "800px",
-                height: "600px",
-                minWidth: "800px",
-                minHeight: "600px",
-                maxWidth: "800px",
-                maxHeight: "600px",
+                // Target 800×600, but never overflow the window (status bar
+                // below needs ~24px; p-4 on the wrapper adds the rest).
+                width: "min(800px, 100%)",
+                height: "min(600px, calc(100% - 24px))",
                 flexShrink: 0,
                 flexGrow: 0,
               }

@@ -101,9 +101,19 @@ export function WindowManagerProvider({ children, className }: WindowManagerProv
     };
   }, [isResizing, activeResize, setLeftWidth, setRightWidth]);
 
+  // Cap the side tracks relative to the viewport so the grid never grows
+  // wider than the window — with fixed pixel tracks (200 + 400 + 420 + gaps)
+  // any window below ~1050px clipped the right edge, hiding the window-size
+  // controls at the end of the toolbar. The caps only bite on small windows;
+  // at 1280px+ the configured pixel widths win.
+  // Worst case must hold: 22vw + 35vw + 400px main + gaps ≤ 100vw at the
+  // 1024px minimum window width.
+  const leftTrack = `min(${layout.leftWidth}px, 22vw)`;
+  const rightTrack = `min(${layout.rightWidth}px, 35vw)`;
+
   const gridStyle = {
     display: "grid",
-    gridTemplateColumns: `${layout.leftWidth}px minmax(400px, 1fr) ${layout.rightWidth}px`,
+    gridTemplateColumns: `${leftTrack} minmax(400px, 1fr) ${rightTrack}`,
     gridTemplateRows: "auto 1fr auto auto",
     gridTemplateAreas: `
       "toolbar toolbar toolbar"
@@ -136,7 +146,7 @@ export function WindowManagerProvider({ children, className }: WindowManagerProv
         <div
           className="pointer-events-none absolute z-50 w-5"
           style={{
-            left: layout.leftWidth - 4,
+            left: `calc(${leftTrack} - 4px)`,
             top: `${layout.toolbarHeight + 8}px`,
             bottom: `${layout.bottomHeight + 8}px`,
             background:
@@ -168,7 +178,7 @@ export function WindowManagerProvider({ children, className }: WindowManagerProv
         <div
           className="pointer-events-none absolute z-50 w-5"
           style={{
-            right: layout.rightWidth - 4,
+            right: `calc(${rightTrack} - 4px)`,
             top: `${layout.toolbarHeight + 8}px`,
             bottom: `${layout.bottomHeight + 8}px`,
             background:
