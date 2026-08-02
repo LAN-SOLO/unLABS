@@ -208,7 +208,6 @@ export function MidnightCommander({
     (path: string) => {
       setActivePath(path);
       setActiveCursor(0);
-       
     },
     [activePane],
   );
@@ -634,7 +633,6 @@ export function MidnightCommander({
         default:
           break;
       }
-       
     },
     [
       dialog,
