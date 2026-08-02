@@ -155,7 +155,16 @@ export function GameTickProvider({
         ratePerSecond: 0,
       };
       const next = Math.max(0, Math.min(current.capacity, current.amount + delta));
-      return { ...prev, [id]: { ...current, amount: next } };
+      const applied = next - current.amount;
+      return {
+        ...prev,
+        [id]: {
+          ...current,
+          amount: next,
+          totalProduced: (current.totalProduced ?? 0) + Math.max(0, applied),
+          totalConsumed: (current.totalConsumed ?? 0) + Math.max(0, -applied),
+        },
+      };
     });
   }, []);
 

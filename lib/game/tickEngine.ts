@@ -35,6 +35,10 @@ export interface ResourceState {
   capacity: number;
   /** Net rate in units per second (can be negative). */
   ratePerSecond: number;
+  /** Lifetime sum of positive applied deltas. Absent on pre-monitoring saves — read with `?? 0`. */
+  totalProduced?: number;
+  /** Lifetime sum of negative applied deltas (as a positive magnitude). Absent on pre-monitoring saves — read with `?? 0`. */
+  totalConsumed?: number;
 }
 
 export type ResourceMap = Partial<Record<ResourceId, ResourceState>>;
@@ -61,8 +65,14 @@ export function advanceResources(resources: ResourceMap, elapsedSeconds: number)
     const theoretical = state.ratePerSecond * seconds;
     const target = state.amount + theoretical;
     const clamped = Math.max(0, Math.min(state.capacity, target));
-    deltas[id] = clamped - state.amount;
-    nextResources[id] = { ...state, amount: clamped };
+    const applied = clamped - state.amount;
+    deltas[id] = applied;
+    nextResources[id] = {
+      ...state,
+      amount: clamped,
+      totalProduced: (state.totalProduced ?? 0) + Math.max(0, applied),
+      totalConsumed: (state.totalConsumed ?? 0) + Math.max(0, -applied),
+    };
   }
 
   return { nextResources, deltas, elapsedSeconds: seconds };
@@ -94,14 +104,15 @@ export function computeElapsedSeconds(
  *   - Energy starts at 0 capacity until UEC-001 is activated.
  */
 export function createInitialResources(): ResourceMap {
+  const zeroed = { totalProduced: 0, totalConsumed: 0 };
   return {
-    abstractum: { amount: 0, capacity: 100, ratePerSecond: 0 },
-    energy: { amount: 0, capacity: 0, ratePerSecond: 0 },
-    base_alloy: { amount: 0, capacity: 50, ratePerSecond: 0 },
-    advanced_alloy: { amount: 0, capacity: 25, ratePerSecond: 0 },
-    nanomaterial: { amount: 0, capacity: 10, ratePerSecond: 0 },
-    exotic_matter: { amount: 0, capacity: 5, ratePerSecond: 0 },
-    antimatter: { amount: 0, capacity: 1, ratePerSecond: 0 },
-    research: { amount: 0, capacity: 9999, ratePerSecond: 0 },
+    abstractum: { amount: 0, capacity: 100, ratePerSecond: 0, ...zeroed },
+    energy: { amount: 0, capacity: 0, ratePerSecond: 0, ...zeroed },
+    base_alloy: { amount: 0, capacity: 50, ratePerSecond: 0, ...zeroed },
+    advanced_alloy: { amount: 0, capacity: 25, ratePerSecond: 0, ...zeroed },
+    nanomaterial: { amount: 0, capacity: 10, ratePerSecond: 0, ...zeroed },
+    exotic_matter: { amount: 0, capacity: 5, ratePerSecond: 0, ...zeroed },
+    antimatter: { amount: 0, capacity: 1, ratePerSecond: 0, ...zeroed },
+    research: { amount: 0, capacity: 9999, ratePerSecond: 0, ...zeroed },
   };
 }

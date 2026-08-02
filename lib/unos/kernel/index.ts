@@ -158,9 +158,8 @@ export class Kernel {
   }
 
   /** Tick — called periodically to update subsystems */
-  tick() {
+  tick(dt: number = 2000) {
     if (this.info.state !== "running") return;
-    const dt = 2000; // Tick interval in ms
     this.process.tick(dt);
     this.scheduler.tick(dt);
     this.memory.tick();
@@ -179,7 +178,7 @@ export class Kernel {
   /** Start periodic ticking */
   startTicking(intervalMs: number = 2000) {
     if (this.tickHandle) return;
-    this.tickHandle = setInterval(() => this.tick(), intervalMs);
+    this.tickHandle = setInterval(() => this.tick(intervalMs), intervalMs);
   }
 
   /** Stop periodic ticking */
