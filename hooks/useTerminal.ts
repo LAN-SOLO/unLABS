@@ -52,8 +52,8 @@ import type {
 } from "@/lib/terminal/types";
 import { useThermalManagerOptional } from "@/contexts/ThermalManager";
 import { executeCommand, getWelcomeMessage } from "@/lib/terminal/commands";
-import { savePanelState } from "@/lib/panel/panelState";
-import type { PanelSaveData } from "@/lib/panel/panelState";
+import { loadPanelState, savePanelState } from "@/lib/panel/panelState";
+import { buildPanelSaveData } from "@/lib/panel/buildPanelSaveData";
 import { isDeviceUnlocked as checkDeviceUnlocked } from "@/lib/game/devices/unlocks";
 import {
   fetchBalance,
@@ -137,6 +137,12 @@ interface UseTerminalProps {
   nexusActions?: import("@/lib/terminal/types").NexusTerminalActions;
   questFlags?: Record<string, boolean>;
 }
+
+// Scrollback cap — keeps DOM size and re-render cost bounded during long
+// sessions; old lines fall off the top like a real terminal.
+const MAX_LINES = 2000;
+const capLines = (lines: TerminalLine[]): TerminalLine[] =>
+  lines.length > MAX_LINES ? lines.slice(lines.length - MAX_LINES) : lines;
 
 export function useTerminal({
   userId,
@@ -229,7 +235,7 @@ export function useTerminal({
       };
       setState((prev) => ({
         ...prev,
-        lines: [...prev.lines, line],
+        lines: capLines([...prev.lines, line]),
       }));
     },
     [generateId],
@@ -246,7 +252,7 @@ export function useTerminal({
       }));
       setState((prev) => ({
         ...prev,
-        lines: [...prev.lines, ...newLines],
+        lines: capLines([...prev.lines, ...newLines]),
       }));
     },
     [generateId],
@@ -286,219 +292,74 @@ export function useTerminal({
 
   // Save all device state to localStorage
   const saveAllDeviceState = useCallback(() => {
-    const cdcState = cdcDeviceActions?.getState();
-    const uecState = uecDeviceActions?.getState();
-    const batState = batDeviceActions?.getState();
-    const hmsState = hmsDeviceActions?.getState();
-    const ecrState = ecrDeviceActions?.getState();
-    const iplState = iplDeviceActions?.getState();
-    const mfrState = mfrDeviceActions?.getState();
-    const aicState = aicDeviceActions?.getState();
-    const vntState = vntDeviceActions?.getState();
-    const scaState = scaDeviceActions?.getState();
-    const exdState = exdDeviceActions?.getState();
-    const qsmState = qsmDeviceActions?.getState();
-    const emcState = emcDeviceActions?.getState();
-    const quaState = quaDeviceActions?.getState();
-    const pwbState = pwbDeviceActions?.getState();
-    const btkState = btkDeviceActions?.getState();
-    const rmgState = rmgDeviceActions?.getState();
-    const mscState = mscDeviceActions?.getState();
-    const netState = netDeviceActions?.getState();
-    const tmpState = tmpDeviceActions?.getState();
-    const dimState = dimDeviceActions?.getState();
-    const cpuState = cpuDeviceActions?.getState();
-    const clkState = clkDeviceActions?.getState();
-    const screwStates = screwButtonDeviceActions?.getAllStates();
-
-    const data: PanelSaveData = {
-      version: 1,
-      timestamp: Date.now(),
-      filesystem: filesystemActions?.toJSON(),
-      users: userActions?.toJSON(),
-      resources: resourceManagerActions?.toSaveData(),
-      firmware: firmwareActions?.toSaveData(),
-      kernel: kernelActions
-        ? (() => {
-            try {
-              return kernelActions.toJSON();
-            } catch {
-              return undefined;
-            }
-          })()
-        : undefined,
-      shell: shellActions
-        ? (() => {
-            try {
-              const env = shellActions.getAllEnv();
-              const aliases = shellActions.listAliases();
-              return {
-                config: { prompt: "\\u@_unLAB:\\w\\$", historySize: 500, aliases },
-                aliases: Object.entries(aliases),
-                env: Object.entries(env),
-              };
-            } catch {
-              return undefined;
-            }
-          })()
-        : undefined,
-      devices: {
-        cdc: { isPowered: cdcState?.isPowered ?? true, isExpanded: cdcState?.isExpanded ?? true },
-        uec: { isPowered: uecState?.isPowered ?? true, isExpanded: uecState?.isExpanded ?? true },
-        bat: {
-          isPowered: batState?.isPowered ?? true,
-          currentCharge: batState?.currentCharge ?? 5000,
-          autoRegen: batState?.autoRegen ?? true,
-          isExpanded: batState?.isExpanded ?? true,
-        },
-        hms: {
-          isPowered: hmsState?.isPowered ?? true,
-          pulseValue: hmsState?.pulseValue ?? 35,
-          tempoValue: hmsState?.tempoValue ?? 40,
-          freqValue: hmsState?.freqValue ?? 37,
-          waveformType: hmsState?.waveformType ?? "sine",
-          isExpanded: hmsState?.isExpanded ?? true,
-        },
-        ecr: {
-          isPowered: ecrState?.isPowered ?? true,
-          pulseValue: ecrState?.pulseValue ?? 40,
-          bloomValue: ecrState?.bloomValue ?? 60,
-          isRecording: ecrState?.isRecording ?? false,
-          isExpanded: ecrState?.isExpanded ?? true,
-        },
-        ipl: { isPowered: iplState?.isPowered ?? true, isExpanded: iplState?.isExpanded ?? true },
-        mfr: { isPowered: mfrState?.isPowered ?? true, isExpanded: mfrState?.isExpanded ?? true },
-        aic: {
-          isPowered: aicState?.isPowered ?? true,
-          isLearning: aicState?.isLearning ?? true,
-          isExpanded: aicState?.isExpanded ?? true,
-        },
-        vnt: {
-          isPowered: vntState?.isPowered ?? true,
-          cpuFanSpeed: vntState?.cpuFan?.speed ?? 65,
-          gpuFanSpeed: vntState?.gpuFan?.speed ?? 65,
-          fanMode: vntState?.cpuFan?.mode ?? "AUTO",
-          isExpanded: vntState?.isExpanded ?? true,
-        },
-        sca: { isPowered: scaState?.isPowered ?? true, isExpanded: scaState?.isExpanded ?? true },
-        exd: {
-          isPowered: exdState?.isPowered ?? true,
-          isDeployed: exdState?.isDeployed ?? true,
-          isExpanded: exdState?.isExpanded ?? true,
-        },
-        qsm: { isPowered: qsmState?.isPowered ?? true, isExpanded: qsmState?.isExpanded ?? true },
-        emc: { isPowered: emcState?.isPowered ?? true, isExpanded: emcState?.isExpanded ?? true },
-        qua: {
-          isPowered: quaState?.isPowered ?? true,
-          mode: quaState?.mode ?? "ANOMALY",
-          sensitivity: quaState?.sensitivity ?? 65,
-          depth: quaState?.depth ?? 50,
-          frequency: quaState?.frequency ?? 40,
-          isExpanded: quaState?.isExpanded ?? true,
-        },
-        pwb: { isPowered: pwbState?.isPowered ?? true, isExpanded: pwbState?.isExpanded ?? true },
-        btk: { isPowered: btkState?.isPowered ?? true, isExpanded: btkState?.isExpanded ?? true },
-        rmg: {
-          isPowered: rmgState?.isPowered ?? true,
-          strength: rmgState?.strength ?? 45,
-          isExpanded: rmgState?.isExpanded ?? true,
-        },
-        msc: { isPowered: mscState?.isPowered ?? true, isExpanded: mscState?.isExpanded ?? true },
-        net: {
-          isPowered: netState?.isPowered ?? true,
-          bandwidth: netState?.bandwidth ?? 2.4,
-          latencyMs: netState?.latencyMs ?? 12,
-          isExpanded: netState?.isExpanded ?? true,
-        },
-        tmp: {
-          isPowered: tmpState?.isPowered ?? true,
-          temperature: tmpState?.temperature ?? 28.4,
-          isExpanded: tmpState?.isExpanded ?? true,
-        },
-        dim: {
-          isPowered: dimState?.isPowered ?? true,
-          dimension: dimState?.dimension ?? 3.14,
-          stability: dimState?.stability ?? 98,
-          isExpanded: dimState?.isExpanded ?? true,
-        },
-        cpu: {
-          isPowered: cpuState?.isPowered ?? true,
-          cores: cpuState?.cores ?? 8,
-          utilization: cpuState?.utilization ?? 67,
-          frequency: cpuState?.frequency ?? 4.2,
-          isExpanded: cpuState?.isExpanded ?? true,
-        },
-        clk: {
-          isPowered: clkState?.isPowered ?? true,
-          displayMode: clkState?.displayMode ?? "local",
-          isExpanded: clkState?.isExpanded ?? true,
-        },
-        mem: {
-          isPowered: memDeviceActions?.getState().isPowered ?? true,
-          totalMemory: memDeviceActions?.getState().totalMemory ?? 16,
-          usedMemory: memDeviceActions?.getState().usedMemory ?? 11.5,
-          displayMode: memDeviceActions?.getState().displayMode ?? "usage",
-          isExpanded: memDeviceActions?.getState().isExpanded ?? true,
-        },
-        and: {
-          isPowered: andDeviceActions?.getState().isPowered ?? true,
-          signalStrength: andDeviceActions?.getState().signalStrength ?? 67,
-          anomaliesFound: andDeviceActions?.getState().anomaliesFound ?? 3,
-          displayMode: andDeviceActions?.getState().displayMode ?? "waveform",
-          isExpanded: andDeviceActions?.getState().isExpanded ?? true,
-        },
-        qcp: {
-          isPowered: qcpDeviceActions?.getState().isPowered ?? true,
-          anomalyDirection: qcpDeviceActions?.getState().anomalyDirection ?? 127,
-          anomalyDistance: qcpDeviceActions?.getState().anomalyDistance ?? 42,
-          displayMode: qcpDeviceActions?.getState().displayMode ?? "compass",
-          isExpanded: qcpDeviceActions?.getState().isExpanded ?? true,
-        },
-        tlp: {
-          isPowered: tlpDeviceActions?.getState().isPowered ?? true,
-          chargeLevel: tlpDeviceActions?.getState().chargeLevel ?? 65,
-          lastDestination: tlpDeviceActions?.getState().lastDestination ?? "LAB-Ω",
-          displayMode: tlpDeviceActions?.getState().displayMode ?? "standard",
-          isExpanded: tlpDeviceActions?.getState().isExpanded ?? true,
-        },
-        lct: {
-          isPowered: lctDeviceActions?.getState().isPowered ?? true,
-          laserPower: lctDeviceActions?.getState().laserPower ?? 450,
-          precision: lctDeviceActions?.getState().precision ?? 0.01,
-          displayMode: lctDeviceActions?.getState().displayMode ?? "cutting",
-          isExpanded: lctDeviceActions?.getState().isExpanded ?? true,
-        },
-        p3d: {
-          isPowered: p3dDeviceActions?.getState().isPowered ?? true,
-          progress: p3dDeviceActions?.getState().progress ?? 67,
-          layerCount: p3dDeviceActions?.getState().layerCount ?? 234,
-          bedTemp: p3dDeviceActions?.getState().bedTemp ?? 60,
-          displayMode: p3dDeviceActions?.getState().displayMode ?? "plastic",
-          isExpanded: p3dDeviceActions?.getState().isExpanded ?? true,
-        },
-        spk: {
-          isPowered: spkDeviceActions?.getState().isPowered ?? true,
-          volume: spkDeviceActions?.getState().volume ?? 45,
-          isMuted: spkDeviceActions?.getState().isMuted ?? false,
-          filters: spkDeviceActions?.getState().filters ?? { bass: false, mid: true, high: false },
-          isExpanded: spkDeviceActions?.getState().isExpanded ?? true,
-        },
-        dgn: {
-          isPowered: dgnDeviceActions?.getState().isPowered ?? true,
-          category: dgnDeviceActions?.getState().category ?? "SYSTEMS",
-          scanDepth: dgnDeviceActions?.getState().scanDepth ?? 75,
-          isExpanded: dgnDeviceActions?.getState().isExpanded ?? true,
-        },
-        screwButtons: screwStates
-          ? Object.fromEntries(
-              Object.entries(screwStates).map(([k, v]) => [
-                k,
-                { unlocked: v.unlocked, active: v.active, totalActiveTime: v.totalActiveTime },
-              ]),
-            )
+    const data = buildPanelSaveData(
+      {
+        cdc: cdcDeviceActions?.getState(),
+        uec: uecDeviceActions?.getState(),
+        bat: batDeviceActions?.getState(),
+        hms: hmsDeviceActions?.getState(),
+        ecr: ecrDeviceActions?.getState(),
+        ipl: iplDeviceActions?.getState(),
+        mfr: mfrDeviceActions?.getState(),
+        aic: aicDeviceActions?.getState(),
+        vnt: vntDeviceActions?.getState(),
+        sca: scaDeviceActions?.getState(),
+        exd: exdDeviceActions?.getState(),
+        qsm: qsmDeviceActions?.getState(),
+        emc: emcDeviceActions?.getState(),
+        qua: quaDeviceActions?.getState(),
+        pwb: pwbDeviceActions?.getState(),
+        btk: btkDeviceActions?.getState(),
+        rmg: rmgDeviceActions?.getState(),
+        msc: mscDeviceActions?.getState(),
+        net: netDeviceActions?.getState(),
+        tmp: tmpDeviceActions?.getState(),
+        dim: dimDeviceActions?.getState(),
+        cpu: cpuDeviceActions?.getState(),
+        clk: clkDeviceActions?.getState(),
+        mem: memDeviceActions?.getState(),
+        and: andDeviceActions?.getState(),
+        qcp: qcpDeviceActions?.getState(),
+        tlp: tlpDeviceActions?.getState(),
+        lct: lctDeviceActions?.getState(),
+        p3d: p3dDeviceActions?.getState(),
+        spk: spkDeviceActions?.getState(),
+        dgn: dgnDeviceActions?.getState(),
+        screwButtons: screwButtonDeviceActions?.getAllStates(),
+      },
+      {
+        filesystem: filesystemActions?.toJSON(),
+        users: userActions?.toJSON(),
+        resources: resourceManagerActions?.toSaveData(),
+        firmware: firmwareActions?.toSaveData(),
+        journal: journalActions?.toSaveData(),
+        kernel: kernelActions
+          ? (() => {
+              try {
+                return kernelActions.toJSON();
+              } catch {
+                return undefined;
+              }
+            })()
+          : undefined,
+        shell: shellActions
+          ? (() => {
+              try {
+                const env = shellActions.getAllEnv();
+                const aliases = shellActions.listAliases();
+                return {
+                  config: { prompt: "\\u@_unLAB:\\w\\$", historySize: 500, aliases },
+                  aliases: Object.entries(aliases),
+                  env: Object.entries(env),
+                };
+              } catch {
+                return undefined;
+              }
+            })()
           : undefined,
       },
-    };
+      loadPanelState(),
+    );
 
     savePanelState(data);
   }, [

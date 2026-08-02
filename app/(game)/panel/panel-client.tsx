@@ -10,6 +10,8 @@ import {
   PanelBottom,
 } from "@/components/panel/GamePanel";
 import { WindowManagerProvider } from "@/components/panel/WindowManager";
+import { PanelSaveBridge } from "@/components/panel/PanelSaveBridge";
+import { GridObserverBridge } from "@/components/panel/GridObserverBridge";
 import { PanelFrame } from "@/components/panel/PanelFrame";
 import { TerminalModule } from "@/components/panel/TerminalModule";
 import { Oscilloscope } from "@/components/panel/displays/Oscilloscope";
@@ -116,6 +118,10 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
   const saved = savedStateRef.current?.devices;
   const [hasAccess, setHasAccess] = useState(false);
 
+  // Filled by PanelSaveBridge (mounted below the device providers) so the
+  // power manager above them can trigger a real save.
+  const panelSaveRef = useRef<(() => void) | null>(null);
+
   // Simulated system loads for ventilation fans
   const [cpuLoad, setCpuLoad] = useState(45);
   const [gpuLoad, setGpuLoad] = useState(62);
@@ -177,9 +183,7 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
     <WalletProvider>
       <SystemPowerManagerProvider
         onShutdownComplete={handleShutdownComplete}
-        saveDeviceState={() => {
-          // saveAllDeviceState is wired via the terminal — trigger from context
-        }}
+        saveDeviceState={() => panelSaveRef.current?.()}
       >
         <PowerManagerProvider initialPowerState={savedStateRef.current?.power}>
           <ThermalManagerProvider>
@@ -385,6 +389,12 @@ export function PanelClient({ userId, username, balance, equipmentData }: PanelC
                                                                                 }
                                                                               >
                                                                                 <WindowManagerProvider className="text-white">
+                                                                                  <PanelSaveBridge
+                                                                                    registerRef={
+                                                                                      panelSaveRef
+                                                                                    }
+                                                                                  />
+                                                                                  <GridObserverBridge />
                                                                                   {/* Top Toolbar */}
                                                                                   <PanelToolbar>
                                                                                     {/* Tools */}
