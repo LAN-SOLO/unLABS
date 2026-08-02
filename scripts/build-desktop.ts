@@ -54,7 +54,7 @@ async function main(): Promise<void> {
     `Step 4: Package (${targets.join(", ")})`,
   );
 
-  console.log("\n\nBuild complete! Check the INSTALL/ directory.");
+  console.log("\n\nBuild complete! Check the .INSTALL/ directory.");
 }
 
 main().catch((err) => {
