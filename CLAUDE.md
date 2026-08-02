@@ -1,102 +1,79 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code in this repository.
 
 ## Commands
 
-- `pnpm dev` — Start Next.js dev server (port 3000)
-- `pnpm build` — Production build
-- `pnpm start` — Run the production build
-- `pnpm lint` / `pnpm lint:fix` — ESLint (`eslint-config-next` + `eslint-config-prettier`)
-- `pnpm typecheck` — `tsc --noEmit`
-- `pnpm format` / `pnpm format:check` — Prettier
-- `pnpm test` / `pnpm test:watch` — Vitest unit tests
-- `pnpm test:e2e` — Playwright smoke tests (requires `pnpm exec playwright install --with-deps chromium` once)
-- `pnpm check` — lint + typecheck + format:check + test + build (the same gates CI runs)
-- `pnpm db:start` / `db:stop` / `db:reset` / `db:new <name>` / `db:diff` / `db:types` — Supabase CLI wrappers
+- `pnpm dev` — Next.js dev server (port 3000); `pnpm build` / `pnpm start` — production
+- `pnpm lint` / `lint:fix` · `pnpm typecheck` · `pnpm format` / `format:check`
+- `pnpm test` / `test:watch` — Vitest; `pnpm test:e2e` — Playwright (once: `pnpm exec playwright install --with-deps chromium`)
+- `pnpm check` — lint + typecheck + format:check + test + build (same gates as CI)
+- `pnpm db:start|db:stop|db:reset|db:new <name>|db:diff|db:types` — Supabase CLI wrappers
+- `pnpm electron:dev` — desktop dev; `pnpm build:mac|build:win|build:all` — desktop builds → output in `.INSTALL/`; `pnpm download:binaries` — fetch bundled binaries
 
-See `docs/PIPELINE.md` for the full pipeline breakdown. Lefthook runs format/lint/typecheck on every commit and `pnpm test` on every push. GitHub Actions re-runs the same commands in CI.
+Lefthook runs format/lint/typecheck on commit and `pnpm test` on push; CI (`.github/workflows/ci.yml`) re-runs the same commands. Details: `docs/PIPELINE.md`, `docs/SUPABASE.md`.
 
-Supabase local stack lives under `supabase/` (`config.toml`, `migrations/`). Use the Supabase CLI via the `db:*` scripts for migrations; never edit schema directly.
+## Standards (non-negotiable)
 
-## Project Standards (non-negotiable)
+- TypeScript strict · Node 20+ · Next.js 16 (App Router) + React 19
+- **pnpm only** — never npm or yarn
+- No `any` — use `unknown` + type guards; prefer named exports; absolute imports via `@/*` (only alias)
+- Schema changes only via migrations in `supabase/migrations/` (use `db:*` scripts); no destructive queries (`DROP`, `TRUNCATE`) without explicit user confirmation
+- Never force-push `main`/`develop`; never commit secrets or `.env` files; lint + typecheck before committing
+- Business logic lives in service layers (`lib/api/*`, `lib/unos/*`, `lib/game/*`), not in API route handlers; prefer composition over inheritance
 
-### Language & Runtime
+## Architecture
 
-- TypeScript strict mode (already enabled in `tsconfig.json`)
-- **PNPM only** — never `npm` or `yarn`
-- Node.js 20+ / ES2022+
-- Next.js 16 (App Router) + React 19
+Next.js game simulating a Linux-like OS (`_unOS`): terminal, hardware panel, 38 in-game devices, episode-based quest progression, plus an Electron desktop build.
 
-### Code
+### Routes — `app/`
 
-- Follow existing patterns before introducing new ones
-- No `any` — use `unknown` and narrow with type guards
-- Prefer named exports
-- Use the `@/*` path alias for absolute imports (the only alias defined in `tsconfig.json`)
-
-### Database
-
-- Never modify the schema directly — always use migrations under `supabase/migrations/`
-- Never run destructive queries (`DROP`, `TRUNCATE`) without explicit user confirmation
-
-### Git
-
-- Never force-push `main` or `develop`
-- Never commit secrets or `.env` files
-- Run lint and type-check before committing
-
-### Architecture
-
-- Keep business logic out of API route handlers — use service layers (`lib/api/*`, `lib/unos/*`)
-- Prefer composition over inheritance
-
-## High-Level Architecture
-
-UnstableLabs is a Next.js App Router game that simulates a Linux-like operating system (`_unOS`) with a terminal, a hardware panel, and ~37 in-game devices. The non-obvious cross-cutting structure:
-
-### Routes
-
-- `app/(auth)/`, `app/auth/` — authentication
-- `app/(game)/terminal/` — terminal UI (`terminal-frame.tsx`, `terminal-power-wrapper.tsx`, `actions/` for server actions)
-- `app/(game)/panel/` — hardware panel UI (`panel-client.tsx`)
-- `app/api/` — API routes; keep handlers thin and delegate to `lib/`
+- `(auth)/`, `auth/` — authentication
+- `(game)/` — `terminal/` (`terminal-frame.tsx`, `terminal-power-wrapper.tsx`, `actions/` server actions), `panel/`, `lab/`, `dev/`, `monitor/`; shared shell in `game-shell.tsx`
+- `api/` — thin handlers that delegate to `lib/`
 
 ### \_unOS Kernel — `lib/unos/kernel/`
 
-A simulated kernel with subsystems: `dmesg`, `process`, `memory`, `scheduler`, `syscall`, `ipc`, `modules`, `procfs`. Surrounding modules in `lib/unos/`: `filesystem`, `users`, `network`, `packages`, `containers`, `cron`, `journal`, `shell`, `devices`, `init`.
+Subsystems: dmesg, process, memory, scheduler, syscall, ipc, modules, procfs. Surrounding modules in `lib/unos/`: filesystem, users, network, packages, containers, cron, journal, shell, devices, init.
 
-- The kernel is instantiated in `components/terminal/Terminal.tsx` via `kernelRef` and exposed through a `KernelActions` interface.
-- `procfs` hooks into the virtual filesystem via `setProcFS()` / `setProcFSListDir()` to render dynamic `/unproc` content.
-- Kernel state persists to `localStorage` through `PanelSaveData.kernel` (see `lib/panel/panelState.ts`).
-- `init.ts` accepts an optional `Kernel` so processes get real PIDs from the process table.
+- Instantiated in `components/terminal/Terminal.tsx` via `kernelRef`, exposed through `KernelActions`
+- procfs hooks into the virtual FS via `setProcFS()` / `setProcFSListDir()` (dynamic `/unproc`)
+- State persists to localStorage via `PanelSaveData.kernel`; `init.ts` accepts an optional `Kernel` so processes get real PIDs
 
-### Terminal Subsystem — `lib/terminal/`
+### Terminal — `lib/terminal/`
 
-- `commands.ts` is **~18,500+ lines**. New commands must be registered in **two** places: (1) the command definition itself, and (2) the `commands[]` array at the bottom of the file. Missing the array registration is the most common bug.
-- `types.ts` defines `DataFetchers` (~line 1340) — the contract every command uses to read game state and dispatch actions.
-- `unapp/` (`appShell.ts`, `deviceApps.ts`, `moduleRenderers.ts`) implements in-terminal "apps" that render device modules.
-- `hooks/useTerminal.ts` builds the `dataFetchers` object and wraps every command execution with `kernelActions.execCommand()` / `finishCommand()` so the kernel sees real processes.
+- `commands.ts` is **~26,000+ lines**. New commands must be registered in **two** places: the definition AND the `commands[]` array at the end of the file — missing the array is the most common bug.
+- `types.ts` defines `DataFetchers` (~line 1615) — the contract every command uses for game state and actions
+- `unapp/` (`appShell.ts`, `deviceApps.ts`, `moduleRenderers.ts`) — in-terminal apps rendering device modules
+- `hooks/useTerminal.ts` builds `dataFetchers` and wraps every command in `kernelActions.execCommand()` / `finishCommand()` so the kernel sees real processes
 
 ### Device System — `contexts/` + `devices/` + `lib/firmware/`
 
-Each in-game device has the same fan-out:
+Every device follows the same fan-out:
 
-1. **Manager context** — `contexts/[XXX]Manager.tsx` (e.g. `VNTManager.tsx`, `CPUManager.tsx`). React provider holding state, firmware metadata, power specs, and action callbacks.
-2. **Ref pattern** — `components/terminal/Terminal.tsx` collects every manager's ref and assembles an actions object.
-3. **DataFetchers wiring** — `hooks/useTerminal.ts` wires those actions into `dataFetchers`.
-4. **Command access** — terminal commands reach the device through `ctx.data.<actions>` (kernel actions live at `ctx.data.kernelActions`).
-5. **UI module** — `components/panel/modules/` renders the device on the hardware panel.
-6. **Docs/firmware metadata** — `devices/tier-{1,2,3}/<DEVICE>/` contains `DEVICE-ID.md` and `firmware.json`. `lib/firmware/registry.ts` and `lib/firmware/types.ts` model firmware at runtime; `contexts/FirmwareManager.tsx` is the runtime owner.
+1. `contexts/[XXX]Manager.tsx` — provider holding state, firmware metadata, power specs, actions
+2. `components/terminal/Terminal.tsx` collects manager refs into an actions object
+3. `hooks/useTerminal.ts` wires actions into `dataFetchers`
+4. Commands access via `ctx.data.<actions>` (kernel at `ctx.data.kernelActions`)
+5. `components/panel/modules/` — panel UI module
+6. `devices/tier-{1,2,3}/<DEVICE>/` — `DEVICE-ID.md` + `firmware.json`; runtime model in `lib/firmware/registry.ts`, owner `contexts/FirmwareManager.tsx`
 
-When adding device functionality, follow this exact pattern end-to-end — skipping the wiring layer is the second most common bug. See `devices/README.md` for the full device catalog and `devices/FIRMWARE-API.md` / `FIRMWARE-SPEC.md` for firmware contracts.
+Follow the pattern end-to-end — skipping the wiring layer is the second most common bug. Catalog: `devices/README.md`; firmware contracts: `devices/FIRMWARE-API.md`, `FIRMWARE-SPEC.md`.
 
-### Supabase / Data Layer
+### Game Layer — `lib/game/` + `contexts/`
 
-- Client setup in `lib/supabase/`, schema types in `types/database.ts` and `types/devices.ts`.
-- All device DB operations go through `lib/api/devices.ts` (queries, runtime state, combinations, tweaks). System preferences split into `sysprefs.ts` (client) and `sysprefs-server.ts` (server actions) — server actions are the canonical loader for preference data.
-- Recent perf work has consolidated sequential queries into RPCs/embeds/upserts; keep that pattern when adding new data flows.
+Quests (`quests/ep0.ts`–`ep6.ts`), missions (`missions/catalog/`), tutorial (`tutorial/`, UI in `components/onboarding/`), tick engine (`tickEngine.ts` + `contexts/GameTickProvider.tsx`), plus achievements, techTree, economy, production, resonance, hints. Each system has a provider in `contexts/` (QuestProvider, MissionProvider, TutorialProvider, …) and UI in `components/{quest,mission,journal,onboarding}/`. Device unlock/roster logic: `lib/game/devices/`.
 
-### Panel Save Game
+### Supabase / Data
 
-`lib/panel/panelState.ts` is the single source of truth for serialized game state (including kernel snapshot). Read it before designing any new persistence.
+- Clients in `lib/supabase/`; schema types `types/database.ts` (regenerate via `pnpm db:types`) + `types/devices.ts`
+- All device DB ops go through `lib/api/devices.ts`; sysprefs split into `sysprefs.ts` (client) and `sysprefs-server.ts` (server actions — canonical loader)
+- Prefer RPCs/embeds/upserts over sequential queries (established perf pattern)
+
+### Save Game
+
+`lib/panel/panelState.ts` is the single source of truth for serialized state (incl. kernel snapshot); `lib/panel/buildPanelSaveData.ts` assembles it. Read both before adding any persistence.
+
+### Desktop (Electron) — `electron/`
+
+`main.ts`, `window.ts`, `auth/`, `services/`, `config/`; compiled to `dist-electron/` via `pnpm electron:compile`. `scripts/build-desktop.ts` packages with electron-builder (`electron-builder.config.ts`) → output in **`.INSTALL/`** (note the leading dot). Bundled binaries (Postgres/PostgREST/GoTrue) land in `bin/` via `pnpm download:binaries`.
