@@ -106,6 +106,19 @@ export function canAdvanceStep(state: QuestState): boolean {
 }
 
 /**
+ * Like `isTriggerSatisfied`, but for use by the *automatic/background*
+ * cascade walker only. A `continue` trigger is trivially "satisfied" at all
+ * times — that's fine for an explicit player click (`advanceStep` via
+ * `isTriggerSatisfied`), but it is NOT evidence that the player has actually
+ * engaged with the step. `continue` steps require a real CONTINUE click and
+ * must never be walked through by a background flag write.
+ */
+function isCascadeSatisfied(trigger: StepTrigger, flags: Record<string, boolean>): boolean {
+  if (trigger.kind === "continue") return false;
+  return isTriggerSatisfied(trigger, flags);
+}
+
+/**
  * Mark the current step complete and move to the next one. Returns the
  * rewards that the caller should apply to the game state (rates, flags,
  * grants). Idempotent on "already complete" — a double-advance at the end
@@ -234,7 +247,7 @@ export function cascadeAdvance(state: QuestState): AdvanceResult {
     if (cur.currentStepIndex >= episode.steps.length) break;
 
     const currentStep = episode.steps[cur.currentStepIndex];
-    const currentSatisfied = isTriggerSatisfied(currentStep.trigger, cur.flags);
+    const currentSatisfied = isCascadeSatisfied(currentStep.trigger, cur.flags);
 
     if (currentSatisfied) {
       const result = advanceStep(cur);
@@ -247,11 +260,14 @@ export function cascadeAdvance(state: QuestState): AdvanceResult {
     }
 
     // Look at most one step ahead for a satisfied trigger. Anything further
-    // would skip steps the player never actually engaged with.
+    // would skip steps the player never actually engaged with. A `continue`
+    // next-step is never accepted as evidence here (isCascadeSatisfied
+    // returns false for it) — only a real out-of-order flag/command trigger
+    // justifies force-skipping the current step.
     const nextIdx = cur.currentStepIndex + 1;
     if (nextIdx >= episode.steps.length) break;
     const nextStep = episode.steps[nextIdx];
-    if (!isTriggerSatisfied(nextStep.trigger, cur.flags)) break;
+    if (!isCascadeSatisfied(nextStep.trigger, cur.flags)) break;
 
     // Force-skip the current (unsatisfied) step. Next iteration will see
     // the now-current step (= old nextStep) as satisfied and advance it

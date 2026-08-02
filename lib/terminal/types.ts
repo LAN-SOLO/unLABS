@@ -1818,6 +1818,11 @@ export interface TutorialTerminalActions {
   getDifficulty: () => "easy" | "hard" | null;
   /** Persist a new difficulty choice. */
   setDifficulty: (difficulty: "easy" | "hard") => Promise<{ ok: boolean; error?: string }>;
+  /**
+   * Non-destructive replay: reopens the easy-mode overlay from step 1
+   * without touching quest/mission progress. Only meaningful in easy mode.
+   */
+  replayOverlay: () => Promise<{ ok: boolean; error?: string }>;
 }
 
 /**
@@ -2057,6 +2062,7 @@ export interface JournalActions {
   write: (unit: string, priority: number, message: string, pid?: number) => void;
   formatEntry: (entry: import("@/lib/unos/journal").JournalEntry) => string;
   priorityFromName: (name: string) => number;
+  toSaveData: () => { entries: import("@/lib/unos/journal").JournalEntry[]; bootTime: number };
 }
 
 export interface CronActions {

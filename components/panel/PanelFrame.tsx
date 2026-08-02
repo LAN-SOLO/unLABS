@@ -9,6 +9,8 @@ interface PanelFrameProps {
   className?: string;
   title?: string;
   style?: React.CSSProperties;
+  /** Device id stamped as `data-device` — anchor for tutorial highlights. */
+  dataDevice?: string;
 }
 
 export function PanelFrame({
@@ -18,6 +20,7 @@ export function PanelFrame({
   className,
   title,
   style,
+  dataDevice,
 }: PanelFrameProps) {
   const variantStyles = {
     default: "panel-frame",
@@ -35,6 +38,7 @@ export function PanelFrame({
 
   return (
     <div
+      data-device={dataDevice}
       className={cn(
         "relative overflow-hidden",
         variantStyles[variant],

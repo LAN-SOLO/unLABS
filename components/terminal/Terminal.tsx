@@ -299,6 +299,24 @@ export function Terminal({
           return { ok: false, error: e instanceof Error ? e.message : "save failed" };
         }
       },
+      replayOverlay: async () => {
+        if (!tutorialCtx) {
+          return { ok: false, error: "Tutorial provider not mounted." };
+        }
+        if (tutorialCtx.state.difficulty !== "easy") {
+          return {
+            ok: false,
+            error:
+              "Guided walkthrough is only available in easy mode. Switch with `tutorial difficulty easy`.",
+          };
+        }
+        try {
+          await tutorialCtx.setOverlayStep(1);
+          return { ok: true };
+        } catch (e) {
+          return { ok: false, error: e instanceof Error ? e.message : "save failed" };
+        }
+      },
     }),
     [
       quest,
@@ -715,6 +733,7 @@ export function Terminal({
       },
       formatEntry: (entry) => Journal.formatEntry(entry),
       priorityFromName: (name) => Journal.priorityFromName(name),
+      toSaveData: () => journalRef.current!.toJSON(),
     }),
     [sharedJournal],
   );

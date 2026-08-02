@@ -20,9 +20,10 @@
  * add an optional "pin to side" toggle.
  */
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { useQuest } from "@/contexts/QuestProvider";
+import { useJournalOptional } from "@/contexts/JournalProvider";
 import type { VoiceId, VoiceLine } from "@/lib/game/quests/types";
 import { LissajousCalibration } from "./LissajousCalibration";
 
@@ -36,6 +37,7 @@ const VOICE_STYLE: Record<VoiceId, { label: string; color: string; italic?: bool
 
 export function QuestOverlay() {
   const { episode, currentStep, advance, isAdvancing, state, setFlag } = useQuest();
+  const journal = useJournalOptional();
 
   // Called by the Lissajous minigame when its lock latches. Sets the gating
   // flag, then immediately advances the step so the "reveal" beat fires.
@@ -43,6 +45,19 @@ export function QuestOverlay() {
     await setFlag("lissajous_locked", true);
     advance();
   }, [setFlag, advance]);
+
+  // Log each step's voice lines to the Journal once, so the player can
+  // re-read past narrative beats via the Journal panel ("J") even after the
+  // overlay has advanced or the episode has completed.
+  const loggedStepRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!currentStep || !journal) return;
+    if (loggedStepRef.current === currentStep.id) return;
+    loggedStepRef.current = currentStep.id;
+    for (const line of currentStep.voiceLines) {
+      journal.write(`voice/${line.voice}`, 5, line.text);
+    }
+  }, [currentStep, journal]);
 
   if (!episode || !currentStep) return null;
 
@@ -55,6 +70,7 @@ export function QuestOverlay() {
   return (
     <aside
       aria-label="Quest overlay"
+      data-quest-overlay
       className="pointer-events-auto fixed top-4 right-4 z-40 w-[min(32rem,calc(100vw-2rem))] border border-green-500/60 bg-black/90 font-mono text-sm text-green-400 shadow-[0_0_30px_rgba(34,197,94,0.25)] backdrop-blur"
     >
       <header className="flex items-center justify-between border-b border-green-500/40 px-3 py-2">

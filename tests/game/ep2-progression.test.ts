@@ -173,6 +173,45 @@ describe("cascadeAdvance — out-of-order triggers", () => {
     expect(result.state.flags.ep3_drone_done).not.toBe(true);
   });
 
+  it("never auto-advances a continue-triggered step (background cascade)", () => {
+    // Regression: cascadeAdvance must not walk through continue-triggered
+    // steps in the background — only an explicit advanceStep (a real player
+    // click) may do so. EP1 step 0 (ep1.briefing) is continue-triggered.
+    const initial = createInitialQuestState("EP1");
+    const cascaded = cascadeAdvance(initial);
+    expect(cascaded.state.currentStepIndex).toBe(0);
+    expect(cascaded.rewards).toEqual([]);
+
+    // The explicit single-step path, in contrast, does advance it.
+    const advanced = advanceStep(initial);
+    expect(advanced.state.currentStepIndex).toBe(1);
+  });
+
+  it("does not force-skip a flag-gated step just because the next step is continue-triggered", () => {
+    // Regression for the real bug: EP1.calibrate (flag: lissajous_locked)
+    // is immediately followed by EP1.reveal (continue, sets anomaly_mode).
+    // A background flag write unrelated to lissajous_locked must not skip
+    // the calibration step and grant anomaly_mode for free.
+    let state: QuestState = createInitialQuestState("EP1");
+    state = advanceStep(state).state; // briefing -> power_on
+    state = advanceStep(state).state; // power_on -> calibrate
+    expect(getCurrentStep(state)?.id).toBe("ep1.calibrate");
+
+    // Some unrelated background flag fires (e.g. a phase observer) while
+    // lissajous_locked is still unset.
+    state = setQuestFlag(state, "first_production_run", true);
+    const result = cascadeAdvance(state);
+
+    expect(getCurrentStep(result.state)?.id).toBe("ep1.calibrate");
+    expect(result.state.flags.anomaly_mode).not.toBe(true);
+
+    // Once the player actually completes the minigame, the explicit click
+    // (not cascadeAdvance) is what carries them to ep1.reveal and beyond.
+    const withLissajous = setQuestFlag(result.state, "lissajous_locked", true);
+    const afterCalibrate = advanceStep(withLissajous);
+    expect(getCurrentStep(afterCalibrate.state)?.id).toBe("ep1.reveal");
+  });
+
   it("cascades across episode boundaries when the next episode's first step is also satisfied", () => {
     // Walk EP2 to its last step, then set EVERY needed flag at once.
     let state = createInitialQuestState("EP2");

@@ -15,11 +15,13 @@
  * target's bounding rect.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 
 import { useMissionOptional } from "@/contexts/MissionProvider";
 import { useQuest } from "@/contexts/QuestProvider";
 import { useTutorial } from "@/contexts/TutorialProvider";
+import { useJournalOptional } from "@/contexts/JournalProvider";
 import {
   OVERLAY_STEP_COUNT,
   OVERLAY_STEPS,
@@ -81,6 +83,7 @@ export function TutorialOverlay() {
   const tutorial = useTutorial();
   const mission = useMissionOptional();
   const quest = useQuest();
+  const pathname = usePathname();
 
   // Build the observation — kept lean so re-renders are cheap.
   const observation: OverlayObservation = useMemo(() => {
@@ -100,10 +103,10 @@ export function TutorialOverlay() {
       questFlags: quest.state.flags,
       missionStatus,
       objectiveStatus,
-      onPanel: typeof window !== "undefined" && window.location.pathname.startsWith("/panel"),
-      onLab: typeof window !== "undefined" && window.location.pathname.startsWith("/lab"),
+      onPanel: (pathname ?? "").startsWith("/panel"),
+      onLab: (pathname ?? "").startsWith("/lab"),
     };
-  }, [mission, quest.state.flags]);
+  }, [mission, quest.state.flags, pathname]);
 
   // Auto-advance loop. Whenever the predicate flips true and we're not
   // already past it, bump the step. Guarded by `tutorial.overlayActive` so
@@ -123,6 +126,18 @@ export function TutorialOverlay() {
   const stepIndex = tutorial.state.overlayStepIndex;
   const step = getOverlayStep(stepIndex);
   const targetRect = useTargetRect(step?.target ?? null);
+
+  // Log each shown step to the Journal once, so the player can re-read past
+  // tutorial cards via the Journal panel ("J") after they've advanced past
+  // them or dismissed the overlay.
+  const journal = useJournalOptional();
+  const loggedStepRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!tutorial.overlayActive || !step || !journal) return;
+    if (loggedStepRef.current === stepIndex) return;
+    loggedStepRef.current = stepIndex;
+    journal.write("tutorial", 5, `${step.title}\n${step.body}`);
+  }, [tutorial.overlayActive, step, stepIndex, journal]);
 
   const handleManualAdvance = useCallback(() => {
     if (stepIndex >= OVERLAY_STEP_COUNT) {

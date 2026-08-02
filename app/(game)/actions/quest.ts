@@ -18,6 +18,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import {
+  advanceStep,
   cascadeAdvance,
   getEpisode,
   hydrateQuestState,
@@ -113,7 +114,11 @@ export async function advanceQuestStep(): Promise<QuestAdvanceResult> {
     };
   }
 
-  const advanced = cascadeAdvance(loaded.state);
+  // Single-step advance — "one CONTINUE button per step" (see
+  // components/quest/QuestOverlay.tsx). Background catch-up for
+  // out-of-order flag/command triggers happens separately via
+  // `setQuestFlagAction`'s cascadeAdvance call, not here.
+  const advanced = advanceStep(loaded.state);
 
   // The pure engine already computes the correct next episode id (honoring
   // Episode.nextEpisode when the current episode completes).
@@ -173,6 +178,9 @@ const CLIENT_SETTABLE_FLAGS = new Set([
   "lissajous_locked",
   "abstractum_bottleneck_observed",
   "first_production_run",
+  // Tutorial "wake the basic grid" beat — set by GridObserverBridge once
+  // BAT-001, NET-001, and MEM-001 are all powered on.
+  "grid_online",
   // Production recipe flags (set by ProductionProvider.applyRewards on claim)
   "smt_01_online",
   "cnd_01_online",

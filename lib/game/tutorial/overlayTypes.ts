@@ -37,6 +37,7 @@ export type OverlayAdvance =
   | { kind: "questFlag"; flag: string; value: boolean }
   | { kind: "missionStatus"; missionId: string; status: string }
   | { kind: "objectiveStatus"; key: string; status: string }
+  | { kind: "route"; route: "panel" | "lab" }
   | { kind: "anyOf"; conditions: OverlayAdvance[] };
 
 export type OverlayPosition = "top" | "bottom" | "left" | "right" | "center";
@@ -76,6 +77,8 @@ export function predicateSatisfied(predicate: OverlayAdvance, obs: OverlayObserv
       return obs.missionStatus[predicate.missionId] === predicate.status;
     case "objectiveStatus":
       return obs.objectiveStatus[predicate.key] === predicate.status;
+    case "route":
+      return predicate.route === "panel" ? obs.onPanel : obs.onLab;
     case "anyOf":
       return predicate.conditions.some((c) => predicateSatisfied(c, obs));
   }

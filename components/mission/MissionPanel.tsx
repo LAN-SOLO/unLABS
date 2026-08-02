@@ -56,7 +56,11 @@ export function MissionPanel() {
   if (!hasMissions) return null;
 
   return (
-    <div className="border border-green-500/30 bg-black/80 font-mono backdrop-blur-sm">
+    <div
+      data-mission-panel
+      aria-label="Missions panel"
+      className="border border-green-500/30 bg-black/80 font-mono backdrop-blur-sm"
+    >
       {/* Header */}
       <button
         onClick={() => setIsExpanded((e) => !e)}
@@ -242,6 +246,7 @@ function MissionCard({
       <div className="flex justify-end gap-1 pt-0.5">
         {isComplete && (
           <button
+            data-mission-claim={mission.id}
             onClick={() => onClaim(mission.id)}
             disabled={claimingId !== null}
             className="rounded border border-green-400/50 px-1.5 py-0.5 text-[9px] text-green-300 transition-colors hover:bg-green-500/20 disabled:opacity-50"

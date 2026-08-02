@@ -21,11 +21,52 @@ export const OVERLAY_STEPS: OverlayStep[] = [
     title: "Welcome to _unOS",
     body:
       "This is your lab terminal. The bottom area is _unOS — type here to run commands.\n\n" +
-      "Around it, the hardware panel shows live device readouts. We'll walk through the first few missions together.",
+      "The lab itself is dark. Someone — something — is already talking to you in the window at the top right.",
     target: null,
     position: "center",
     advance: { kind: "manual" },
     allowSkipAhead: true,
+  },
+  {
+    id: "follow-mcp",
+    title: "Respond to the wake-up call",
+    body:
+      "MCP is briefing you in the top-right window. Read each message and press CONTINUE to work through the cold-boot procedure.\n\n" +
+      "At the end of it, emergency power reaches the basic subsystems again.",
+    target: "[data-quest-overlay]",
+    position: "left",
+    advance: { kind: "questFlag", flag: "ep0_complete", value: true },
+  },
+  {
+    id: "ep1-calibration",
+    title: "Calibrate the array",
+    body:
+      "Keep following MCP: bring OSC-001 online and lock the Lissajous calibration when the minigame appears.\n\n" +
+      "Locking the pattern is what unlocks your mission queue.",
+    target: "[data-quest-overlay]",
+    position: "left",
+    advance: { kind: "questFlag", flag: "missions_unlocked", value: true },
+  },
+  {
+    id: "open-panel",
+    title: "Open the hardware panel",
+    body:
+      "Time to see the lab itself. In the terminal, type:\n\n  panel\n\n" +
+      "That grants access and takes you to the hardware panel — every device in the lab lives there.",
+    target: "[data-terminal-input]",
+    position: "top",
+    advance: { kind: "route", route: "panel" },
+  },
+  {
+    id: "wake-the-grid",
+    title: "Wake the basic grid",
+    body:
+      "MCP re-authorized five basic subsystems, but they are still powered down. Use the panel's terminal to switch them on:\n\n" +
+      "  power on BAT-001\n  power on NET-001\n  power on MEM-001\n\n" +
+      "The same syntax powers anything off again (power off <ID>), and 'undev' lists every device.",
+    target: "[data-terminal-input]",
+    position: "top",
+    advance: { kind: "questFlag", flag: "grid_online", value: true },
   },
   {
     id: "open-missions",
@@ -33,7 +74,7 @@ export const OVERLAY_STEPS: OverlayStep[] = [
     body:
       "Look at the left side of the panel — there's a MISSIONS card listing your active jobs.\n\n" +
       "Each mission has a checklist of tasks. The first one is Power Budget.",
-    target: "[aria-label='Missions panel'], .mission-panel, [data-mission-panel]",
+    target: "[data-mission-panel]",
     position: "right",
     advance: { kind: "manual" },
     allowSkipAhead: true,

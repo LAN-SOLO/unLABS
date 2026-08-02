@@ -25871,8 +25871,9 @@ const guideCommand: Command = {
 const tutorialCommand: Command = {
   name: "tutorial",
   aliases: ["onboarding"],
-  description: "Control the onboarding flow (status | skip | resume | welcomeback | difficulty)",
-  usage: "tutorial [status|skip|resume|welcomeback|difficulty|help]",
+  description:
+    "Control the onboarding flow (status | skip | resume | replay | welcomeback | difficulty)",
+  usage: "tutorial [status|skip|resume|replay|welcomeback|difficulty|help]",
   execute: async (args, ctx) => {
     const actions = ctx.data.tutorialActions;
     if (!actions) {
@@ -25888,7 +25889,9 @@ const tutorialCommand: Command = {
           "",
           "  tutorial status            Show current onboarding progress",
           "  tutorial skip              Hard-skip the tutorial (irreversible grants)",
-          "  tutorial resume            Restart from Phase 0 (EP0)",
+          "  tutorial resume            Restart from Phase 0 (EP0) — resets quest progress",
+          "  tutorial replay            Reopen the guided overlay from step 1 (easy mode only,",
+          "                             does NOT reset quest/mission progress)",
           "  tutorial welcomeback       Show the last offline catch-up summary",
           "  tutorial difficulty <m>    Switch guidance mode (easy | hard)",
           "",
@@ -26004,6 +26007,17 @@ const tutorialCommand: Command = {
           "> Tutorial reset to EP0 'Cold Boot'. Rewards from prior play were retained.",
           "",
         ],
+      };
+    }
+
+    if (sub === "replay") {
+      const res = await actions.replayOverlay();
+      if (!res.ok) {
+        return { success: false, error: res.error ?? "Tutorial replay failed." };
+      }
+      return {
+        success: true,
+        output: ["", "> Guided overlay reopened from step 1. Quest progress is untouched.", ""],
       };
     }
 

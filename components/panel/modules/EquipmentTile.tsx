@@ -8783,6 +8783,7 @@ export function AnomalyDetector({ className }: AnomalyDetectorProps) {
   return (
     <PanelFrame
       variant="teal"
+      dataDevice="AND-001"
       className={cn("relative overflow-hidden", className)}
       style={{ perspective: "600px" }}
     >

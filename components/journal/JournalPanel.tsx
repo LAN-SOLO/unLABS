@@ -28,6 +28,7 @@ import type { JournalEntry } from "@/lib/unos/journal";
 const FILTERS = [
   { id: "all", label: "ALL" },
   { id: "hint", label: "HINT" },
+  { id: "tutorial", label: "TUT" },
   { id: "mission", label: "MISS" },
   { id: "achievement", label: "ACHV" },
   { id: "voice", label: "VOICE" },

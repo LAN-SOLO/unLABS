@@ -119,6 +119,7 @@ export function TerminalInput({
         </span>
         <input
           ref={inputRef}
+          data-terminal-input
           type={passwordMode ? "password" : "text"}
           value={value}
           onChange={(e) => {
