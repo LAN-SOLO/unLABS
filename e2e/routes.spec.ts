@@ -1,13 +1,10 @@
 /**
- * Step-2 browser smoke probe.
+ * Route-level smoke suite.
  *
- * Goal: confirm the new systems push didn't break SSR or trigger console
- * errors on the public routes. Auth-protected interactive flows are NOT
- * covered here (tutorial overlay, achievement toasts, tech graph, etc.)
- * — those need a human driver.
- *
- * This file is intentionally prefixed with `_` so it can be deleted (or
- * renamed in Step 3 when proper coverage lands).
+ * Confirms SSR works and no console errors fire on the public routes, and
+ * that auth-protected routes redirect to /login. Auth-protected interactive
+ * flows (tutorial overlay, achievement toasts, tech graph, missions) are
+ * NOT covered here — they need authenticated fixtures first.
  */
 
 import { test, expect, type ConsoleMessage } from "@playwright/test";
