@@ -67,7 +67,7 @@ interface BTKManagerProviderProps {
 }
 
 export function BTKManagerProvider({ children, initialState }: BTKManagerProviderProps) {
-  const startPowered = initialState?.isPowered ?? false;
+  const startPowered = initialState?.isPowered ?? true; // essential system — auto-boots on emergency power
   const [deviceState, setDeviceState] = useState<BTKDeviceState>(
     startPowered ? "booting" : "standby",
   );

@@ -94,7 +94,7 @@ interface VNTManagerProviderProps {
 }
 
 export function VNTManagerProvider({ children, initialState }: VNTManagerProviderProps) {
-  const startPowered = initialState?.isPowered ?? false;
+  const startPowered = initialState?.isPowered ?? true; // essential system — auto-boots on emergency power
   const startExpanded = initialState?.isExpanded ?? startPowered;
   const thermalManager = useThermalManagerOptional();
   const [isExpanded, setIsExpanded] = useState(startExpanded);

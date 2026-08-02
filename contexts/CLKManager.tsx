@@ -81,7 +81,7 @@ interface CLKManagerProviderProps {
 }
 
 export function CLKManagerProvider({ children, initialState }: CLKManagerProviderProps) {
-  const startPowered = initialState?.isPowered ?? false;
+  const startPowered = initialState?.isPowered ?? true; // essential system — auto-boots on emergency power
   const startExpanded = initialState?.isExpanded ?? startPowered;
   const [isExpanded, setIsExpanded] = useState(startExpanded);
   const toggleExpanded = useCallback(() => {
