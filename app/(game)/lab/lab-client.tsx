@@ -94,6 +94,9 @@ export function LabClient({
           <Link href="/panel" className="underline hover:text-green-300">
             panel
           </Link>
+          <Link href="/monitor" className="underline hover:text-green-300">
+            monitor
+          </Link>
           <Link href="/dev" className="underline hover:text-green-300">
             dev
           </Link>
@@ -108,6 +111,7 @@ export function LabClient({
           return (
             <ResourceCard
               key={id}
+              resourceId={id}
               label={RESOURCE_LABEL[id]}
               value={r.amount.toFixed(2)}
               sub={`${r.ratePerSecond >= 0 ? "+" : ""}${r.ratePerSecond.toFixed(2)}/s`}
@@ -199,14 +203,17 @@ function ResourceCard({
   value,
   sub,
   highlight,
+  resourceId,
 }: {
   label: string;
   value: string;
   sub?: string;
   highlight?: boolean;
+  resourceId?: string;
 }) {
   return (
     <div
+      data-resource={resourceId}
       className={`border p-2 ${
         highlight ? "border-green-400 bg-green-500/10" : "border-green-500/30"
       }`}
@@ -239,7 +246,7 @@ function RecipeCard({
   const canAfford = missingCosts.length === 0 && !missingUnsc;
 
   return (
-    <div className="border border-green-500/30 bg-black/40 p-3">
+    <div data-recipe={recipe.id} className="border border-green-500/30 bg-black/40 p-3">
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="text-green-200">{recipe.label}</div>

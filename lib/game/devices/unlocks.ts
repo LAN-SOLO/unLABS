@@ -12,16 +12,13 @@
  * decides whether to short-circuit `powerOn`, render a disabled button, etc.
  */
 
-export const STARTER_DEVICES = [
-  "CDC-001",
-  "BAT-001",
-  "BTK-001",
-  "CLK-001",
-  "MEM-001",
-  "NET-001",
-  "PWB-001",
-  "VNT-001",
-] as const;
+/**
+ * The bare emergency systems that survive the lab blackout: a clock, life
+ * support, and a hand toolkit. Everything else — including basic monitors —
+ * is re-authorized by MCP at the end of EP0 and must then be powered on by
+ * the operator (the tutorial teaches `power on <ID>` in the terminal).
+ */
+export const STARTER_DEVICES = ["CLK-001", "VNT-001", "BTK-001"] as const;
 
 const STARTER_SET = new Set<string>(STARTER_DEVICES);
 
@@ -30,6 +27,15 @@ const STARTER_SET = new Set<string>(STARTER_DEVICES);
  * resolve truthy in `quest.state.flags` for the device to be powerable.
  */
 export const DEVICE_UNLOCK_FLAGS: Readonly<Record<string, string>> = {
+  // Tier-1 basic subsystems — re-authorized by MCP once emergency power is
+  // routed at the end of EP0 (they still start powered OFF; the operator
+  // brings them online via the terminal).
+  "CDC-001": "ep0_complete",
+  "BAT-001": "ep0_complete",
+  "MEM-001": "ep0_complete",
+  "NET-001": "ep0_complete",
+  "PWB-001": "ep0_complete",
+
   // Tier-1 (non-starter)
   "CPU-001": "tutorial_graduated",
   "MSC-001": "tutorial_graduated",

@@ -142,6 +142,9 @@ export function DevClient({
             <Link href="/lab" className="underline hover:text-green-300">
               lab
             </Link>
+            <Link href="/monitor" className="underline hover:text-green-300">
+              monitor
+            </Link>
           </nav>
         </div>
       </header>
