@@ -52,17 +52,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid address" }, { status: 400 });
   }
 
-  // SECURITY: Optional - verify address belongs to user
-  // Uncomment to restrict to user's own wallet only:
-  // const { data: profile } = await supabase
-  //   .from('profiles')
-  //   .select('solana_address')
-  //   .eq('id', user.id)
-  //   .single()
-  //
-  // if (profile?.solana_address !== address) {
-  //   return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  // }
+  // Ownership of the queried address is NOT verified: wallet addresses are
+  // never persisted server-side (the client talks to window.phantom directly),
+  // so there is nothing to check against. Balances are public on-chain data;
+  // auth + rate limiting above bound abuse of our RPC quota. If a wallet
+  // column is ever added to profiles, enforce ownership here.
 
   for (const endpoint of RPC_ENDPOINTS) {
     try {
