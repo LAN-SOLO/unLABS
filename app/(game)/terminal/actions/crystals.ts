@@ -209,10 +209,6 @@ function generateSlices(crystalId: string, color: CrystalColor, era: CrystalEra)
   return slices;
 }
 
-// Type-safe database helpers using type assertions for Supabase operations
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyTable = any;
-
 // Server Actions
 
 export async function mintCrystal(name: string): Promise<MintResult> {
@@ -274,8 +270,7 @@ export async function mintCrystal(name: string): Promise<MintResult> {
 
   // Deduct balance atomically using the secure RPC function
   // This prevents race conditions and double-spend attacks
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: deductResult, error: deductError } = await (supabase as any).rpc("deduct_balance", {
+  const { data: deductResult, error: deductError } = await supabase.rpc("deduct_balance", {
     p_user_id: user.id,
     p_amount: MINT_COST,
     p_reason: `crystal_mint:${name}`,
@@ -307,7 +302,8 @@ export async function mintCrystal(name: string): Promise<MintResult> {
     slice_count: SLICES_PER_CRYSTAL,
   };
 
-  const { data: crystalData, error: crystalError } = await (supabase.from("crystals") as AnyTable)
+  const { data: crystalData, error: crystalError } = await supabase
+    .from("crystals")
     .insert(crystalInsert)
     .select("id, name, color, volatility, rotation, state, era")
     .single();
@@ -316,8 +312,7 @@ export async function mintCrystal(name: string): Promise<MintResult> {
 
   if (crystalError || !crystal) {
     // Rollback balance atomically
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).rpc("credit_balance", {
+    await supabase.rpc("credit_balance", {
       p_user_id: user.id,
       p_amount: MINT_COST,
       p_reason: "rollback:crystal_creation_failed",
@@ -328,13 +323,12 @@ export async function mintCrystal(name: string): Promise<MintResult> {
 
   // Create slices
   const slices = generateSlices(crystal.id, color, era);
-  const { error: slicesError } = await (supabase.from("slices") as AnyTable).insert(slices);
+  const { error: slicesError } = await supabase.from("slices").insert(slices);
 
   if (slicesError) {
     // Rollback: delete crystal and restore balance atomically
     await supabase.from("crystals").delete().eq("id", crystal.id);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).rpc("credit_balance", {
+    await supabase.rpc("credit_balance", {
       p_user_id: user.id,
       p_amount: MINT_COST,
       p_reason: "rollback:slice_creation_failed",
@@ -345,7 +339,8 @@ export async function mintCrystal(name: string): Promise<MintResult> {
 
   // Note: Transaction already recorded by deduct_balance RPC function
   // Update the transaction to include crystal_id for traceability
-  await (supabase.from("transactions") as AnyTable)
+  await supabase
+    .from("transactions")
     .update({ crystal_id: crystal.id })
     .eq("user_id", user.id)
     .eq("description", `crystal_mint:${name}`)
@@ -376,7 +371,8 @@ export async function fetchCrystalByName(name: string): Promise<CrystalDetails |
   if (!user) return null;
 
   // Single query with PostgREST embed - fetches crystal + slices in one round trip
-  const { data: crystalData, error } = await (supabase.from("crystals") as AnyTable)
+  const { data: crystalData, error } = await supabase
+    .from("crystals")
     .select(
       "id, name, color, volatility, rotation, state, era, is_genesis, total_power, slice_count, created_at, slices(id, crystal_id, position, power, is_active, hue, saturation, brightness, created_at)",
     )
@@ -450,7 +446,8 @@ export async function renameCrystal(oldName: string, newName: string): Promise<R
   }
 
   // Update name
-  const { error: updateError } = await (supabase.from("crystals") as AnyTable)
+  const { error: updateError } = await supabase
+    .from("crystals")
     .update({ name: newName })
     .eq("id", crystal.id);
 

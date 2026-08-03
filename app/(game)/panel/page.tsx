@@ -3,9 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { PanelClient } from "./panel-client";
 import type { EquipmentData, TechTreeProgress } from "../terminal/actions/equipment";
 
-// Type workaround for Supabase strict typing
-type AnyTable = ReturnType<Awaited<ReturnType<typeof createClient>>["from"]>;
-
 interface ProfileData {
   username: string | null;
   display_name: string | null;
@@ -111,22 +108,16 @@ export default async function PanelPage() {
     progressResult,
     volatilityResult,
   ] = await Promise.all([
-    (supabase.from("profiles") as AnyTable)
-      .select("username, display_name")
-      .eq("id", user.id)
-      .single(),
-    (supabase.from("balances") as AnyTable)
-      .select("available, staked, locked")
-      .eq("user_id", user.id)
-      .single(),
-    (supabase.from("crystals") as AnyTable)
-      .select("id, total_power, slice_count")
-      .eq("owner_id", user.id),
-    (supabase.from("tech_trees") as AnyTable).select("*"),
-    (supabase.from("research_progress") as AnyTable)
+    supabase.from("profiles").select("username, display_name").eq("id", user.id).single(),
+    supabase.from("balances").select("available, staked, locked").eq("user_id", user.id).single(),
+    supabase.from("crystals").select("id, total_power, slice_count").eq("owner_id", user.id),
+    supabase.from("tech_trees").select("*"),
+    supabase
+      .from("research_progress")
       .select("current_tier, experience, experience_to_next, tech_tree:tech_trees(*)")
       .eq("user_id", user.id),
-    (supabase.from("volatility_snapshots") as AnyTable)
+    supabase
+      .from("volatility_snapshots")
       .select("tps, calculated_tier, network")
       .order("captured_at", { ascending: false })
       .limit(1)

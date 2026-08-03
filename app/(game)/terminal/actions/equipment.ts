@@ -1,10 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
-import type { TechTree, ResearchProgress, Crystal, Balance } from "@/types";
-
-// Type workaround for Supabase strict typing
-type AnyTable = ReturnType<Awaited<ReturnType<typeof createClient>>["from"]>;
+import type { TechTree, ResearchProgress } from "@/types";
 
 export interface EquipmentData {
   crystals: {
@@ -103,26 +100,23 @@ export async function fetchEquipmentData(): Promise<EquipmentData | null> {
   const [crystalsResult, balanceResult, techTreesResult, progressResult, volatilityResult] =
     await Promise.all([
       // Crystals with aggregates
-      (supabase.from("crystals") as AnyTable)
-        .select("id, total_power, slice_count")
-        .eq("owner_id", user.id),
+      supabase.from("crystals").select("id, total_power, slice_count").eq("owner_id", user.id),
 
       // Balance
-      (supabase.from("balances") as AnyTable)
-        .select("available, staked, locked")
-        .eq("user_id", user.id)
-        .single(),
+      supabase.from("balances").select("available, staked, locked").eq("user_id", user.id).single(),
 
       // Tech trees
-      (supabase.from("tech_trees") as AnyTable).select("*"),
+      supabase.from("tech_trees").select("*"),
 
       // Research progress
-      (supabase.from("research_progress") as AnyTable)
+      supabase
+        .from("research_progress")
         .select("*, tech_tree:tech_trees(*)")
         .eq("user_id", user.id),
 
       // Latest volatility snapshot
-      (supabase.from("volatility_snapshots") as AnyTable)
+      supabase
+        .from("volatility_snapshots")
         .select("*")
         .order("captured_at", { ascending: false })
         .limit(1)
@@ -130,7 +124,7 @@ export async function fetchEquipmentData(): Promise<EquipmentData | null> {
     ]);
 
   // Calculate crystal totals
-  const crystals = (crystalsResult.data as Crystal[]) || [];
+  const crystals = crystalsResult.data ?? [];
   const crystalData = {
     count: crystals.length,
     totalSlices: crystals.reduce((sum, c) => sum + (c.slice_count || 0), 0),
@@ -141,8 +135,7 @@ export async function fetchEquipmentData(): Promise<EquipmentData | null> {
   const balance = balanceResult.data || { available: 100, staked: 0, locked: 0 };
 
   // Build tech tree progress map
-  const techTrees = (techTreesResult.data as TechTree[]) || [];
-  const progress = (progressResult.data as (ResearchProgress & { tech_tree: TechTree })[]) || [];
+  const progress: (ResearchProgress & { tech_tree: TechTree | null })[] = progressResult.data ?? [];
 
   const techTreeProgress: Record<string, TechTreeProgress> = {
     devices: createDefaultProgress("devices", "Devices"),
@@ -154,7 +147,7 @@ export async function fetchEquipmentData(): Promise<EquipmentData | null> {
   // Map actual progress
   for (const p of progress) {
     const category = p.tech_tree?.category?.toLowerCase();
-    if (category && techTreeProgress[category]) {
+    if (category && techTreeProgress[category] && p.tech_tree) {
       techTreeProgress[category] = {
         name: p.tech_tree.name,
         category: category,
