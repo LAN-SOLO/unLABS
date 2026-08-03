@@ -1,5 +1,76 @@
 # Changelog
 
+## v0.1.27-beta (2026-06-06)
+
+### Fixed
+
+- **Mission claim buttons unblocked.** Claim no longer stays disabled after
+  reload; claimed missions remain reviewable in the panel.
+- **Desktop window fit.** Game content is fitted to the desktop (Electron)
+  window instead of overflowing it.
+
+## v0.1.26-beta (2026-05-29)
+
+Version-bump-only release (desktop rebuild). No code changes.
+
+## v0.1.25-beta (2026-05-29)
+
+### Added
+
+- **`harmonize` terminal command** for resonance input.
+
+## v0.1.24-beta (2026-05-29)
+
+### Fixed
+
+- **Atomic mission claim** with client-side progress, closing the window for
+  double-claims.
+
+## v0.1.23-beta (2026-05-29)
+
+### Added
+
+- **AND-001 sensitivity slider** on the panel tile.
+
+## v0.1.22-beta (2026-05-28)
+
+### Fixed
+
+- **Midnight Commander file views** are reported to the mission system, so
+  file-view objectives track.
+- **Boot sequence** stays inside the viewport (no overflow).
+- **Mission progress** derived client-side is persisted before claim.
+
+## v0.1.21-beta (2026-05-28)
+
+### Fixed
+
+- **Mission tracking** for device, command, and flag objectives.
+
+## v0.1.20-beta (2026-05-27)
+
+### Added
+
+- **Quest episodes EP5 (Quantum Frontier) and EP6 (Convergence)** with 8 new
+  missions (m014–m021).
+- **Tier 3 device recipes** (EMC, QAN, QSM, AIC, SCA, TLP) and exotic
+  material crafting.
+
+### Changed
+
+- **PowerManager overhaul:** source state sync, performance throttle, load
+  shedding, initial state hydration. BAT and MFR managers sync to
+  PowerManager as the authoritative source.
+
+### Fixed
+
+- ResourceBar wired to GameTickProvider for live data.
+- Electron navigation with `window.location` fallback.
+- Quest cascade wrapped in `startTransition`.
+
+_(Versions 0.1.18/0.1.19 were never released — numbering jumped from
+0.1.17 to 0.1.20.)_
+
 ## v0.1.17-beta (2026-05-26)
 
 ### Fixed
