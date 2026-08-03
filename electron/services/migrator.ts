@@ -29,15 +29,15 @@ import { join } from "path";
  * upgrading FROM). Any migrations added in the CURRENT build must be
  * strictly greater than this value so they actually run on upgrade.
  *
- * Current value (0.1.10-beta): last 0.1.9-alpha migration was
- * 20260429000001_tutorial_difficulty. The 20260521xxx migration adding the
- * balances UPDATE RLS policy is new in this release and must run.
+ * Current value: 20260521000001_balances_update_policy is the newest
+ * migration and has shipped since 0.1.21-beta, so every orphan data dir a
+ * current build can encounter already has it applied.
  *
  * Backstop: the self-heal pass below detects tracked migrations whose
  * declared tables/columns don't actually exist and untracks them, so
  * even a wrong cutoff can be recovered from on a subsequent boot.
  */
-const ORPHAN_RECOVERY_CUTOFF = "20260412999999";
+const ORPHAN_RECOVERY_CUTOFF = "20260521000001";
 
 /**
  * @param runSqlFiles If false, only creates schemas and roles. If true, runs SQL migration files.
