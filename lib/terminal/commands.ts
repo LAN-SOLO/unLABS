@@ -1,5 +1,6 @@
 import type { Command, CommandContext, CommandResult } from "./types";
 import { parseTimeArg, formatCountdown } from "@/lib/power/timeParser";
+import { REROLL_COST, STREAK_INSURANCE_COST } from "@/lib/game/daily/engine";
 
 // Simple text banner - no fancy ASCII art to avoid font issues
 const ASCII_LOGO = `
@@ -239,6 +240,7 @@ const helpCommand: Command = {
       "|                      economy                               |",
       "+------------------------------------------------------------+",
       "|  balance   - check _unSC token balance                     |",
+      "|  daily     - daily contracts: list / claim / reroll        |",
       "|  research  - tech tree browser (NXS-01: list/start/claim)  |",
       "|  nexus     - launch the tech-tree graph app                |",
       "|  scan      - scan for volatility data                      |",
@@ -25767,6 +25769,220 @@ const achieveCommand: Command = {
   },
 };
 
+/** Friendly messages for the machine-readable daily-contract error codes. */
+const DAILY_ERROR_MESSAGES: Record<string, string> = {
+  not_authenticated: "Not authenticated. Log in again.",
+  profile_missing: "Profile not found. Reload the terminal.",
+  unknown_contract: "Unknown contract. Run 'daily list' to see today's board.",
+  already_claimed: "Contract already claimed.",
+  objective_incomplete: "Objective not complete yet. Check 'daily list' for progress.",
+  already_rerolled: "Only one reroll per day — already used.",
+  not_rerollable: "This contract cannot be rerolled.",
+  already_insured: "Streak insurance is already active.",
+  insufficient_unsc: "Insufficient balance.",
+  award_failed: "Payout failed. Try again.",
+  write_failed: "Could not save changes. Try again.",
+};
+
+const dailyErrorMessage = (
+  code: string | undefined,
+  overrides?: Record<string, string>,
+): string => {
+  if (!code) return "Operation failed.";
+  return overrides?.[code] ?? DAILY_ERROR_MESSAGES[code] ?? `Operation failed (${code}).`;
+};
+
+const dailyCommand: Command = {
+  name: "daily",
+  aliases: ["contracts"],
+  description: "Daily contracts: view board, claim payouts, reroll, streak insurance",
+  usage: "daily [list|claim <n>|reroll <n>|insure|help]",
+  execute: async (args, ctx) => {
+    const actions = ctx.data.dailyActions;
+    if (!actions) {
+      return { success: false, error: "Daily contract subsystem not available." };
+    }
+
+    const sub = (args[0] ?? "list").toLowerCase();
+
+    // Resolve a claim/reroll target: 1-based board index or raw contract id.
+    const resolveContract = (token: string) => {
+      const rows = actions.list();
+      if (/^\d+$/.test(token)) {
+        const n = Number.parseInt(token, 10);
+        return n >= 1 && n <= rows.length ? rows[n - 1] : null;
+      }
+      return rows.find((r) => r.contractId === token) ?? null;
+    };
+
+    const formatProgress = (value: number): string =>
+      Number.isInteger(value) ? String(value) : value.toFixed(1);
+
+    if (sub === "help" || sub === "-h" || sub === "--help") {
+      return {
+        success: true,
+        output: [
+          "",
+          "  daily list              Show today's contract board + streak",
+          "  daily claim <n>         Claim a completed contract (1-3 or id)",
+          `  daily reroll <n>        Swap a contract for a new one (${REROLL_COST} _unSC)`,
+          `  daily insure            Buy streak insurance (${STREAK_INSURANCE_COST} _unSC)`,
+          "",
+        ],
+      };
+    }
+
+    if (sub === "list") {
+      const rows = actions.list();
+      const streak = actions.streak();
+      const insured = streak.insuredUntil ? ` [insured until ${streak.insuredUntil}]` : "";
+      const output: string[] = [
+        "",
+        "+-- DAILY CONTRACTS ---------------------------------------------+",
+        `|  ${streak.dayKey}  ·  STREAK: ${streak.count} day${streak.count === 1 ? "" : "s"}${insured}`.padEnd(
+          65,
+        ) + "|",
+        "+----------------------------------------------------------------+",
+      ];
+
+      if (rows.length === 0) {
+        output.push("|  No contracts on the board today.".padEnd(65) + "|");
+      }
+
+      rows.forEach((r, i) => {
+        const tag = r.claimed ? "  [CLAIMED]" : r.completed ? "  [DONE]" : "";
+        const rerolled = r.isReplacement ? " [REROLLED]" : "";
+        const barWidth = 10;
+        const ratio = r.target > 0 ? Math.min(1, r.progress / r.target) : 0;
+        const filled = Math.min(barWidth - 1, Math.floor(ratio * barWidth));
+        const bar =
+          ratio >= 1
+            ? "=".repeat(barWidth)
+            : "=".repeat(filled) + ">" + ".".repeat(barWidth - filled - 1);
+        const shown = formatProgress(Math.min(r.progress, r.target));
+        output.push("|".padEnd(65) + "|");
+        output.push(`|  ${i + 1}. ${r.title}${rerolled}${tag}`.padEnd(65) + "|");
+        output.push(`|     [${bar}] ${shown}/${r.target}   +${r.payout} _unSC`.padEnd(65) + "|");
+      });
+
+      output.push("+----------------------------------------------------------------+");
+      output.push("");
+      output.push("  daily claim <n>    claim a completed contract");
+      output.push(`  daily reroll <n>   swap a contract (${REROLL_COST} _unSC)`);
+      if (!streak.insuredUntil) {
+        output.push(`  daily insure       protect your streak (${STREAK_INSURANCE_COST} _unSC)`);
+      }
+      output.push("");
+      return { success: true, output };
+    }
+
+    if (sub === "claim") {
+      const token = args[1];
+      if (!token) return { success: false, error: "Usage: daily claim <n|contract-id>" };
+      const target = resolveContract(token);
+      if (!target) {
+        return { success: false, error: `Unknown contract '${token}'. Run 'daily list'.` };
+      }
+
+      ctx.setTyping(true);
+      const result = await actions.claim(target.contractId);
+      // ctx.balance is a static SSR snapshot — always re-fetch after a payout.
+      const balance = result.ok ? await ctx.data.fetchBalance() : null;
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        return { success: false, error: dailyErrorMessage(result.error) };
+      }
+
+      const output = [
+        "",
+        `> Contract claimed: ${target.title}`,
+        `> +${result.awarded ?? target.payout} _unSC awarded`,
+      ];
+      if (result.milestone) {
+        output.push(`> STREAK MILESTONE: +${result.milestone} _unSC`);
+      }
+      if (result.streak !== undefined) {
+        output.push(`> Streak: ${result.streak} day${result.streak === 1 ? "" : "s"}`);
+      }
+      if (balance) {
+        output.push(`> Balance: ${balance.available.toFixed(2)} _unSC available`);
+      }
+      output.push("");
+      return { success: true, output };
+    }
+
+    if (sub === "reroll") {
+      const token = args[1];
+      if (!token) return { success: false, error: "Usage: daily reroll <n|contract-id>" };
+      const target = resolveContract(token);
+      if (!target) {
+        return { success: false, error: `Unknown contract '${token}'. Run 'daily list'.` };
+      }
+
+      ctx.setTyping(true);
+      const result = await actions.reroll(target.contractId);
+      // ctx.balance is a static SSR snapshot — always re-fetch after a burn.
+      const balance = result.ok ? await ctx.data.fetchBalance() : null;
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        return {
+          success: false,
+          error: dailyErrorMessage(result.error, {
+            insufficient_unsc: `Insufficient balance. Rerolling costs ${REROLL_COST} _unSC.`,
+          }),
+        };
+      }
+
+      const replacement = actions.list().find((r) => r.isReplacement);
+      const output = ["", `> Contract rerolled (-${REROLL_COST} _unSC).`];
+      if (replacement) {
+        output.push(`> New contract: ${replacement.title}  (+${replacement.payout} _unSC)`);
+        output.push(`>   ${replacement.description}`);
+      }
+      if (balance) {
+        output.push(`> Balance: ${balance.available.toFixed(2)} _unSC available`);
+      }
+      output.push("");
+      return { success: true, output };
+    }
+
+    if (sub === "insure" || sub === "insurance") {
+      ctx.setTyping(true);
+      const result = await actions.buyInsurance();
+      // ctx.balance is a static SSR snapshot — always re-fetch after a burn.
+      const balance = result.ok ? await ctx.data.fetchBalance() : null;
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        return {
+          success: false,
+          error: dailyErrorMessage(result.error, {
+            insufficient_unsc: `Insufficient balance. Streak insurance costs ${STREAK_INSURANCE_COST} _unSC.`,
+          }),
+        };
+      }
+
+      const streak = actions.streak();
+      const output = [
+        "",
+        `> Streak insurance active${streak.insuredUntil ? ` until ${streak.insuredUntil}` : ""} (-${STREAK_INSURANCE_COST} _unSC).`,
+      ];
+      if (balance) {
+        output.push(`> Balance: ${balance.available.toFixed(2)} _unSC available`);
+      }
+      output.push("");
+      return { success: true, output };
+    }
+
+    return {
+      success: false,
+      error: `Unknown subcommand '${sub}'. Try 'daily help'.`,
+    };
+  },
+};
+
 /**
  * `guide` prints the active mission's full walkthrough — every objective, in
  * order, with its hint text inline. Designed for the "hard" difficulty mode
@@ -26248,6 +26464,8 @@ export const commands: Command[] = [
   guideCommand,
   // Achievements
   achieveCommand,
+  // Daily contracts
+  dailyCommand,
   // Nexus (tech tree graph app)
   nexusCommand,
 ];

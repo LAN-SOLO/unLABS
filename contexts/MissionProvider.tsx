@@ -54,6 +54,13 @@ import {
   untrackMissionAction,
   updateObjectiveProgressAction,
 } from "@/app/(game)/actions/mission";
+import {
+  buyStreakInsurance,
+  claimContract,
+  getDailyState,
+  rerollContract,
+} from "@/app/(game)/actions/daily";
+import { utcDayKey, type DailyContract } from "@/lib/game/daily/engine";
 import type { StepReward } from "@/lib/game/quests/types";
 
 // ── Context shape ─────────────────────────────────────────────────────
@@ -93,6 +100,33 @@ interface MissionContextValue {
   missionState: MissionPlayerState;
   /** Quest flags (for terminal commands). */
   questFlags: Record<string, boolean>;
+  /** Daily contract board (comeback loop) with client-derived progress. */
+  daily: {
+    loaded: boolean;
+    dayKey: string;
+    contracts: Array<{
+      contractId: string;
+      title: string;
+      description: string;
+      payout: number;
+      rerollable: boolean;
+      claimed: boolean;
+      isReplacement: boolean;
+      progress: number;
+      target: number;
+      completed: boolean;
+    }>;
+    streak: { count: number; insuredUntil: string | null };
+    claim: (contractId: string) => Promise<{
+      ok: boolean;
+      awarded?: number;
+      milestone?: number;
+      streak?: number;
+      error?: string;
+    }>;
+    reroll: (contractId: string) => Promise<{ ok: boolean; error?: string }>;
+    buyInsurance: () => Promise<{ ok: boolean; error?: string }>;
+  };
 }
 
 const MissionContext = createContext<MissionContextValue | null>(null);
@@ -116,6 +150,21 @@ function describeRewards(rewards: StepReward[]): string {
     }
   }
   return parts.join(", ");
+}
+
+/**
+ * Server-loaded snapshot of today's daily contract board
+ * (app/(game)/actions/daily.ts → getDailyState). Progress is NOT part of
+ * this state — it is derived per render, same as mission objectives.
+ */
+interface DailyBoardState {
+  loaded: boolean;
+  dayKey: string;
+  contracts: DailyContract[];
+  claimedIds: string[];
+  rerolledIds: string[];
+  streakCount: number;
+  streakInsuredUntil: string | null;
 }
 
 // ── Provider ──────────────────────────────────────────────────────────
@@ -319,6 +368,265 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
     effectiveStateRef.current = effectiveState;
   }, [effectiveState]);
 
+  // ── Daily contracts (comeback loop) ─────────────────────────────────
+  // Server-authoritative board (app/(game)/actions/daily.ts) with
+  // client-derived progress, mirroring the derive-don't-store pattern of
+  // the mission objectives above.
+
+  const [dailyBoard, setDailyBoard] = useState<DailyBoardState>({
+    loaded: false,
+    dayKey: "",
+    contracts: [],
+    claimedIds: [],
+    rerolledIds: [],
+    streakCount: 0,
+    streakInsuredUntil: null,
+  });
+  // Local counters for `command` objectives, keyed by contractId (fed by
+  // reportCommand below). Contract ids embed the day key, so entries from
+  // a previous day are inert even before the rollover reload prunes them.
+  const [dailyCommandCounts, setDailyCommandCounts] = useState<Record<string, number>>({});
+  // contractIds of replacements produced by reroll() in THIS session. The
+  // getDailyState payload cannot attribute replacements client-side (the
+  // originals are derived from the userId-seeded engine, and no provider
+  // has the userId), so after a full page reload `isReplacement` degrades
+  // to false. Cosmetic only — claim/reroll validation is server-side.
+  const [dailyReplacementIds, setDailyReplacementIds] = useState<string[]>([]);
+  const dailyLoadingRef = useRef(false);
+
+  const loadDaily = useCallback(async () => {
+    if (dailyLoadingRef.current) return;
+    dailyLoadingRef.current = true;
+    try {
+      const result = await getDailyState();
+      if (result.ok) {
+        setDailyBoard({
+          loaded: true,
+          dayKey: result.dayKey,
+          contracts: result.contracts,
+          claimedIds: result.claimedIds,
+          rerolledIds: result.rerolledIds,
+          streakCount: result.streakCount,
+          streakInsuredUntil: result.streakInsuredUntil,
+        });
+        // Fresh board (mount or day rollover): drop day-scoped client state.
+        setDailyCommandCounts({});
+        setDailyReplacementIds([]);
+      }
+    } catch {
+      // Network hiccup on load — stay unloaded; the terminal surface
+      // degrades to an empty board instead of crashing the provider.
+    } finally {
+      dailyLoadingRef.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadDaily();
+  }, [loadDaily]);
+
+  // Day rollover: re-derive "today" once per tick; when the UTC day flips
+  // past the loaded board, refetch. tickCount is the clock here — the memo
+  // has no other reactive input.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const currentDayKey = useMemo(() => utcDayKey(new Date()), [tick.tickCount]);
+  useEffect(() => {
+    if (!dailyBoard.loaded) return;
+    if (currentDayKey !== dailyBoard.dayKey) void loadDaily();
+  }, [currentDayKey, dailyBoard.loaded, dailyBoard.dayKey, loadDaily]);
+
+  // Ref mirror so reportCommand/claim callbacks read the latest board
+  // without depending on it (same pattern as stateRef/effectiveStateRef).
+  const dailyBoardRef = useRef(dailyBoard);
+  useEffect(() => {
+    dailyBoardRef.current = dailyBoard;
+  }, [dailyBoard]);
+
+  // Client-derived progress per contractId (derive-don't-store, like
+  // resourceThresholdProgress/craftCountProgress above).
+  const dailyProgress = useMemo(() => {
+    const updates: Record<string, number> = {};
+    const midnightMs = dailyBoard.dayKey ? Date.parse(`${dailyBoard.dayKey}T00:00:00Z`) : 0;
+    for (const contract of dailyBoard.contracts) {
+      const obj = contract.objective;
+      if (obj.type === "craft_count") {
+        // Claimed production jobs for the target recipe since UTC midnight
+        // of the board's day — the same window the server verifies against.
+        let count = 0;
+        for (const job of production.jobs) {
+          if (job.status !== "claimed") continue;
+          if (job.recipeId !== obj.target) continue;
+          if (job.claimedAt === null || job.claimedAt < midnightMs) continue;
+          count += 1;
+        }
+        updates[contract.contractId] = count;
+      } else if (obj.type === "resource_threshold") {
+        const resource = tick.resources[obj.target as keyof typeof tick.resources];
+        updates[contract.contractId] = resource ? resource.amount : 0;
+      } else if (obj.type === "command") {
+        updates[contract.contractId] = dailyCommandCounts[contract.contractId] ?? 0;
+      } else {
+        updates[contract.contractId] = 0;
+      }
+    }
+    return updates;
+    // tick.tickCount keeps resource thresholds honest every second (same
+    // posture as resourceThresholdProgress above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    tick.tickCount,
+    tick.resources,
+    production.jobs,
+    dailyBoard.contracts,
+    dailyBoard.dayKey,
+    dailyCommandCounts,
+  ]);
+
+  const dailyProgressRef = useRef(dailyProgress);
+  useEffect(() => {
+    dailyProgressRef.current = dailyProgress;
+  }, [dailyProgress]);
+
+  const dailyContracts = useMemo(
+    () =>
+      dailyBoard.contracts.map((contract) => {
+        const obj = contract.objective;
+        const claimed = dailyBoard.claimedIds.includes(contract.contractId);
+        const progress = dailyProgress[contract.contractId] ?? 0;
+        const satisfied =
+          obj.comparison === "lte" ? progress <= obj.targetValue : progress >= obj.targetValue;
+        return {
+          contractId: contract.contractId,
+          title: contract.title,
+          description: obj.description,
+          payout: contract.payout,
+          rerollable: contract.rerollable,
+          claimed,
+          isReplacement: dailyReplacementIds.includes(contract.contractId),
+          progress,
+          target: obj.targetValue,
+          // Claimed contracts stay completed even if derived progress
+          // drifts afterwards (e.g. an lte resource threshold rising again).
+          completed: claimed || satisfied,
+        };
+      }),
+    [dailyBoard.contracts, dailyBoard.claimedIds, dailyProgress, dailyReplacementIds],
+  );
+
+  // The _unSC balance is owned by ProductionProvider; its exported
+  // refresh() re-reads jobs + balance from the server, so daily payouts
+  // and burns show up immediately instead of waiting for the provider's
+  // 15s periodic refresh. refresh() is a stable useCallback([]) there.
+  const refreshProduction = production.refresh;
+
+  const dailyClaim = useCallback(
+    async (contractId: string) => {
+      const board = dailyBoardRef.current;
+      const contract = board.contracts.find((c) => c.contractId === contractId);
+      if (!contract) return { ok: false, error: "unknown_contract" };
+      const obj = contract.objective;
+      // craft_count is verified server-side against production_jobs; the
+      // client-trusted objective types ship their derived progress.
+      const clientProgress =
+        obj.type === "command" || obj.type === "resource_threshold"
+          ? { [obj.id]: dailyProgressRef.current[contractId] ?? 0 }
+          : undefined;
+      try {
+        const result = await claimContract(contractId, clientProgress);
+        if (!result.ok) return { ok: false, error: result.error ?? "unknown" };
+        setDailyBoard((s) => ({
+          ...s,
+          claimedIds: s.claimedIds.includes(contractId)
+            ? s.claimedIds
+            : [...s.claimedIds, contractId],
+          streakCount: result.streakCount,
+        }));
+        const milestoneText =
+          result.milestoneAwarded > 0
+            ? ` — streak milestone: +${result.milestoneAwarded} _unSC`
+            : "";
+        journal?.write(
+          "daily",
+          5,
+          `[ daily ] claimed: ${contract.title} — +${result.unscAwarded} _unSC${milestoneText}`,
+        );
+        void refreshProduction();
+        return {
+          ok: true,
+          awarded: result.unscAwarded,
+          milestone: result.milestoneAwarded > 0 ? result.milestoneAwarded : undefined,
+          streak: result.streakCount,
+        };
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : "network_error" };
+      }
+    },
+    [journal, refreshProduction],
+  );
+
+  const dailyReroll = useCallback(
+    async (contractId: string) => {
+      try {
+        const result = await rerollContract(contractId);
+        if (!result.ok || !result.replacement) {
+          return { ok: false, error: result.error ?? "unknown" };
+        }
+        const replacement = result.replacement;
+        setDailyBoard((s) => ({
+          ...s,
+          contracts: s.contracts.map((c) => (c.contractId === contractId ? replacement : c)),
+          rerolledIds: s.rerolledIds.includes(contractId)
+            ? s.rerolledIds
+            : [...s.rerolledIds, contractId],
+        }));
+        setDailyReplacementIds((prev) =>
+          prev.includes(replacement.contractId) ? prev : [...prev, replacement.contractId],
+        );
+        // The reroll burned REROLL_COST _unSC server-side — sync the balance.
+        void refreshProduction();
+        return { ok: true };
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : "network_error" };
+      }
+    },
+    [refreshProduction],
+  );
+
+  const dailyBuyInsurance = useCallback(async () => {
+    try {
+      const result = await buyStreakInsurance();
+      if (!result.ok) return { ok: false, error: result.error ?? "unknown" };
+      setDailyBoard((s) => ({ ...s, streakInsuredUntil: result.streakInsuredUntil }));
+      // Insurance burned STREAK_INSURANCE_COST _unSC — sync the balance.
+      void refreshProduction();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : "network_error" };
+    }
+  }, [refreshProduction]);
+
+  const daily = useMemo<MissionContextValue["daily"]>(
+    () => ({
+      loaded: dailyBoard.loaded,
+      dayKey: dailyBoard.dayKey,
+      contracts: dailyContracts,
+      streak: { count: dailyBoard.streakCount, insuredUntil: dailyBoard.streakInsuredUntil },
+      claim: dailyClaim,
+      reroll: dailyReroll,
+      buyInsurance: dailyBuyInsurance,
+    }),
+    [
+      dailyBoard.loaded,
+      dailyBoard.dayKey,
+      dailyBoard.streakCount,
+      dailyBoard.streakInsuredUntil,
+      dailyContracts,
+      dailyClaim,
+      dailyReroll,
+      dailyBuyInsurance,
+    ],
+  );
+
   // ── Actions ─────────────────────────────────────────────────────────
 
   const trackMission = useCallback((id: string) => {
@@ -483,6 +791,27 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
           }
         }
       }
+
+      // Daily contracts: command objectives of today's un-claimed contracts
+      // use the same normalization (exact match, or command + arguments).
+      // Counts are local-only; they ride to the server as clientProgress at
+      // claim time (same trust posture as mission command objectives).
+      const board = dailyBoardRef.current;
+      if (board.loaded) {
+        for (const contract of board.contracts) {
+          if (board.claimedIds.includes(contract.contractId)) continue;
+          const obj = contract.objective;
+          if (obj.type !== "command") continue;
+          const target = obj.target.trim().toLowerCase();
+          if (normalized === target || normalized.startsWith(target + " ")) {
+            setDailyCommandCounts((prev) => {
+              const current = prev[contract.contractId] ?? 0;
+              if (current >= obj.targetValue) return prev;
+              return { ...prev, [contract.contractId]: current + 1 };
+            });
+          }
+        }
+      }
     },
     [incrementProgress],
   );
@@ -582,6 +911,7 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
       activeDeviceIds,
       missionState: effectiveState,
       questFlags: flags,
+      daily,
     }),
     [
       allMissions,
@@ -601,6 +931,7 @@ export function MissionProvider({ children, initialMissionState }: MissionProvid
       activeDeviceIds,
       effectiveState,
       flags,
+      daily,
     ],
   );
 

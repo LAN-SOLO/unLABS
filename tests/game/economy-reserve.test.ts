@@ -39,6 +39,10 @@ describe("isReserveSource", () => {
     expect(isReserveSource("")).toBe(false);
     expect(isReserveSource("Achievement")).toBe(false); // case sensitive
   });
+
+  it("accepts 'daily' (requires migration 20260808000001 on the DB side)", () => {
+    expect(isReserveSource("daily")).toBe(true);
+  });
 });
 
 describe("awardFromReserve — validation", () => {

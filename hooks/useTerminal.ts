@@ -133,6 +133,7 @@ interface UseTerminalProps {
   resonanceActions?: import("@/lib/terminal/types").ResonanceTerminalActions;
   tutorialActions?: import("@/lib/terminal/types").TutorialTerminalActions;
   achievementActions?: import("@/lib/terminal/types").AchievementTerminalActions;
+  dailyActions?: import("@/lib/terminal/types").DailyTerminalActions;
   researchActions?: import("@/lib/terminal/types").ResearchTerminalActions;
   nexusActions?: import("@/lib/terminal/types").NexusTerminalActions;
   questFlags?: Record<string, boolean>;
@@ -196,6 +197,7 @@ export function useTerminal({
   resonanceActions,
   tutorialActions,
   achievementActions,
+  dailyActions,
   researchActions,
   nexusActions,
   questFlags,
@@ -516,6 +518,7 @@ export function useTerminal({
       resonanceActions,
       tutorialActions,
       achievementActions,
+      dailyActions,
       researchActions,
       nexusActions,
     }),
@@ -569,6 +572,7 @@ export function useTerminal({
       resonanceActions,
       tutorialActions,
       achievementActions,
+      dailyActions,
       researchActions,
       nexusActions,
       questFlags,

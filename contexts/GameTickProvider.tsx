@@ -47,6 +47,8 @@ interface GameTickContextValue {
   lastTickAt: number;
   /** Seconds of offline progress applied on mount (for MCP welcome message). */
   offlineCatchUpSeconds: number;
+  /** True when offline catch-up hit the hard cap and elapsed time was truncated. */
+  offlineTruncated: boolean;
   /**
    * Per-resource amount applied during offline catch-up. Keyed by ResourceId.
    * Stable until `acknowledgeOfflineCatchUp()` is called, then cleared.
@@ -95,6 +97,7 @@ export function GameTickProvider({
   // client produce different timestamps on the same render pass.
   const [lastTickAt, setLastTickAt] = useState(0);
   const [offlineCatchUpSeconds, setOfflineCatchUpSeconds] = useState(0);
+  const [offlineTruncated, setOfflineTruncated] = useState(false);
   const [offlineDeltas, setOfflineDeltas] = useState<Partial<Record<ResourceId, number>>>({});
   const [hasUnseenOfflineCatchUp, setHasUnseenOfflineCatchUp] = useState(false);
 
@@ -113,11 +116,12 @@ export function GameTickProvider({
   // --- Offline catch-up (runs once on mount) ---
   useEffect(() => {
     if (!initialLastTickAt) return;
-    const { elapsedSeconds } = computeElapsedSeconds(initialLastTickAt, Date.now());
+    const { elapsedSeconds, truncated } = computeElapsedSeconds(initialLastTickAt, Date.now());
     if (elapsedSeconds > 0) {
       const result = advanceResources(resourcesRef.current, elapsedSeconds);
       setResources(result.nextResources);
       setOfflineCatchUpSeconds(elapsedSeconds);
+      setOfflineTruncated(truncated);
       setOfflineDeltas(result.deltas);
       // Only surface the modal when there's actually something worth showing:
       // >60s offline AND at least one non-zero resource delta.
@@ -197,6 +201,7 @@ export function GameTickProvider({
       tickCount,
       lastTickAt,
       offlineCatchUpSeconds,
+      offlineTruncated,
       offlineDeltas,
       hasUnseenOfflineCatchUp,
       acknowledgeOfflineCatchUp,
@@ -209,6 +214,7 @@ export function GameTickProvider({
       tickCount,
       lastTickAt,
       offlineCatchUpSeconds,
+      offlineTruncated,
       offlineDeltas,
       hasUnseenOfflineCatchUp,
       acknowledgeOfflineCatchUp,

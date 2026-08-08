@@ -82,6 +82,7 @@ import {
 } from "@/app/(game)/actions/tutorial";
 import type {
   AchievementTerminalActions,
+  DailyTerminalActions,
   MissionTerminalActions,
   ResearchTerminalActions,
   ResonanceTerminalActions,
@@ -350,6 +351,40 @@ export function Terminal({
       claim: (id) => ctx.claim(id),
     };
   }, [achievementsCtx]);
+
+  // Daily contracts ride the mission provider (same server-side blob), so
+  // the terminal surface degrades to undefined alongside missions. Before
+  // the initial getDailyState() resolves, list() returns [] so the command
+  // can render a clean empty state instead of the surface vanishing.
+  const dailyTerminalActions: DailyTerminalActions | undefined = useMemo(() => {
+    if (!missionCtx) return undefined;
+    const daily = missionCtx.daily;
+    return {
+      list: () =>
+        daily.loaded
+          ? daily.contracts.map((c) => ({
+              contractId: c.contractId,
+              title: c.title,
+              description: c.description,
+              payout: c.payout,
+              rerollable: c.rerollable,
+              claimed: c.claimed,
+              isReplacement: c.isReplacement,
+              progress: c.progress,
+              target: c.target,
+              completed: c.completed,
+            }))
+          : [],
+      streak: () => ({
+        count: daily.streak.count,
+        insuredUntil: daily.streak.insuredUntil,
+        dayKey: daily.dayKey,
+      }),
+      claim: (contractId) => daily.claim(contractId),
+      reroll: (contractId) => daily.reroll(contractId),
+      buyInsurance: () => daily.buyInsurance(),
+    };
+  }, [missionCtx]);
 
   const researchTerminalActions: ResearchTerminalActions | undefined = useMemo(() => {
     if (!techTreeCtx || !nexusCtx) return undefined;
@@ -2782,6 +2817,7 @@ export function Terminal({
     resonanceActions: resonanceTerminalActions,
     tutorialActions: tutorialTerminalActions,
     achievementActions: achievementTerminalActions,
+    dailyActions: dailyTerminalActions,
     researchActions: researchTerminalActions,
     nexusActions: nexusTerminalActions,
     questFlags: quest.state.flags,

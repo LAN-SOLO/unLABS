@@ -17,9 +17,10 @@
  * session. Escape / outside click is fine to dismiss.
  */
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useGameTick } from "@/contexts/GameTickProvider";
+import { useMissionOptional } from "@/contexts/MissionProvider";
 import { ackWelcomeBack } from "@/app/(game)/actions/tutorial";
 import type { ResourceId } from "@/lib/game/tickEngine";
 
@@ -45,13 +46,41 @@ function formatDuration(seconds: number): string {
   return `${clamped}s`;
 }
 
+type ClaimRowState =
+  | { status: "pending" }
+  | { status: "ok"; awarded?: number }
+  | { status: "error"; error: string };
+
 export function WelcomeBackModal() {
   const {
     offlineCatchUpSeconds,
+    offlineTruncated,
     offlineDeltas,
     hasUnseenOfflineCatchUp,
     acknowledgeOfflineCatchUp,
   } = useGameTick();
+
+  // Optional: the modal can mount outside a MissionProvider (auth edge routes,
+  // storybook-ish dev pages). In that case the daily section is simply omitted.
+  const mission = useMissionOptional();
+  const daily = mission?.daily;
+
+  const [claimStates, setClaimStates] = useState<Record<string, ClaimRowState>>({});
+
+  const handleClaim = useCallback(
+    async (contractId: string) => {
+      if (!daily) return;
+      setClaimStates((prev) => ({ ...prev, [contractId]: { status: "pending" } }));
+      const result = await daily.claim(contractId);
+      setClaimStates((prev) => ({
+        ...prev,
+        [contractId]: result.ok
+          ? { status: "ok", awarded: result.awarded }
+          : { status: "error", error: result.error ?? "claim failed" },
+      }));
+    },
+    [daily],
+  );
 
   const dismiss = useCallback(() => {
     acknowledgeOfflineCatchUp();
@@ -70,7 +99,9 @@ export function WelcomeBackModal() {
 
   if (!hasUnseenOfflineCatchUp) return null;
 
-  const capped = offlineCatchUpSeconds >= MAX_OFFLINE_SECONDS;
+  const insured =
+    daily?.streak.insuredUntil != null &&
+    daily.streak.insuredUntil.slice(0, 10) >= new Date().toISOString().slice(0, 10);
 
   // Top-3 resource gains, descending.
   const deltas = Object.entries(offlineDeltas)
@@ -86,7 +117,7 @@ export function WelcomeBackModal() {
     >
       <header className="flex items-center justify-between border-b border-green-500/40 px-3 py-2">
         <span className="text-green-300">[ WELCOME BACK, OPERATOR ]</span>
-        {capped && (
+        {offlineTruncated && (
           <span className="rounded border border-amber-500/60 px-1.5 py-0.5 text-[10px] tracking-wider text-amber-300 uppercase">
             capped
           </span>
@@ -98,6 +129,72 @@ export function WelcomeBackModal() {
           Offline duration:{" "}
           <span className="text-green-100">{formatDuration(offlineCatchUpSeconds)}</span>
         </p>
+
+        {daily && daily.loaded && (
+          <div className="border-b border-green-500/20 pb-3">
+            <p className="text-green-300">
+              STREAK:{" "}
+              <span className="text-green-100 tabular-nums">
+                {daily.streak.count} day{daily.streak.count === 1 ? "" : "s"}
+              </span>
+              {insured && (
+                <span className="ml-2 text-[10px] tracking-wider text-cyan-300/80">[insured]</span>
+              )}
+            </p>
+            <ul className="mt-1 space-y-0.5" aria-label="Daily contracts">
+              {daily.contracts.slice(0, 3).map((contract) => {
+                const rowState = claimStates[contract.contractId];
+                const claimed = contract.claimed || rowState?.status === "ok";
+                return (
+                  <li key={contract.contractId}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span
+                        className={claimed ? "truncate text-gray-500" : "truncate text-gray-300"}
+                      >
+                        {contract.title}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-2 tabular-nums">
+                        <span className={claimed ? "text-gray-500" : "text-green-200"}>
+                          +{contract.payout} _unSC
+                        </span>
+                        {rowState?.status === "ok" ? (
+                          <span className="text-green-100">
+                            +{rowState.awarded ?? contract.payout} _unSC
+                          </span>
+                        ) : claimed ? (
+                          <span className="text-[10px] tracking-wider text-gray-500">
+                            [CLAIMED]
+                          </span>
+                        ) : contract.completed ? (
+                          <button
+                            type="button"
+                            disabled={rowState?.status === "pending"}
+                            onClick={() => void handleClaim(contract.contractId)}
+                            className="border border-green-500/60 bg-green-500/10 px-1.5 py-0.5 text-[10px] tracking-wider text-green-300 uppercase transition-colors hover:bg-green-500/20 focus:ring-1 focus:ring-green-300 focus:outline-none disabled:cursor-wait disabled:opacity-50"
+                          >
+                            Claim
+                          </button>
+                        ) : (
+                          <span className="text-gray-400">
+                            {contract.progress}/{contract.target}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    {rowState?.status === "error" && (
+                      <p role="alert" className="text-[10px] text-red-400/80">
+                        {rowState.error}
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="mt-1 text-[10px] text-gray-500">
+              full board: type &apos;daily&apos; in the terminal
+            </p>
+          </div>
+        )}
 
         {deltas.length === 0 ? (
           <p className="text-gray-400">
@@ -117,7 +214,7 @@ export function WelcomeBackModal() {
           </div>
         )}
 
-        {capped && (
+        {offlineTruncated && (
           <p className="text-[11px] text-amber-300/80">
             Offline progress is capped at 8 hours. Long breaks are welcome, but the lab will not
             hoard more than that.

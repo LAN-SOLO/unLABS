@@ -9,6 +9,7 @@ import {
   milestoneFor,
   rollStreak,
   selectDailyContracts,
+  selectRerollReplacement,
   utcDayKey,
   type DailyContract,
   type StreakSnapshot,
@@ -52,6 +53,30 @@ describe("DAILY_CONTRACT_TEMPLATES", () => {
       expect(allowed.has(t.objective.type)).toBe(true);
       expect(t.objective.targetValue).toBeGreaterThan(0);
       expect(t.weight).toBeGreaterThan(0);
+    }
+  });
+});
+
+// ── selectRerollReplacement ───────────────────────────────────────────
+
+describe("selectRerollReplacement", () => {
+  const userId = "user-reroll";
+  const dayKey = "2026-08-08";
+
+  it("is deterministic for the same inputs", () => {
+    const a = selectRerollReplacement(userId, dayKey, 1);
+    const b = selectRerollReplacement(userId, dayKey, 1);
+    expect(a).toEqual(b);
+  });
+
+  it("never returns one of the day's original contracts", () => {
+    const originalIds = new Set(selectDailyContracts(userId, dayKey).map((c) => c.id));
+    for (let slot = 0; slot < CONTRACTS_PER_DAY; slot++) {
+      const replacement = selectRerollReplacement(userId, dayKey, slot);
+      expect(originalIds.has(replacement.id)).toBe(false);
+      expect(replacement.slot).toBe(slot);
+      expect(replacement.dayKey).toBe(dayKey);
+      expect(replacement.contractId).toBe(`${dayKey}:${replacement.id}`);
     }
   });
 });
