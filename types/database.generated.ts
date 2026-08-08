@@ -1535,6 +1535,24 @@ export type Database = {
           },
         ];
       };
+      prestige_state: {
+        Row: {
+          level: number;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          level?: number;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          level?: number;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       production_jobs: {
         Row: {
           claimed_at: string | null;
@@ -2706,6 +2724,16 @@ export type Database = {
         Args: { p_source: string };
         Returns: boolean;
       };
+      kernel_recompile: {
+        Args: never;
+        Returns: {
+          cost: number;
+          error_message: string;
+          new_available: number;
+          new_level: number;
+          success: boolean;
+        }[];
+      };
       log_pref_change: {
         Args: {
           p_area: string;
@@ -2750,6 +2778,32 @@ export type Database = {
       toggle_app_favorite: {
         Args: { p_app_id: string; p_player_id: string };
         Returns: boolean;
+      };
+      unsc_burn: {
+        Args: {
+          p_amount: number;
+          p_description?: string;
+          p_metadata?: Json;
+          p_type: string;
+        };
+        Returns: {
+          error_message: string;
+          new_available: number;
+          success: boolean;
+        }[];
+      };
+      unsc_earn: {
+        Args: {
+          p_amount: number;
+          p_description?: string;
+          p_metadata?: Json;
+          p_type: string;
+        };
+        Returns: {
+          error_message: string;
+          new_available: number;
+          success: boolean;
+        }[];
       };
     };
     Enums: {
