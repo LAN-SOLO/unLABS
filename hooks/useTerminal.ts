@@ -696,6 +696,12 @@ export function useTerminal({
         missionActions.reportCommand(input);
       }
 
+      // Feed the resonance buffer with the normalized command line.
+      // Deliberately not gated on success: hidden protocol invocations
+      // (e.g. "qbridge sync", "kernel sync --deep") are rituals the shell
+      // does not necessarily recognize as registered commands.
+      resonanceActions?.pushCommandEvent(input.trim().replace(/\s+/g, " "));
+
       // Output results
       if (result.error) {
         addLine(result.error, "error");
@@ -753,6 +759,7 @@ export function useTerminal({
       passwordMode,
       userActions,
       filesystemActions,
+      resonanceActions,
     ],
   );
 

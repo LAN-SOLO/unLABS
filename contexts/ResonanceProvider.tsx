@@ -195,3 +195,8 @@ export function useResonance(): ResonanceContextValue {
   }
   return ctx;
 }
+
+/** Non-throwing variant for components that may mount outside the provider. */
+export function useResonanceOptional(): ResonanceContextValue | null {
+  return useContext(ResonanceContext);
+}

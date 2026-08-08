@@ -220,3 +220,8 @@ export function useQuest(): QuestContextValue {
   }
   return ctx;
 }
+
+/** Non-throwing variant for components that may mount outside the provider. */
+export function useQuestOptional(): QuestContextValue | null {
+  return useContext(QuestContext);
+}

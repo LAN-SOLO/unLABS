@@ -73,6 +73,7 @@ import { useAchievementsOptional } from "@/contexts/AchievementProvider";
 import { useTechTreeOptional } from "@/contexts/TechTreeProvider";
 import { useNexusOptional } from "@/contexts/NexusManager";
 import { useTutorialOptional } from "@/contexts/TutorialProvider";
+import { useResonanceEventBridge } from "@/hooks/useResonanceEvents";
 import { getTechNode } from "@/lib/game/techTree";
 import {
   getTutorialStatus,
@@ -176,6 +177,10 @@ export function Terminal({
   const resourceManager = useResourceManagerOptional();
   const systemPowerManager = useSystemPowerOptional();
   const firmwareManager = useFirmwareManagerOptional();
+
+  // Resonance event sources: watches the device managers mounted above and
+  // feeds state/param/thermal events into the resonance discovery buffer.
+  useResonanceEventBridge();
 
   // Mission and resonance systems
   let missionCtx: ReturnType<typeof useMission> | null = null;

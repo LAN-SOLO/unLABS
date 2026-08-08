@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useThermalManagerOptional } from "@/contexts/ThermalManager";
+import { useResonanceOptional } from "@/contexts/ResonanceProvider";
 
 // VNT Device States
 type VNTDeviceState = "booting" | "online" | "testing" | "rebooting" | "standby" | "shutdown";
@@ -97,6 +98,7 @@ export function VNTManagerProvider({ children, initialState }: VNTManagerProvide
   const startPowered = initialState?.isPowered ?? true; // essential system — auto-boots on emergency power
   const startExpanded = initialState?.isExpanded ?? startPowered;
   const thermalManager = useThermalManagerOptional();
+  const resonance = useResonanceOptional();
   const [isExpanded, setIsExpanded] = useState(startExpanded);
   const toggleExpanded = useCallback(() => {
     setIsExpanded((prev) => !prev);
@@ -357,6 +359,8 @@ export function VNTManagerProvider({ children, initialState }: VNTManagerProvide
   // Emergency purge - max fans for 5 seconds
   const emergencyPurge = useCallback(async () => {
     if (deviceState !== "online") return;
+    // Resonance protocols listen for the purge trigger (e.g. THERMAL-PHOENIX)
+    resonance?.pushStateEvent({ kind: "device_state", deviceId: "VNT-001", value: "purge" });
     setCurrentDraw(VNT_POWER_SPECS.emergency);
     setStatusMessage("EMERGENCY PURGE - MAX AIRFLOW");
     if (thermalManager) {
@@ -370,7 +374,7 @@ export function VNTManagerProvider({ children, initialState }: VNTManagerProvide
     setCurrentDraw(VNT_POWER_SPECS.idle);
     setStatusMessage("Purge complete - returning to normal");
     setTimeout(() => setStatusMessage("Fans operational"), 2000);
-  }, [deviceState, thermalManager]);
+  }, [deviceState, thermalManager, resonance]);
 
   // Local temperature simulation when no thermal manager
   useEffect(() => {
