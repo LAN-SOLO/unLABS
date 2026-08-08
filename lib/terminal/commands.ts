@@ -1,6 +1,19 @@
 import type { Command, CommandContext, CommandResult } from "./types";
 import { parseTimeArg, formatCountdown } from "@/lib/power/timeParser";
-import { REROLL_COST, STREAK_INSURANCE_COST } from "@/lib/game/daily/engine";
+import { REROLL_COST, STREAK_INSURANCE_COST, utcDayKey } from "@/lib/game/daily/engine";
+import { applyVolatility, volatilityPercent } from "@/lib/game/volatility";
+
+/**
+ * Today's market snapshot for price displays. Burn prices (research
+ * burns, production rush fees) swing with the daily volatility
+ * modifier; fixed meta prices (daily reroll, streak insurance) are
+ * deliberately NOT volatile and are displayed as-is.
+ */
+const todayMarket = (): { dayKey: string; pct: number; swing: string } => {
+  const dayKey = utcDayKey(new Date());
+  const pct = volatilityPercent(dayKey);
+  return { dayKey, pct, swing: `${pct > 0 ? "+" : ""}${pct}%` };
+};
 
 // Simple text banner - no fancy ASCII art to avoid font issues
 const ASCII_LOGO = `
@@ -315,6 +328,7 @@ const helpCommand: Command = {
       "+------------------------------------------------------------+",
       "|                       kernel                               |",
       "+------------------------------------------------------------+",
+      "|  kernel    - kernel status and sync (kernel sync --deep)   |",
       "|  ps        - list running processes (ps aux)               |",
       "|  top       - display system processes overview             |",
       "|  kill      - send signal to process (kill -9 <pid>)        |",
@@ -855,6 +869,7 @@ const researchCommand: Command = {
         byTree.set(r.tree, list);
       }
 
+      const market = todayMarket();
       const output: string[] = [
         "",
         "+-- TECH TREE ---------------------------------------------------+",
@@ -871,8 +886,10 @@ const researchCommand: Command = {
                   ? "OK  "
                   : "LOCK";
           const dur = `${Math.floor(n.durationSec / 60)}m`;
+          // Today's price: base burn adjusted by the daily market swing.
+          const burn = n.unscBurn > 0 ? `${applyVolatility(n.unscBurn, market.dayKey)} _unSC` : "—";
           output.push(
-            `|  ${chip}  T${n.tier}  ${n.title.padEnd(26)}  ${dur.padStart(5)}  ${n.id}`.padEnd(
+            `|  ${chip}  T${n.tier}  ${n.title.padEnd(26)}  ${dur.padStart(5)}  ${burn.padStart(9)}  ${n.id}`.padEnd(
               65,
             ) + "|",
           );
@@ -880,6 +897,9 @@ const researchCommand: Command = {
       }
       output.push("+----------------------------------------------------------------+");
       output.push("");
+      if (market.pct !== 0) {
+        output.push(`  MARKET: research/craft burns ${market.swing} today`);
+      }
       output.push("  'research start <node-id>' to begin. 'nexus' for graph view.");
       output.push("");
       return { success: true, output };
@@ -1764,12 +1784,13 @@ const killCommand: Command = {
 /**
  * Client-side rush-cost estimate — mirrors the server's pricing in
  * rushJob(): 1 _unSC per started minute remaining (minimum 1), capped at
- * 2x the recipe's start burn when the recipe has one.
+ * 2x the recipe's start burn when the recipe has one, then adjusted by
+ * the daily market volatility modifier (same day key on both sides).
  */
 const estimateRushCost = (remainingMs: number, unscBurn: number): number => {
   let cost = Math.max(1, Math.ceil(remainingMs / 60000));
   if (unscBurn > 0) cost = Math.min(cost, 2 * unscBurn);
-  return cost;
+  return applyVolatility(cost, utcDayKey(new Date()));
 };
 
 const labCommand: Command = {
@@ -1841,6 +1862,11 @@ const labCommand: Command = {
             : `${estimateRushCost(remainingMs, recipe?.unscBurn ?? 0)} _unSC`;
           output.push(`|   ${index + 1}  ${label}  ${eta}  ${rush}`.padEnd(65) + "|");
         });
+        const market = todayMarket();
+        if (market.pct !== 0) {
+          output.push("+----------------------------------------------------------------+");
+          output.push(`|  MARKET: rush fees ${market.swing} today`.padEnd(65) + "|");
+        }
         output.push("+----------------------------------------------------------------+");
         output.push("");
         output.push("  'lab rush <n>' to finish a running job. 'lab' to claim READY jobs.");
@@ -14328,7 +14354,7 @@ const qbridgeCommand: Command = {
   name: "qbridge",
   aliases: ["qb", "bridge"],
   description: "QUANTUM-BRIDGE dimensional link (SB-04)",
-  usage: "qbridge [status|link|unlink|share|coassemble|chat]",
+  usage: "qbridge [status|link|unlink|sync|share|coassemble|chat]",
   execute: async (args, ctx) => {
     const sb = ctx.data.screwButtons;
     if (!sb) return { success: false, error: "Screw button system not available" };
@@ -14356,6 +14382,58 @@ const qbridgeCommand: Command = {
       return ok
         ? { success: true, output: ["", "  [Q-BRIDGE] ○ Quantum bridge collapsed", ""] }
         : { success: false, error: "Q-BRIDGE is not active" };
+    }
+
+    if (sub === "sync") {
+      // Quantum sync runs even without the SB-04 multiplayer link — it
+      // phase-locks the local entangled pair (QSM-001 <-> QUA-001).
+      const qsmState = ctx.data.qsmDevice?.getState();
+      const quaState = ctx.data.quaDevice?.getState();
+      const qsmUp = qsmState?.isPowered === true;
+      const quaUp = quaState?.isPowered === true;
+
+      const output: string[] = [
+        "",
+        "  [Q-BRIDGE] Initiating quantum synchronization sequence...",
+        "  Aligning entanglement channels .................... OK",
+      ];
+      output.push(
+        qsmState
+          ? qsmUp
+            ? `  QSM-001 coherence lock ............................ ${qsmState.coherence.toFixed(1)}% (${qsmState.qubits} qubits)`
+            : "  QSM-001 coherence lock ............................ SKIPPED (device offline)"
+          : "  QSM-001 coherence lock ............................ NO TELEMETRY",
+      );
+      output.push(
+        quaState
+          ? quaUp
+            ? `  QUA-001 resonance match ........................... ${quaState.coherence.toFixed(1)}% @ ${quaState.frequency} Hz [${quaState.mode}]`
+            : "  QUA-001 resonance match ........................... SKIPPED (device offline)"
+          : "  QUA-001 resonance match ........................... NO TELEMETRY",
+      );
+      if (sb.isActive("SB-04")) {
+        const stats = sb.getBridgeStats();
+        output.push(
+          `  Bridge carrier (${stats.linkedLab}) ....... re-synced`,
+          `  Entanglement fidelity ............................. ${stats.entanglementFidelity}`,
+        );
+      }
+      if (qsmUp && quaUp) {
+        output.push(
+          "  Entangled pair QSM-001 <-> QUA-001 ................ PHASE-LOCKED",
+          "",
+          "  [Q-BRIDGE] Synchronization complete. States correlated.",
+        );
+      } else {
+        output.push(
+          "  Entangled pair QSM-001 <-> QUA-001 ................ PARTIAL SYNC",
+          "",
+          "  [Q-BRIDGE] Sync completed with residual decoherence.",
+          "  Bring both quantum devices online for a full phase lock.",
+        );
+      }
+      output.push("");
+      return { success: true, output };
     }
 
     if (!sb.isActive("SB-04") && sub !== "status") {
@@ -14441,7 +14519,7 @@ const qbridgeCommand: Command = {
           "    qbridge — QUANTUM-BRIDGE dimensional multiplayer link (SB-04)",
           "",
           "SYNOPSIS",
-          "    qbridge [status|link|unlink|share|coassemble|chat]",
+          "    qbridge [status|link|unlink|sync|share|coassemble|chat]",
           "",
           "DESCRIPTION",
           "    The qbridge utility provides management and control of",
@@ -14457,6 +14535,7 @@ const qbridgeCommand: Command = {
           "    status               Show bridge connection status",
           "    link <player>        Establish quantum link with player",
           "    unlink               Disconnect quantum bridge",
+          "    sync                 Phase-lock the entangled pair (QSM/QUA)",
           "    share <item>         Share item across bridge",
           "    coassemble           Start co-assembly session",
           "    chat <msg>           Send message over bridge",
@@ -14477,7 +14556,7 @@ const qbridgeCommand: Command = {
 
     return {
       success: false,
-      error: `Unknown subcommand: ${sub}. Use: qbridge [status|link|unlink|share|coassemble|chat]`,
+      error: `Unknown subcommand: ${sub}. Use: qbridge [status|link|unlink|sync|share|coassemble|chat]`,
     };
   },
 };
@@ -21826,6 +21905,113 @@ const vmstatCommand: Command = {
   },
 };
 
+const kernelCommand: Command = {
+  name: "kernel",
+  aliases: ["unkernel"],
+  description: "_unOS kernel status and subsystem synchronization",
+  usage: "kernel [status|sync [--deep]]",
+  execute: async (args, ctx) => {
+    const k = ctx.data.kernelActions;
+    const sub = (args[0] ?? "status").toLowerCase();
+
+    if (sub === "status" || sub === "info") {
+      if (!k) {
+        return {
+          success: true,
+          output: [
+            "",
+            "  [kernel] telemetry interface unavailable in this session.",
+            "  Core is running headless — reload the terminal to reattach.",
+            "",
+          ],
+        };
+      }
+      const uname = k.getUname();
+      const uptime = k.getUptime();
+      const [l1, l5, l15] = k.getLoadAverage();
+      const mem = k.getMemoryStats();
+      const sched = k.getSchedulerStats();
+      const modules = k.getModules().filter((m) => m.loaded);
+      const usedMB = Math.floor(mem.usedKB / 1024);
+      const totalMB = Math.floor(mem.totalKB / 1024);
+      return {
+        success: true,
+        output: [
+          "",
+          "+-- _unOS KERNEL ------------------------------------------------+",
+          `|  ${uname.sysname} ${uname.release} (${uname.machine}) on ${uname.nodename}`.padEnd(
+            65,
+          ) + "|",
+          `|  Uptime: ${formatUptimeString(uptime.seconds)}   Load: ${l1.toFixed(2)}, ${l5.toFixed(2)}, ${l15.toFixed(2)}`.padEnd(
+            65,
+          ) + "|",
+          `|  Processes: ${sched.processCount} (run queue ${sched.runQueueLength}, last PID ${sched.lastPid})`.padEnd(
+            65,
+          ) + "|",
+          `|  Context switches: ${sched.contextSwitches}`.padEnd(65) + "|",
+          `|  Memory: ${usedMB} MB used / ${totalMB} MB total`.padEnd(65) + "|",
+          `|  Modules loaded: ${modules.length}`.padEnd(65) + "|",
+          "+----------------------------------------------------------------+",
+          "",
+          "  'kernel sync' re-synchronizes subsystems ('--deep' for full).",
+          "",
+        ],
+      };
+    }
+
+    if (sub === "sync") {
+      const deep = args.slice(1).some((a) => a === "--deep" || a === "-d");
+      const procs = k ? k.getProcessList().length : null;
+      const mods = k ? k.getModules().filter((m) => m.loaded).length : null;
+      const ring = k ? k.getDmesg().length : null;
+      const vectors = k ? k.getSyscallTable().length : null;
+      const mappedMB = k ? Math.floor(k.getMemoryStats().usedKB / 1024) : null;
+      const stat = (v: number | null, unit: string) => (v === null ? "OK" : `OK  (${v} ${unit})`);
+
+      if (!deep) {
+        return {
+          success: true,
+          output: [
+            "",
+            "  [kernel] synchronizing subsystems...",
+            `  [kernel] scheduler / process table ............... ${stat(procs, "procs")}`,
+            `  [kernel] memory manager .......................... ${stat(mappedMB, "MB mapped")}`,
+            `  [kernel] module graph ............................ ${stat(mods, "modules")}`,
+            "  [kernel] sync complete. Run 'kernel sync --deep' for a full",
+            "           subsystem resynchronization.",
+            "",
+          ],
+        };
+      }
+
+      return {
+        success: true,
+        output: [
+          "",
+          "  [kernel] DEEP SYNCHRONIZATION requested (--deep)",
+          "  [kernel] quiescing CFS scheduler ................... OK",
+          `  [kernel] draining dmesg ring buffer ................ ${stat(ring, "entries")}`,
+          `  [kernel] resyncing process table ................... ${stat(procs, "procs")}`,
+          `  [kernel] recalibrating memory manager .............. ${stat(mappedMB, "MB mapped")}`,
+          `  [kernel] rebuilding module dependency graph ........ ${stat(mods, "modules")}`,
+          `  [kernel] verifying syscall vector table ............ ${stat(vectors, "vectors")}`,
+          "  [kernel] remounting /unproc (procfs) ............... OK",
+          "  [kernel] phase-locking subsystem clocks ............ OK",
+          "  [kernel] releasing scheduler ....................... OK",
+          "",
+          "  [kernel] deep sync complete — all subsystems coherent.",
+          "",
+        ],
+      };
+    }
+
+    return {
+      success: false,
+      error: `Unknown subcommand '${sub}'. Usage: kernel [status|sync [--deep]]`,
+    };
+  },
+};
+
 function formatCpuTime(ms: number): string {
   const totalSeconds = Math.floor(ms / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -26009,8 +26195,16 @@ const dailyCommand: Command = {
         `|  ${streak.dayKey}  ·  STREAK: ${streak.count} day${streak.count === 1 ? "" : "s"}${insured}`.padEnd(
           65,
         ) + "|",
-        "+----------------------------------------------------------------+",
       ];
+      // Market note only — daily payouts and reroll/insurance prices are
+      // fixed meta prices and do not follow the daily volatility swing.
+      const market = todayMarket();
+      if (market.pct !== 0) {
+        output.push(
+          `|  MARKET: burn prices ${market.swing} today (payouts fixed)`.padEnd(65) + "|",
+        );
+      }
+      output.push("+----------------------------------------------------------------+");
 
       if (rows.length === 0) {
         output.push("|  No contracts on the board today.".padEnd(65) + "|");
@@ -26541,6 +26735,7 @@ export const commands: Command[] = [
   unrunCommand,
   unqsCommand,
   // Kernel commands
+  kernelCommand,
   psCommand,
   topCommand,
   dmesgCommand,
