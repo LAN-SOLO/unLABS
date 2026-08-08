@@ -52,11 +52,24 @@ export interface BurnResult {
   error?: "insufficient_funds" | "write_failed" | "not_found";
 }
 
+/** Row shape shared by the unsc_burn / unsc_earn RPCs. */
+interface BalanceRpcRow {
+  success: boolean;
+  new_available: number | string;
+  error_message: string | null;
+}
+
+function firstRpcRow(data: unknown): BalanceRpcRow | null {
+  const rows = (Array.isArray(data) ? data : []) as BalanceRpcRow[];
+  return rows[0] ?? null;
+}
+
 /**
- * Burn _unSC from the user's balance and record a transaction. Atomic in
- * the sense that the UPDATE uses a `where available >= amount` clause —
- * if two concurrent burns race, only one observes the decrement. The
- * transaction row is inserted after a successful balance update.
+ * Burn _unSC from the caller's balance and record a ledger row. Atomic
+ * in the DB via the `unsc_burn` SECURITY DEFINER RPC (row lock +
+ * balance check + ledger insert in one transaction). Identity comes
+ * from auth.uid() inside the RPC — `opts.userId` is kept for call-site
+ * clarity/metadata but cannot redirect the burn to another account.
  *
  * Returns the new available balance on success, or an error code.
  */
@@ -65,57 +78,29 @@ export async function burnUnsc(supabase: SupabaseClient, opts: BurnOptions): Pro
     return { ok: true, newAvailable: 0 };
   }
 
-  // 1) read current available to verify + compute new value client-side.
-  //    We re-check in the UPDATE's WHERE clause to close the TOCTOU window.
-  const readResult = await supabase
-    .from("balances")
-    .select("available, total_spent")
-    .eq("user_id", opts.userId)
-    .maybeSingle();
-
-  const row = readResult.data as { available: number; total_spent: number } | null;
-
-  if (!row) {
-    return { ok: false, newAvailable: 0, error: "not_found" };
-  }
-  if (Number(row.available) < opts.amount) {
-    return {
-      ok: false,
-      newAvailable: Number(row.available),
-      error: "insufficient_funds",
-    };
-  }
-
-  const newAvailable = Number(row.available) - opts.amount;
-  const newTotalSpent = Number(row.total_spent) + opts.amount;
-
-  const { error: updateError } = await supabase
-    .from("balances")
-    .update({
-      available: newAvailable,
-      total_spent: newTotalSpent,
-      updated_at: new Date().toISOString(),
-    } as never)
-    .eq("user_id", opts.userId)
-    // Guard: only update if the row's available is still >= amount.
-    .gte("available", opts.amount);
-
-  if (updateError) {
-    return { ok: false, newAvailable: 0, error: "write_failed" };
-  }
-
-  // 2) Record the transaction (best-effort; failure here does not roll
-  //    back the burn — we prefer consistent balance + missing audit over
-  //    a silent drop of funds).
-  await supabase.from("transactions").insert({
-    user_id: opts.userId,
-    type: opts.type,
-    amount: opts.amount,
-    description: opts.description,
-    metadata: opts.metadata ?? {},
+  const { data, error } = await supabase.rpc("unsc_burn", {
+    p_amount: opts.amount,
+    p_type: opts.type,
+    p_description: opts.description,
+    p_metadata: opts.metadata ?? {},
   } as never);
 
-  return { ok: true, newAvailable };
+  if (error) return { ok: false, newAvailable: 0, error: "write_failed" };
+
+  const row = firstRpcRow(data);
+  if (!row) return { ok: false, newAvailable: 0, error: "write_failed" };
+
+  if (!row.success) {
+    const code: BurnResult["error"] =
+      row.error_message === "insufficient_funds"
+        ? "insufficient_funds"
+        : row.error_message === "not_found"
+          ? "not_found"
+          : "write_failed";
+    return { ok: false, newAvailable: Number(row.new_available ?? 0), error: code };
+  }
+
+  return { ok: true, newAvailable: Number(row.new_available) };
 }
 
 export interface EarnOptions {
@@ -132,41 +117,36 @@ export interface EarnResult {
   error?: "write_failed" | "not_found";
 }
 
+/**
+ * Credit _unSC to the caller's balance via the `unsc_earn` RPC. The RPC
+ * is dev-gated (profiles.is_dev) — every player-facing earn must go
+ * through `awardFromReserve` so the economy stays deflationary. As with
+ * burnUnsc, identity is auth.uid() inside the RPC.
+ */
 export async function earnUnsc(supabase: SupabaseClient, opts: EarnOptions): Promise<EarnResult> {
   if (opts.amount <= 0) return { ok: true, newAvailable: 0 };
 
-  const readResult = await supabase
-    .from("balances")
-    .select("available, total_earned")
-    .eq("user_id", opts.userId)
-    .maybeSingle();
-
-  const row = readResult.data as { available: number; total_earned: number } | null;
-  if (!row) return { ok: false, newAvailable: 0, error: "not_found" };
-
-  const newAvailable = Number(row.available) + opts.amount;
-  const newTotalEarned = Number(row.total_earned) + opts.amount;
-
-  const { error } = await supabase
-    .from("balances")
-    .update({
-      available: newAvailable,
-      total_earned: newTotalEarned,
-      updated_at: new Date().toISOString(),
-    } as never)
-    .eq("user_id", opts.userId);
+  const { data, error } = await supabase.rpc("unsc_earn", {
+    p_amount: opts.amount,
+    p_type: opts.type,
+    p_description: opts.description,
+    p_metadata: opts.metadata ?? {},
+  } as never);
 
   if (error) return { ok: false, newAvailable: 0, error: "write_failed" };
 
-  await supabase.from("transactions").insert({
-    user_id: opts.userId,
-    type: opts.type,
-    amount: opts.amount,
-    description: opts.description,
-    metadata: opts.metadata ?? {},
-  } as never);
+  const row = firstRpcRow(data);
+  if (!row) return { ok: false, newAvailable: 0, error: "write_failed" };
 
-  return { ok: true, newAvailable };
+  if (!row.success) {
+    return {
+      ok: false,
+      newAvailable: Number(row.new_available ?? 0),
+      error: row.error_message === "not_found" ? "not_found" : "write_failed",
+    };
+  }
+
+  return { ok: true, newAvailable: Number(row.new_available) };
 }
 
 // ── Reserve pool (deflationary awards) ─────────────────────────────────

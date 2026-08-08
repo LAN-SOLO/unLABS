@@ -4,6 +4,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   RESERVE_SOURCES,
   awardFromReserve,
+  burnUnsc,
+  earnUnsc,
   getReserveStatus,
   isReserveSource,
 } from "@/lib/game/economy";
@@ -167,6 +169,139 @@ describe("awardFromReserve — RPC response handling", () => {
     });
     expect(r.ok).toBe(false);
     expect(r.error).toBe("rpc_no_row");
+  });
+});
+
+describe("burnUnsc — unsc_burn RPC marshaling", () => {
+  it("short-circuits non-positive amounts without touching the RPC", async () => {
+    const rpc = vi.fn();
+    const supabase = mockSupabase({ rpc });
+    const r = await burnUnsc(supabase, {
+      userId: "u1",
+      amount: 0,
+      type: "fee",
+      description: "noop",
+    });
+    expect(r).toEqual({ ok: true, newAvailable: 0 });
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("passes amount/type/description/metadata and unwraps the row", async () => {
+    const supabase = mockSupabase({
+      rpc: async (name, params) => {
+        expect(name).toBe("unsc_burn");
+        expect(params).toMatchObject({
+          p_amount: 5,
+          p_type: "fee",
+          p_description: "daily:reroll:x",
+        });
+        return {
+          data: [{ success: true, new_available: "37.5", error_message: null }],
+          error: null,
+        };
+      },
+    });
+    const r = await burnUnsc(supabase, {
+      userId: "u1",
+      amount: 5,
+      type: "fee",
+      description: "daily:reroll:x",
+    });
+    expect(r.ok).toBe(true);
+    expect(r.newAvailable).toBe(37.5);
+  });
+
+  it("maps insufficient_funds and keeps the reported balance", async () => {
+    const supabase = mockSupabase({
+      rpc: async () => ({
+        data: [{ success: false, new_available: 3, error_message: "insufficient_funds" }],
+        error: null,
+      }),
+    });
+    const r = await burnUnsc(supabase, {
+      userId: "u1",
+      amount: 5,
+      type: "burn",
+      description: "x",
+    });
+    expect(r).toEqual({ ok: false, newAvailable: 3, error: "insufficient_funds" });
+  });
+
+  it("maps not_found and falls back to write_failed for anything else", async () => {
+    for (const [msg, expected] of [
+      ["not_found", "not_found"],
+      ["unauthorized", "write_failed"],
+      ["invalid_type", "write_failed"],
+    ] as const) {
+      const supabase = mockSupabase({
+        rpc: async () => ({
+          data: [{ success: false, new_available: 0, error_message: msg }],
+          error: null,
+        }),
+      });
+      const r = await burnUnsc(supabase, {
+        userId: "u1",
+        amount: 1,
+        type: "burn",
+        description: "x",
+      });
+      expect(r.ok).toBe(false);
+      expect(r.error).toBe(expected);
+    }
+  });
+
+  it("returns write_failed on transport error or empty row set", async () => {
+    for (const impl of [
+      async () => ({ data: null, error: { message: "network" } }),
+      async () => ({ data: [], error: null }),
+    ]) {
+      const supabase = mockSupabase({ rpc: impl });
+      const r = await burnUnsc(supabase, {
+        userId: "u1",
+        amount: 1,
+        type: "burn",
+        description: "x",
+      });
+      expect(r).toEqual({ ok: false, newAvailable: 0, error: "write_failed" });
+    }
+  });
+});
+
+describe("earnUnsc — unsc_earn RPC marshaling", () => {
+  it("unwraps a successful credit", async () => {
+    const supabase = mockSupabase({
+      rpc: async (name) => {
+        expect(name).toBe("unsc_earn");
+        return {
+          data: [{ success: true, new_available: 120, error_message: null }],
+          error: null,
+        };
+      },
+    });
+    const r = await earnUnsc(supabase, {
+      userId: "u1",
+      amount: 100,
+      type: "mint",
+      description: "dev grant",
+    });
+    expect(r).toEqual({ ok: true, newAvailable: 120 });
+  });
+
+  it("maps the dev-gate rejection to write_failed", async () => {
+    const supabase = mockSupabase({
+      rpc: async () => ({
+        data: [{ success: false, new_available: 0, error_message: "forbidden" }],
+        error: null,
+      }),
+    });
+    const r = await earnUnsc(supabase, {
+      userId: "u1",
+      amount: 100,
+      type: "mint",
+      description: "dev grant",
+    });
+    expect(r.ok).toBe(false);
+    expect(r.error).toBe("write_failed");
   });
 });
 
