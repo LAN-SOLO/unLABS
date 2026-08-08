@@ -55,14 +55,28 @@ export interface TickResult {
  * Advance the resource state by `elapsedSeconds`. Pure function.
  * Each resource is clamped to [0, capacity]. Deltas reflect actual applied
  * change, not the theoretical `rate * elapsed`.
+ *
+ * `rateMultiplier` (default 1) scales production only: `ratePerSecond` is a
+ * NET rate per resource, so a positive rate means the resource is net-produced
+ * and a negative rate means it is net-consumed. The prestige bonus is meant to
+ * accelerate production, never to punish consumption, so the multiplier is
+ * applied only to positive net rates — negative (consuming) rates advance at
+ * their unscaled speed. Callers that omit the argument get the exact previous
+ * behavior.
  */
-export function advanceResources(resources: ResourceMap, elapsedSeconds: number): TickResult {
+export function advanceResources(
+  resources: ResourceMap,
+  elapsedSeconds: number,
+  rateMultiplier = 1,
+): TickResult {
   const seconds = Math.max(0, elapsedSeconds);
   const nextResources: ResourceMap = {};
   const deltas: Partial<Record<ResourceId, number>> = {};
 
   for (const [id, state] of Object.entries(resources) as Array<[ResourceId, ResourceState]>) {
-    const theoretical = state.ratePerSecond * seconds;
+    const effectiveRate =
+      state.ratePerSecond > 0 ? state.ratePerSecond * rateMultiplier : state.ratePerSecond;
+    const theoretical = effectiveRate * seconds;
     const target = state.amount + theoretical;
     const clamped = Math.max(0, Math.min(state.capacity, target));
     const applied = clamped - state.amount;
@@ -76,6 +90,22 @@ export function advanceResources(resources: ResourceMap, elapsedSeconds: number)
   }
 
   return { nextResources, deltas, elapsedSeconds: seconds };
+}
+
+/**
+ * Map a kernel-recompile (prestige) level to its production rate multiplier.
+ *
+ * Each recompile multiplies production by 1.5, so the multiplier is
+ * `1.5^level`. Levels at or below 0 (including a not-yet-loaded or missing
+ * prestige row) map to the neutral multiplier 1. The DB caps the level at 20;
+ * this function does not re-clamp so tests and previews can probe beyond it.
+ *
+ * @param level Prestige level from `prestige_state.level` (0 when no row).
+ * @returns Multiplier to pass as `rateMultiplier` to {@link advanceResources}.
+ */
+export function prestigeMultiplier(level: number): number {
+  if (!Number.isFinite(level) || level <= 0) return 1;
+  return Math.pow(1.5, level);
 }
 
 /**

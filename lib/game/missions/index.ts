@@ -481,7 +481,18 @@ export function computeWhatNext(
     };
   }
 
-  // 5. All missions done — explore resonances
+  // 5. All missions done + endgame reached — point at the prestige loop
+  if (flags.ENDGAME_UNLOCKED) {
+    return {
+      action: "Burn _unSC to recompile the kernel: permanent production multiplier",
+      reason:
+        "All missions complete. Each recompile costs 500 × 2^level _unSC and multiplies production by 1.5×, permanently.",
+      voice: "mcp",
+      hintLevel: 0,
+    };
+  }
+
+  // 6. All missions done — explore resonances
   const discoveryCount = state.discoveryLog.length;
   return {
     action:

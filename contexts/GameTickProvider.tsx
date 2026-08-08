@@ -33,10 +33,12 @@ import {
   advanceResources,
   computeElapsedSeconds,
   createInitialResources,
+  prestigeMultiplier as computePrestigeMultiplier,
   type ResourceId,
   type ResourceMap,
   type ResourceState,
 } from "@/lib/game/tickEngine";
+import { getPrestige } from "@/app/(game)/actions/prestige";
 
 interface GameTickContextValue {
   /** Current resource state. Re-renders on every applied tick. */
@@ -64,6 +66,12 @@ interface GameTickContextValue {
   setRate: (id: ResourceId, ratePerSecond: number) => void;
   /** Replace the capacity for a resource; re-clamps `amount`. */
   setCapacity: (id: ResourceId, capacity: number) => void;
+  /** Kernel-recompile (prestige) level; 0 until loaded / never recompiled. */
+  prestigeLevel: number;
+  /** Production rate multiplier derived from the prestige level (1.5^level). */
+  prestigeMultiplier: number;
+  /** Re-fetch the prestige level from the server (call after a recompile). */
+  refreshPrestige: () => Promise<void>;
 }
 
 const GameTickContext = createContext<GameTickContextValue | null>(null);
@@ -100,6 +108,16 @@ export function GameTickProvider({
   const [offlineTruncated, setOfflineTruncated] = useState(false);
   const [offlineDeltas, setOfflineDeltas] = useState<Partial<Record<ResourceId, number>>>({});
   const [hasUnseenOfflineCatchUp, setHasUnseenOfflineCatchUp] = useState(false);
+  const [prestigeLevel, setPrestigeLevel] = useState(0);
+
+  const prestigeMult = useMemo(() => computePrestigeMultiplier(prestigeLevel), [prestigeLevel]);
+
+  // Ref mirror so the 1Hz interval sees the current multiplier without being
+  // re-created whenever the level changes.
+  const prestigeMultRef = useRef(1);
+  useEffect(() => {
+    prestigeMultRef.current = prestigeMult;
+  }, [prestigeMult]);
 
   // Initialize lastTickAt on the client only.
   useEffect(() => {
@@ -113,26 +131,62 @@ export function GameTickProvider({
     resourcesRef.current = resources;
   }, [resources]);
 
-  // --- Offline catch-up (runs once on mount) ---
+  // --- Prestige load + offline catch-up (runs once on mount) ---
+  //
+  // Ordering decision: the offline catch-up must know the prestige multiplier,
+  // but the level lives server-side and arrives async. Rather than applying
+  // catch-up at multiplier 1 and "patching it up" later (a race hack), the
+  // one-shot mount effect SEQUENCES the two: it awaits getPrestige() first and
+  // only then applies catch-up with the correct multiplier. The wall-clock gap
+  // is measured against `mountedAt` (captured synchronously before the await),
+  // so the seconds the 1Hz loop already simulated during the fetch are not
+  // double-counted. If the fetch fails, catch-up proceeds at level 0
+  // (multiplier 1) — the conservative fallback. An SSR-provided level prop
+  // would remove the round-trip entirely but was judged too invasive for this
+  // provider's prop surface; revisit if catch-up latency becomes visible.
   useEffect(() => {
-    if (!initialLastTickAt) return;
-    const { elapsedSeconds, truncated } = computeElapsedSeconds(initialLastTickAt, Date.now());
-    if (elapsedSeconds > 0) {
-      const result = advanceResources(resourcesRef.current, elapsedSeconds);
-      setResources(result.nextResources);
-      setOfflineCatchUpSeconds(elapsedSeconds);
-      setOfflineTruncated(truncated);
-      setOfflineDeltas(result.deltas);
-      // Only surface the modal when there's actually something worth showing:
-      // >60s offline AND at least one non-zero resource delta.
-      const anyDelta = Object.values(result.deltas).some((v) => (v ?? 0) > 0);
-      if (elapsedSeconds > 60 && anyDelta) {
-        setHasUnseenOfflineCatchUp(true);
+    let cancelled = false;
+    const mountedAt = Date.now();
+
+    void (async () => {
+      let level = 0;
+      const prestige = await getPrestige();
+      if (prestige.ok) level = prestige.level;
+      if (cancelled) return;
+      setPrestigeLevel(level);
+
+      if (!initialLastTickAt) return;
+      const { elapsedSeconds, truncated } = computeElapsedSeconds(initialLastTickAt, mountedAt);
+      if (elapsedSeconds > 0) {
+        const result = advanceResources(
+          resourcesRef.current,
+          elapsedSeconds,
+          computePrestigeMultiplier(level),
+        );
+        setResources(result.nextResources);
+        setOfflineCatchUpSeconds(elapsedSeconds);
+        setOfflineTruncated(truncated);
+        setOfflineDeltas(result.deltas);
+        // Only surface the modal when there's actually something worth showing:
+        // >60s offline AND at least one non-zero resource delta.
+        const anyDelta = Object.values(result.deltas).some((v) => (v ?? 0) > 0);
+        if (elapsedSeconds > 60 && anyDelta) {
+          setHasUnseenOfflineCatchUp(true);
+        }
       }
-    }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
     // intentionally ignoring changes to initialLastTickAt after mount —
     // catch-up is a one-shot
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const refreshPrestige = useCallback(async () => {
+    const prestige = await getPrestige();
+    if (prestige.ok) setPrestigeLevel(prestige.level);
   }, []);
 
   const acknowledgeOfflineCatchUp = useCallback(() => {
@@ -142,7 +196,7 @@ export function GameTickProvider({
   // --- 1Hz tick loop ---
   useEffect(() => {
     const interval = setInterval(() => {
-      const result = advanceResources(resourcesRef.current, 1);
+      const result = advanceResources(resourcesRef.current, 1, prestigeMultRef.current);
       setResources(result.nextResources);
       setTickCount((c) => c + 1);
       setLastTickAt(Date.now());
@@ -208,6 +262,9 @@ export function GameTickProvider({
       grant,
       setRate,
       setCapacity,
+      prestigeLevel,
+      prestigeMultiplier: prestigeMult,
+      refreshPrestige,
     }),
     [
       resources,
@@ -221,6 +278,9 @@ export function GameTickProvider({
       grant,
       setRate,
       setCapacity,
+      prestigeLevel,
+      prestigeMult,
+      refreshPrestige,
     ],
   );
 
