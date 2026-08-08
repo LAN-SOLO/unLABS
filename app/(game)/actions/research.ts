@@ -23,6 +23,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { burnUnsc } from "@/lib/game/economy";
+import { utcDayKey } from "@/lib/game/daily/engine";
+import { applyVolatility } from "@/lib/game/volatility";
 import { getTechNode } from "@/lib/game/techTree";
 import { hydrateTechTreeState, nodeStatus, type TechTreeState } from "@/lib/game/techTree";
 import type { QuestState, StepReward } from "@/lib/game/quests/types";
@@ -168,15 +170,17 @@ export async function startResearch(nodeId: string): Promise<StartResearchResult
     .maybeSingle();
   if (activeRes.data) return { ok: false, error: "job_already_active" };
 
-  // Burn _unSC (client-side in-game resources are trusted per existing
-  // production flow; _unSC is the server-authoritative half of the cost).
+  // Burn _unSC at today's market price (client-side in-game resources are
+  // trusted per existing production flow; _unSC is the server-authoritative
+  // half of the cost — the client derives the same modifier for display).
   if (node.unscBurn > 0) {
+    const cost = applyVolatility(node.unscBurn, utcDayKey(new Date()));
     const burn = await burnUnsc(supabase, {
       userId: user.id,
-      amount: node.unscBurn,
+      amount: cost,
       type: "research",
       description: `research:${node.id}`,
-      metadata: { source: "research", node_id: node.id },
+      metadata: { source: "research", node_id: node.id, base_cost: node.unscBurn },
     });
     if (!burn.ok) return { ok: false, error: "insufficient_unsc" };
   }

@@ -24,6 +24,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTechTree } from "@/contexts/TechTreeProvider";
 import { useNexus } from "@/contexts/NexusManager";
 import { useGameTick } from "@/contexts/GameTickProvider";
+import { utcDayKey } from "@/lib/game/daily/engine";
+import { applyVolatility, volatilityPercent } from "@/lib/game/volatility";
 import {
   TECH_TREES,
   getTechNode,
@@ -353,8 +355,19 @@ export function TechGraph({ onExit }: TechGraphProps) {
                   ))}
                   {selected.unscBurn > 0 && (
                     <li className="flex justify-between text-amber-300">
-                      <span>_unSC (burned from reserve path)</span>
-                      <span className="tabular-nums">{selected.unscBurn}</span>
+                      <span>
+                        _unSC burn
+                        {volatilityPercent(utcDayKey(new Date())) !== 0 && (
+                          <span className="ml-1 text-[10px] text-gray-500">
+                            (base {selected.unscBurn}, market{" "}
+                            {volatilityPercent(utcDayKey(new Date())) > 0 ? "+" : ""}
+                            {volatilityPercent(utcDayKey(new Date()))}%)
+                          </span>
+                        )}
+                      </span>
+                      <span className="tabular-nums">
+                        {applyVolatility(selected.unscBurn, utcDayKey(new Date()))}
+                      </span>
                     </li>
                   )}
                   <li className="flex justify-between pt-1 text-gray-400">

@@ -21,6 +21,8 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { burnUnsc } from "@/lib/game/economy";
+import { utcDayKey } from "@/lib/game/daily/engine";
+import { applyVolatility } from "@/lib/game/volatility";
 import { getRecipe } from "@/lib/game/recipes";
 import { fromRow, type ProductionJob, type ProductionJobRow } from "@/lib/game/production";
 import type { QuestState, StepReward } from "@/lib/game/quests/types";
@@ -41,15 +43,17 @@ export async function startJob(recipeId: string): Promise<StartJobResult> {
   const recipe = getRecipe(recipeId);
   if (!recipe) return { ok: false, error: "unknown_recipe" };
 
-  // Burn _unSC first. If this fails, the client never sees an inserted
-  // job row and can show the error verbatim.
+  // Burn _unSC first (at today's market price — the client derives the
+  // same modifier from lib/game/volatility for display). If this fails,
+  // the client never sees an inserted job row and can show the error.
   if (recipe.unscBurn > 0) {
+    const cost = applyVolatility(recipe.unscBurn, utcDayKey(new Date()));
     const burn = await burnUnsc(supabase, {
       userId: user.id,
-      amount: recipe.unscBurn,
+      amount: cost,
       type: "burn",
       description: `start:${recipe.id}`,
-      metadata: { recipe_id: recipe.id, phase: "start" },
+      metadata: { recipe_id: recipe.id, phase: "start", base_cost: recipe.unscBurn },
     });
     if (!burn.ok) {
       return { ok: false, error: burn.error ?? "burn_failed" };
@@ -254,6 +258,8 @@ export async function rushJob(jobId: string): Promise<RushJobResult> {
   if (recipe.unscBurn > 0) {
     cost = Math.min(cost, 2 * recipe.unscBurn);
   }
+  // Rush fees ride the daily market like every other burn.
+  cost = applyVolatility(cost, utcDayKey(new Date(now)));
 
   // Burn first, like startJob: if the fee fails, the job row is untouched
   // and the client can show the error verbatim.

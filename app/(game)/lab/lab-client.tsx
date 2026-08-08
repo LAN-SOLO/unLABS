@@ -26,6 +26,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { useGameTick } from "@/contexts/GameTickProvider";
+import { utcDayKey } from "@/lib/game/daily/engine";
+import { applyVolatility, volatilityPercent } from "@/lib/game/volatility";
 import { useQuest } from "@/contexts/QuestProvider";
 import { useProduction } from "@/contexts/ProductionProvider";
 import { Terminal } from "@/components/terminal";
@@ -238,11 +240,13 @@ function RecipeCard({
   busy: boolean;
   onStart: () => void;
 }) {
-  // Check whether the player can afford the recipe right now.
+  // Check whether the player can afford the recipe right now. The burn
+  // price rides the daily market — same pure modifier the server charges.
+  const todaysBurn = applyVolatility(recipe.unscBurn, utcDayKey(new Date()));
   const missingCosts = recipe.costs.filter(
     (c) => (resources[c.resourceId]?.amount ?? 0) < c.amount,
   );
-  const missingUnsc = balance < recipe.unscBurn;
+  const missingUnsc = balance < todaysBurn;
   const canAfford = missingCosts.length === 0 && !missingUnsc;
 
   return (
@@ -269,7 +273,13 @@ function RecipeCard({
         })}
         {recipe.unscBurn > 0 ? (
           <div className={missingUnsc ? "text-amber-300" : "text-green-400"}>
-            &gt; burn {recipe.unscBurn} _unSC
+            &gt; burn {todaysBurn} _unSC
+            {todaysBurn !== recipe.unscBurn ? (
+              <span className="ml-1 text-[10px] text-green-500/60">
+                (base {recipe.unscBurn}, market {todaysBurn > recipe.unscBurn ? "+" : ""}
+                {volatilityPercent(utcDayKey(new Date()))}%)
+              </span>
+            ) : null}
           </div>
         ) : null}
       </div>
