@@ -182,7 +182,8 @@ export type ReserveSource =
   | "quest_reward"
   | "tutorial_skip"
   | "event"
-  | "test";
+  | "test"
+  | "daily";
 
 export const RESERVE_SOURCES: readonly ReserveSource[] = [
   "achievement",
@@ -191,6 +192,7 @@ export const RESERVE_SOURCES: readonly ReserveSource[] = [
   "tutorial_skip",
   "event",
   "test",
+  "daily",
 ] as const;
 
 export function isReserveSource(s: string): s is ReserveSource {
