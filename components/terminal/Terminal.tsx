@@ -391,6 +391,13 @@ export function Terminal({
     };
   }, [missionCtx]);
 
+  // Prestige bridge: the recompile command talks to the server action
+  // directly; only the tick provider's multiplier refresh needs a hook.
+  const prestigeTerminalActions = useMemo(
+    () => ({ refresh: tick.refreshPrestige }),
+    [tick.refreshPrestige],
+  );
+
   const researchTerminalActions: ResearchTerminalActions | undefined = useMemo(() => {
     if (!techTreeCtx || !nexusCtx) return undefined;
     const tree = techTreeCtx;
@@ -2823,6 +2830,7 @@ export function Terminal({
     tutorialActions: tutorialTerminalActions,
     achievementActions: achievementTerminalActions,
     dailyActions: dailyTerminalActions,
+    prestigeActions: prestigeTerminalActions,
     researchActions: researchTerminalActions,
     nexusActions: nexusTerminalActions,
     questFlags: quest.state.flags,

@@ -1716,6 +1716,10 @@ export interface DataFetchers {
   achievementActions?: AchievementTerminalActions;
   // Daily contracts (comeback loop)
   dailyActions?: DailyTerminalActions;
+  // Kernel recompile (prestige). Tiny on purpose: the command reads
+  // level/cost via the server action; only the tick provider's refresh
+  // needs a client bridge so the multiplier applies without a reload.
+  prestigeActions?: { refresh: () => Promise<void> };
   // Research / tech tree (NXS-01)
   researchActions?: ResearchTerminalActions;
   // Nexus device state (NXS-01). Separate from researchActions because the

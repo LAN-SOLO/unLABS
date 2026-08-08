@@ -134,6 +134,7 @@ interface UseTerminalProps {
   tutorialActions?: import("@/lib/terminal/types").TutorialTerminalActions;
   achievementActions?: import("@/lib/terminal/types").AchievementTerminalActions;
   dailyActions?: import("@/lib/terminal/types").DailyTerminalActions;
+  prestigeActions?: { refresh: () => Promise<void> };
   researchActions?: import("@/lib/terminal/types").ResearchTerminalActions;
   nexusActions?: import("@/lib/terminal/types").NexusTerminalActions;
   questFlags?: Record<string, boolean>;
@@ -198,6 +199,7 @@ export function useTerminal({
   tutorialActions,
   achievementActions,
   dailyActions,
+  prestigeActions,
   researchActions,
   nexusActions,
   questFlags,
@@ -519,6 +521,7 @@ export function useTerminal({
       tutorialActions,
       achievementActions,
       dailyActions,
+      prestigeActions,
       researchActions,
       nexusActions,
     }),
@@ -573,6 +576,7 @@ export function useTerminal({
       tutorialActions,
       achievementActions,
       dailyActions,
+      prestigeActions,
       researchActions,
       nexusActions,
       questFlags,

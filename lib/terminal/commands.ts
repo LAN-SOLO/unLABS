@@ -254,6 +254,7 @@ const helpCommand: Command = {
       "+------------------------------------------------------------+",
       "|  balance   - check _unSC token balance                     |",
       "|  daily     - daily contracts: list / claim / reroll        |",
+      "|  recompile - prestige: burn _unSC for permanent speed      |",
       "|  research  - tech tree browser (NXS-01: list/start/claim)  |",
       "|  nexus     - launch the tech-tree graph app                |",
       "|  scan      - scan for volatility data                      |",
@@ -792,6 +793,87 @@ const balanceCommand: Command = {
       `|  Lifetime Earned: ${earned.toFixed(2).padStart(10)} _unSC |`,
       `|  Lifetime Spent:  ${spent.toFixed(2).padStart(10)} _unSC |`,
       "+-------------------------------------+",
+      "",
+    ];
+    return { success: true, output };
+  },
+};
+
+const recompileCommand: Command = {
+  name: "recompile",
+  aliases: ["prestige"],
+  description: "Kernel recompile: burn _unSC for a permanent production multiplier",
+  usage: "recompile [confirm]",
+  execute: async (args, ctx) => {
+    const sub = (args[0] || "").toLowerCase();
+
+    ctx.setTyping(true);
+    const { getPrestige, recompile } = await import("@/app/(game)/actions/prestige");
+    const state = await getPrestige();
+    ctx.setTyping(false);
+
+    if (!state.ok) {
+      return {
+        success: false,
+        output: ["", "Prestige subsystem unavailable — sign in and retry.", ""],
+      };
+    }
+
+    if (sub !== "confirm") {
+      const output = [
+        "",
+        "+------------------------------------------------------------+",
+        "|                    KERNEL RECOMPILE                        |",
+        "+------------------------------------------------------------+",
+        `|  Current level      : L${String(state.level).padEnd(36)}|`,
+        `|  Production speed   : x${state.multiplier.toFixed(2).padEnd(35)}|`,
+        state.atMaxLevel
+          ? "|  Next recompile     : MAX LEVEL REACHED                    |"
+          : `|  Next recompile     : ${`${state.nextCost} _unSC -> x${(state.multiplier * 1.5).toFixed(2)}`.padEnd(37)}|`,
+        "+------------------------------------------------------------+",
+        "|  A recompile hard-burns _unSC and permanently raises all   |",
+        "|  net production rates. There is no undo and no refund.     |",
+        "+------------------------------------------------------------+",
+        "",
+        state.atMaxLevel
+          ? "The kernel is fully optimized. There is nothing left to squeeze."
+          : "Type 'recompile confirm' to burn and rebuild.",
+        "",
+      ];
+      return { success: true, output };
+    }
+
+    ctx.setTyping(true);
+    const result = await recompile();
+    const balance = await ctx.data.fetchBalance();
+    await ctx.data.prestigeActions?.refresh();
+    ctx.setTyping(false);
+
+    if (!result.ok) {
+      const messages: Record<string, string> = {
+        endgame_locked: "Recompile locked — finish EP4 (Autonomy) first.",
+        max_level: "MAX LEVEL reached. The kernel is fully optimized.",
+        insufficient_funds: `Insufficient balance. This recompile costs ${result.cost} _unSC (${(balance?.available ?? result.newBalance).toFixed(2)} available).`,
+        not_found: "No balance record found.",
+        unauthorized: "Not authenticated.",
+      };
+      return {
+        success: false,
+        output: ["", messages[result.error ?? ""] ?? "Recompile failed. Try again.", ""],
+      };
+    }
+
+    const output = [
+      "",
+      "[KERNEL] Draining scheduler queues ..................... OK",
+      "[KERNEL] Unlinking module graph ........................ OK",
+      `[KERNEL] Burning ${result.cost} _unSC .................. GONE`,
+      "[KERNEL] Recompiling with -O∞ .......................... OK",
+      "[KERNEL] Relinking, rebooting subsystems ............... OK",
+      "",
+      `> KERNEL RECOMPILED — level L${result.level}`,
+      `> All net production rates now x${result.multiplier.toFixed(2)} — permanently.`,
+      `> Balance: ${(balance?.available ?? result.newBalance).toFixed(2)} _unSC available`,
       "",
     ];
     return { success: true, output };
@@ -26828,6 +26910,8 @@ export const commands: Command[] = [
   achieveCommand,
   // Daily contracts
   dailyCommand,
+  // Kernel recompile (prestige)
+  recompileCommand,
   // Nexus (tech tree graph app)
   nexusCommand,
 ];
