@@ -1761,16 +1761,183 @@ const killCommand: Command = {
   },
 };
 
+/**
+ * Client-side rush-cost estimate — mirrors the server's pricing in
+ * rushJob(): 1 _unSC per started minute remaining (minimum 1), capped at
+ * 2x the recipe's start burn when the recipe has one.
+ */
+const estimateRushCost = (remainingMs: number, unscBurn: number): number => {
+  let cost = Math.max(1, Math.ceil(remainingMs / 60000));
+  if (unscBurn > 0) cost = Math.min(cost, 2 * unscBurn);
+  return cost;
+};
+
 const labCommand: Command = {
   name: "lab",
   aliases: ["production", "unlab"],
-  description: "Open the Lab production hub",
-  usage: "lab",
-  execute: async () => {
+  description: "Open the Lab production hub / manage production jobs",
+  usage: "lab [jobs|rush <n|job-id>|help]",
+  execute: async (args, ctx) => {
+    const sub = args[0]?.toLowerCase();
+
+    if (!sub) {
+      return {
+        success: true,
+        output: ["", "[unlab] opening production hub...", ""],
+        navigate: "/lab",
+      };
+    }
+
+    if (sub === "help" || sub === "-h" || sub === "--help") {
+      return {
+        success: true,
+        output: [
+          "",
+          "  lab                     Open the Lab production hub UI",
+          "  lab jobs                List production jobs (index, ETA, rush cost)",
+          "  lab rush <n|job-id>     Finish a running job instantly for _unSC",
+          "",
+          "  Rush pricing: 1 _unSC per started minute remaining (min 1).",
+          "  Recipes with a start burn cap the fee at 2x that burn.",
+          "  Rushed jobs become claimable immediately in the Lab.",
+          "",
+        ],
+      };
+    }
+
+    if (sub === "jobs") {
+      ctx.setTyping(true);
+      try {
+        const [{ listJobs }, { getRecipe: lookupRecipe }] = await Promise.all([
+          import("@/app/(game)/actions/production"),
+          import("@/lib/game/recipes"),
+        ]);
+        const listed = await listJobs();
+        if (!listed.ok) {
+          return { success: false, error: "Could not load production jobs. Try again." };
+        }
+        const pending = listed.jobs.filter((j) => j.status === "pending");
+        if (pending.length === 0) {
+          return {
+            success: true,
+            output: ["", "> No active production jobs. Start one in the Lab ('lab').", ""],
+          };
+        }
+        const now = Date.now();
+        const output: string[] = [
+          "",
+          "+-- PRODUCTION JOBS ---------------------------------------------+",
+          "|   #  RECIPE                      REMAINING    RUSH COST".padEnd(65) + "|",
+          "+----------------------------------------------------------------+",
+        ];
+        pending.forEach((job, index) => {
+          const recipe = lookupRecipe(job.recipeId);
+          const label = (recipe?.label ?? job.recipeId).slice(0, 26).padEnd(26);
+          const remainingMs = job.completesAt - now;
+          const ready = remainingMs <= 0;
+          const eta = (ready ? "READY" : formatTime(Math.ceil(remainingMs / 1000))).padEnd(11);
+          const rush = ready
+            ? "—"
+            : `${estimateRushCost(remainingMs, recipe?.unscBurn ?? 0)} _unSC`;
+          output.push(`|   ${index + 1}  ${label}  ${eta}  ${rush}`.padEnd(65) + "|");
+        });
+        output.push("+----------------------------------------------------------------+");
+        output.push("");
+        output.push("  'lab rush <n>' to finish a running job. 'lab' to claim READY jobs.");
+        output.push("");
+        return { success: true, output };
+      } finally {
+        ctx.setTyping(false);
+      }
+    }
+
+    if (sub === "rush") {
+      const token = args[1];
+      if (!token) {
+        return {
+          success: false,
+          error:
+            "Usage: lab rush <n|job-id> — costs 1 _unSC per started minute remaining (min 1, capped at 2x the recipe's start burn). 'lab jobs' lists indexes.",
+        };
+      }
+      ctx.setTyping(true);
+      try {
+        const [{ listJobs, rushJob }, { getRecipe: lookupRecipe }] = await Promise.all([
+          import("@/app/(game)/actions/production"),
+          import("@/lib/game/recipes"),
+        ]);
+        const listed = await listJobs();
+        if (!listed.ok) {
+          return { success: false, error: "Could not load production jobs. Try again." };
+        }
+        const pending = listed.jobs.filter((j) => j.status === "pending");
+        const job = /^\d+$/.test(token)
+          ? (pending[Number.parseInt(token, 10) - 1] ?? null)
+          : (pending.find((j) => j.id === token) ?? null);
+        if (!job) {
+          return {
+            success: false,
+            error: `No pending job '${token}'. Run 'lab jobs' to see the list.`,
+          };
+        }
+
+        const now = Date.now();
+        const recipe = lookupRecipe(job.recipeId);
+        const label = recipe?.label ?? job.recipeId;
+        if (job.completesAt <= now) {
+          return {
+            success: false,
+            error: `${label} is already complete — claim it in the Lab ('lab').`,
+          };
+        }
+
+        // Preview the cost client-side so an obviously-broke player never
+        // triggers a server round-trip that can only fail.
+        const estimate = estimateRushCost(job.completesAt - now, recipe?.unscBurn ?? 0);
+        const balance = await ctx.data.fetchBalance();
+        if (balance && balance.available < estimate) {
+          return {
+            success: false,
+            error: `Rushing this job costs ${estimate} _unSC — insufficient balance (${balance.available.toFixed(2)} _unSC available).`,
+          };
+        }
+
+        const result = await rushJob(job.id);
+        if (!result.ok) {
+          if (result.error === "insufficient_funds") {
+            return {
+              success: false,
+              error: `Rushing this job costs ${result.cost ?? estimate} _unSC — insufficient balance.`,
+            };
+          }
+          if (result.error === "already_complete") {
+            return {
+              success: false,
+              error: `${label} is already complete — claim it in the Lab ('lab').`,
+            };
+          }
+          return { success: false, error: `Rush failed (${result.error ?? "unknown"}).` };
+        }
+
+        const fresh = await ctx.data.fetchBalance();
+        const output = [
+          "",
+          `> Rush complete: ${label}  (-${result.cost ?? estimate} _unSC)`,
+          "> Job is ready to claim — open the Lab ('lab') to collect the output.",
+        ];
+        if (fresh) {
+          output.push(`> Balance: ${fresh.available.toFixed(2)} _unSC available`);
+        }
+        output.push("");
+        return { success: true, output };
+      } finally {
+        ctx.setTyping(false);
+      }
+    }
+
     return {
-      success: true,
-      output: ["", "[unlab] opening production hub...", ""],
-      navigate: "/lab",
+      success: false,
+      error: `Unknown subcommand '${sub}'. Try 'lab help'.`,
     };
   },
 };

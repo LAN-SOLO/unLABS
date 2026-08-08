@@ -204,6 +204,96 @@ export async function claimJob(jobId: string): Promise<ClaimJobResult> {
   };
 }
 
+export interface RushJobResult {
+  ok: boolean;
+  job?: ProductionJob;
+  /** _unSC burned for the rush (also present on insufficient_funds). */
+  cost?: number;
+  /** Available balance after the burn. */
+  newBalance?: number;
+  error?: string;
+}
+
+/**
+ * Instantly finish a pending job for an _unSC fee. Pricing: 1 _unSC per
+ * started minute remaining (minimum 1); recipes with a start burn cap the
+ * fee at 2x that burn so rushing never dwarfs the recipe's own cost.
+ */
+export async function rushJob(jobId: string): Promise<RushJobResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "not_authenticated" };
+
+  const readResult = await supabase
+    .from("production_jobs")
+    .select("id, user_id, recipe_id, status, started_at, completes_at, claimed_at, metadata")
+    .eq("id", jobId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const row = readResult.data as ProductionJobRow | null;
+  if (!row) return { ok: false, error: "not_found" };
+
+  const job = fromRow(row);
+  if (job.status !== "pending") {
+    return { ok: false, error: "already_closed" };
+  }
+
+  const now = Date.now();
+  if (job.completesAt <= now) {
+    return { ok: false, error: "already_complete" };
+  }
+
+  const recipe = getRecipe(job.recipeId);
+  if (!recipe) return { ok: false, error: "unknown_recipe" };
+
+  const remainingMs = job.completesAt - now;
+  let cost = Math.max(1, Math.ceil(remainingMs / 60000));
+  if (recipe.unscBurn > 0) {
+    cost = Math.min(cost, 2 * recipe.unscBurn);
+  }
+
+  // Burn first, like startJob: if the fee fails, the job row is untouched
+  // and the client can show the error verbatim.
+  const burn = await burnUnsc(supabase, {
+    userId: user.id,
+    amount: cost,
+    type: "fee",
+    description: `rush:${recipe.id}`,
+    metadata: { source: "rush", job_id: job.id },
+  });
+  if (!burn.ok) {
+    return { ok: false, cost, error: burn.error ?? "burn_failed" };
+  }
+
+  const rushedAtIso = new Date(now).toISOString();
+  const updateResult = await supabase
+    .from("production_jobs")
+    .update({
+      completes_at: rushedAtIso,
+      metadata: { ...job.metadata, rushedAt: rushedAtIso, rush_cost: cost },
+    } as never)
+    .eq("id", jobId)
+    .eq("user_id", user.id)
+    .eq("status", "pending")
+    .select("id, user_id, recipe_id, status, started_at, completes_at, claimed_at, metadata")
+    .maybeSingle();
+
+  const updated = updateResult.data as ProductionJobRow | null;
+  if (updateResult.error || !updated) {
+    return {
+      ok: false,
+      cost,
+      newBalance: burn.newAvailable,
+      error: updateResult.error?.message ?? "update_failed",
+    };
+  }
+
+  return { ok: true, job: fromRow(updated), cost, newBalance: burn.newAvailable };
+}
+
 export interface CancelJobResult {
   ok: boolean;
   error?: string;

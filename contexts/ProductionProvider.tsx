@@ -33,6 +33,7 @@ import { useQuest } from "@/contexts/QuestProvider";
 import {
   claimJob as claimJobAction,
   listJobs as listJobsAction,
+  rushJob as rushJobAction,
   startJob as startJobAction,
 } from "@/app/(game)/actions/production";
 import { getBalance } from "@/app/(game)/actions/economy";
@@ -50,6 +51,8 @@ interface ProductionContextValue {
   lastError: string | null;
   startJob: (recipeId: string) => Promise<void>;
   claimJob: (jobId: string) => Promise<void>;
+  /** Finish a pending job instantly for an _unSC fee. */
+  rushJob: (jobId: string) => Promise<void>;
   refresh: () => Promise<void>;
 }
 
@@ -212,6 +215,28 @@ export function ProductionProvider({
     [busy, applyRewards],
   );
 
+  const rushJob = useCallback(
+    async (jobId: string) => {
+      if (busy) return;
+      setBusy(true);
+      setLastError(null);
+
+      const result = await rushJobAction(jobId);
+      if (!result.ok) {
+        setBusy(false);
+        setLastError(result.error ?? "rush_failed");
+        return;
+      }
+
+      // The server burned the fee and moved completes_at. Pull jobs +
+      // balance through the existing refresh path so the UI shows the
+      // claimable job and the reduced balance without bespoke bookkeeping.
+      await refresh();
+      setBusy(false);
+    },
+    [busy, refresh],
+  );
+
   // Periodic refresh (every 15s) to keep the jobs list + balance honest if
   // the player has another tab open, offline progress applies, etc.
   useEffect(() => {
@@ -229,9 +254,10 @@ export function ProductionProvider({
       lastError,
       startJob,
       claimJob,
+      rushJob,
       refresh,
     }),
-    [jobs, balance, busy, lastError, startJob, claimJob, refresh],
+    [jobs, balance, busy, lastError, startJob, claimJob, rushJob, refresh],
   );
 
   return <ProductionContext.Provider value={value}>{children}</ProductionContext.Provider>;
