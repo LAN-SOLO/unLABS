@@ -19,8 +19,20 @@
   today's contracts with inline CLAIM, and reports the tick engine's real
   8h-truncation flag.
 
+- **Rush jobs (`lab rush <n>`).** Finish a running production job now for
+  1 \_unSC per started minute remaining (min 1, capped at 2× the recipe's
+  start burn) — `lab jobs` lists pending jobs with a cost preview.
+- **Resonance discovery goes live.** The event sources for all 5 resonance
+  protocols are wired (device state/param bridge, thermal sampling, command
+  feed, VNT purge) — previously none could ever fire, leaving dependent
+  missions and achievements unreachable.
+
 ### Fixed
 
+- **Server-authoritative balances.** Burns/earns now run through
+  SECURITY DEFINER RPCs keyed on `auth.uid()`; the RLS policy that let a
+  client UPDATE its own balance row directly is dropped. `unsc_earn` is
+  dev-gated so all player-facing earns flow through the finite reserve.
 - **Ledger integrity.** `transactions` had no INSERT policy, so
   `burnUnsc`/`earnUnsc` audit rows were silently dropped;
   `deduct_balance`/`credit_balance` logged into a nonexistent column with

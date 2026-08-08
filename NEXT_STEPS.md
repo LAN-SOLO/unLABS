@@ -28,12 +28,16 @@ streaks + reroll/insurance sinks, reserve-funded payouts (`daily` source),
 `daily` terminal command, WelcomeBack board, ledger-integrity migration
 (20260808000001). Follow-up slices, in dependency order:
 
-1. **Rush Job** (S): finish a running production job now for
-   `ceil(remainingMinutes)` \_unSC (cap 2× the recipe's `unscBurn`), type
-   `fee`, `completes_at = now()` — an in-session impulse burn.
-2. **Resonance live-wire** (S): wire `pushStateEvent` from harmonize/device
-   managers so the 5 dormant protocols, 3 stuck achievements, and 2 mission
-   objectives fire — activates ~140 \_unSC of already-budgeted faucet.
+1. ~~**Rush Job** (S)~~ — shipped 2026-08-08: `lab jobs` / `lab rush <n>`,
+   1 \_unSC per started minute remaining (min 1, cap 2× `unscBurn`).
+2. ~~**Resonance live-wire** (S)~~ — shipped 2026-08-08:
+   `useResonanceEventBridge` (device state/param + thermal + heartbeat),
+   command feed in useTerminal, VNT purge event. Open ends:
+   `qbridge sync` / `kernel sync --deep` don't exist as real subcommands
+   yet (they count via the command feed but print errors); OSC-001 state
+   stands in via the `osc_001_online` flag; DIM "scan" maps to the
+   rift-scan test phase; THERMAL-PHOENIX ≥85° is only reachable via
+   CPU/GPU zones (panel is clamped to 80°).
 3. **Volatility pricing** (M): deterministic date-seeded ±20-25% daily
    modifier on `unscBurn`/rush prices via a shared `chargeForAction()`
    helper — makes checking prices a daily habit.
@@ -41,13 +45,12 @@ streaks + reroll/insurance sinks, reserve-funded payouts (`daily` source),
    production multiplier (rateMultiplier param in `advanceResources`),
    gated on EP4's reserved prestige flag; the long-horizon sink.
 
-**Security debt (blocker before any real-money framing):** the
-`balances` UPDATE RLS policy (20260521000001) lets a client set its own
-balance directly with the anon key — the "server-authoritative" economy is
-authoritative by convention only. Fix: move burn/earn into SECURITY
-DEFINER RPCs keyed on `auth.uid()` and drop the broad UPDATE policy.
-Same class: `updateAchievementProgress` and mission `clientProgress`
-accept client-asserted progress for reserve-paying claims.
+**Security debt:** ~~balances UPDATE RLS~~ — fixed 2026-08-08
+(20260808000002: `unsc_burn`/`unsc_earn` SECURITY DEFINER RPCs keyed on
+`auth.uid()`, earn dev-gated, UPDATE policy dropped). Still open, same
+class: `updateAchievementProgress`, mission `clientProgress`, and
+resonance `logDiscovery` accept client-asserted progress for
+reserve-paying or reward-granting claims.
 
 ## 0.1.28 — "Onboarding" (the first impression) ⬅ START HERE
 
