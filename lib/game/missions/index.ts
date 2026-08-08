@@ -574,5 +574,14 @@ export function hydrateMissionState(raw: unknown): MissionPlayerState {
             >,
           )
         : {},
+    dailyResetAt: typeof obj.dailyResetAt === "string" ? obj.dailyResetAt : null,
+    dailyClaimedIds: Array.isArray(obj.dailyClaimedIds)
+      ? obj.dailyClaimedIds.filter((v): v is string => typeof v === "string")
+      : [],
+    dailyRerolledIds: Array.isArray(obj.dailyRerolledIds)
+      ? obj.dailyRerolledIds.filter((v): v is string => typeof v === "string")
+      : [],
+    streakCount: typeof obj.streakCount === "number" ? obj.streakCount : 0,
+    streakInsuredUntil: typeof obj.streakInsuredUntil === "string" ? obj.streakInsuredUntil : null,
   };
 }

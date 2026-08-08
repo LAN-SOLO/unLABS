@@ -137,6 +137,16 @@ export interface MissionPlayerState {
   hintLevel: Record<string, number>;
   /** Timestamp (epoch ms) of last progress per objective. */
   lastActivityAt: Record<string, number>;
+  /** UTC day key ("YYYY-MM-DD") the daily-contract fields below refer to. */
+  dailyResetAt: string | null;
+  /** Daily contract ids claimed on the `dailyResetAt` day. */
+  dailyClaimedIds: string[];
+  /** Daily contract ids rerolled on the `dailyResetAt` day. */
+  dailyRerolledIds: string[];
+  /** Consecutive-day claim streak (increments on first claim of a day). */
+  streakCount: number;
+  /** UTC day key up to which streak insurance protects the streak. */
+  streakInsuredUntil: string | null;
 }
 
 export function createInitialMissionState(): MissionPlayerState {
@@ -147,6 +157,11 @@ export function createInitialMissionState(): MissionPlayerState {
     discoveryLog: [],
     hintLevel: {},
     lastActivityAt: {},
+    dailyResetAt: null,
+    dailyClaimedIds: [],
+    dailyRerolledIds: [],
+    streakCount: 0,
+    streakInsuredUntil: null,
   };
 }
 
