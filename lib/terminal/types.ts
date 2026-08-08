@@ -1714,6 +1714,8 @@ export interface DataFetchers {
   tutorialActions?: TutorialTerminalActions;
   // Achievement system
   achievementActions?: AchievementTerminalActions;
+  // Daily contracts (comeback loop)
+  dailyActions?: DailyTerminalActions;
   // Research / tech tree (NXS-01)
   researchActions?: ResearchTerminalActions;
   // Nexus device state (NXS-01). Separate from researchActions because the
@@ -1768,6 +1770,39 @@ export interface ResearchTerminalActions {
  * Terminal-facing achievement actions. Kept minimal: list + claim cover
  * every command the `achieve` shell exposes.
  */
+/**
+ * Terminal-facing daily-contract actions. Mirrors the daily surface on
+ * MissionProvider: list + streak are synchronous reads of client state;
+ * claim/reroll/buyInsurance wrap the server actions (all _unSC movement
+ * is server-authoritative).
+ */
+export interface DailyTerminalActions {
+  /** Today's board with client-derived progress. */
+  list: () => Array<{
+    contractId: string;
+    title: string;
+    description: string;
+    payout: number;
+    rerollable: boolean;
+    claimed: boolean;
+    /** True when this entry replaced a rerolled original. */
+    isReplacement: boolean;
+    progress: number;
+    target: number;
+    completed: boolean;
+  }>;
+  streak: () => { count: number; insuredUntil: string | null; dayKey: string };
+  claim: (contractId: string) => Promise<{
+    ok: boolean;
+    awarded?: number;
+    milestone?: number;
+    streak?: number;
+    error?: string;
+  }>;
+  reroll: (contractId: string) => Promise<{ ok: boolean; error?: string }>;
+  buyInsurance: () => Promise<{ ok: boolean; error?: string }>;
+}
+
 export interface AchievementTerminalActions {
   list: () => Array<{
     id: string;

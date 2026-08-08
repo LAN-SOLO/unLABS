@@ -142,6 +142,43 @@ export function selectDailyContracts(userId: string, dayKey: string): DailyContr
   return picked;
 }
 
+/**
+ * Deterministic replacement for a rerolled slot. Drawn from the templates
+ * NOT selected for this day (so a reroll always changes the contract),
+ * salted with `reroll:` so it differs from the original slot draw. Client
+ * and server derive the same replacement, which lets `claimContract`
+ * validate a rerolled slot without storing the replacement anywhere.
+ */
+export function selectRerollReplacement(
+  userId: string,
+  dayKey: string,
+  slot: number,
+): DailyContract {
+  const originalIds = new Set(selectDailyContracts(userId, dayKey).map((c) => c.id));
+  const pool = DAILY_CONTRACT_TEMPLATES.filter((t) => !originalIds.has(t.id));
+
+  const totalWeight = pool.reduce((sum, t) => sum + Math.max(1, t.weight), 0);
+  const roll = fnv1a(`${userId}:${dayKey}:reroll:${slot}`) % totalWeight;
+
+  let cumulative = 0;
+  let index = pool.length - 1;
+  for (let i = 0; i < pool.length; i++) {
+    cumulative += Math.max(1, pool[i].weight);
+    if (roll < cumulative) {
+      index = i;
+      break;
+    }
+  }
+
+  const template = pool[index];
+  return {
+    ...template,
+    contractId: `${dayKey}:${template.id}`,
+    dayKey,
+    slot,
+  };
+}
+
 // ── Streak logic ──────────────────────────────────────────────────────
 
 export interface StreakSnapshot {
