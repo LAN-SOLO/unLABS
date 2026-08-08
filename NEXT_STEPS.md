@@ -20,6 +20,35 @@ regenerated from schema (54 tables, `AnyTable` workarounds removed —
 `Database` now comes from `types/database.generated.ts` via `pnpm db:types`),
 migrator orphan-recovery cutoff bumped, CHANGELOG caught up through 0.1.27.
 
+## Shipped 2026-08-08 — Economy slice 1: Daily Contracts
+
+The CRONWORK design (multi-agent design review, winner over sink-first
+OVERDRIVE and endgame-first RECOMPILE): date-seeded daily contracts +
+streaks + reroll/insurance sinks, reserve-funded payouts (`daily` source),
+`daily` terminal command, WelcomeBack board, ledger-integrity migration
+(20260808000001). Follow-up slices, in dependency order:
+
+1. **Rush Job** (S): finish a running production job now for
+   `ceil(remainingMinutes)` \_unSC (cap 2× the recipe's `unscBurn`), type
+   `fee`, `completes_at = now()` — an in-session impulse burn.
+2. **Resonance live-wire** (S): wire `pushStateEvent` from harmonize/device
+   managers so the 5 dormant protocols, 3 stuck achievements, and 2 mission
+   objectives fire — activates ~140 \_unSC of already-budgeted faucet.
+3. **Volatility pricing** (M): deterministic date-seeded ±20-25% daily
+   modifier on `unscBurn`/rush prices via a shared `chargeForAction()`
+   helper — makes checking prices a daily habit.
+4. **Kernel Recompile prestige** (L): 500×2ⁿ \_unSC burn for a permanent
+   production multiplier (rateMultiplier param in `advanceResources`),
+   gated on EP4's reserved prestige flag; the long-horizon sink.
+
+**Security debt (blocker before any real-money framing):** the
+`balances` UPDATE RLS policy (20260521000001) lets a client set its own
+balance directly with the anon key — the "server-authoritative" economy is
+authoritative by convention only. Fix: move burn/earn into SECURITY
+DEFINER RPCs keyed on `auth.uid()` and drop the broad UPDATE policy.
+Same class: `updateAchievementProgress` and mission `clientProgress`
+accept client-asserted progress for reserve-paying claims.
+
 ## 0.1.28 — "Onboarding" (the first impression) ⬅ START HERE
 
 1. **Full-chain progression test first.** EP2 and EP3/EP4 have progression

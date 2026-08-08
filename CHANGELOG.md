@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **Daily contracts (`daily` / `contracts` terminal command).** 3 date-seeded
+  contracts per UTC day (deterministic from userId + date — no cron, no new
+  table), paying 10–20 \_unSC each from the deflationary reserve (new
+  `daily` source). Craft objectives are verified server-side against claimed
+  production jobs; command/resource objectives follow the mission trust
+  posture at the lowest payout tier.
+- **Streaks with grace + insurance.** First claim of the day advances the
+  streak; milestones at 3/7/30 days pay 25/75/250 \_unSC. One missed day is
+  free; a 15 \_unSC insurance shields 7 days; otherwise the streak halves.
+- **Reroll sink.** 5 \_unSC swaps a contract for a deterministically derived
+  replacement (one per slot per day).
+- **WelcomeBack daily board.** The welcome-back aside now shows streak +
+  today's contracts with inline CLAIM, and reports the tick engine's real
+  8h-truncation flag.
+
+### Fixed
+
+- **Ledger integrity.** `transactions` had no INSERT policy, so
+  `burnUnsc`/`earnUnsc` audit rows were silently dropped;
+  `deduct_balance`/`credit_balance` logged into a nonexistent column with
+  invalid enum values (breaking the crystal-mint burn); `credit_balance`
+  was missing its auth guard. All repaired in migration 20260808000001.
+
 ## v0.1.27-beta (2026-06-06)
 
 ### Fixed
