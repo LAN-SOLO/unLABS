@@ -19,6 +19,17 @@
   today's contracts with inline CLAIM, and reports the tick engine's real
   8h-truncation flag.
 
+- **Kernel Recompile (`recompile` / `prestige`).** The endgame sink: burn
+  500 × 2^level \_unSC (server-gated on EP4 completion, level cap 20) for a
+  permanent 1.5^level production multiplier applied to all net-positive
+  rates — including offline catch-up.
+- **Daily market volatility.** One global ±25% modifier per UTC day on all
+  burn prices (production starts, research, rush fees) — charged
+  server-side and displayed identically in the lab, tech graph, and
+  terminal (`MARKET: … today` lines). Payouts and meta prices stay fixed.
+- **`kernel` command + `qbridge sync`.** The two resonance ritual commands
+  are now real: kernel status/sync --deep with live kernel telemetry, and
+  a quantum sync sequence fed by QSM/QUA state.
 - **Rush jobs (`lab rush <n>`).** Finish a running production job now for
   1 \_unSC per started minute remaining (min 1, capped at 2× the recipe's
   start burn) — `lab jobs` lists pending jobs with a cost preview.

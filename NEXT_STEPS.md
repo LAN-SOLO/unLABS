@@ -38,12 +38,16 @@ streaks + reroll/insurance sinks, reserve-funded payouts (`daily` source),
    stands in via the `osc_001_online` flag; DIM "scan" maps to the
    rift-scan test phase; THERMAL-PHOENIX ≥85° is only reachable via
    CPU/GPU zones (panel is clamped to 80°).
-3. **Volatility pricing** (M): deterministic date-seeded ±20-25% daily
-   modifier on `unscBurn`/rush prices via a shared `chargeForAction()`
-   helper — makes checking prices a daily habit.
-4. **Kernel Recompile prestige** (L): 500×2ⁿ \_unSC burn for a permanent
-   production multiplier (rateMultiplier param in `advanceResources`),
-   gated on EP4's reserved prestige flag; the long-horizon sink.
+3. ~~**Volatility pricing** (M)~~ — shipped 2026-08-08:
+   `lib/game/volatility.ts` (global ±25%/day, 1% steps), charged in
+   startJob/rushJob/startResearch, displayed in lab, TechGraph, and the
+   research/lab/daily terminal outputs. `qbridge sync` and the `kernel`
+   command are real now (closes the resonance ritual gap).
+4. ~~**Kernel Recompile prestige** (L)~~ — shipped 2026-08-08:
+   `prestige_state` table + `kernel_recompile()` RPC (500×2ⁿ, cap 20,
+   ENDGAME_UNLOCKED gate), 1.5^level multiplier on net-positive rates in
+   `advanceResources`, `recompile` command, computeWhatNext endgame
+   branch. All four economy slices are live.
 
 **Security debt:** ~~balances UPDATE RLS~~ — fixed 2026-08-08
 (20260808000002: `unsc_burn`/`unsc_earn` SECURITY DEFINER RPCs keyed on
