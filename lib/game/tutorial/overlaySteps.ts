@@ -31,7 +31,7 @@ export const OVERLAY_STEPS: OverlayStep[] = [
     id: "follow-mcp",
     title: "Respond to the wake-up call",
     body:
-      "MCP is briefing you in the top-right window. Read each message and press CONTINUE to work through the cold-boot procedure.\n\n" +
+      "MCP is briefing you in the top-right window. Type `dmesg` to read the boot log, then read each message and press CONTINUE to work through the rest of the cold-boot procedure.\n\n" +
       "At the end of it MCP re-authorizes the basic subsystems — and hands you the job of switching the first ones on.",
     target: "[data-quest-overlay]",
     position: "left",

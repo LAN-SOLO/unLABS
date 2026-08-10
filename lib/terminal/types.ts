@@ -1726,6 +1726,20 @@ export interface DataFetchers {
   // `device list` UI needs to distinguish "not built" from "built but offline"
   // — researchActions.available() collapses both into false.
   nexusActions?: NexusTerminalActions;
+  // Terminal→quest command bridge. useTerminal calls reportCommand with the
+  // lowercase base command name (no args) after every SUCCESSFUL execution;
+  // Terminal.tsx matches it against the active quest step's `command` trigger
+  // and sets the corresponding `cmd:<name>` flag exactly once.
+  questCommandActions?: QuestCommandTerminalActions;
+}
+
+/**
+ * Terminal-facing quest command bridge. Tiny on purpose: only successful
+ * commands are reported (quest steps model real, completed player actions —
+ * unlike the resonance feed, which deliberately also hears failed rituals).
+ */
+export interface QuestCommandTerminalActions {
+  reportCommand: (commandName: string) => void;
 }
 
 /**

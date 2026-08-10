@@ -137,6 +137,7 @@ interface UseTerminalProps {
   prestigeActions?: { refresh: () => Promise<void> };
   researchActions?: import("@/lib/terminal/types").ResearchTerminalActions;
   nexusActions?: import("@/lib/terminal/types").NexusTerminalActions;
+  questCommandActions?: import("@/lib/terminal/types").QuestCommandTerminalActions;
   questFlags?: Record<string, boolean>;
 }
 
@@ -202,6 +203,7 @@ export function useTerminal({
   prestigeActions,
   researchActions,
   nexusActions,
+  questCommandActions,
   questFlags,
 }: UseTerminalProps) {
   const router = useRouter();
@@ -524,6 +526,7 @@ export function useTerminal({
       prestigeActions,
       researchActions,
       nexusActions,
+      questCommandActions,
     }),
     [
       cdcDeviceActions,
@@ -579,6 +582,7 @@ export function useTerminal({
       prestigeActions,
       researchActions,
       nexusActions,
+      questCommandActions,
       questFlags,
     ],
   );
@@ -700,6 +704,14 @@ export function useTerminal({
         missionActions.reportCommand(input);
       }
 
+      // Report the base command name to the quest bridge. Only SUCCESSFUL
+      // executions count (unlike the resonance feed below): command-triggered
+      // quest steps model real, completed player actions, not typos or
+      // failed invocations.
+      if (result.success && cmd && questCommandActions?.reportCommand) {
+        questCommandActions.reportCommand(cmd);
+      }
+
       // Feed the resonance buffer with the normalized command line.
       // Deliberately not gated on success: hidden protocol invocations
       // (e.g. "qbridge sync", "kernel sync --deep") are rituals the shell
@@ -764,6 +776,7 @@ export function useTerminal({
       userActions,
       filesystemActions,
       resonanceActions,
+      questCommandActions,
     ],
   );
 

@@ -15,8 +15,12 @@
  *   - JADE    — margin notes left by the previous operator
  *   - FRIDGE  — the engineering log, terse and precise
  *
- * Trigger anchoring (0.1.28):
- *   - Steps wake→seep are narrative beats and keep the "continue" trigger.
+ * Trigger anchoring (0.1.28, command bridge 0.1.29):
+ *   - ep0.wake gates on a real `command` trigger (`dmesg`): the terminal
+ *     bridge (Terminal.tsx questCommandActions → hooks/useTerminal.ts)
+ *     sets `cmd:dmesg` after the first successful run and the server
+ *     cascade advances the step.
+ *   - Steps survey→seep are narrative beats and keep the "continue" trigger.
  *   - `ep0_complete` is granted at ep0.seep (not at the end) so the basic
  *     subsystems (BAT-001 / NET-001 / MEM-001, see DEVICE_UNLOCK_FLAGS)
  *     unlock while EP0 is still active.
@@ -24,9 +28,6 @@
  *     actually power on BAT-001, NET-001 and MEM-001 (three real actions).
  *     GridObserverBridge (components/panel/GridObserverBridge.tsx) sets the
  *     flag once all three are live; setQuestFlagAction cascades the step.
- *   - "command" triggers stay unused here: nothing sets `cmd:*` flags yet
- *     (the terminal→quest bridge is still Phase 4), so a command-gated step
- *     would soft-lock. Revisit once the bridge exists.
  */
 
 import type { Episode } from "./types";
@@ -38,7 +39,8 @@ export const EP0: Episode = {
   steps: [
     {
       id: "ep0.wake",
-      objective: "Respond to the wake-up call",
+      objective: "Read the boot log",
+      hint: "Type `dmesg` in the terminal to read the kernel boot log. That is how you tell the lab you are awake.",
       voiceLines: [
         {
           voice: "system",
@@ -53,7 +55,10 @@ export const EP0: Episode = {
           text: "Before you ask: yes, the lab is off. No, I did not turn it off. Yes, it is your problem now.",
         },
       ],
-      trigger: { kind: "continue" },
+      // Real action gate: the terminal→quest bridge sets `cmd:dmesg` after
+      // the first successful `dmesg` run (no CONTINUE button — QuestOverlay
+      // shows "awaiting: dmesg").
+      trigger: { kind: "command", command: "dmesg" },
     },
     {
       id: "ep0.survey",

@@ -13,7 +13,9 @@
  *   - Phosphor-green CRT aesthetic matching the rest of the game
  *   - Voice lines are prefixed and colored per persona (see VOICE_STYLE)
  *   - One CONTINUE button per step; disabled while the server advance is
- *     in-flight so double-clicks can't skip steps
+ *     in-flight so double-clicks can't skip steps. Flag- and command-gated
+ *     steps hide the button and show an "awaiting" status instead — the
+ *     observer/minigame/terminal bridge advances them.
  *
  * Intentionally not a modal. Players should be able to glance at the panel
  * and at the same time see the panel/terminal underneath. Later phases can
@@ -66,6 +68,16 @@ export function QuestOverlay() {
   const hasMinigame = !!currentStep.minigame;
   const flagGated =
     currentStep.trigger.kind === "flag" && state.flags[currentStep.trigger.flag] !== true;
+  // Command-gated steps advance via the terminal bridge (Terminal.tsx sets
+  // `cmd:<name>` after a successful run) — never via CONTINUE. Showing the
+  // button here would soft-lock: the server refuses the advance until the
+  // flag is set.
+  const awaitedCommand =
+    currentStep.trigger.kind === "command" &&
+    state.flags[`cmd:${currentStep.trigger.command}`] !== true
+      ? currentStep.trigger.command
+      : null;
+  const gated = flagGated || awaitedCommand !== null;
 
   return (
     <aside
@@ -111,11 +123,17 @@ export function QuestOverlay() {
 
       <footer className="flex items-center justify-between border-t border-green-500/40 px-3 py-2">
         <span className="text-[10px] text-green-500/50">
-          {isAdvancing ? "transmitting..." : flagGated ? "awaiting trigger" : "ready"}
+          {isAdvancing
+            ? "transmitting..."
+            : awaitedCommand
+              ? `awaiting: ${awaitedCommand}`
+              : flagGated
+                ? "awaiting trigger"
+                : "ready"}
         </span>
-        {/* Hide CONTINUE on flag-gated steps — the minigame or command
-            listener is responsible for unlocking them. */}
-        {flagGated ? null : (
+        {/* Hide CONTINUE on gated steps — the minigame, observer, or the
+            terminal command bridge is responsible for unlocking them. */}
+        {gated ? null : (
           <button
             type="button"
             onClick={advance}

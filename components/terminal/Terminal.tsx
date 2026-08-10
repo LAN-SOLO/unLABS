@@ -85,6 +85,7 @@ import type {
   AchievementTerminalActions,
   DailyTerminalActions,
   MissionTerminalActions,
+  QuestCommandTerminalActions,
   ResearchTerminalActions,
   ResonanceTerminalActions,
   TutorialTerminalActions,
@@ -396,6 +397,34 @@ export function Terminal({
   const prestigeTerminalActions = useMemo(
     () => ({ refresh: tick.refreshPrestige }),
     [tick.refreshPrestige],
+  );
+
+  // Terminal→quest command bridge: useTerminal reports each SUCCESSFUL
+  // command's base name here. The bridge only reacts when the ACTIVE quest
+  // step is a `command` trigger for exactly this command, and sets the
+  // `cmd:<name>` flag once via the existing allow-listed flag path
+  // (setQuestFlagAction cascades the step server-side). Everything else is
+  // a no-op: wrong command, flag already set, or a set already in flight
+  // (pendingCmdFlagsRef guards the async window before the server state
+  // lands back in the provider).
+  const pendingCmdFlagsRef = useRef<Set<string>>(new Set());
+  const questCommandTerminalActions: QuestCommandTerminalActions = useMemo(
+    () => ({
+      reportCommand: (commandName: string) => {
+        const step = quest.currentStep;
+        if (!step || step.trigger.kind !== "command") return;
+        if (step.trigger.command.toLowerCase() !== commandName) return;
+        // Flag key must match isTriggerSatisfied's `cmd:${trigger.command}`.
+        const flag = `cmd:${step.trigger.command}`;
+        if (quest.state.flags[flag] === true) return;
+        if (pendingCmdFlagsRef.current.has(flag)) return;
+        pendingCmdFlagsRef.current.add(flag);
+        void quest.setFlag(flag, true).finally(() => {
+          pendingCmdFlagsRef.current.delete(flag);
+        });
+      },
+    }),
+    [quest],
   );
 
   const researchTerminalActions: ResearchTerminalActions | undefined = useMemo(() => {
@@ -2833,6 +2862,7 @@ export function Terminal({
     prestigeActions: prestigeTerminalActions,
     researchActions: researchTerminalActions,
     nexusActions: nexusTerminalActions,
+    questCommandActions: questCommandTerminalActions,
     questFlags: quest.state.flags,
   });
 

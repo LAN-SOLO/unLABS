@@ -207,12 +207,30 @@ const CLIENT_SETTABLE_FLAGS = new Set([
 ]);
 
 /**
+ * Terminal→quest command bridge (Phase 4): the terminal reports successful
+ * command executions as `cmd:<name>` flags, which `isTriggerSatisfied`
+ * resolves for `command`-triggered steps.
+ *
+ * Security note: `cmd:*` flags are pure progression triggers — no step or
+ * completion reward is ever keyed on a `cmd:*` flag (rewards flow through
+ * the step engine's own `rewards` arrays), so a forged flag can at worst
+ * advance a command-gated narrative beat the player skipped typing. The
+ * name is still constrained to a conservative charset/length so arbitrary
+ * strings can't be persisted into the flag map.
+ */
+const CMD_FLAG_PATTERN = /^cmd:[a-z0-9_-]{1,32}$/;
+
+function isClientSettableFlag(flag: string): boolean {
+  return CLIENT_SETTABLE_FLAGS.has(flag) || CMD_FLAG_PATTERN.test(flag);
+}
+
+/**
  * Set a quest flag from the client. Used by minigames to report completion
  * back to the engine. Restricted to an allow-list so a malicious client
  * can't set `ep0_complete` or similar to bypass content.
  */
 export async function setQuestFlagAction(flag: string, value: boolean): Promise<QuestFlagResult> {
-  if (!CLIENT_SETTABLE_FLAGS.has(flag)) {
+  if (!isClientSettableFlag(flag)) {
     return {
       ok: false,
       state: null,
