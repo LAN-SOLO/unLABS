@@ -35,23 +35,30 @@ const config: Configuration = {
     },
   ],
   afterPack: async (context) => {
-    // Copy next's nested node_modules that electron-builder skips
+    // Copy next's nested node_modules that electron-builder skips.
+    // The packaged resources dir is platform-specific: mac nests it
+    // inside the .app bundle; win/linux put it directly in appOutDir.
+    // The old mac-only path silently produced Windows builds without
+    // next's node_modules (broken since 0.1.2-alpha).
     const fs = await import("fs");
     const path = await import("path");
-    const src = path.join(
-      context.appOutDir,
-      context.packager.appInfo.productFilename + ".app",
-      "Contents",
-      "Resources",
-      "app",
-    );
+    const resourcesApp =
+      context.electronPlatformName === "darwin"
+        ? path.join(
+            context.appOutDir,
+            context.packager.appInfo.productFilename + ".app",
+            "Contents",
+            "Resources",
+            "app",
+          )
+        : path.join(context.appOutDir, "resources", "app");
     const nextNested = path.join(
       context.packager.projectDir,
       "node_modules",
       "next",
       "node_modules",
     );
-    const destNested = path.join(src, "node_modules", "next", "node_modules");
+    const destNested = path.join(resourcesApp, "node_modules", "next", "node_modules");
     if (fs.existsSync(nextNested)) {
       fs.cpSync(nextNested, destNested, { recursive: true, force: true });
     }
