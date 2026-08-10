@@ -48,18 +48,21 @@ const POWER_GRID_T2: Achievement = {
 const PERPETUAL_ENERGY_T3: Achievement = {
   id: "energy.first_spark.t3",
   title: "Perpetual Energy",
-  description: "Hold 5 000 Energy. If this bar stays pinned, something is going right.",
+  description:
+    "Generate 100 000 Energy lifetime. If the meter keeps spinning, something is going right.",
   branch: "energy",
   tier: 3,
-  target: 5000,
-  unit: "Energy",
+  target: 100000,
+  unit: "Energy (lifetime)",
   reward: {
     unsc: 100,
     flag: "ach_energy_first_spark_t3",
     description: "+100 _unSC",
   },
   available: (flags) => flags.ach_energy_first_spark_t2 === true,
-  evaluate: (s) => s.resources.energy?.amount ?? 0,
+  // Held-amount targets stop at capacity (1 500 after Power Condense) —
+  // 5 000 held was unreachable. Lifetime generation measures play instead.
+  evaluate: (s) => s.resources.energy?.totalProduced ?? s.resources.energy?.amount ?? 0,
 };
 
 export const ENERGY_ACHIEVEMENTS: Achievement[] = [

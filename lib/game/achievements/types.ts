@@ -37,7 +37,19 @@ export type AchievementTier = 1 | 2 | 3;
  */
 export interface AchievementGameState {
   /** Current resource map. */
-  resources: Record<string, { amount: number; capacity: number; ratePerSecond: number }>;
+  resources: Record<
+    string,
+    {
+      amount: number;
+      capacity: number;
+      ratePerSecond: number;
+      /** Lifetime counters (tickEngine) — present on live snapshots; use for
+       *  accumulation achievements: `amount` is capacity-clamped and can make
+       *  high targets literally unreachable. */
+      totalProduced?: number;
+      totalConsumed?: number;
+    }
+  >;
   /** Quest + mission flags. */
   flags: Record<string, boolean>;
   /** Number of production jobs the player has claimed (i.e. crafted). */
