@@ -86,37 +86,37 @@ export const TECH_TREES: TechTreeMeta[] = [
     id: "optics",
     label: "Optics",
     color: "text-fuchsia-300",
-    tagline: "Light + wavelength control (stubbed for MVP).",
+    tagline: "Light + wavelength control for nanomaterial work.",
   },
   {
     id: "adapters",
     label: "Adapters",
     color: "text-lime-300",
-    tagline: "Blockchain oracle integration (stubbed for MVP).",
+    tagline: "Oracle uplinks that widen the abstractum pipeline.",
   },
   {
     id: "synthesizers",
     label: "Synthesizers",
     color: "text-pink-300",
-    tagline: "Slice / crystal deterministic fabrication (stubbed).",
+    tagline: "Deterministic exotic-matter fabrication.",
   },
   {
     id: "science",
     label: "Science",
     color: "text-sky-300",
-    tagline: "Research speed and knowledge unlocks (stubbed).",
+    tagline: "Research throughput and knowledge unlocks.",
   },
   {
     id: "devices",
     label: "Devices",
     color: "text-green-300",
-    tagline: "Physical crystal structure (stubbed).",
+    tagline: "Chassis, alloys, and structural capacity.",
   },
   {
     id: "gadgets",
     label: "Gadgets",
     color: "text-orange-300",
-    tagline: "Utility + cross-tree synergies (stubbed).",
+    tagline: "Utility grants + cross-tree synergies.",
   },
 ];
 

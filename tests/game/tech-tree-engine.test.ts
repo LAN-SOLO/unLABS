@@ -41,6 +41,44 @@ describe("tech tree catalog integrity", () => {
     expect(TECH_TREES).toHaveLength(8);
   });
 
+  it("populates every tree with content (no empty columns)", () => {
+    const byTree = groupByTree(listTechNodes());
+    for (const tree of TECH_TREES) {
+      expect(byTree.get(tree.id)?.length ?? 0).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  const CONTENT_TREES = ["optics", "adapters", "synthesizers", "science", "devices", "gadgets"];
+
+  it("the six content-drop trees carry tiers 1–4 in a chain", () => {
+    const byTree = groupByTree(listTechNodes());
+    for (const treeId of CONTENT_TREES) {
+      const nodes = byTree.get(treeId as (typeof TECH_TREES)[number]["id"])!;
+      expect(nodes.map((n) => n.tier)).toEqual([1, 2, 3, 4]);
+      // Tier 1 is a root; each later tier requires the previous tier's node.
+      expect(nodes[0]!.requires).toEqual([]);
+      for (let i = 1; i < nodes.length; i++) {
+        expect(nodes[i]!.requires).toContain(nodes[i - 1]!.id);
+      }
+    }
+  });
+
+  it("layout matches the TECH_TREES column order and the node tier", () => {
+    const columnOf = new Map(TECH_TREES.map((t, i) => [t.id, i]));
+    for (const n of TECH_NODES) {
+      expect(n.layout.x).toBe(columnOf.get(n.tree));
+      expect(n.layout.y).toBe(n.tier);
+    }
+  });
+
+  it("every content-drop node has at least one mechanical (non-flag) effect", () => {
+    for (const n of TECH_NODES) {
+      if (!CONTENT_TREES.includes(n.tree)) continue;
+      const mechanical = n.effects.filter((e) => e.kind !== "set_flag");
+      expect(mechanical.length, `node ${n.id} has only placebo effects`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
   it("every node has a positive duration and a non-negative unscBurn", () => {
     for (const n of TECH_NODES) {
       expect(n.durationSec).toBeGreaterThan(0);
