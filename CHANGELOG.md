@@ -19,6 +19,14 @@
   today's contracts with inline CLAIM, and reports the tick engine's real
   8h-truncation flag.
 
+- **All 8 tech trees populated.** Optics, adapters, synthesizers, science,
+  devices, and gadgets gain tier 1–4 chains (24 nodes, ~1.9k \_unSC of
+  research sinks); every node carries a real mechanical effect.
+- **EP0 plays for real.** Cold Boot opens by typing `dmesg` (new
+  terminal→quest command-trigger bridge) and ends by actually powering
+  BAT-001, NET-001 and MEM-001 — no more click-through onboarding.
+- **`monitor` terminal command** — the monitor page is reachable from the
+  terminal (aliases `unmonitor`, `mon`).
 - **Kernel Recompile (`recompile` / `prestige`).** The endgame sink: burn
   500 × 2^level \_unSC (server-gated on EP4 completion, level cap 20) for a
   permanent 1.5^level production multiplier applied to all net-positive
@@ -40,6 +48,10 @@
 
 ### Fixed
 
+- **Unreachable achievement targets.** Accumulation tiers now measure
+  lifetime production (`totalProduced`) — held-amount targets were
+  capacity-clamped (abstractum caps at 100, so "stockpile 500/2000" and
+  "hold 5000 energy" could never complete).
 - **Server-authoritative balances.** Burns/earns now run through
   SECURITY DEFINER RPCs keyed on `auth.uid()`; the RLS policy that let a
   client UPDATE its own balance row directly is dropped. `unsc_earn` is

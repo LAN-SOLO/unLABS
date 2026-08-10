@@ -56,33 +56,34 @@ class: `updateAchievementProgress`, mission `clientProgress`, and
 resonance `logDiscovery` accept client-asserted progress for
 reserve-paying or reward-granting claims.
 
-## 0.1.28 — "Onboarding" (the first impression) ⬅ START HERE
+## 0.1.28 — "Onboarding" — DONE 2026-08-10
 
-1. **Full-chain progression test first.** EP2 and EP3/EP4 have progression
-   tests; EP0/EP1/EP5/EP6 don't. Git history is full of "quest stuck" fixes —
-   a test that simulates the complete flag chain EP0→EP6 through the pure
-   quest engine catches that whole bug class. An afternoon of work; protects
-   everything below. (`tests/game/ep2-progression.test.ts` is the template.)
-2. **Make EP0/EP1 interactive.** Both episodes are click-through (`continue`
-   triggers) while EP2–EP6 anchor to real game flags. Migrate steps to
-   `command`/`flag` triggers ("type `dmesg`", "power on BAT-001") — design
-   note in `lib/game/quests/ep0.ts:18`; the `data-*` overlay anchors are
-   already wired.
+1. ~~**Full-chain progression test**~~ —
+   `tests/game/full-chain-progression.test.ts`: all 32 steps EP0→EP6
+   through the pure engine, trigger-derived flag keys, QUEST-STUCK
+   detection (every gate needs a legitimate setter), cascade fixpoint
+   from every state. Zero stuck candidates at landing.
+2. ~~**Make EP0/EP1 interactive**~~ — EP0 opens with a real `dmesg`
+   (new terminal→quest cmd:\* bridge: success-gated command feed,
+   allow-listed `^cmd:[a-z0-9_-]{1,32}$`, overlay shows "awaiting:
+   <command>") and closes on `grid_online` (power BAT/NET/MEM).
+   EP1's Lissajous lock was already real; `ep1.power_on` stays
+   continue (`osc_001_online` is set by the step itself — needs an
+   OSC manager first).
 
-## 0.1.29 — "Research" (the mid-game engine)
+## 0.1.29 — "Research" — DONE 2026-08-10
 
-3. **Tech-tree content.** 6 of 8 trees are empty (only Refine + Tools, 6
-   nodes total) — the monitor page even tells players so. Engine, provider,
-   UI, and tests all exist; nodes go in `lib/game/techTree/catalog.ts`,
-   design templates in `.local/docs/`. Biggest content lever: research
-   drives progression and device unlocks.
-4. **Achievement balancing.** Tier-2/3 targets are placeholders "pending
-   balancing" (`lib/game/achievements/catalog/resource.ts:5`). The new
-   `totalProduced`/`totalConsumed` counters provide real measures now.
-5. **Make /monitor discoverable** — currently linked only from /lab and
-   /dev, not from terminal or panel.
+3. ~~**Tech-tree content**~~ — all 8 trees populated (24 new nodes,
+   tier 1–4 chains, ~1.9k \_unSC of research sinks, no-placebo-effects
+   rule + integrity tests).
+4. ~~**Achievement balancing**~~ — accumulation tiers measure
+   lifetime `totalProduced` (held-amount targets were
+   capacity-clamped: abstractum caps at 100, "stockpile 500" was
+   unreachable). Energy T1/T2 stay held-amount as research gating.
+5. ~~**Make /monitor discoverable**~~ — `monitor` terminal command
+   (aliases unmonitor, mon).
 
-## 0.1.30 — "Depth & Reach"
+## 0.1.30 — "Depth & Reach" ⬅ START HERE
 
 6. **Mission depth.** M008–M018 average 3–5 thin objectives vs. 7–10 rich
    ones in M001–M007 (hints, deep-dives, voice). Bring them up to par.
