@@ -15,10 +15,18 @@
  *   - JADE    — margin notes left by the previous operator
  *   - FRIDGE  — the engineering log, terse and precise
  *
- * All steps currently use the "continue" trigger so the player can walk
- * through at their own pace. When we integrate with terminal commands in a
- * later phase, specific steps can migrate to the "command" trigger without
- * touching this file — only the trigger field changes.
+ * Trigger anchoring (0.1.28):
+ *   - Steps wake→seep are narrative beats and keep the "continue" trigger.
+ *   - `ep0_complete` is granted at ep0.seep (not at the end) so the basic
+ *     subsystems (BAT-001 / NET-001 / MEM-001, see DEVICE_UNLOCK_FLAGS)
+ *     unlock while EP0 is still active.
+ *   - ep0.handoff gates on the real `grid_online` flag: the player must
+ *     actually power on BAT-001, NET-001 and MEM-001 (three real actions).
+ *     GridObserverBridge (components/panel/GridObserverBridge.tsx) sets the
+ *     flag once all three are live; setQuestFlagAction cascades the step.
+ *   - "command" triggers stay unused here: nothing sets `cmd:*` flags yet
+ *     (the terminal→quest bridge is still Phase 4), so a command-gated step
+ *     would soft-lock. Revisit once the bridge exists.
  */
 
 import type { Episode } from "./types";
@@ -137,15 +145,27 @@ export const EP0: Episode = {
           // 1 per minute → 1/60 per second
           ratePerSecond: 1 / 60,
         },
+        // Re-authorizes the basic subsystems (BAT/NET/MEM/CDC/PWB unlock on
+        // this flag) so the final step can demand a real power-on action.
+        { kind: "set_flag", flag: "ep0_complete", value: true },
       ],
     },
     {
       id: "ep0.handoff",
-      objective: "Accept your commission",
+      objective: "Wake the basic grid: power on BAT-001, NET-001 and MEM-001",
+      hint: "Type `panel` to open the hardware panel, then switch the three subsystems on (power on BAT-001, and the same for NET-001 and MEM-001). The step completes the moment all three are live.",
       voiceLines: [
         {
           voice: "mcp",
           text: "Minimal survivability achieved. Congratulations.",
+        },
+        {
+          voice: "system",
+          text: "[ AUTH ] subsystems re-authorized: CDC-001 · BAT-001 · MEM-001 · NET-001 · PWB-001 — state: OFF",
+        },
+        {
+          voice: "mcp",
+          text: "The basic grid is yours now. Open the panel and power on BAT-001, NET-001, and MEM-001. I will not do it for you. Character building.",
         },
         {
           voice: "mcp",
@@ -156,9 +176,11 @@ export const EP0: Episode = {
           text: "welcome to the lab, operator. the anomalies are not friends, but some of them are polite. look for the one that hums in D.",
         },
       ],
-      trigger: { kind: "continue" },
+      // Real action gate: GridObserverBridge sets `grid_online` once BAT-001,
+      // NET-001 and MEM-001 are all powered; the server cascade advances this
+      // step (no CONTINUE button — QuestOverlay shows "awaiting trigger").
+      trigger: { kind: "flag", flag: "grid_online" },
       rewards: [
-        { kind: "set_flag", flag: "ep0_complete", value: true },
         // A small Abstractum grant so the player has something to spend in EP1
         { kind: "grant_resource", resourceId: "abstractum", amount: 5 },
       ],

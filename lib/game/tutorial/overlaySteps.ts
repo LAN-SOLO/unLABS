@@ -32,7 +32,7 @@ export const OVERLAY_STEPS: OverlayStep[] = [
     title: "Respond to the wake-up call",
     body:
       "MCP is briefing you in the top-right window. Read each message and press CONTINUE to work through the cold-boot procedure.\n\n" +
-      "At the end of it, emergency power reaches the basic subsystems again.",
+      "At the end of it MCP re-authorizes the basic subsystems — and hands you the job of switching the first ones on.",
     target: "[data-quest-overlay]",
     position: "left",
     advance: { kind: "questFlag", flag: "ep0_complete", value: true },
@@ -41,7 +41,8 @@ export const OVERLAY_STEPS: OverlayStep[] = [
     id: "ep1-calibration",
     title: "Calibrate the array",
     body:
-      "Keep following MCP: bring OSC-001 online and lock the Lissajous calibration when the minigame appears.\n\n" +
+      "Keep following MCP: first wake the basic grid (open the panel with `panel`, then power on BAT-001, NET-001 and MEM-001), " +
+      "then bring OSC-001 online and lock the Lissajous calibration when the minigame appears.\n\n" +
       "Locking the pattern is what unlocks your mission queue.",
     target: "[data-quest-overlay]",
     position: "left",
@@ -61,9 +62,10 @@ export const OVERLAY_STEPS: OverlayStep[] = [
     id: "wake-the-grid",
     title: "Wake the basic grid",
     body:
-      "MCP re-authorized five basic subsystems, but they are still powered down. Use the panel's terminal to switch them on:\n\n" +
+      "MCP re-authorized five basic subsystems. If BAT-001, NET-001 and MEM-001 aren't already humming from the cold boot, use the panel's terminal to switch them on:\n\n" +
       "  power on BAT-001\n  power on NET-001\n  power on MEM-001\n\n" +
-      "The same syntax powers anything off again (power off <ID>), and 'undev' lists every device.",
+      "The same syntax powers anything off again (power off <ID>), and 'undev' lists every device.\n\n" +
+      "(Already done during the cold boot? Then this step skips itself.)",
     target: "[data-terminal-input]",
     position: "top",
     advance: { kind: "questFlag", flag: "grid_online", value: true },

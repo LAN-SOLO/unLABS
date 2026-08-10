@@ -19,6 +19,18 @@
  *     in a later polish pass) can render the overlay distortion.
  *   - A "first research point" is granted by introducing a new resource
  *     `research` so the progression spine is ready for Phase 5.
+ *
+ * Trigger anchoring (0.1.28 audit):
+ *   - ep1.calibrate is the episode's real action: flag `lissajous_locked`,
+ *     set by the Lissajous minigame via setQuestFlagAction (allow-listed).
+ *   - ep1.power_on intentionally stays "continue": OSC-001's unlock flag IS
+ *     `osc_001_online`, which this very step grants — there is no external
+ *     mechanic (no OSC manager / power observer) that could set it first, so
+ *     gating on it would be circular. `command` triggers are likewise not an
+ *     option yet: nothing sets `cmd:*` flags (terminal→quest bridge is
+ *     Phase 4). Revisit when either exists.
+ *   - EP0's finale already anchors on `grid_online` (three real power-ons),
+ *     so the EP0+EP1 onboarding contains four real player actions in total.
  */
 
 import type { Episode } from "./types";
