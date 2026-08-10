@@ -2078,6 +2078,20 @@ const undevCommand: Command = {
   },
 };
 
+const monitorCommand: Command = {
+  name: "monitor",
+  aliases: ["unmonitor", "mon"],
+  description: "Open the system Monitor (tech trees, telemetry)",
+  usage: "monitor",
+  execute: async () => {
+    return {
+      success: true,
+      output: ["", "[monitor] opening system monitor...", ""],
+      navigate: "/monitor",
+    };
+  },
+};
+
 const runCommand: Command = {
   name: "run",
   aliases: ["exec", "launch"],
@@ -26749,6 +26763,7 @@ export const commands: Command[] = [
   labCommand,
   panelCommand,
   undevCommand,
+  monitorCommand,
   runCommand,
   killCommand,
   unsystemctlCommand,
