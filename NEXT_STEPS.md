@@ -83,21 +83,30 @@ reserve-paying or reward-granting claims.
 5. ~~**Make /monitor discoverable**~~ — `monitor` terminal command
    (aliases unmonitor, mon).
 
-## 0.1.30 — "Depth & Reach" ⬅ START HERE
+## 0.1.30 — "Depth & Reach" — DONE 2026-08-10
 
-6. **Mission depth.** M008–M018 average 3–5 thin objectives vs. 7–10 rich
-   ones in M001–M007 (hints, deep-dives, voice). Bring them up to par.
-7. **Fix the Windows desktop build.** The `afterPack` hook in
-   `electron-builder.config.ts:41` writes to a hardcoded macOS path
-   (`*.app/Contents/Resources/app`), so `build:win` output is missing Next's
-   `node_modules`. Branch on `context.electronPlatformName`, run
-   `pnpm build:win`, verify the installer. Windows hasn't been built since
-   0.1.2-alpha (April) — until fixed, don't advertise the installer.
-8. **E2E for authed flows.** Authenticated Playwright fixtures, then:
-   tutorial first-load → DifficultyPicker → first overlay step; achievement
-   toast; research unlock via Nexus; mission claim (m007/m008).
+6. ~~**Mission depth**~~ — M008–M018 raised to the M001–M007 standard
+   (6–7 objectives across 2–3 tasks, hints/deep-dives everywhere, all
+   four voice roles, relatedDeviceIds); IDs and rewards untouched.
+   Bonus: fixed a genuine M016 deadlock (scan objective gated on the
+   flag only its own claim sets — blocked EP5 step 3 transitively).
+7. ~~**Windows desktop build**~~ — afterPack branches on
+   electronPlatformName; UnstableLabs-Setup-0.1.27-beta.exe built on
+   macOS with next's nested node_modules verified present. Still to
+   do before advertising: a smoke run on real Windows.
+8. ~~**E2E authed flows**~~ — setup project provisions a fresh
+   confirmed user per run (localhost-guarded admin API), logs in via
+   the real UI; four flows green: DifficultyPicker→overlay, dmesg→EP0
+   advance (cmd:\* bridge end-to-end), balance box, daily board.
+   Remaining flow ideas: achievement toast, research unlock, mission
+   claim.
 
-## 0.2.0 — the strategic question
+**Follow-up (small):** the full-chain test treats "allow-listed" as
+"settable" — M016 showed a flag can be allow-listed yet never set by
+any code path. Tighten the stuck-detection to require an actual
+setter (grep client bridges) or an explicit exemption list.
+
+## 0.2.0 — the strategic question ⬅ START HERE
 
 The old roadmap's marketplace/staking/on-chain/NFT phases
 (`.local/notes/roadmap.md`, phases 5–9) were never started. Decide: build

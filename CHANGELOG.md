@@ -19,6 +19,12 @@
   today's contracts with inline CLAIM, and reports the tick engine's real
   8h-truncation flag.
 
+- **Missions M008–M018 at full depth.** Eleven thin missions now match the
+  M001–M007 standard — 6–7 objectives across structured tasks, hints and
+  deep-dive walkthroughs everywhere, all four voice roles, device markers.
+- **Authenticated e2e suite.** Playwright setup project provisions a fresh
+  user per run and covers the tutorial picker, the `dmesg` quest bridge,
+  the balance box, and the daily board (16 e2e tests total).
 - **All 8 tech trees populated.** Optics, adapters, synthesizers, science,
   devices, and gadgets gain tier 1–4 chains (24 nodes, ~1.9k \_unSC of
   research sinks); every node carries a real mechanical effect.
@@ -48,6 +54,12 @@
 
 ### Fixed
 
+- **M016 deadlock.** The deep-scan objective gated on a flag that only
+  M016's own claim reward sets — the mission (and EP5 step 3 behind it)
+  could never complete. It is now the real `scan` command.
+- **Windows desktop build.** The afterPack hook wrote into a hardcoded
+  macOS bundle path, so Windows builds shipped without next's nested
+  node_modules since 0.1.2-alpha. First working installer built.
 - **Unreachable achievement targets.** Accumulation tiers now measure
   lifetime production (`totalProduced`) — held-amount targets were
   capacity-clamped (abstractum caps at 100, so "stockpile 500/2000" and
