@@ -2743,6 +2743,10 @@ export type Database = {
       };
     };
     Functions: {
+      assert_slice_op_allowed: {
+        Args: { p_crystal_id: string; p_uid: string };
+        Returns: string;
+      };
       calc_effective_capacity: {
         Args: { base_cap: number; upgrade_lvl: number };
         Returns: number;
@@ -2886,6 +2890,41 @@ export type Database = {
       reset_player_prefs: {
         Args: { p_area?: string; p_player_id: string };
         Returns: undefined;
+      };
+      slice_merge: {
+        Args: { p_crystal_id: string; p_pos_absorb: number; p_pos_keep: number };
+        Returns: {
+          error_message: string;
+          fee: number;
+          new_power: number;
+          success: boolean;
+        }[];
+      };
+      slice_split: {
+        Args: {
+          p_crystal_id: string;
+          p_pos_source: number;
+          p_pos_target: number;
+        };
+        Returns: {
+          error_message: string;
+          fee: number;
+          half_power: number;
+          success: boolean;
+        }[];
+      };
+      slice_swap: {
+        Args: {
+          p_crystal_a: string;
+          p_crystal_b: string;
+          p_pos_a: number;
+          p_pos_b: number;
+        };
+        Returns: {
+          error_message: string;
+          fee: number;
+          success: boolean;
+        }[];
       };
       stake_claim_rewards: {
         Args: never;

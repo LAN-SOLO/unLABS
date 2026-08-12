@@ -197,7 +197,10 @@ function generateSlices(crystalId: string, color: CrystalColor, era: CrystalEra)
 
     slices.push({
       crystal_id: crystalId,
-      position: i,
+      // Positions are 1-based (schema CHECK: 1..30). The old 0-based
+      // index violated the constraint, so every slice insert — and with
+      // it the whole mint — failed after the balance deduct.
+      position: i + 1,
       power: Math.round(power * 100) / 100,
       is_active: true,
       hue: Math.round(hue),
