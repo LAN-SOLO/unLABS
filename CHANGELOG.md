@@ -19,6 +19,16 @@
   today's contracts with inline CLAIM, and reports the tick engine's real
   8h-truncation flag.
 
+- **On-chain layer, first pass.** Verified Solana wallet linking
+  (ed25519-signed challenge, service-role-only writes, `wallet` command),
+  \_unSC staking with a 7-day lock and reserve-funded 0.5%/day rewards
+  (`stake`), and a player-to-player crystal marketplace with a
+  deflationary 5% fee (`market`) — every mutation behind SECURITY DEFINER
+  RPCs. Metaplex-standard metadata route scaffolds the devnet NFT mint.
+- **Claim verification hardened.** Reserve-paying achievement claims
+  re-derive construction/breadth/trade progress from server data instead
+  of trusting the client-written progress row; mission craft counts come
+  from the DB.
 - **Missions M008–M018 at full depth.** Eleven thin missions now match the
   M001–M007 standard — 6–7 objectives across structured tasks, hints and
   deep-dive walkthroughs everywhere, all four voice roles, device markers.

@@ -106,14 +106,45 @@ reserve-paying or reward-granting claims.
 any code path. Tighten the stuck-detection to require an actual
 setter (grep client bridges) or an explicit exemption list.
 
-## 0.2.0 — the strategic question ⬅ START HERE
+## 0.2.0 — the strategic question — DECIDED: BUILD (2026-08-12)
 
-The old roadmap's marketplace/staking/on-chain/NFT phases
-(`.local/notes/roadmap.md`, phases 5–9) were never started. Decide: build
-or officially cut. If cut, drop `@solana/web3.js` (production dep used for
-one type import in `types/phantom.ts`) and the wallet integration — the
-game positions cleanly as an idle/puzzle title, simplifying deps to
-marketing.
+The user chose to build the on-chain layer. Shipped in the first pass
+(every mutation behind SECURITY DEFINER RPCs; user-JWT anon key can
+read but never forge):
+
+- **Wallet linking** — one verified Solana wallet per account,
+  ed25519 signature over a stateless user+hour challenge, verified in
+  TS (tweetnacl), written only by the service-role client. `wallet`
+  command (status/link/unlink/balance); solana-balance route now
+  403s on non-owned addresses.
+- **Staking** (roadmap phase 6) — 7-day lock, 0.5%/full-day rewards
+  from the deflationary reserve (source 'staking'). `stake` command.
+- **Marketplace** (phase 5) — public crystal listings, atomic
+  market_buy with 5% fee leaving circulation, counterparty ledger
+  rows. `market` command.
+- **Trust hardening** — reserve-paying achievement claims re-derive
+  construction/breadth/trade truth from production_jobs/balances;
+  monotonic progress writes; mission craft_count claims use DB
+  counts. Documented residual: resource/energy/exploration branches
+  and non-craft mission objectives remain client-trusted (no DB
+  mirror).
+- **NFT scaffolding** (phase 9, partial) — Metaplex-standard
+  metadata route for minted crystals (`/api/crystal-metadata/[id]`);
+  `crystals.mint_address` was schema-ready from day one.
+
+**Still open before anything touches real value:**
+
+1. **Devnet mint flow** — needs a funded devnet keypair (user
+   provisions; never commit keys) + `@metaplex-foundation/*` deps;
+   mint on request for wallet-linked users, write mint_address back.
+2. **Slice manipulation** (phase 7: MERGE/SPLIT/SWAP) and real-time
+   volatility from Solana (phase 8) — game features, order flexible.
+3. **Legal/regulatory review before any mainnet or real-money
+   framing** — a tradeable token with cash value is a different
+   compliance regime than an in-game currency; this is a
+   user/counsel decision, not an engineering task.
+4. Service-role key must be provisioned in every deploy target for
+   wallet linking (degrades to service_unavailable without it).
 
 ## Later / structural
 
