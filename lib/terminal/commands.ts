@@ -2,6 +2,14 @@ import type { Command, CommandContext, CommandResult } from "./types";
 import { parseTimeArg, formatCountdown } from "@/lib/power/timeParser";
 import { REROLL_COST, STREAK_INSURANCE_COST, utcDayKey } from "@/lib/game/daily/engine";
 import { applyVolatility, volatilityPercent } from "@/lib/game/volatility";
+import {
+  SLICE_MERGE_FEE,
+  SLICE_POWER_CAP,
+  SLICE_SPLIT_FEE,
+  SLICE_SWAP_FEE,
+  normalizeSlicePosition,
+  round2,
+} from "@/lib/game/slices";
 
 /**
  * Today's market snapshot for price displays. Burn prices (research
@@ -248,6 +256,7 @@ const helpCommand: Command = {
       "|  inv       - view crystal inventory                        |",
       "|  mint      - mint a new crystal (50 _unSC)                 |",
       "|  crystal   - view detailed crystal info                    |",
+      "|  slice     - merge / split / swap slices                   |",
       "|  rename    - rename a crystal                              |",
       "+------------------------------------------------------------+",
       "|                      economy                               |",
@@ -1050,6 +1059,30 @@ const scanCommand: Command = {
   execute: async (_args, ctx) => {
     ctx.setTyping(true);
     const volatility = await ctx.data.fetchVolatility();
+
+    // On-chain network telemetry from /api/volatility-feed (display-only
+    // feed; NOT the price system in lib/game/volatility.ts).
+    let telemetry: { tps: number; blockTimeMs: number; tier: string; stale: boolean } | null = null;
+    try {
+      const res = await fetch("/api/volatility-feed");
+      if (res.ok) {
+        const body = (await res.json()) as Record<string, unknown>;
+        if (
+          typeof body.tps === "number" &&
+          typeof body.blockTimeMs === "number" &&
+          typeof body.tier === "string"
+        ) {
+          telemetry = {
+            tps: body.tps,
+            blockTimeMs: body.blockTimeMs,
+            tier: body.tier,
+            stale: body.stale === true,
+          };
+        }
+      }
+    } catch {
+      telemetry = null;
+    }
     ctx.setTyping(false);
 
     const tps = volatility?.tps || 0;
@@ -1069,8 +1102,26 @@ const scanCommand: Command = {
       `|  BLOCK TIME   : ${blockTime.toString().padStart(3)}ms              |`,
       "|  STATUS       : STABLE              |",
       "+-------------------------------------+",
-      "",
     ];
+
+    if (telemetry) {
+      const row = (label: string, value: string) => `|  ${label.padEnd(13)}: ${value.padEnd(20)}|`;
+      const tierNum = Math.min(5, Math.max(1, parseInt(telemetry.tier, 10) || 1));
+      const bar = `[${"#".repeat(tierNum)}${"-".repeat(5 - tierNum)}]`;
+      output.push(
+        "|        NETWORK TELEMETRY            |",
+        "+-------------------------------------+",
+        row("SOURCE", "solana-mainnet"),
+        row("ONCHAIN TPS", telemetry.tps.toFixed(2)),
+        row("BLOCK TIME", `${telemetry.blockTimeMs}ms`),
+        row("VOLAT. TIER", `${bar} ${tierNum}/5`),
+        row("DATA AGE", telemetry.stale ? "[STALE]" : "LIVE"),
+        "+-------------------------------------+",
+      );
+    } else {
+      output.push("  uplink to layer-1 lost — telemetry from local heuristics");
+    }
+    output.push("");
     return { success: true, output };
   },
 };
@@ -27164,6 +27215,323 @@ const marketCommand: Command = {
 };
 
 /**
+ * `slice` — slice manipulation: map / merge / split / swap.
+ *
+ * Pairs with app/(game)/actions/slices.ts; the operations themselves are
+ * server-authoritative (SECURITY DEFINER RPCs, slice UPDATEs are closed
+ * under RLS). Every op burns a flat _unSC fee, merging keeps 90% of the
+ * absorbed slice, splitting keeps 95% across both halves — power is
+ * shuffled and slowly ground down, never created. Crystal tokens resolve
+ * exactly like `market sell`: inventory index, exact name, or an
+ * unambiguous prefix against a FRESH fetchCrystals() inside this
+ * execution.
+ */
+const sliceCommand: Command = {
+  name: "slice",
+  aliases: ["slices"],
+  description: "Crystal slices: map / merge / split / swap",
+  usage:
+    "slice <crystal> | merge <crystal> <keep> <absorb> | split <crystal> <src> <target> | swap <cA> <posA> <cB> <posB>",
+  execute: async (args, ctx) => {
+    const sub = (args[0] ?? "help").toLowerCase();
+
+    // Same source the `inv` command lists from, so a numeric token maps
+    // onto the exact index the player just saw in their inventory (the
+    // market-command convention).
+    type OwnedCrystal = Awaited<ReturnType<typeof ctx.data.fetchCrystals>>[number];
+    const resolveCrystal = (
+      token: string,
+      crystals: OwnedCrystal[],
+    ): { crystal: OwnedCrystal } | { error: string } => {
+      const notFound = { error: `Crystal '${token}' not found in your inventory — run 'inv'.` };
+      if (/^\d+$/.test(token)) {
+        const n = Number.parseInt(token, 10);
+        const crystal = n >= 1 && n <= crystals.length ? crystals[n - 1] : null;
+        return crystal ? { crystal } : notFound;
+      }
+      const lower = token.toLowerCase();
+      const exact = crystals.find((c) => c.name.toLowerCase() === lower);
+      if (exact) return { crystal: exact };
+      const prefixed = crystals.filter((c) => c.name.toLowerCase().startsWith(lower));
+      if (prefixed.length > 1) {
+        return {
+          error: `Ambiguous crystal '${token}' — matches: ${prefixed.map((c) => c.name).join(", ")}`,
+        };
+      }
+      return prefixed[0] ? { crystal: prefixed[0] } : notFound;
+    };
+
+    if (sub === "help" || sub === "-h" || sub === "--help") {
+      return {
+        success: true,
+        output: [
+          "",
+          "  slice <crystal>                        Slice map (power per position)",
+          "  slice merge <crystal> <keep> <absorb>  Absorb one slice into another (90% kept)",
+          "  slice split <crystal> <src> <target>   Split onto an inactive slot (95% kept)",
+          "  slice swap <cA> <posA> <cB> <posB>     Swap slices between two of your crystals",
+          "",
+          `  Fees burn on every op: merge ${SLICE_MERGE_FEE} / split ${SLICE_SPLIT_FEE} / swap ${SLICE_SWAP_FEE} _unSC.`,
+          "  Listed crystals are locked — unlist before manipulating.",
+          "",
+        ],
+      };
+    }
+
+    if (sub === "merge") {
+      const token = args[1];
+      const posKeep = normalizeSlicePosition(args[2]);
+      const posAbsorb = normalizeSlicePosition(args[3]);
+      if (!token || posKeep === null || posAbsorb === null) {
+        return {
+          success: false,
+          error: "Usage: slice merge <crystal> <posKeep> <posAbsorb> — positions 1-30.",
+        };
+      }
+
+      ctx.setTyping(true);
+      const crystals = await ctx.data.fetchCrystals();
+      const resolved = resolveCrystal(token, crystals);
+      if ("error" in resolved) {
+        ctx.setTyping(false);
+        return { success: false, error: resolved.error };
+      }
+      const crystal = resolved.crystal;
+
+      const { getCrystalSlices, mergeSlices } = await import("@/app/(game)/actions/slices");
+      // Pre-op snapshot so the success line can report what the lattice ate.
+      const before = await getCrystalSlices(crystal.id);
+      const keepBefore = before.ok ? before.slices.find((s) => s.position === posKeep) : undefined;
+      const absorbBefore = before.ok
+        ? before.slices.find((s) => s.position === posAbsorb)
+        : undefined;
+
+      const result = await mergeSlices(crystal.id, posKeep, posAbsorb);
+      // ctx.balance is a static SSR snapshot — always re-fetch after a burn.
+      const [balance, after] = result.ok
+        ? await Promise.all([ctx.data.fetchBalance(), getCrystalSlices(crystal.id)])
+        : [null, null];
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        const messages: Record<string, string> = {
+          invalid_position: "Positions must be whole numbers between 1 and 30.",
+          same_slice: "Pick two different positions.",
+          crystal_not_found: `Crystal '${crystal.name}' not found.`,
+          not_owner: `You don't own '${crystal.name}'.`,
+          listed: "Unlist it first — buyers see the power they pay for.",
+          slice_not_active: `Both positions must hold active slices — run 'slice ${crystal.name}'.`,
+          merge_overflow: `Merge would push the slice past the ${SLICE_POWER_CAP}-power cap.`,
+          insufficient_funds: `Insufficient balance — a merge burns ${SLICE_MERGE_FEE} _unSC.`,
+          unauthorized: "Not authenticated.",
+        };
+        return {
+          success: false,
+          error: messages[result.error ?? ""] ?? "Merge failed. Try again.",
+        };
+      }
+
+      const lost =
+        keepBefore && absorbBefore
+          ? round2(keepBefore.power + absorbBefore.power - result.newPower).toFixed(2)
+          : null;
+      const output = [
+        "",
+        `> Slices ${posKeep}+${posAbsorb} merged: ${result.newPower.toFixed(2)}` +
+          (lost !== null ? ` (+${lost} lost to the lattice)` : "") +
+          ` — fee ${result.fee} _unSC`,
+        `> Slot ${posAbsorb} is now inactive — a future split can reuse it.`,
+      ];
+      if (after?.ok) output.push(`> Total power: ${after.totalPower.toFixed(2)}`);
+      if (balance) output.push(`> Balance: ${balance.available.toFixed(2)} _unSC available`);
+      output.push("");
+      return { success: true, output };
+    }
+
+    if (sub === "split") {
+      const token = args[1];
+      const posSource = normalizeSlicePosition(args[2]);
+      const posTarget = normalizeSlicePosition(args[3]);
+      if (!token || posSource === null || posTarget === null) {
+        return {
+          success: false,
+          error: "Usage: slice split <crystal> <posSource> <posTarget> — positions 1-30.",
+        };
+      }
+
+      ctx.setTyping(true);
+      const crystals = await ctx.data.fetchCrystals();
+      const resolved = resolveCrystal(token, crystals);
+      if ("error" in resolved) {
+        ctx.setTyping(false);
+        return { success: false, error: resolved.error };
+      }
+      const crystal = resolved.crystal;
+
+      const { getCrystalSlices, splitSlice } = await import("@/app/(game)/actions/slices");
+      const result = await splitSlice(crystal.id, posSource, posTarget);
+      // ctx.balance is a static SSR snapshot — always re-fetch after a burn.
+      const [balance, after] = result.ok
+        ? await Promise.all([ctx.data.fetchBalance(), getCrystalSlices(crystal.id)])
+        : [null, null];
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        const messages: Record<string, string> = {
+          invalid_position: "Positions must be whole numbers between 1 and 30.",
+          same_slice: "Pick two different positions.",
+          crystal_not_found: `Crystal '${crystal.name}' not found.`,
+          not_owner: `You don't own '${crystal.name}'.`,
+          listed: "Unlist it first — buyers see the power they pay for.",
+          slice_not_active: `Position ${posSource} must hold an active slice — run 'slice ${crystal.name}'.`,
+          no_inactive_target: "Split needs an inactive slot — merge first, split later.",
+          too_small_to_split: "Too small to split — each half would round down to nothing.",
+          insufficient_funds: `Insufficient balance — a split burns ${SLICE_SPLIT_FEE} _unSC.`,
+          unauthorized: "Not authenticated.",
+        };
+        return {
+          success: false,
+          error: messages[result.error ?? ""] ?? "Split failed. Try again.",
+        };
+      }
+
+      const output = [
+        "",
+        `> Slice ${posSource} split into ${posSource}+${posTarget}: ${result.halfPower.toFixed(2)} each (5% lost to the lattice) — fee ${result.fee} _unSC`,
+      ];
+      if (after?.ok) output.push(`> Total power: ${after.totalPower.toFixed(2)}`);
+      if (balance) output.push(`> Balance: ${balance.available.toFixed(2)} _unSC available`);
+      output.push("");
+      return { success: true, output };
+    }
+
+    if (sub === "swap") {
+      const tokenA = args[1];
+      const posA = normalizeSlicePosition(args[2]);
+      const tokenB = args[3];
+      const posB = normalizeSlicePosition(args[4]);
+      if (!tokenA || !tokenB || posA === null || posB === null) {
+        return {
+          success: false,
+          error: "Usage: slice swap <crystalA> <posA> <crystalB> <posB> — positions 1-30.",
+        };
+      }
+
+      ctx.setTyping(true);
+      const crystals = await ctx.data.fetchCrystals();
+      const resolvedA = resolveCrystal(tokenA, crystals);
+      if ("error" in resolvedA) {
+        ctx.setTyping(false);
+        return { success: false, error: resolvedA.error };
+      }
+      const resolvedB = resolveCrystal(tokenB, crystals);
+      if ("error" in resolvedB) {
+        ctx.setTyping(false);
+        return { success: false, error: resolvedB.error };
+      }
+      const a = resolvedA.crystal;
+      const b = resolvedB.crystal;
+
+      const { swapSlices } = await import("@/app/(game)/actions/slices");
+      const result = await swapSlices(a.id, posA, b.id, posB);
+      // ctx.balance is a static SSR snapshot — always re-fetch after a burn;
+      // fresh crystals carry the trigger-maintained total_power values.
+      const [balance, fresh] = result.ok
+        ? await Promise.all([ctx.data.fetchBalance(), ctx.data.fetchCrystals()])
+        : [null, null];
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        const messages: Record<string, string> = {
+          invalid_position: "Positions must be whole numbers between 1 and 30.",
+          same_slice: "That's the same slice — pick two different ones.",
+          crystal_not_found: "Crystal not found.",
+          not_owner: "You can only swap between crystals you own.",
+          listed: "Unlist it first — buyers see the power they pay for.",
+          slice_not_active: "Both positions must hold active slices — check both slice maps.",
+          insufficient_funds: `Insufficient balance — a swap burns ${SLICE_SWAP_FEE} _unSC.`,
+          unauthorized: "Not authenticated.",
+        };
+        return {
+          success: false,
+          error: messages[result.error ?? ""] ?? "Swap failed. Try again.",
+        };
+      }
+
+      const output = [
+        "",
+        `> Swapped ${a.name}#${posA} <-> ${b.name}#${posB} — fee ${result.fee} _unSC`,
+      ];
+      const freshA = fresh?.find((c) => c.id === a.id);
+      const freshB = fresh?.find((c) => c.id === b.id);
+      if (freshA && freshB) {
+        output.push(
+          `> Total power: ${a.name} ${Number(freshA.total_power).toFixed(2)} | ${b.name} ${Number(freshB.total_power).toFixed(2)}`,
+        );
+      }
+      if (balance) output.push(`> Balance: ${balance.available.toFixed(2)} _unSC available`);
+      output.push("");
+      return { success: true, output };
+    }
+
+    // Anything else is a crystal token: render the slice map.
+    const token = args[0];
+    ctx.setTyping(true);
+    const crystals = await ctx.data.fetchCrystals();
+    const resolved = resolveCrystal(token, crystals);
+    if ("error" in resolved) {
+      ctx.setTyping(false);
+      return { success: false, error: resolved.error };
+    }
+    const crystal = resolved.crystal;
+
+    const { getCrystalSlices } = await import("@/app/(game)/actions/slices");
+    const res = await getCrystalSlices(crystal.id);
+    ctx.setTyping(false);
+
+    if (!res.ok || res.slices.length === 0) {
+      return { success: false, error: "Slice data unavailable — sign in and retry." };
+    }
+
+    const bySlot = new Map(res.slices.map((s) => [s.position, s]));
+    const active = res.slices.filter((s) => s.isActive).length;
+
+    const output: string[] = [
+      "",
+      `+-- SLICES: ${crystal.name.toUpperCase()} `.padEnd(65, "-") + "+",
+    ];
+    // 30 positions as a 6×5 grid; inactive slots (merge leftovers) as --.
+    for (let row = 0; row < 6; row++) {
+      let line = "|  ";
+      for (let col = 0; col < 5; col++) {
+        const pos = row * 5 + col + 1;
+        const slice = bySlot.get(pos);
+        const value = slice?.isActive ? slice.power.toFixed(2) : "--";
+        line += `${String(pos).padStart(2)}:${value.padStart(6)}  `;
+      }
+      output.push(line.padEnd(65) + "|");
+    }
+    output.push("+".padEnd(65, "-") + "+");
+    output.push(
+      `|  ACTIVE ${active}/30   TOTAL POWER ${res.totalPower.toFixed(2)}`.padEnd(65) + "|",
+    );
+    output.push("+".padEnd(65, "-") + "+");
+    output.push("");
+    output.push(
+      `  slice merge <crystal> <keep> <absorb>   ${SLICE_MERGE_FEE} _unSC — keeps 90% of absorbed`,
+    );
+    output.push(
+      `  slice split <crystal> <src> <target>    ${SLICE_SPLIT_FEE} _unSC — 47.5% of source each`,
+    );
+    output.push(
+      `  slice swap <cA> <posA> <cB> <posB>      ${SLICE_SWAP_FEE} _unSC — trade across crystals`,
+    );
+    output.push("");
+    return { success: true, output };
+  },
+};
+
+/**
  * `guide` prints the active mission's full walkthrough — every objective, in
  * order, with its hint text inline. Designed for the "hard" difficulty mode
  * where hints are otherwise passive: when the player wants help, they ask.
@@ -27656,6 +28024,8 @@ export const commands: Command[] = [
   stakeCommand,
   // Crystal marketplace
   marketCommand,
+  // Slice manipulation (merge / split / swap)
+  sliceCommand,
   // Nexus (tech tree graph app)
   nexusCommand,
 ];
