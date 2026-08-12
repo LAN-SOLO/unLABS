@@ -832,6 +832,47 @@ export type Database = {
         };
         Relationships: [];
       };
+      marketplace_listings: {
+        Row: {
+          buyer_id: string | null;
+          closed_at: string | null;
+          created_at: string;
+          crystal_id: string;
+          id: string;
+          price: number;
+          seller_id: string;
+          status: string;
+        };
+        Insert: {
+          buyer_id?: string | null;
+          closed_at?: string | null;
+          created_at?: string;
+          crystal_id: string;
+          id?: string;
+          price: number;
+          seller_id: string;
+          status?: string;
+        };
+        Update: {
+          buyer_id?: string | null;
+          closed_at?: string | null;
+          created_at?: string;
+          crystal_id?: string;
+          id?: string;
+          price?: number;
+          seller_id?: string;
+          status?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_listings_crystal_id_fkey";
+            columns: ["crystal_id"];
+            isOneToOne: false;
+            referencedRelation: "crystals";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       pack_purchases: {
         Row: {
           bonus_items_granted: Json | null;
@@ -2051,6 +2092,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      staking_state: {
+        Row: {
+          last_claim_at: string;
+          lock_until: string | null;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          last_claim_at?: string;
+          lock_until?: string | null;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          last_claim_at?: string;
+          lock_until?: string | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       starter_packs: {
         Row: {
           active: boolean | null;
@@ -2571,6 +2633,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      wallet_links: {
+        Row: {
+          address: string;
+          created_at: string;
+          network: string;
+          user_id: string;
+          verified_at: string;
+        };
+        Insert: {
+          address: string;
+          created_at?: string;
+          network?: string;
+          user_id: string;
+          verified_at?: string;
+        };
+        Update: {
+          address?: string;
+          created_at?: string;
+          network?: string;
+          user_id?: string;
+          verified_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       player_all_prefs: {
@@ -2745,6 +2831,32 @@ export type Database = {
         };
         Returns: string;
       };
+      market_buy: {
+        Args: { p_listing_id: string };
+        Returns: {
+          crystal_id: string;
+          error_message: string;
+          fee: number;
+          new_available: number;
+          price: number;
+          success: boolean;
+        }[];
+      };
+      market_list: {
+        Args: { p_crystal_id: string; p_price: number };
+        Returns: {
+          error_message: string;
+          listing_id: string;
+          success: boolean;
+        }[];
+      };
+      market_unlist: {
+        Args: { p_listing_id: string };
+        Returns: {
+          error_message: string;
+          success: boolean;
+        }[];
+      };
       record_app_launch: {
         Args: { p_app_id: string; p_player_id: string; p_source: string };
         Returns: undefined;
@@ -2775,6 +2887,16 @@ export type Database = {
         Args: { p_area?: string; p_player_id: string };
         Returns: undefined;
       };
+      stake_claim_rewards: {
+        Args: never;
+        Returns: {
+          days_settled: number;
+          error_message: string;
+          new_available: number;
+          reward: number;
+          success: boolean;
+        }[];
+      };
       toggle_app_favorite: {
         Args: { p_app_id: string; p_player_id: string };
         Returns: boolean;
@@ -2802,6 +2924,25 @@ export type Database = {
         Returns: {
           error_message: string;
           new_available: number;
+          success: boolean;
+        }[];
+      };
+      unsc_stake: {
+        Args: { p_amount: number };
+        Returns: {
+          error_message: string;
+          lock_until: string;
+          new_available: number;
+          new_staked: number;
+          success: boolean;
+        }[];
+      };
+      unsc_unstake: {
+        Args: { p_amount: number };
+        Returns: {
+          error_message: string;
+          new_available: number;
+          new_staked: number;
           success: boolean;
         }[];
       };
