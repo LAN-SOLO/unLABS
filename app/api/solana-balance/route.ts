@@ -52,11 +52,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Invalid address" }, { status: 400 });
   }
 
-  // Ownership of the queried address is NOT verified: wallet addresses are
-  // never persisted server-side (the client talks to window.phantom directly),
-  // so there is nothing to check against. Balances are public on-chain data;
-  // auth + rate limiting above bound abuse of our RPC quota. If a wallet
-  // column is ever added to profiles, enforce ownership here.
+  // SECURITY: Ownership — the queried address must be the caller's verified
+  // wallet_links entry (linked via signed challenge in actions/wallet.ts).
+  // RLS only exposes the caller's own row, so a match proves ownership.
+  const linkRes = await supabase
+    .from("wallet_links")
+    .select("address")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const link = linkRes.data as { address: string } | null;
+  if (!link || link.address !== address) {
+    return NextResponse.json({ error: "Address not linked to this account" }, { status: 403 });
+  }
 
   for (const endpoint of RPC_ENDPOINTS) {
     try {

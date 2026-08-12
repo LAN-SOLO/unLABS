@@ -253,6 +253,7 @@ const helpCommand: Command = {
       "|                      economy                               |",
       "+------------------------------------------------------------+",
       "|  balance   - check _unSC token balance                     |",
+      "|  wallet    - link a Solana wallet (status/link/balance)    |",
       "|  daily     - daily contracts: list / claim / reroll        |",
       "|  recompile - prestige: burn _unSC for permanent speed      |",
       "|  research  - tech tree browser (NXS-01: list/start/claim)  |",
@@ -26441,6 +26442,226 @@ const dailyCommand: Command = {
 };
 
 /**
+ * `wallet` — Solana wallet link (on-chain layer, client side).
+ *
+ * Pairs with app/(game)/actions/wallet.ts: the server hands out a challenge,
+ * Phantom signs it locally, the server verifies the ed25519 signature and
+ * stores the link. Runs client-side only — Phantom lives on `window`.
+ */
+const walletCommand: Command = {
+  name: "wallet",
+  description: "Solana wallet link: status / link / unlink / balance",
+  usage: "wallet [status|link|unlink|balance|help]",
+  execute: async (args, ctx) => {
+    const sub = (args[0] ?? "status").toLowerCase();
+
+    const shorten = (addr: string): string => `${addr.slice(0, 4)}…${addr.slice(-4)}`;
+    const provider = typeof window === "undefined" ? undefined : window.phantom?.solana;
+
+    if (sub === "help" || sub === "-h" || sub === "--help") {
+      return {
+        success: true,
+        output: [
+          "",
+          "  wallet status           Show server link + local signer state",
+          "  wallet link             Link a Solana wallet (Phantom signature)",
+          "  wallet unlink           Remove the wallet link",
+          "  wallet balance          SOL balance of the linked wallet",
+          "",
+        ],
+      };
+    }
+
+    if (sub === "status") {
+      ctx.setTyping(true);
+      const { getWalletLink } = await import("@/app/(game)/actions/wallet");
+      const result = await getWalletLink();
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        return { success: false, error: "Wallet subsystem unavailable — sign in and retry." };
+      }
+
+      const output: string[] = [
+        "",
+        "+-- WALLET UPLINK -----------------------------------------------+",
+      ];
+      if (result.link) {
+        output.push(
+          `|  LINK      : ${shorten(result.link.address)}  (${result.link.network})`.padEnd(65) +
+            "|",
+        );
+        output.push(`|  VERIFIED  : ${result.link.verifiedAt}`.padEnd(65) + "|");
+      } else {
+        output.push("|  LINK      : none — run 'wallet link'".padEnd(65) + "|");
+      }
+      const localKey = provider?.publicKey;
+      const signerLine = !provider
+        ? "not detected"
+        : provider.isConnected && localKey
+          ? `phantom connected (${shorten(localKey.toBase58())})`
+          : "phantom installed, not connected";
+      output.push(`|  SIGNER    : ${signerLine}`.padEnd(65) + "|");
+      output.push("+----------------------------------------------------------------+");
+      if (!provider) {
+        output.push("");
+        output.push("> No external signer detected on this workstation.");
+        output.push("> Acquire the Phantom uplink module: https://phantom.com");
+      }
+      output.push("");
+      return { success: true, output };
+    }
+
+    if (sub === "link") {
+      if (!provider) {
+        return {
+          success: false,
+          output: [
+            "",
+            "> EXTERNAL SIGNER NOT DETECTED.",
+            "> The wallet uplink requires the Phantom signer module.",
+            "> Acquire it at https://phantom.com and reload the terminal.",
+            "",
+          ],
+        };
+      }
+
+      ctx.setTyping(true);
+      try {
+        // 1. Local signer approval (Phantom popup).
+        const { publicKey } = await provider.connect();
+        const address = publicKey.toBase58();
+
+        // 2. Server-issued challenge, bound to the operator + current hour.
+        const { walletChallenge, linkWallet } = await import("@/app/(game)/actions/wallet");
+        const challenge = await walletChallenge();
+        if (!challenge.ok) {
+          return { success: false, error: "Not authenticated — sign in and retry." };
+        }
+
+        // 3. Sign locally, ship the signature as base64 (browser context).
+        const { signature } = await provider.signMessage(
+          new TextEncoder().encode(challenge.message),
+          "utf8",
+        );
+        const signatureBase64 = btoa(String.fromCharCode(...Array.from(signature)));
+
+        // 4. Server verifies + stores the link.
+        const result = await linkWallet(address, signatureBase64);
+        if (!result.ok) {
+          const messages: Record<string, string> = {
+            not_authenticated: "Not authenticated — sign in and retry.",
+            invalid_address: "Signer returned an invalid address. Reconnect Phantom and retry.",
+            invalid_signature:
+              "Signature check failed — the challenge may have expired. Run 'wallet link' again.",
+            address_taken: "This wallet is already linked to another operator.",
+            service_unavailable: "Link service offline. Try again later.",
+            write_failed: "Link could not be stored. Try again.",
+          };
+          return {
+            success: false,
+            error: messages[result.error ?? ""] ?? "Wallet link failed. Try again.",
+          };
+        }
+
+        return {
+          success: true,
+          output: [
+            "",
+            "> SIGNATURE VERIFIED.",
+            `> Wallet ${shorten(result.address)} linked to this operator.`,
+            "> Run 'wallet balance' to query on-chain funds.",
+            "",
+          ],
+        };
+      } catch {
+        return {
+          success: false,
+          error: "Signer request rejected or failed. Run 'wallet link' to retry.",
+        };
+      } finally {
+        ctx.setTyping(false);
+      }
+    }
+
+    if (sub === "unlink") {
+      ctx.setTyping(true);
+      const { unlinkWallet } = await import("@/app/(game)/actions/wallet");
+      const result = await unlinkWallet();
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        const messages: Record<string, string> = {
+          not_authenticated: "Not authenticated — sign in and retry.",
+          service_unavailable: "Link service offline. Try again later.",
+          write_failed: "Unlink failed. Try again.",
+        };
+        return { success: false, error: messages[result.error ?? ""] ?? "Unlink failed." };
+      }
+
+      return {
+        success: true,
+        output: [
+          "",
+          "> Wallet link removed from this operator.",
+          "> On-chain funds are untouched — run 'wallet link' to re-link anytime.",
+          "",
+        ],
+      };
+    }
+
+    if (sub === "balance") {
+      ctx.setTyping(true);
+      const { getWalletLink } = await import("@/app/(game)/actions/wallet");
+      const linkRes = await getWalletLink();
+      if (!linkRes.ok) {
+        ctx.setTyping(false);
+        return { success: false, error: "Wallet subsystem unavailable — sign in and retry." };
+      }
+      if (!linkRes.link) {
+        ctx.setTyping(false);
+        return { success: false, error: "No wallet linked. Run 'wallet link' first." };
+      }
+
+      try {
+        // Same-origin fetch — auth cookies ride along, which the balance
+        // route requires (it only serves the caller's own linked address).
+        const res = await fetch(
+          `/api/solana-balance?address=${encodeURIComponent(linkRes.link.address)}`,
+        );
+        ctx.setTyping(false);
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { error?: string } | null;
+          return {
+            success: false,
+            error: `Balance query failed (${res.status}): ${body?.error ?? "RPC unavailable"}`,
+          };
+        }
+        const data = (await res.json()) as { balance?: number };
+        const sol = data.balance ?? 0;
+        return {
+          success: true,
+          output: [
+            "",
+            `> WALLET  : ${shorten(linkRes.link.address)} (${linkRes.link.network})`,
+            `> BALANCE : ${sol.toFixed(4)} SOL`,
+            "",
+          ],
+        };
+      } catch {
+        ctx.setTyping(false);
+        return { success: false, error: "Balance query failed — network unreachable." };
+      }
+    }
+
+    return {
+      success: false,
+      error: `Unknown subcommand '${sub}'. Try 'wallet help'.`,
+    };
+  },
+};
+
+/**
  * `guide` prints the active mission's full walkthrough — every objective, in
  * order, with its hint text inline. Designed for the "hard" difficulty mode
  * where hints are otherwise passive: when the player wants help, they ask.
@@ -26925,6 +27146,8 @@ export const commands: Command[] = [
   achieveCommand,
   // Daily contracts
   dailyCommand,
+  // Wallet link (on-chain layer)
+  walletCommand,
   // Kernel recompile (prestige)
   recompileCommand,
   // Nexus (tech tree graph app)
