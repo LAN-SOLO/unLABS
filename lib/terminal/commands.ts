@@ -256,6 +256,8 @@ const helpCommand: Command = {
       "|  wallet    - link a Solana wallet (status/link/balance)    |",
       "|  daily     - daily contracts: list / claim / reroll        |",
       "|  recompile - prestige: burn _unSC for permanent speed      |",
+      "|  stake     - stake _unSC: status / add / remove / claim    |",
+      "|  market    - crystal market: list / buy / sell / unlist    |",
       "|  research  - tech tree browser (NXS-01: list/start/claim)  |",
       "|  nexus     - launch the tech-tree graph app                |",
       "|  scan      - scan for volatility data                      |",
@@ -26662,6 +26664,506 @@ const walletCommand: Command = {
 };
 
 /**
+ * `stake` — _unSC staking (server-authoritative).
+ *
+ * Pairs with app/(game)/actions/staking.ts: rewards accrue at 0.5% per
+ * FULL day since the last claim, and every deposit (re)starts a 7-day
+ * unstake lock. Topping up an existing position auto-claims pending
+ * full-day rewards first (see StakeResult.claimedFirst) so the new
+ * deposit can't retroactively boost already-accrued days.
+ */
+const stakeCommand: Command = {
+  name: "stake",
+  aliases: ["staking"],
+  description: "Stake _unSC: status / add / remove / claim rewards",
+  usage: "stake [status|add <n>|remove <n>|claim]",
+  execute: async (args, ctx) => {
+    const sub = (args[0] ?? "status").toLowerCase();
+
+    const parseAmount = (token: string | undefined): number | null => {
+      if (!token) return null;
+      const n = Number(token);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    };
+
+    if (sub === "status" || sub === "help" || sub === "-h" || sub === "--help") {
+      ctx.setTyping(true);
+      const { getStakingStatus } = await import("@/app/(game)/actions/staking");
+      const status = await getStakingStatus();
+      ctx.setTyping(false);
+
+      if (!status.ok) {
+        return { success: false, error: "Staking subsystem unavailable — sign in and retry." };
+      }
+
+      const lockLine =
+        status.locked && status.lockUntil ? `[LOCKED until ${status.lockUntil}]` : "unlocked";
+      const pendingLine = `${status.pendingReward} _unSC (${status.pendingDays} full days @ ${status.dailyRatePct}%/day)`;
+
+      const output = [
+        "",
+        "+------------------------------------------------------------+",
+        "|                      _unSC STAKING                         |",
+        "+------------------------------------------------------------+",
+        `|  ${"AVAILABLE".padEnd(10)}: ${`${status.available.toFixed(2)} _unSC`.padEnd(46)}|`,
+        `|  ${"STAKED".padEnd(10)}: ${`${status.staked.toFixed(2)} _unSC`.padEnd(46)}|`,
+        `|  ${"LOCK".padEnd(10)}: ${lockLine.padEnd(46)}|`,
+        `|  ${"PENDING".padEnd(10)}: ${pendingLine.padEnd(46)}|`,
+        "+------------------------------------------------------------+",
+        "",
+        "  stake add <n>       stake available _unSC (restarts 7-day lock)",
+        "  stake remove <n>    unstake after the lock expires",
+        "  stake claim         settle pending full-day rewards",
+        "",
+      ];
+      return { success: true, output };
+    }
+
+    if (sub === "add") {
+      const amount = parseAmount(args[1]);
+      if (amount === null) {
+        return { success: false, error: "Usage: stake add <amount>" };
+      }
+
+      ctx.setTyping(true);
+      const { stake } = await import("@/app/(game)/actions/staking");
+      const result = await stake(amount);
+      // ctx.balance is a static SSR snapshot — always re-fetch after a mutation.
+      const balance = result.ok ? await ctx.data.fetchBalance() : null;
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        // A pre-stake auto-claim may have settled even when the stake
+        // itself failed — surface it so the credit isn't invisible.
+        const claimedNote =
+          result.claimedFirst !== undefined
+            ? `Auto-claimed pending rewards first: +${result.claimedFirst} _unSC. `
+            : "";
+        const messages: Record<string, string> = {
+          invalid_amount: "Invalid amount — stake a positive whole number of _unSC.",
+          insufficient_funds: `Insufficient balance. You have ${result.newAvailable.toFixed(2)} _unSC available.`,
+          unauthorized: "Not authenticated.",
+          not_found: "No balance record found.",
+        };
+        return {
+          success: false,
+          error: claimedNote + (messages[result.error ?? ""] ?? "Stake failed. Try again."),
+        };
+      }
+
+      const output = [""];
+      if (result.claimedFirst !== undefined) {
+        output.push(`> Auto-claimed pending rewards first: +${result.claimedFirst} _unSC`);
+      }
+      output.push(`> Staked. Position: ${result.newStaked.toFixed(2)} _unSC staked`);
+      if (result.lockUntil) {
+        output.push(
+          `> Locked until ${result.lockUntil} — the 7-day clock restarts with every deposit`,
+        );
+      }
+      if (balance) {
+        output.push(`> Balance: ${balance.available.toFixed(2)} _unSC available`);
+      }
+      output.push("");
+      return { success: true, output };
+    }
+
+    if (sub === "remove") {
+      const amount = parseAmount(args[1]);
+      if (amount === null) {
+        return { success: false, error: "Usage: stake remove <amount>" };
+      }
+
+      ctx.setTyping(true);
+      const { unstake } = await import("@/app/(game)/actions/staking");
+      const result = await unstake(amount);
+      // ctx.balance is a static SSR snapshot — always re-fetch after a mutation.
+      const balance = result.ok ? await ctx.data.fetchBalance() : null;
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        if (result.error === "locked") {
+          return {
+            success: false,
+            error: `Stake is locked until ${result.lockUntil ?? "the lock expires"} — the 7-day clock restarts with every deposit.`,
+          };
+        }
+        const messages: Record<string, string> = {
+          invalid_amount: "Invalid amount — unstake a positive whole number of _unSC.",
+          insufficient_staked: `Insufficient staked balance. You have ${result.newStaked.toFixed(2)} _unSC staked.`,
+          unauthorized: "Not authenticated.",
+          not_found: "No staking position found. Run 'stake add <n>' first.",
+        };
+        return {
+          success: false,
+          error: messages[result.error ?? ""] ?? "Unstake failed. Try again.",
+        };
+      }
+
+      const output = ["", `> Unstaked. Position: ${result.newStaked.toFixed(2)} _unSC staked`];
+      if (balance) {
+        output.push(`> Balance: ${balance.available.toFixed(2)} _unSC available`);
+      }
+      output.push("");
+      return { success: true, output };
+    }
+
+    if (sub === "claim") {
+      ctx.setTyping(true);
+      const { claimStakingRewards } = await import("@/app/(game)/actions/staking");
+      const result = await claimStakingRewards();
+      // ctx.balance is a static SSR snapshot — always re-fetch after a payout.
+      const balance = result.ok ? await ctx.data.fetchBalance() : null;
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        const messages: Record<string, string> = {
+          nothing_accrued: "Nothing accrued yet — rewards settle per full day.",
+          nothing_staked: "Nothing staked. Run 'stake add <n>' first.",
+          reserve_insufficient: "The reward reserve ran dry — try again later.",
+          unauthorized: "Not authenticated.",
+        };
+        return {
+          success: false,
+          error: messages[result.error ?? ""] ?? "Claim failed. Try again.",
+        };
+      }
+
+      const output = ["", `> +${result.reward} _unSC (${result.daysSettled} day(s) settled)`];
+      if (balance) {
+        output.push(`> Balance: ${balance.available.toFixed(2)} _unSC available`);
+      }
+      output.push("");
+      return { success: true, output };
+    }
+
+    return {
+      success: false,
+      error: `Unknown subcommand '${sub}'. Try 'stake status'.`,
+    };
+  },
+};
+
+/**
+ * `market` — player-to-player crystal marketplace.
+ *
+ * Pairs with app/(game)/actions/market.ts; the market itself is
+ * server-authoritative (SECURITY DEFINER RPCs). Buy/unlist indices are
+ * resolved against a FRESH listings fetch inside the same execution —
+ * never against a previous command's output — so a stale board can't
+ * silently buy the wrong crystal. A 5% fee burns on every sale.
+ */
+const marketCommand: Command = {
+  name: "market",
+  aliases: ["shop"],
+  description: "Crystal marketplace: browse / buy / sell / unlist",
+  usage: "market [list|buy <n>|sell <crystal> <price>|unlist <n>|mine]",
+  execute: async (args, ctx) => {
+    const sub = (args[0] ?? "list").toLowerCase();
+
+    const shortName = (name: string): string => (name.length > 14 ? `${name.slice(0, 13)}…` : name);
+
+    const renderRows = (
+      rows: Array<{
+        name: string;
+        color: string;
+        volatility: string;
+        totalPower: number;
+        price: number;
+        sellerIsMe: boolean;
+      }>,
+    ): string[] =>
+      rows.map((l, i) => {
+        const tier = `${l.color.toUpperCase()}/T${l.volatility}`;
+        const yours = l.sellerIsMe ? "  [YOURS]" : "";
+        return (
+          `|  ${String(i + 1).padStart(2)}. ${shortName(l.name).padEnd(15)} ${tier.padEnd(12)} PWR ${l.totalPower.toFixed(1).padStart(6)}  ${`${l.price} _unSC`.padStart(13)}${yours}`.padEnd(
+            65,
+          ) + "|"
+        );
+      });
+
+    if (sub === "help" || sub === "-h" || sub === "--help") {
+      return {
+        success: true,
+        output: [
+          "",
+          "  market list                     Browse active listings",
+          "  market buy <n|id>               Buy a listing",
+          "  market sell <crystal> <price>   List one of your crystals",
+          "  market unlist <n|id>            Cancel one of your listings",
+          "  market mine                     Show your active listings",
+          "",
+          "  5% market fee burns on every sale.",
+          "",
+        ],
+      };
+    }
+
+    if (sub === "list") {
+      ctx.setTyping(true);
+      const { browseListings } = await import("@/app/(game)/actions/market");
+      const result = await browseListings();
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        return { success: false, error: "Marketplace unavailable — sign in and retry." };
+      }
+
+      const output: string[] = ["", "+-- CRYSTAL MARKET ".padEnd(65, "-") + "+"];
+      if (result.listings.length === 0) {
+        output.push("|  The market floor is silent — no crystals on offer.".padEnd(65) + "|");
+      } else {
+        output.push(...renderRows(result.listings));
+      }
+      output.push("+".padEnd(65, "-") + "+");
+      output.push("");
+      output.push("  market buy <n>                  buy a listing");
+      output.push("  market sell <crystal> <price>   list one of your crystals");
+      if (result.listings.some((l) => l.sellerIsMe)) {
+        output.push("  market unlist <n>               cancel one of your listings");
+      }
+      output.push("");
+      output.push("  5% market fee burns on every sale.");
+      output.push("");
+      return { success: true, output };
+    }
+
+    if (sub === "mine") {
+      ctx.setTyping(true);
+      const { myListings } = await import("@/app/(game)/actions/market");
+      const result = await myListings();
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        return { success: false, error: "Marketplace unavailable — sign in and retry." };
+      }
+
+      const output: string[] = ["", "+-- MY LISTINGS ".padEnd(65, "-") + "+"];
+      if (result.listings.length === 0) {
+        output.push("|  You have no active listings.".padEnd(65) + "|");
+      } else {
+        output.push(...renderRows(result.listings));
+      }
+      output.push("+".padEnd(65, "-") + "+");
+      output.push("");
+      output.push("  market unlist <n>   cancel a listing");
+      output.push("  market sell <crystal> <price>   list another crystal");
+      output.push("");
+      return { success: true, output };
+    }
+
+    if (sub === "sell") {
+      const token = args[1];
+      const priceToken = args[2];
+      if (!token || !priceToken) {
+        return { success: false, error: "Usage: market sell <crystal|n> <price>" };
+      }
+      const price = Number(priceToken);
+      if (!Number.isFinite(price)) {
+        return {
+          success: false,
+          error: "Invalid price — whole _unSC between 1 and 1,000,000.",
+        };
+      }
+
+      ctx.setTyping(true);
+      // Same source the `inv` command lists from, so a numeric token maps
+      // onto the exact index the player just saw in their inventory.
+      const crystals = await ctx.data.fetchCrystals();
+
+      let crystal: (typeof crystals)[number] | null = null;
+      if (/^\d+$/.test(token)) {
+        const n = Number.parseInt(token, 10);
+        crystal = n >= 1 && n <= crystals.length ? crystals[n - 1] : null;
+      } else {
+        const lower = token.toLowerCase();
+        crystal = crystals.find((c) => c.name.toLowerCase() === lower) ?? null;
+        if (!crystal) {
+          const prefixed = crystals.filter((c) => c.name.toLowerCase().startsWith(lower));
+          if (prefixed.length > 1) {
+            ctx.setTyping(false);
+            return {
+              success: false,
+              error: `Ambiguous crystal '${token}' — matches: ${prefixed.map((c) => c.name).join(", ")}`,
+            };
+          }
+          crystal = prefixed[0] ?? null;
+        }
+      }
+      if (!crystal) {
+        ctx.setTyping(false);
+        return {
+          success: false,
+          error: `Crystal '${token}' not found in your inventory — run 'inv'.`,
+        };
+      }
+
+      const { listCrystal } = await import("@/app/(game)/actions/market");
+      const result = await listCrystal(crystal.id, price);
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        const messages: Record<string, string> = {
+          invalid_price: "Invalid price — whole _unSC between 1 and 1,000,000.",
+          not_owner: `You don't own '${crystal.name}'.`,
+          already_listed: `'${crystal.name}' is already listed — run 'market mine'.`,
+          crystal_not_found: `Crystal '${crystal.name}' not found.`,
+          unauthorized: "Not authenticated.",
+        };
+        return {
+          success: false,
+          error: messages[result.error ?? ""] ?? "Listing failed. Try again.",
+        };
+      }
+
+      const proceeds = Number((result.price - result.feePreview).toFixed(2));
+      const output = [
+        "",
+        `> Listed '${crystal.name}' for ${result.price} _unSC`,
+        `> A sale burns ${result.feePreview} _unSC (5% fee) — you'd receive ${proceeds} _unSC`,
+        "",
+      ];
+      return { success: true, output };
+    }
+
+    if (sub === "buy") {
+      const token = args[1];
+      if (!token) return { success: false, error: "Usage: market buy <n|listing-id>" };
+
+      ctx.setTyping(true);
+      const { browseListings, buyCrystal } = await import("@/app/(game)/actions/market");
+      // Indices resolve against a fresh fetch inside THIS execution — no
+      // cross-command state, so the board can't have silently shifted.
+      const browse = await browseListings();
+      if (!browse.ok) {
+        ctx.setTyping(false);
+        return { success: false, error: "Marketplace unavailable — sign in and retry." };
+      }
+
+      let target: (typeof browse.listings)[number] | null = null;
+      let listingId = token;
+      if (/^\d+$/.test(token)) {
+        const n = Number.parseInt(token, 10);
+        target = n >= 1 && n <= browse.listings.length ? browse.listings[n - 1] : null;
+        if (!target) {
+          ctx.setTyping(false);
+          return {
+            success: false,
+            error: `No listing #${token} on the board — run 'market list'.`,
+          };
+        }
+        listingId = target.listingId;
+      } else {
+        // Raw listing id: may sit beyond the browse page — pass it through.
+        target = browse.listings.find((l) => l.listingId === token) ?? null;
+      }
+
+      if (target?.sellerIsMe) {
+        ctx.setTyping(false);
+        return { success: false, error: "That's your own listing — use 'market unlist'." };
+      }
+
+      const result = await buyCrystal(listingId);
+      // ctx.balance is a static SSR snapshot — always re-fetch after a purchase.
+      const balance = result.ok ? await ctx.data.fetchBalance() : null;
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        if (result.error === "own_listing") {
+          return { success: false, error: "That's your own listing — use 'market unlist'." };
+        }
+        if (result.error === "insufficient_funds") {
+          return {
+            success: false,
+            error: `Insufficient balance. Price ${result.price} _unSC (fee ${result.fee} _unSC burns on sale) — you have ${result.newAvailable.toFixed(2)} _unSC.`,
+          };
+        }
+        const messages: Record<string, string> = {
+          not_found: "Listing not found — run 'market list' for a fresh board.",
+          not_active: "That listing is no longer active — run 'market list'.",
+          seller_missing: "Sale fell through — the seller vanished.",
+          seller_no_longer_owner: "Sale fell through — the seller no longer holds that crystal.",
+          unauthorized: "Not authenticated.",
+        };
+        return {
+          success: false,
+          error: messages[result.error ?? ""] ?? "Purchase failed. Try again.",
+        };
+      }
+
+      const name = target?.name ?? result.crystalId ?? "crystal";
+      const output = [
+        "",
+        `> Crystal '${name}' acquired for ${result.price} _unSC (fee ${result.fee} burned)`,
+        `> Balance: ${(balance?.available ?? result.newAvailable).toFixed(2)} _unSC available`,
+        "",
+      ];
+      return { success: true, output };
+    }
+
+    if (sub === "unlist") {
+      const token = args[1];
+      if (!token) return { success: false, error: "Usage: market unlist <n|listing-id>" };
+
+      ctx.setTyping(true);
+      const { myListings, unlistCrystal } = await import("@/app/(game)/actions/market");
+      // Indices resolve against a fresh myListings fetch inside THIS execution.
+      const mine = await myListings();
+      if (!mine.ok) {
+        ctx.setTyping(false);
+        return { success: false, error: "Marketplace unavailable — sign in and retry." };
+      }
+
+      let target: (typeof mine.listings)[number] | null = null;
+      let listingId = token;
+      if (/^\d+$/.test(token)) {
+        const n = Number.parseInt(token, 10);
+        target = n >= 1 && n <= mine.listings.length ? mine.listings[n - 1] : null;
+        if (!target) {
+          ctx.setTyping(false);
+          return {
+            success: false,
+            error: `No listing #${token} of yours — run 'market mine'.`,
+          };
+        }
+        listingId = target.listingId;
+      } else {
+        target = mine.listings.find((l) => l.listingId === token) ?? null;
+      }
+
+      const result = await unlistCrystal(listingId);
+      ctx.setTyping(false);
+
+      if (!result.ok) {
+        const messages: Record<string, string> = {
+          not_seller: "Not your listing — you can only unlist your own.",
+          not_found: "Listing not found — run 'market mine'.",
+          not_active: "That listing is no longer active.",
+          unauthorized: "Not authenticated.",
+        };
+        return {
+          success: false,
+          error: messages[result.error ?? ""] ?? "Unlist failed. Try again.",
+        };
+      }
+
+      const output = [
+        "",
+        `> Listing cancelled — '${target?.name ?? "crystal"}' is back in your inventory.`,
+        "",
+      ];
+      return { success: true, output };
+    }
+
+    return {
+      success: false,
+      error: `Unknown subcommand '${sub}'. Try 'market help'.`,
+    };
+  },
+};
+
+/**
  * `guide` prints the active mission's full walkthrough — every objective, in
  * order, with its hint text inline. Designed for the "hard" difficulty mode
  * where hints are otherwise passive: when the player wants help, they ask.
@@ -27150,6 +27652,10 @@ export const commands: Command[] = [
   walletCommand,
   // Kernel recompile (prestige)
   recompileCommand,
+  // Staking (_unSC)
+  stakeCommand,
+  // Crystal marketplace
+  marketCommand,
   // Nexus (tech tree graph app)
   nexusCommand,
 ];
