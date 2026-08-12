@@ -11,10 +11,15 @@
  *   1. Re-reads the achievement_progress row (anti-cheat: client-side
  *      progress is untrusted)
  *   2. Validates `progress >= target` on DB state
- *   3. Calls `reserve_burn_and_award` to debit the reserve + credit the
+ *   3. Re-derives progress from server-authoritative tables where possible
+ *      (construction/breadth via production_jobs, trade via
+ *      balances.total_spent) — see lib/game/achievements/verify.ts. The
+ *      progress-row check alone is circular because the client writes
+ *      those rows via updateAchievementProgress.
+ *   4. Calls `reserve_burn_and_award` to debit the reserve + credit the
  *      player atomically (one RPC)
- *   4. Inserts/updates the achievement_unlocks row with reward_claimed=true
- *   5. Optionally flips a quest flag (for achievements that gate downstream
+ *   5. Inserts/updates the achievement_unlocks row with reward_claimed=true
+ *   6. Optionally flips a quest flag (for achievements that gate downstream
  *      unlocks)
  *
  * Progress *reads* hit the client-visible RLS policies; progress *writes*
@@ -25,6 +30,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { awardFromReserve } from "@/lib/game/economy";
 import { getAchievement, listAchievements } from "@/lib/game/achievements";
+import { verifyBranchServerSide } from "@/lib/game/achievements/verify";
 import type { QuestState } from "@/lib/game/quests/types";
 
 export interface AchievementRow {
@@ -114,9 +120,13 @@ export interface UpdateProgressResult {
  * after its tick-local evaluator crosses an integer boundary (to avoid
  * spamming the DB on sub-second drift).
  *
- * Idempotent at the value level — a smaller value replaces a larger one
- * only for achievements that can decrease, which at the moment is none.
- * If you add a decaying achievement, add a monotonic guard here.
+ * Monotonic: no catalog achievement can legitimately decrease, so a new
+ * value below the persisted one is treated as a no-op instead of an
+ * overwrite. This blocks reset games (deliberately writing a low value,
+ * e.g. to re-trigger unlock toasts or confuse downstream tooling) at the
+ * cost of one extra SELECT per progress commit — acceptable because the
+ * client already debounces these calls to integer-boundary crossings.
+ * If you ever add a decaying achievement, carve it out of this guard.
  */
 export async function updateAchievementProgress(
   achievementId: string,
@@ -137,6 +147,20 @@ export async function updateAchievementProgress(
   if (!user) return { ok: false, error: "not_authenticated" };
 
   const clamped = Math.min(achievement.target, progress);
+
+  // Monotonic guard (see doc comment): read the existing row first and
+  // ignore regressions.
+  const existingRes = await supabase
+    .from("achievement_progress")
+    .select("progress")
+    .eq("user_id", user.id)
+    .eq("achievement_id", achievement.id)
+    .eq("tier", achievement.tier)
+    .maybeSingle();
+  const existingRow = existingRes.data as { progress: number | string } | null;
+  if (existingRow && clamped < Number(existingRow.progress)) {
+    return { ok: true };
+  }
 
   // Upsert by primary key (user_id, achievement_id, tier).
   const { error } = await supabase.from("achievement_progress").upsert(
@@ -176,6 +200,17 @@ export interface ClaimAchievementResult {
  * transaction, and the unlock row is only flipped after a successful
  * award. A failure between award and unlock-update leaves the user with
  * the credits but `reward_claimed=false` — preferable to losing _unSC.
+ *
+ * Trust surface: the achievement_progress row is client-written, so step 1
+ * alone is circular. Step 1b re-derives progress from server-authoritative
+ * tables for the construction / breadth / trade branches and rejects the
+ * claim when the DB disagrees — regardless of what the progress row
+ * asserts. The resource / energy / exploration branches evaluate tick-local
+ * state (lifetime resource counters, resonance discoveries) that has no
+ * server-side mirror; those claims still trust the progress row. That
+ * residual surface is documented in lib/game/achievements/verify.ts and
+ * must be closed (e.g. by persisting tick checkpoints) before those
+ * branches can gate on-chain value.
  */
 export async function claimAchievement(achievementId: string): Promise<ClaimAchievementResult> {
   const achievement = getAchievement(achievementId);
@@ -215,6 +250,21 @@ export async function claimAchievement(achievementId: string): Promise<ClaimAchi
     .maybeSingle();
   const progRow = progRes.data as { progress: number | string; target: number | string } | null;
   if (!progRow || Number(progRow.progress) < Number(progRow.target)) {
+    return {
+      ok: false,
+      achievementId,
+      tier: achievement.tier,
+      unscAwarded: 0,
+      newBalance: 0,
+      error: "progress_insufficient",
+    };
+  }
+
+  // 1b. Server-side re-derivation (anti-cheat). Overrides the client-written
+  // progress row: when the branch is verifiable and the DB says the target
+  // is not met, the claim is rejected no matter what the row claims.
+  const verification = await verifyBranchServerSide(supabase, user.id, achievement);
+  if (verification.verifiable && !verification.satisfied) {
     return {
       ok: false,
       achievementId,

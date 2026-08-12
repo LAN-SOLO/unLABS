@@ -196,17 +196,63 @@ export async function claimMissionAction(
   let state = hydrateMissionState(profile.mission_state);
   const flags = extractFlags(profile.quest_state);
 
-  // Merge client-derived progress (craft_count, resource_threshold, flag,
-  // device_action, command) into the state before evaluation. These are
-  // computed/tracked client-side and the persisted objectiveProgress can
-  // lag behind due to debouncing or concurrent writes. Trusting the client
-  // for this single-player game is acceptable; the alternative is racing
-  // multiple writes and silently failing the claim.
+  // Merge client-derived progress into the state before evaluation. The
+  // persisted objectiveProgress can lag behind due to debouncing or
+  // concurrent writes, so the client sends its current view along.
+  //
+  // Trust posture: missions pay no _unSC directly, but their set_flag
+  // rewards gate episodes and device unlocks — so the merged values are
+  // not harmless. craft_count objectives are therefore overridden below
+  // with the real production_jobs count (rows the client cannot forge).
+  // The remaining objective types (resource_threshold, flag, device_action,
+  // command, discovery) evaluate tick-/terminal-local state with no
+  // server-authoritative mirror and stay client-trusted — documented
+  // residual surface, same as the resource/energy/exploration achievement
+  // branches.
   if (clientProgress && Object.keys(clientProgress).length > 0) {
     state = {
       ...state,
       objectiveProgress: { ...state.objectiveProgress, ...clientProgress },
     };
+  }
+
+  // Server-authoritative override for craft_count objectives of the mission
+  // being claimed: replace the client-asserted value with the lifetime count
+  // of claimed production jobs for the objective's recipe. The DB count is
+  // >= any honestly tracked progress, so honest players are never worse off.
+  const mission = getMission(missionId);
+  if (mission) {
+    const craftObjectives = mission.tasks.flatMap((task) =>
+      task.objectives.filter((obj) => obj.type === "craft_count"),
+    );
+    if (craftObjectives.length > 0) {
+      const countResults = await Promise.all(
+        craftObjectives.map((obj) =>
+          supabase
+            .from("production_jobs")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", user.id)
+            .eq("recipe_id", obj.target)
+            .eq("status", "claimed"),
+        ),
+      );
+      const overrides: Record<string, number> = {};
+      craftObjectives.forEach((obj, i) => {
+        const res = countResults[i];
+        if (res.error) {
+          // Fail open on transient query errors: keep the merged value so a
+          // DB hiccup doesn't block honest claims (same posture as
+          // lib/game/achievements/verify.ts).
+          console.warn(`[mission] craft_count verify failed for ${obj.id}: ${res.error.message}`);
+          return;
+        }
+        overrides[obj.id] = res.count ?? 0;
+      });
+      state = {
+        ...state,
+        objectiveProgress: { ...state.objectiveProgress, ...overrides },
+      };
+    }
   }
 
   const result = claimMissionPure(missionId, state, flags);
