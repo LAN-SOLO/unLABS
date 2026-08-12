@@ -137,14 +137,21 @@ read but never forge):
 1. **Devnet mint flow** — needs a funded devnet keypair (user
    provisions; never commit keys) + `@metaplex-foundation/*` deps;
    mint on request for wallet-linked users, write mint_address back.
-2. **Slice manipulation** (phase 7: MERGE/SPLIT/SWAP) and real-time
-   volatility from Solana (phase 8) — game features, order flexible.
+   The metadata route and in-game mint path (position bug fixed
+   2026-08-12 — minting had never worked end-to-end) are ready.
+2. ~~**Slice manipulation** (phase 7)~~ — shipped 2026-08-12: `slice`
+   command over merge/split/swap RPCs (90%/95% retention, fee burns,
+   listed-crystal guard, direct-slice-write RLS hole closed).
+   ~~**Solana volatility** (phase 8)~~ — shipped 2026-08-12:
+   /api/volatility-feed (mainnet TPS → tier, cached snapshots,
+   graceful stale) rendered in `scan`'s NETWORK TELEMETRY block.
 3. **Legal/regulatory review before any mainnet or real-money
    framing** — a tradeable token with cash value is a different
    compliance regime than an in-game currency; this is a
    user/counsel decision, not an engineering task.
 4. Service-role key must be provisioned in every deploy target for
-   wallet linking (degrades to service_unavailable without it).
+   wallet linking + volatility snapshots (both degrade gracefully
+   without it).
 
 ## Later / structural
 

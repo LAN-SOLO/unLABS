@@ -19,6 +19,13 @@
   today's contracts with inline CLAIM, and reports the tick engine's real
   8h-truncation flag.
 
+- **Slice manipulation (`slice` command).** Merge (90% retained), split
+  (95% across both halves into an inactive slot), and swap across owned
+  crystals — each op burns a fee, listed crystals are untouchable, and
+  the RLS hole that let clients set slice power directly is closed.
+- **Live Solana telemetry in `scan`.** /api/volatility-feed polls mainnet
+  performance samples (cached, rate-limited, graceful stale fallback) and
+  maps TPS to the game's volatility tiers.
 - **On-chain layer, first pass.** Verified Solana wallet linking
   (ed25519-signed challenge, service-role-only writes, `wallet` command),
   \_unSC staking with a 7-day lock and reserve-funded 0.5%/day rewards
@@ -64,6 +71,10 @@
 
 ### Fixed
 
+- **Crystal minting was broken end-to-end.** generateSlices wrote 0-based
+  positions against the schema's 1..30 CHECK, so the slice insert (and
+  the whole mint) failed after the balance deduct. First of the two mint
+  blockers was the ledger enum bug fixed earlier; both are now gone.
 - **M016 deadlock.** The deep-scan objective gated on a flag that only
   M016's own claim reward sets — the mission (and EP5 step 3 behind it)
   could never complete. It is now the real `scan` command.
