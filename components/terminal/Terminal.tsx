@@ -10,6 +10,7 @@ import { Journal } from "@/lib/unos/journal";
 import { CronManager } from "@/lib/unos/cron";
 import { commands } from "@/lib/terminal/commands";
 import { loadPanelState } from "@/lib/panel/panelState";
+import { labSyncActions } from "@/lib/terminal/labSync";
 import type {
   FilesystemActions,
   UserActions,
@@ -423,9 +424,46 @@ export function Terminal({
           pendingCmdFlagsRef.current.delete(flag);
         });
       },
+      syncFlags: (flags: readonly string[]) => {
+        for (const flag of flags) {
+          if (quest.state.flags[flag] === true) continue;
+          if (pendingCmdFlagsRef.current.has(flag)) continue;
+          pendingCmdFlagsRef.current.add(flag);
+          void quest.setFlag(flag, true).finally(() => {
+            pendingCmdFlagsRef.current.delete(flag);
+          });
+        }
+      },
     }),
     [quest],
   );
+
+  // Lab world → terminal quests: devices built/powered in /world complete the
+  // matching episode steps (WORLD_QUEST_FLAGS). Re-checked whenever the quest
+  // state changes and when the tab becomes visible again. No-op without a
+  // world save.
+  useEffect(() => {
+    let alive = true;
+    const sync = (): void => {
+      void labSyncActions
+        .refresh()
+        .then(() => {
+          if (alive) questCommandTerminalActions.syncFlags?.(labSyncActions.questFlags());
+        })
+        .catch(() => {
+          // The lab world is optional.
+        });
+    };
+    sync();
+    const onVisible = (): void => {
+      if (!document.hidden) sync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      alive = false;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [questCommandTerminalActions]);
 
   const researchTerminalActions: ResearchTerminalActions | undefined = useMemo(() => {
     if (!techTreeCtx || !nexusCtx) return undefined;

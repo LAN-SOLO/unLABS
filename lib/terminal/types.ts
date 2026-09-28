@@ -1731,6 +1731,12 @@ export interface DataFetchers {
   // Terminal.tsx matches it against the active quest step's `command` trigger
   // and sets the corresponding `cmd:<name>` flag exactly once.
   questCommandActions?: QuestCommandTerminalActions;
+  // Lab world bridge (/world): read the active world save slot, key codes
+  // into it. Lazy-loads lib/world/bridge.ts. See lib/terminal/labWorld.ts.
+  labWorldActions?: import("@/lib/terminal/labWorld").LabWorldTerminalActions;
+  // Lab world device/quest sync: gates device commands on the world's
+  // hardware state and writes power switches back. See lib/terminal/labSync.ts.
+  labSync?: import("@/lib/terminal/labSync").LabSyncTerminalActions;
 }
 
 /**
@@ -1740,6 +1746,11 @@ export interface DataFetchers {
  */
 export interface QuestCommandTerminalActions {
   reportCommand: (commandName: string) => void;
+  /**
+   * Set quest flags earned elsewhere (the lab world — see
+   * lib/terminal/labSync.ts `WORLD_QUEST_FLAGS`). Already-set flags are skipped.
+   */
+  syncFlags?: (flags: readonly string[]) => void;
 }
 
 /**

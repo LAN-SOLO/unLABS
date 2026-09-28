@@ -2,6 +2,9 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { labBootLines, labWorldActions } from "@/lib/terminal/labWorld";
+import { labSyncActions } from "@/lib/terminal/labSync";
+import { isEmbedLeaveCommand, isEmbeddedFrame, requestCloseTerminal } from "@/lib/terminal/embed";
 import type {
   TerminalLine,
   TerminalState,
@@ -470,8 +473,11 @@ export function useTerminal({
       renameCrystal,
       // Panel state save
       saveAllDeviceState,
-      // Device unlock check — drives terminal/UI gating against quest flags
-      isDeviceUnlocked: (deviceId: string) => checkDeviceUnlocked(deviceId, questFlags ?? {}),
+      // Device unlock check — drives terminal/UI gating. With a lab world save
+      // the world decides (built there = physically present); without one the
+      // terminal's quest flags do (see lib/terminal/labSync.ts).
+      isDeviceUnlocked: (deviceId: string) =>
+        labSyncActions.isPresent(deviceId) ?? checkDeviceUnlocked(deviceId, questFlags ?? {}),
       // Device actions for bidirectional sync
       cdcDevice: cdcDeviceActions,
       uecDevice: uecDeviceActions,
@@ -527,6 +533,10 @@ export function useTerminal({
       researchActions,
       nexusActions,
       questCommandActions,
+      // Lab world bridge — module singleton, stable across renders.
+      labWorldActions,
+      // Lab world device/quest sync — module singleton, stable across renders.
+      labSync: labSyncActions,
     }),
     [
       cdcDeviceActions,
@@ -595,6 +605,18 @@ export function useTerminal({
       welcomeLines.forEach((line) => {
         addLine(line, line.startsWith(">") ? "system" : "ascii");
       });
+
+      // Lab world breadcrumb: where Jade stands in /world (active save slot).
+      // Async (lazy bridge import); prints nothing without a world save.
+      void labBootLines()
+        .then((lines) => {
+          if (!lines.length) return;
+          addLine("", "output");
+          for (const l of lines) addLine(l, "system");
+        })
+        .catch(() => {
+          // The lab world is optional — never block the terminal boot.
+        });
 
       // Returning player breadcrumbs (if mission system is available)
       if (missionActions) {
@@ -676,6 +698,18 @@ export function useTerminal({
         }
       }
 
+      // Inside the Lab World overlay, `back` / `exit` return to the lab
+      // (the overlay closes) instead of doing nothing.
+      if (isEmbeddedFrame()) {
+        const switched =
+          !!userActions && !userActions.isRoot() && userActions.whoami() !== "operator";
+        if (isEmbedLeaveCommand(cmd, parts.slice(1), switched)) {
+          addLine("[lab] Back to the lab…", "output");
+          window.setTimeout(() => requestCloseTerminal(), 300);
+          return;
+        }
+      }
+
       // Create command context
       const context: CommandContext = {
         userId,
@@ -712,6 +746,11 @@ export function useTerminal({
         questCommandActions.reportCommand(cmd);
       }
 
+      // A terminal power switch may just have completed a lab-driven quest
+      // step (e.g. BAT/NET/MEM online → grid_online). Cached snapshot; no-op
+      // without a world save.
+      questCommandActions?.syncFlags?.(labSyncActions.questFlags());
+
       // Feed the resonance buffer with the normalized command line.
       // Deliberately not gated on success: hidden protocol invocations
       // (e.g. "qbridge sync", "kernel sync --deep") are rituals the shell
@@ -739,6 +778,9 @@ export function useTerminal({
           );
         }
         setTimeout(() => {
+          // Embedded in the Lab World overlay: "/world" means "close the
+          // overlay" — navigating would nest the world inside itself.
+          if (result.navigate === "/world" && requestCloseTerminal()) return;
           // Use window.location for reliable navigation in Electron builds
           // where Next.js client-side router can fail silently
           window.location.href = result.navigate!;

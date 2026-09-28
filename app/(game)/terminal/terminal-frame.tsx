@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 
 import { isDesktopApp } from "@/lib/desktop";
+import { EMBED_TERMINAL_PATH } from "@/lib/auth/next";
 
 interface TerminalFrameProps {
   username: string | null;
   availableBalance: number;
-  logoutAction: () => Promise<void>;
+  logoutAction: (formData: FormData) => Promise<void>;
+  /** Inside the Lab World overlay: always fullscreen, Esc belongs to the overlay. */
+  embed?: boolean;
   children: React.ReactNode;
 }
 
@@ -15,9 +18,10 @@ export function TerminalFrame({
   username,
   availableBalance,
   logoutAction,
+  embed = false,
   children,
 }: TerminalFrameProps) {
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(embed);
 
   // In the desktop app the Electron window already is "the window" — start
   // in fullscreen mode so the terminal fills it instead of rendering a fake
@@ -27,6 +31,7 @@ export function TerminalFrame({
   }, []);
 
   useEffect(() => {
+    if (embed) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isFullscreen) {
         setIsFullscreen(false);
@@ -34,7 +39,7 @@ export function TerminalFrame({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isFullscreen]);
+  }, [isFullscreen, embed]);
 
   return (
     <div
@@ -76,14 +81,18 @@ export function TerminalFrame({
           </div>
           <div className="flex items-center gap-4">
             <span className="text-xs text-green-500/50">{availableBalance.toFixed(2)} _unSC</span>
-            <button
-              type="button"
-              onClick={() => setIsFullscreen(!isFullscreen)}
-              className="text-xs text-green-500/70 transition-colors hover:text-green-400"
-            >
-              {isFullscreen ? "[RESTORE]" : "[FULLSCREEN]"}
-            </button>
+            {!embed && (
+              <button
+                type="button"
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="text-xs text-green-500/70 transition-colors hover:text-green-400"
+              >
+                {isFullscreen ? "[RESTORE]" : "[FULLSCREEN]"}
+              </button>
+            )}
             <form action={logoutAction}>
+              {/* In the overlay, log out to the login page inside the overlay. */}
+              {embed && <input type="hidden" name="next" value={EMBED_TERMINAL_PATH} />}
               <button
                 type="submit"
                 className="text-xs text-red-500/70 transition-colors hover:text-red-400"

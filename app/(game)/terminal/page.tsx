@@ -3,6 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { logout } from "@/app/(auth)/actions";
 import { TerminalPowerWrapper } from "./terminal-power-wrapper";
 import { TerminalFrame } from "./terminal-frame";
+import { LabReturnLink } from "./lab-return-link";
+import { EmbedBridge } from "./embed-bridge";
+import { EMBED_TERMINAL_PATH, loginUrlFor } from "@/lib/auth/next";
 import { QuestOverlay } from "@/components/quest/QuestOverlay";
 import { AnomalyOverlay } from "@/components/quest/AnomalyOverlay";
 
@@ -16,14 +19,20 @@ interface BalanceData {
   staked: number;
 }
 
-export default async function TerminalPage() {
+interface TerminalPageProps {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}
+
+export default async function TerminalPage({ searchParams }: TerminalPageProps) {
+  // `?embed=1`: rendered inside the Lab World's terminal overlay (iframe).
+  const embed = (await searchParams).embed === "1";
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect(loginUrlFor(embed ? EMBED_TERMINAL_PATH : "/terminal"));
   }
 
   // Fetch profile and balance in parallel
@@ -57,7 +66,12 @@ export default async function TerminalPage() {
         }}
       />
 
-      <TerminalFrame username={username} availableBalance={availableBalance} logoutAction={logout}>
+      <TerminalFrame
+        username={username}
+        availableBalance={availableBalance}
+        logoutAction={logout}
+        embed={embed}
+      >
         <TerminalPowerWrapper userId={user.id} username={username} balance={availableBalance} />
       </TerminalFrame>
 
@@ -66,6 +80,10 @@ export default async function TerminalPage() {
 
       {/* Phase 3: ambient anomaly effect. Active once EP1 ep1.reveal fires. */}
       <AnomalyOverlay />
+
+      {/* Back into the lab world — the terminal is one area of the lab. In the
+          overlay the world's own "Back to the lab" button replaces the link. */}
+      {embed ? <EmbedBridge /> : <LabReturnLink />}
 
       {/* Phase 4: persistent link to the production hub. */}
       <a

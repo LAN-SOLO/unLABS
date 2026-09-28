@@ -1,4 +1,5 @@
 import type { Command, CommandContext, CommandResult } from "./types";
+import { tr } from "@/lib/i18n";
 import { parseTimeArg, formatCountdown } from "@/lib/power/timeParser";
 import { REROLL_COST, STREAK_INSURANCE_COST, utcDayKey } from "@/lib/game/daily/engine";
 import { applyVolatility, volatilityPercent } from "@/lib/game/volatility";
@@ -250,6 +251,7 @@ const helpCommand: Command = {
       "|  status    - display system status                         |",
       "|  tutorial  - onboarding: status / skip / resume            |",
       "|  achieve   - list / info / claim achievements              |",
+      "|  labor     - lab world /world: status, map, signal         |",
       "+------------------------------------------------------------+",
       "|                      crystals                              |",
       "+------------------------------------------------------------+",
@@ -716,6 +718,12 @@ const statusCommand: Command = {
       "+-------------------------------------+",
       "",
     ];
+    // Lab world (/world) one-liner — only when the active slot holds a save.
+    const lab = ctx.data.labWorldActions;
+    const sum = lab ? await lab.summary().catch(() => null) : null;
+    if (lab && sum) {
+      output.push(`  LAB WORLD (${sum.slotName}): ${lab.summaryLine(sum)}`, "");
+    }
     return { success: true, output };
   },
 };
@@ -27872,6 +27880,146 @@ const tutorialCommand: Command = {
   },
 };
 
+/**
+ * labor — bridge to the isometric lab world (/world). Reads the active world
+ * save slot via lib/world/bridge.ts (lazy-loaded) and colours its plain lines.
+ */
+const paintLabLine = (line: string): string => {
+  const t = line.trimStart();
+  if (t.startsWith("── ")) return `\x1b[36m${line}\x1b[0m`;
+  if (t.startsWith("✓")) return `\x1b[32m${line}\x1b[0m`;
+  if (t.startsWith("!")) return `\x1b[33m${line}\x1b[0m`;
+  if (t.startsWith("◇")) return `\x1b[96m${line}\x1b[0m`;
+  if (t.startsWith("○") || t.startsWith("·") || t.startsWith("?")) return `\x1b[90m${line}\x1b[0m`;
+  return line;
+};
+
+const paintLabMap = (line: string): string =>
+  line
+    .replace(/@/g, "\x1b[93m@\x1b[0m")
+    .replace(/■/g, "\x1b[32m■\x1b[0m")
+    .replace(/□/g, "\x1b[33m□\x1b[0m")
+    .replace(/◇/g, "\x1b[96m◇\x1b[0m")
+    .replace(/▒/g, "\x1b[31m▒\x1b[0m");
+
+const laborCommand: Command = {
+  name: "labor",
+  aliases: ["welt", "labwelt"],
+  description: tr("Lab World (/world): status, devices, map, signal, MCP"),
+  usage: tr("labor [devices|power|journal|objectives|map|bots|achievements|signal|mcp|world|help]"),
+  execute: async (args) => {
+    const bridge = await import("@/lib/world/bridge");
+    const sub = (args[0] ?? "").toLowerCase();
+    const rest = args.slice(1);
+    const wrap = (lines: readonly string[], paint = paintLabLine): CommandResult => ({
+      success: true,
+      output: ["", ...lines.map(paint), ""],
+    });
+
+    if (sub === "help" || sub === "hilfe" || sub === "-h" || sub === "--help") {
+      return wrap(bridge.LAB_HELP);
+    }
+    if (sub === "world" || sub === "welt" || sub === "open") {
+      return {
+        success: true,
+        output: ["", tr("[labor] Elevator to the lab… /world"), ""],
+        navigate: "/world",
+      };
+    }
+    if (!bridge.hasLabWorld()) {
+      return wrap([`! ${bridge.NO_WORLD_MESSAGE}`, tr("  labor world  → open the Lab World")]);
+    }
+
+    const floorArg = (): {
+      floor?: NonNullable<ReturnType<typeof bridge.parseFloorArg>>;
+      error?: string;
+    } => {
+      if (rest[0] === undefined) return {};
+      const floor = bridge.parseFloorArg(rest[0]);
+      return floor === null
+        ? { error: tr("Unknown level '{arg}'. Allowed: +1, 0, -1, -2, -3, -4.", { arg: rest[0] }) }
+        : { floor };
+    };
+
+    switch (sub) {
+      case "":
+      case "status":
+        return wrap([
+          ...bridge.labStatus(),
+          "",
+          `\x1b[90m${tr("labor help — all subcommands")}\x1b[0m`,
+        ]);
+      case "devices":
+      case "geraete":
+      case "geräte": {
+        const f = floorArg();
+        if (f.error) return { success: false, error: f.error };
+        return wrap(bridge.labDevices(f.floor));
+      }
+      case "power":
+      case "energie":
+      case "strom":
+        return wrap(bridge.labPower());
+      case "journal":
+      case "log": {
+        const n = rest[0] === undefined ? 12 : Number.parseInt(rest[0], 10);
+        if (!Number.isFinite(n) || n < 1) {
+          return { success: false, error: tr("Syntax: labor journal [n]  (n ≥ 1)") };
+        }
+        return wrap(bridge.labJournal(n));
+      }
+      case "objectives":
+      case "quests":
+      case "auftraege":
+      case "aufträge":
+      case "ziele":
+        return wrap(bridge.labObjectives());
+      case "map":
+      case "karte": {
+        const f = floorArg();
+        if (f.error) return { success: false, error: f.error };
+        return wrap(bridge.labMap(f.floor), (l) => paintLabLine(paintLabMap(l)));
+      }
+      case "bots":
+        return wrap(bridge.labBots());
+      case "achievements":
+      case "erfolge":
+      case "errungenschaften":
+        return wrap(bridge.labAchievements());
+      case "signal": {
+        if (!rest.length) return { success: false, error: tr("Syntax: labor signal <code>") };
+        const r = bridge.labSignal(rest.join(" "));
+        const color = r.status === "accepted" ? "\x1b[32m" : r.ok ? "\x1b[90m" : "\x1b[33m";
+        const head = tr("[MAIN CONSOLE] Signal {code} → {status}", {
+          code: bridge.normalizeSignal(rest.join(" ")),
+          status: bridge.SIGNAL_STATUS_LABEL[r.status],
+        });
+        return {
+          success: r.ok,
+          output: [
+            "",
+            `${color}${head}\x1b[0m`,
+            ...r.lines.map((l) => `\x1b[36mMCP ›\x1b[0m ${l}`),
+            ...(r.status === "accepted"
+              ? [`\x1b[90m${tr("(Effective in the lab — labor world)")}\x1b[0m`]
+              : []),
+            "",
+          ],
+        };
+      }
+      case "mcp":
+      case "ask":
+      case "frage":
+        return wrap(bridge.labMcp(rest.join(" ")).map((l) => `\x1b[36mMCP ›\x1b[0m ${l}`));
+      default:
+        return {
+          success: false,
+          error: tr("Unknown subcommand '{sub}'. See 'labor help'.", { sub }),
+        };
+    }
+  },
+};
+
 export const commands: Command[] = [
   helpCommand,
   clearCommand,
@@ -28080,6 +28228,8 @@ export const commands: Command[] = [
   sliceCommand,
   // Nexus (tech tree graph app)
   nexusCommand,
+  // Lab world bridge (/world)
+  laborCommand,
 ];
 
 // Find command by name or alias
@@ -28112,7 +28262,13 @@ export async function executeCommand(
   }
 
   try {
-    const result = await command.execute(args, context);
+    // Lab world sync: device commands check the hardware in the active world
+    // save first (not built → NOT DETECTED, no power → OFFLINE); successful
+    // power switches are written back. No-op without a world save.
+    const labSync = context.data.labSync;
+    const blocked = labSync ? await labSync.gate(command.name, args) : null;
+    const raw = blocked ?? (await command.execute(args, context));
+    const result = labSync && !blocked ? await labSync.afterCommand(command.name, args, raw) : raw;
 
     // Log command to database
     const executionTime = Date.now() - startTime;
