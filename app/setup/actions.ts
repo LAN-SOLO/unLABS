@@ -122,7 +122,7 @@ export async function signInOperator(formData: FormData) {
 
   if (!signInError) {
     revalidatePath("/", "layout");
-    redirect("/terminal");
+    redirect("/world");
   }
 
   // If standard password didn't work, the user was created with a different
@@ -156,7 +156,7 @@ export async function signInOperator(formData: FormData) {
     const { data: signUpData } = await supabase.auth.signUp({ email, password: standardPassword });
     if (signUpData?.session) {
       revalidatePath("/", "layout");
-      redirect("/terminal");
+      redirect("/world");
     }
     return { error: "Failed to prepare login session. Try creating a new operator instead." };
   }
@@ -170,7 +170,7 @@ export async function signInOperator(formData: FormData) {
   if (error) return { error: error.message };
 
   revalidatePath("/", "layout");
-  redirect("/terminal");
+  redirect("/world");
 }
 
 /**
@@ -262,7 +262,7 @@ export async function createOperator(formData: FormData) {
   }
 
   revalidatePath("/", "layout");
-  redirect("/terminal");
+  redirect("/world");
 }
 
 /**
@@ -349,5 +349,5 @@ export async function importSaveFile(formData: FormData) {
   }
 
   revalidatePath("/", "layout");
-  redirect("/terminal");
+  redirect("/world");
 }

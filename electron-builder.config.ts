@@ -70,7 +70,7 @@ const config: Configuration = {
         arch: ["arm64"],
       },
     ],
-    // icon: 'public/icon.icns', // TODO: add custom icon
+    icon: "public/icon.icns",
     category: "public.app-category.games",
     artifactName: "UnstableLabs-${version}.dmg",
     extraResources: [{ from: "bin/darwin-arm64", to: "bin", filter: ["**/*"] }],
