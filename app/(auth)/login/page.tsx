@@ -4,12 +4,22 @@ import { useState } from "react";
 import Link from "next/link";
 import { login } from "../actions";
 import { BootSequence } from "@/components/BootSequence";
+import { useAuthNext } from "../use-auth-next";
+
+function sameOriginReferrer(): boolean {
+  try {
+    return !!document.referrer && new URL(document.referrer).origin === window.location.origin;
+  } catch {
+    return false;
+  }
+}
 
 export default function LoginPage() {
   const [showBoot, setShowBoot] = useState(true);
   const [showContent, setShowContent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const { next, embed, withNext } = useAuthNext();
 
   const handleBootComplete = () => {
     setShowBoot(false);
@@ -53,6 +63,7 @@ export default function LoginPage() {
         </div>
 
         <form action={handleSubmit} className="space-y-4">
+          {next && <input type="hidden" name="next" value={next} />}
           <div>
             <label className="mb-1 block text-sm text-green-500">EMAIL_ADDRESS:</label>
             <input
@@ -99,11 +110,34 @@ export default function LoginPage() {
         <div className="mt-6 border-t border-green-500/20 pt-4">
           <p className="text-xs text-green-500/70">
             &gt; NEW OPERATOR?{" "}
-            <Link href="/register" className="text-green-400 underline hover:text-green-300">
+            <Link
+              href={withNext("/register")}
+              className="text-green-400 underline hover:text-green-300"
+            >
               REQUEST ACCESS
             </Link>
           </p>
         </div>
+
+        {/* The way back when the login is not what the player wanted (the
+            terminal overlay has its own "Back to the lab" button). */}
+        {!embed && (
+          <p className="mt-3 text-xs">
+            <a
+              href="/world"
+              onClick={(e) => {
+                // Came from the lab (e.g. the world preview)? Go back there.
+                if (sameOriginReferrer() && window.history.length > 1) {
+                  e.preventDefault();
+                  window.history.back();
+                }
+              }}
+              className="text-[#FFB800]/80 underline hover:text-[#FFB800]"
+            >
+              &lt; /world · back to the lab
+            </a>
+          </p>
+        )}
 
         {/* Blinking cursor */}
         <div className="mt-4 text-green-500">

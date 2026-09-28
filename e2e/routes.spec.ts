@@ -10,7 +10,7 @@
 import { test, expect, type ConsoleMessage } from "@playwright/test";
 
 const publicRoutes = ["/", "/login", "/register", "/setup"] as const;
-const authedRoutes = ["/panel", "/terminal", "/lab", "/dev"] as const;
+const authedRoutes = ["/panel", "/terminal", "/lab", "/dev", "/world"] as const;
 
 function attachConsoleCapture(page: import("@playwright/test").Page) {
   const errors: string[] = [];

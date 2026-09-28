@@ -33,7 +33,7 @@
  *   admin cleanup can never touch a remote/production project.
  *
  * Login happens through the real login UI (/login form → server action →
- * redirect to /terminal), NOT via the API, so the cookie flow the app
+ * redirect to /world), NOT via the API, so the cookie flow the app
  * actually uses (@supabase/ssr) is what lands in the storage state.
  */
 
@@ -148,9 +148,9 @@ setup("provision test user and capture authenticated storage state", async ({ pa
   await page.locator('input[type="password"]').fill(TEST_USER.password);
   await page.locator('button[type="submit"]').click();
 
-  // Server action → redirect. Generous timeout: first hit compiles /terminal
-  // in dev mode.
-  await page.waitForURL("**/terminal", { timeout: 120_000 });
+  // Server action → redirect into the lab world. Generous timeout: first hit
+  // compiles /world in dev mode.
+  await page.waitForURL("**/world", { timeout: 120_000 });
   await expect(page.locator("body")).not.toBeEmpty();
 
   // 4. Persist cookies (+ localStorage) for the authed project.

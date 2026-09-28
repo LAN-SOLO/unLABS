@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { register } from "../actions";
+import { useAuthNext } from "../use-auth-next";
 import { BootSequence } from "@/components/BootSequence";
 
 export default function RegisterPage() {
@@ -16,6 +17,8 @@ export default function RegisterPage() {
     setShowBoot(false);
     setShowContent(true);
   };
+
+  const { next, withNext } = useAuthNext();
 
   async function handleSubmit(formData: FormData) {
     setIsLoading(true);
@@ -63,7 +66,7 @@ export default function RegisterPage() {
               &gt; SUCCESS: {success}
             </div>
             <Link
-              href="/login"
+              href={withNext("/login")}
               className="block w-full border border-green-500 bg-green-500/20 px-4 py-2 text-center font-mono text-sm text-green-400 transition-colors hover:bg-green-500/30"
             >
               &gt; RETURN TO LOGIN
@@ -71,6 +74,7 @@ export default function RegisterPage() {
           </div>
         ) : (
           <form action={handleSubmit} className="space-y-4">
+            {next && <input type="hidden" name="next" value={next} />}
             <div>
               <label className="mb-1 block text-sm text-green-500">OPERATOR_ID:</label>
               <input
@@ -135,7 +139,10 @@ export default function RegisterPage() {
         <div className="mt-6 border-t border-green-500/20 pt-4">
           <p className="text-xs text-green-500/70">
             &gt; EXISTING OPERATOR?{" "}
-            <Link href="/login" className="text-green-400 underline hover:text-green-300">
+            <Link
+              href={withNext("/login")}
+              className="text-green-400 underline hover:text-green-300"
+            >
               AUTHENTICATE
             </Link>
           </p>

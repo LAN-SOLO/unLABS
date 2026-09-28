@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
+import { loginUrlFor, nextOrDefault } from "@/lib/auth/next";
 
 export async function middleware(request: NextRequest) {
   const { supabaseResponse, user } = await updateSession(request);
@@ -9,8 +10,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (request.nextUrl.pathname.startsWith("/terminal") && !user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  // Keep where the player wanted to go (whitelisted), so the login inside
+  // the Lab World's terminal overlay returns to the embedded terminal.
+  const { pathname, search } = request.nextUrl;
+  if ((pathname.startsWith("/world") || pathname.startsWith("/terminal")) && !user) {
+    return NextResponse.redirect(new URL(loginUrlFor(pathname + search), request.url));
   }
 
   // Protect panel route - require authentication
@@ -26,7 +30,8 @@ export async function middleware(request: NextRequest) {
 
   // Redirect logged-in users away from auth pages
   if ((request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/register") && user) {
-    return NextResponse.redirect(new URL("/terminal", request.url));
+    const next = nextOrDefault(request.nextUrl.searchParams.get("next"));
+    return NextResponse.redirect(new URL(next, request.url));
   }
 
   return supabaseResponse;
