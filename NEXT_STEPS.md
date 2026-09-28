@@ -134,11 +134,19 @@ read but never forge):
 
 **Still open before anything touches real value:**
 
-1. **Devnet mint flow** — needs a funded devnet keypair (user
-   provisions; never commit keys) + `@metaplex-foundation/*` deps;
-   mint on request for wallet-linked users, write mint_address back.
-   The metadata route and in-game mint path (position bug fixed
-   2026-08-12 — minting had never worked end-to-end) are ready.
+1. **Devnet mint flow** — VERIFIED ON DEVNET 2026-08-13:
+   `wallet mint <crystal>` → `app/(game)/actions/nft.ts` (guards:
+   owned, unlisted, unminted, wallet linked) → `lib/solana/
+mintCrystalNft.ts` (umi `createNft`, token URI = crystal-metadata
+   route, NFT lands in the linked wallet) → service-role write-back of
+   `mint_address` under an `is null` guard. Degrades to a clear
+   "mint authority offline" message without `SOLANA_MINT_KEYPAIR`
+   (set in `.env.local`, funded devnet keypair; see `.env.example`).
+   Opt-in smoke test `tests/solana/mint-onchain.test.ts` (needs
+   `SOLANA_SMOKE_RPC` + `SOLANA_MINT_KEYPAIR`; skipped in CI) passed
+   against a local validator AND real devnet (~0.02 SOL per mint).
+   Remaining: in-game e2e — Phantom on devnet, `wallet link`, then
+   `wallet mint <crystal>` (needs a human at the browser).
 2. ~~**Slice manipulation** (phase 7)~~ — shipped 2026-08-12: `slice`
    command over merge/split/swap RPCs (90%/95% retention, fee burns,
    listed-crystal guard, direct-slice-write RLS hole closed).
