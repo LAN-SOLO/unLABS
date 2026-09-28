@@ -26503,8 +26503,8 @@ const dailyCommand: Command = {
  */
 const walletCommand: Command = {
   name: "wallet",
-  description: "Solana wallet link: status / link / unlink / balance",
-  usage: "wallet [status|link|unlink|balance|help]",
+  description: "Solana wallet link: status / link / unlink / balance / mint",
+  usage: "wallet [status|link|unlink|balance|mint <crystal>|help]",
   execute: async (args, ctx) => {
     const sub = (args[0] ?? "status").toLowerCase();
 
@@ -26520,6 +26520,7 @@ const walletCommand: Command = {
           "  wallet link             Link a Solana wallet (Phantom signature)",
           "  wallet unlink           Remove the wallet link",
           "  wallet balance          SOL balance of the linked wallet",
+          "  wallet mint <crystal>   Mint a crystal as devnet NFT into the wallet",
           "",
         ],
       };
@@ -26704,6 +26705,57 @@ const walletCommand: Command = {
       } catch {
         ctx.setTyping(false);
         return { success: false, error: "Balance query failed — network unreachable." };
+      }
+    }
+
+    if (sub === "mint") {
+      const crystalName = args[1];
+      if (!crystalName) {
+        return { success: false, error: "Usage: wallet mint <crystal-name>" };
+      }
+
+      ctx.setTyping(true);
+      try {
+        const { mintCrystalNft } = await import("@/app/(game)/actions/nft");
+        const result = await mintCrystalNft(crystalName);
+
+        if (!result.ok) {
+          const messages: Record<string, string> = {
+            not_authenticated: "Not authenticated — sign in and retry.",
+            not_configured:
+              "Mint authority offline — the lab holds no devnet keypair. (Operator: set SOLANA_MINT_KEYPAIR.)",
+            crystal_not_found: `No crystal named '${crystalName}' in your vault.`,
+            already_minted: result.mintAddress
+              ? `Already minted on-chain: ${result.mintAddress}`
+              : "This crystal is already minted on-chain.",
+            listed: "Crystal is listed on the market — unlist it before minting.",
+            no_wallet: "No wallet linked. Run 'wallet link' first.",
+            mint_failed: "On-chain mint failed — devnet RPC rejected the transaction. Retry.",
+            write_failed: result.mintAddress
+              ? `Minted on-chain (${result.mintAddress}) but the ledger write failed — report this.`
+              : "Ledger write failed. Retry.",
+          };
+          return {
+            success: false,
+            error: messages[result.error ?? ""] ?? "Mint failed. Try again.",
+          };
+        }
+
+        return {
+          success: true,
+          output: [
+            "",
+            "> CRYSTALLINE ASSET TRANSFERRED TO CHAIN.",
+            `> Crystal   : ${result.crystalName}`,
+            `> Mint      : ${result.mintAddress}`,
+            `> Signature : ${result.signature}`,
+            `> Explorer  : ${result.explorerUrl}`,
+            "> Network   : devnet — no real value attached.",
+            "",
+          ],
+        };
+      } finally {
+        ctx.setTyping(false);
       }
     }
 
