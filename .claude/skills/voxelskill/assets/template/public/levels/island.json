@@ -1,0 +1,89 @@
+{
+  "name": "Demo Island",
+  "size": [
+    64,
+    32,
+    64
+  ],
+  "palette": [
+    "#5da33c",
+    "#8a5a35",
+    "#7d8189",
+    "#e3d29a",
+    "#3f8fd6",
+    "#ffd76a",
+    "#b5452f"
+  ],
+  "materials": {
+    "5": "glass",
+    "6": "emit"
+  },
+  "terrain": {
+    "type": "island",
+    "seed": 7,
+    "scale": 0.06,
+    "base": 7,
+    "amplitude": 9,
+    "waterLevel": 4,
+    "colors": {
+      "grass": 1,
+      "dirt": 2,
+      "stone": 3,
+      "sand": 4,
+      "water": 5
+    }
+  },
+  "props": [
+    {
+      "model": "/models/house.vox",
+      "at": [
+        30,
+        34
+      ],
+      "rotY": 0
+    },
+    {
+      "model": "/models/tree.vox",
+      "at": [
+        18,
+        22
+      ]
+    },
+    {
+      "model": "/models/tree.vox",
+      "at": [
+        44,
+        38
+      ],
+      "rotY": 1
+    },
+    {
+      "model": "/models/tree.vox",
+      "at": [
+        17,
+        42
+      ],
+      "rotY": 2
+    },
+    {
+      "model": "/models/crate.vox",
+      "at": [
+        40,
+        28
+      ]
+    },
+    {
+      "model": "/models/lamp.vox",
+      "at": [
+        27,
+        26
+      ]
+    }
+  ],
+  "spawn": [
+    32,
+    24,
+    22
+  ],
+  "view": "perspective"
+}

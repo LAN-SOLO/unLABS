@@ -46,7 +46,9 @@ next-env.d.ts
 
 # local development data (not synced)
 /.local/
-/.claude/
+# Claude Code: keep local settings private, version shared skills
+/.claude/*
+!/.claude/skills/
 supabase/.temp/
 supabase/dumps/
 

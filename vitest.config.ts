@@ -20,6 +20,7 @@ export default defineConfig({
       "dist-electron/**",
       ".INSTALL/**",
       "INSTALL/**",
+      ".claude/**",
     ],
   },
 });
