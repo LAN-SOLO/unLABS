@@ -10,6 +10,16 @@
  * `subscribeSettings()`; React components use `useSettings()`.
  */
 
+import {
+  FOOTSTEP_MODES,
+  MUSIC_STYLES,
+  MUSIC_SWITCH_MODES,
+  SONG_LENGTHS,
+  type FootstepMode,
+  type MusicStyle,
+  type MusicSwitchMode,
+  type SongLength,
+} from "@/lib/world/audio/songs/styles";
 import { useCallback, useSyncExternalStore } from "react";
 import { DEFAULT_LOCALE, LOCALES, getLocale, tr, type Locale } from "@/lib/i18n";
 
@@ -101,6 +111,14 @@ export interface CameraSettings {
 }
 
 export interface AudioSettings {
+  /** Soundtrack: adaptive songs, one genre, or the generative score. */
+  musicStyle: MusicStyle;
+  /** A style change crossfades right away (`now`) or after the current song (`afterSong`). */
+  musicSwitch: MusicSwitchMode;
+  /** Song length: as composed, long (~10 min) or epic (20+ min) with variation passes. */
+  songLength: SongLength;
+  /** Footstep sound set: `auto` follows Jade's shoes, otherwise one fixed set. */
+  footsteps: FootstepMode;
   master: number;
   music: number;
   sfx: number;
@@ -317,7 +335,19 @@ function buildDefaults(reduceMotion: boolean): Settings {
       menuScene: true,
     },
     camera: { defaultZoom: 46, rotateSpeed: 1, followSmoothing: 0.5 },
-    audio: { master: 0.8, music: 0.6, sfx: 0.8, ambience: 0.6, ui: 0.7, voice: 0.9, mute: false },
+    audio: {
+      musicStyle: "adaptive",
+      musicSwitch: "now",
+      songLength: "long",
+      footsteps: "auto",
+      master: 0.8,
+      music: 0.6,
+      sfx: 0.8,
+      ambience: 0.6,
+      ui: 0.7,
+      voice: 0.9,
+      mute: false,
+    },
     gameplay: {
       textSpeed: "normal",
       hints: true,
@@ -375,6 +405,10 @@ const ENUMS: Record<string, readonly (string | number)[]> = {
   "gameplay.autosaveSeconds": AUTOSAVE_INTERVALS,
   "gameplay.hud": HUD_MODES,
   "gameplay.biorhythm": BIORHYTHM_MODES,
+  "audio.musicStyle": MUSIC_STYLES,
+  "audio.musicSwitch": MUSIC_SWITCH_MODES,
+  "audio.songLength": SONG_LENGTHS,
+  "audio.footsteps": FOOTSTEP_MODES,
   "accessibility.colorblindMode": COLORBLIND_MODES,
   language: LOCALES,
 };

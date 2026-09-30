@@ -1,5 +1,10 @@
 export { AudioSystem, DEFAULT_VOLUMES } from "@/lib/world/audio/engine";
-export type { AudioSystemOptions, BusVolumes, PlayOptions } from "@/lib/world/audio/engine";
+export type {
+  AudioSystemOptions,
+  BusVolumes,
+  PlayOptions,
+  StepOptions,
+} from "@/lib/world/audio/engine";
 export {
   FOOTSTEP_GAIN,
   SFX_NAMES,
@@ -39,4 +44,13 @@ export { REVERB_SIZES, reverbFor } from "@/lib/world/audio/reverb";
 export type { ReverbSize, ReverbSpec } from "@/lib/world/audio/reverb";
 export { VOICE_IDS, speakerPitch, speechPlan, voiceFor } from "@/lib/world/audio/voice";
 export type { VoiceId } from "@/lib/world/audio/voice";
-export { FootstepClock } from "@/lib/world/audio/footsteps";
+export { FootstepClock, StepTracker } from "@/lib/world/audio/footsteps";
+export type { StepEvent } from "@/lib/world/audio/footsteps";
+export {
+  FOOTWEAR_SETS,
+  MOTION_LAYER_KINDS,
+  renderMotion,
+  renderStep,
+} from "@/lib/world/audio/footfall";
+export type { Footwear, MotionLayerKind, StepKind } from "@/lib/world/audio/footfall";
+export { activeAudio, registerActiveAudio } from "@/lib/world/audio/active";

@@ -429,9 +429,10 @@ describe("room reverb", () => {
     audio.setRoomAcoustics(ROOM_BY_ID.get("forge"));
     expect(audio.reverb.size).toBe("huge");
     await audio.resume();
-    expect(fake.count("Convolver")).toBe(1);
-    audio.setRoomAcoustics(ROOM_BY_ID.get("jadeq"));
+    // One room convolver + the music hall (songs).
     expect(fake.count("Convolver")).toBe(2);
+    audio.setRoomAcoustics(ROOM_BY_ID.get("jadeq"));
+    expect(fake.count("Convolver")).toBe(3);
     audio.dispose();
   });
 });

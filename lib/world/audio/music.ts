@@ -23,11 +23,33 @@
  * `sting`s (discovery, insight, solved, danger) play in the current key
  * while the bed ducks under them.
  *
+ * Songs (round 6): outside scenes the score plays composed songs from the
+ * catalogue (lib/world/audio/songs) — genres follow the room and the
+ * situation (`styleGenres`), a song plays to its end and the next one
+ * follows after a breath; leaving a song's genres behind for a while
+ * crossfades to a fitting one. The focus pulse and danger heartbeat keep
+ * running as overlays. Style `generative` restores the endless score
+ * below; the studio can pick songs (jukebox), loop, skip and mix parts.
+ *
+ * Preferences (round 7, `setPrefs`): a style change either crossfades to a
+ * fitting song within ~1.5 s (`switchMode: "now"`, also songs ↔ generative)
+ * or waits for the current song to end (`afterSong`, which also never cuts a
+ * song for a mood change). `length` picks the arrangement (standard / long /
+ * epic, see songs/arrange.ts) for every song that starts from then on.
+ *
  * The theory (`themeFor`, `layerLevels`, `chordNotes`, `phrasePlan`,
  * `stingNotes`) is pure and tested; `MusicSystem` schedules it with a
  * look-ahead timer (one setInterval).
  */
 import { clamp, mtof, mulberry32, type Wave } from "@/lib/world/audio/synth";
+import { impulseSamples } from "@/lib/world/audio/reverb";
+import { createNoiseBuffer } from "@/lib/world/audio/webaudio";
+import { SONG_BY_ID } from "@/lib/world/audio/songs/catalog";
+import { SongPlayer } from "@/lib/world/audio/songs/player";
+import { pickSong, styleGenres, type MusicStyle } from "@/lib/world/audio/songs/playlist";
+import type { VaryKind } from "@/lib/world/audio/songs/arrange";
+import type { MusicSwitchMode, SongLength } from "@/lib/world/audio/songs/styles";
+import { PARTS, type InstrumentId, type Part, type SongDef } from "@/lib/world/audio/songs/types";
 
 export const MUSIC_SCENES = [
   "intro",
@@ -53,7 +75,47 @@ export interface MusicState {
   focus?: boolean;
   /** Acute danger 0..1 (brownout, overheating, alarm): heartbeat layer. */
   danger?: number;
+  /** Room theme of the player's room (picks fitting genres). */
+  theme?: string | null;
+  /** Music style setting: adaptive songs (default), one genre, or the generative score. */
+  style?: MusicStyle;
 }
+
+/** What the song system is playing (now-playing display, studio). */
+export interface NowPlaying {
+  song: SongDef;
+  seconds: number;
+  total: number;
+  /** Chosen in the studio jukebox (not by the game). */
+  jukebox: boolean;
+  loop: boolean;
+  /** Variation pass playing now (long / epic arrangements), null = as composed. */
+  pass?: VaryKind | null;
+  /** A style change waiting for this song to end (`afterSong`), else null. */
+  pending?: MusicStyle | null;
+}
+
+/** Song preferences (settings `audio.musicSwitch` + `audio.songLength`). */
+export interface MusicPrefs {
+  switchMode: MusicSwitchMode;
+  length: SongLength;
+}
+
+/** How the music system is doing (settings indicator, studio). */
+export interface MusicStatus {
+  /** Style in effect. */
+  style: MusicStyle;
+  /** Requested style waiting for the song to end (`afterSong`), else null. */
+  pending: MusicStyle | null;
+  /** Song playing now (null: generative score, scene or silence). */
+  song: SongDef | null;
+  seconds: number;
+  total: number;
+  prefs: MusicPrefs;
+}
+
+/** Crossfade used when the player changes the style with `switchMode: "now"`. */
+export const STYLE_SWITCH_FADE = 1.5;
 
 /** The four handshake tones 3-6-4-8 as 0-based scale degrees. */
 export const HANDSHAKE_DEGREES: readonly number[] = [2, 5, 3, 7];
@@ -545,6 +607,29 @@ export class MusicSystem {
   /** Per-session seed: each session phrases the score differently. */
   private readonly seed: number;
   private plan: { phrase: number; plan: PhrasePlan } | null = null;
+  // ── Song mode ──
+  private readonly noiseBuf: AudioBuffer;
+  /** Songs play into this bus (→ tone filter → duck → out). */
+  private readonly songBus: GainNode;
+  private readonly hallIn: GainNode | null = null;
+  private player: SongPlayer | null = null;
+  private readonly retiredPlayers = new Set<SongPlayer>();
+  private readonly recent: string[] = [];
+  /** Audio time since the current song's genre stopped fitting (0 = fits). */
+  private mismatchSince = 0;
+  private jukebox: { id: string; loop: boolean } | null = null;
+  private levelsByPart: Partial<Record<Part, number>> = {};
+  private leadOverride: InstrumentId | undefined;
+  private readonly songListeners = new Set<(song: SongDef, jukebox: boolean) => void>();
+  private readonly songRng: () => number;
+  private prefs: MusicPrefs = { switchMode: "now", length: "standard" };
+  /** Style in effect (the requested one may wait for the song to end). */
+  private activeStyle: MusicStyle = "adaptive";
+  private pendingStyle: MusicStyle | null = null;
+  /** The player changed the style: re-check the song right away (quick crossfade). */
+  private styleSwitch = false;
+  /** Jukebox song to play after the current one (`null` id = give the game the music back). */
+  private queued: { id: string | null; loop: boolean } | null = null;
 
   constructor(
     private readonly ctx: AudioContext,
@@ -579,19 +664,106 @@ export class MusicSystem {
     this.echoIn.connect(this.echo);
     this.echo.connect(damp).connect(fb).connect(this.echo);
     damp.connect(this.tone);
+    // Song mode: bus, hall (convolver where available) and a noise source.
+    this.noiseBuf = createNoiseBuffer(ctx, 1);
+    this.songBus = ctx.createGain();
+    this.songBus.connect(this.tone);
+    this.songRng = mulberry32(seed ^ 0x51ed);
+    if (typeof ctx.createConvolver === "function") {
+      try {
+        const conv = ctx.createConvolver();
+        const sr = ctx.sampleRate;
+        const ir = ctx.createBuffer(2, Math.floor(sr * 2.6), sr);
+        ir.getChannelData(0).set(impulseSamples(sr, 2.6, 3400, 11));
+        ir.getChannelData(1).set(impulseSamples(sr, 2.6, 3400, 12));
+        conv.buffer = ir;
+        const hallIn = ctx.createGain();
+        const hallOut = ctx.createGain();
+        hallOut.gain.value = 0.5;
+        hallIn.connect(conv).connect(hallOut).connect(this.tone);
+        this.hallIn = hallIn;
+      } catch {
+        this.hallIn = null;
+      }
+    }
   }
 
   get playing(): boolean {
     return this.timer !== null;
   }
 
+  /** Switch mode + arrangement length (length applies to the next song). */
+  setPrefs(prefs: Partial<MusicPrefs>): void {
+    this.prefs = { ...this.prefs, ...prefs };
+    // Changing to "now" while a switch is waiting: do it now.
+    if (this.prefs.switchMode === "now" && this.pendingStyle) this.applyStyle(this.pendingStyle);
+  }
+
+  getPrefs(): MusicPrefs {
+    return { ...this.prefs };
+  }
+
+  /** Style in effect, the waiting one and the song (settings indicator). */
+  status(): MusicStatus {
+    const p = this.songMode ? this.player : null;
+    const pos = p?.position(this.ctx.currentTime);
+    return {
+      style: this.activeStyle,
+      pending: this.pendingStyle,
+      song: p?.song ?? null,
+      seconds: pos?.seconds ?? 0,
+      total: pos?.total ?? 0,
+      prefs: { ...this.prefs },
+    };
+  }
+
+  /** A song is audibly playing for the game (what `afterSong` waits for). */
+  private get songSounding(): boolean {
+    return !!this.player && !this.player.isStopped && this.songMode;
+  }
+
+  /** Put `style` into effect; with a song playing that no longer fits, crossfade soon. */
+  private applyStyle(style: MusicStyle): void {
+    const wasSongs = this.songMode;
+    this.activeStyle = style;
+    this.state.style = style;
+    this.pendingStyle = null;
+    this.styleSwitch = true;
+    const now = this.ctx.currentTime;
+    if (wasSongs && !this.songMode) {
+      // Songs → generative: the score takes over on a fresh stem.
+      this.stopSongs(STYLE_SWITCH_FADE);
+      this.beat = 0;
+      this.plan = null;
+      this.nextTime = Math.max(this.nextTime, now + 0.1);
+      this.crossfade(now, STYLE_SWITCH_FADE);
+    } else if (!wasSongs && this.songMode) {
+      // Generative → songs: fade the score's stem, the first song fades in.
+      this.crossfade(now, STYLE_SWITCH_FADE);
+    }
+  }
+
   setState(state: MusicState): void {
     const prevId = this.theme.id;
-    this.state = { ...state };
+    // No style in the state (scenes, title intro): nothing requested, keep the current one.
+    const requested = state.style ?? this.pendingStyle ?? this.activeStyle;
+    this.state = { ...state, style: this.activeStyle };
+    if (requested !== this.activeStyle) {
+      if (this.prefs.switchMode === "now" || !this.songSounding || this.jukebox)
+        this.applyStyle(requested);
+      else this.pendingStyle = requested;
+    } else this.pendingStyle = null;
     this.theme = themeFor(this.state);
     this.levels = layerLevels(this.state, this.theme);
     const now = this.ctx.currentTime;
-    this.echo.delayTime.setTargetAtTime(30 / this.theme.tempo, now, 0.5);
+    const song = this.songMode ? this.player?.song : undefined;
+    this.echo.delayTime.setTargetAtTime(
+      song ? (60 / song.bpm) * 0.75 : 30 / this.theme.tempo,
+      now,
+      0.5,
+    );
+    // Songs thin out under puzzle focus (the pulse overlay keeps time).
+    this.songBus.gain.setTargetAtTime(this.state.focus ? 0.5 : 1, now, 0.8);
     this.tone.frequency.setTargetAtTime(masterCutoff(this.levels), now, 1.2);
     if (this.theme.id !== prevId) {
       // Start the new theme on a fresh phrase, crossfading stems.
@@ -624,16 +796,16 @@ export class MusicSystem {
     d.linearRampToValueAtTime(1, now + end + 0.8);
   }
 
-  private crossfade(now: number): void {
+  private crossfade(now: number, fade = STEM_FADE): void {
     const old = this.stem;
     const next = this.ctx.createGain();
     next.gain.setValueAtTime(0.0001, now);
-    next.gain.exponentialRampToValueAtTime(1, now + STEM_FADE);
+    next.gain.exponentialRampToValueAtTime(1, now + fade);
     next.connect(this.tone);
     this.stem = next;
     old.gain.cancelScheduledValues(now);
     old.gain.setValueAtTime(Math.max(0.0001, old.gain.value), now);
-    old.gain.exponentialRampToValueAtTime(0.0001, now + STEM_FADE);
+    old.gain.exponentialRampToValueAtTime(0.0001, now + fade);
     // Pads already scheduled on the old stem ring up to ~11 s; free it after.
     this.retired.add(old);
     const id = setTimeout(() => {
@@ -642,6 +814,261 @@ export class MusicSystem {
       old.disconnect();
     }, 12_000);
     this.timers.add(id);
+  }
+
+  // ── Song mode API ──────────────────────────────────────────────
+
+  /** Songs (not the generative score) are playing the current state. */
+  get songMode(): boolean {
+    if (this.jukebox) return true;
+    if (this.state.scene) return false;
+    return this.activeStyle !== "generative";
+  }
+
+  /** Current song, position and whether the jukebox chose it. */
+  nowPlaying(): NowPlaying | null {
+    const p = this.player;
+    if (!p || !this.songMode) return null;
+    const pos = p.position(this.ctx.currentTime);
+    return {
+      song: p.song,
+      seconds: pos.seconds,
+      total: pos.total,
+      jukebox: !!this.jukebox,
+      loop: p.loop,
+      pass: pos.pass,
+      pending: this.pendingStyle,
+    };
+  }
+
+  /** Called whenever a new song starts. Returns an unsubscribe function. */
+  onSong(cb: (song: SongDef, jukebox: boolean) => void): () => void {
+    this.songListeners.add(cb);
+    return () => this.songListeners.delete(cb);
+  }
+
+  /** Studio jukebox: play this song now (crossfade), optionally looping. */
+  playSong(id: string, loop = false, fade = 1.2): boolean {
+    const song = SONG_BY_ID.get(id);
+    if (!song) return false;
+    const wasSongs = this.songMode;
+    this.queued = null;
+    this.jukebox = { id, loop };
+    this.switchTo(song, fade);
+    // From the generative / scene score: fade its stem under the song.
+    if (!wasSongs) this.crossfade(this.ctx.currentTime, fade);
+    return true;
+  }
+
+  /**
+   * Play `id` once the current song has ended (title screen with `afterSong`);
+   * `null` gives the music back to the game / generative score at that point.
+   * Without a song playing it starts right away.
+   */
+  queueSong(id: string | null, loop = false): boolean {
+    if (id !== null && !SONG_BY_ID.has(id)) return false;
+    if (!this.player || this.player.isStopped) {
+      if (id === null) this.releaseJukebox(STYLE_SWITCH_FADE);
+      else this.playSong(id, loop, STYLE_SWITCH_FADE);
+      return true;
+    }
+    if (this.player.song.id === id) {
+      this.queued = null;
+      if (this.jukebox) this.jukebox.loop = loop;
+      this.player.loop = loop;
+      return true;
+    }
+    this.queued = { id, loop };
+    if (this.jukebox) this.jukebox.loop = false;
+    this.player.loop = false;
+    return true;
+  }
+
+  /** The song queued after the current one (undefined = none, null = back to the game). */
+  get queuedSong(): string | null | undefined {
+    return this.queued ? this.queued.id : undefined;
+  }
+
+  /**
+   * Leave the jukebox: the game picks songs again (after the current one), or
+   * with `fadeNow` the current song fades out right away.
+   */
+  releaseJukebox(fadeNow?: number): void {
+    this.jukebox = null;
+    this.queued = null;
+    if (this.player) this.player.loop = false;
+    if (fadeNow !== undefined && this.player) {
+      this.stopSongs(fadeNow);
+      // The generative / scene score takes over on a fresh stem.
+      const now = this.ctx.currentTime;
+      this.beat = 0;
+      this.plan = null;
+      this.nextTime = Math.max(this.nextTime, now + 0.1);
+      this.crossfade(now, fadeNow);
+    }
+  }
+
+  setLoop(loop: boolean): void {
+    if (this.jukebox) this.jukebox.loop = loop;
+    if (this.player) this.player.loop = loop;
+  }
+
+  /** Next song now (jukebox: next in the same genre). */
+  skip(): void {
+    const cur = this.player?.song;
+    const genres = this.jukebox && cur ? [cur.genre] : styleGenres(this.activeStyle, this.mood());
+    const next = pickSong(genres, this.recent, this.songRng);
+    if (!next) return;
+    if (this.jukebox) this.jukebox = { id: next.id, loop: this.jukebox.loop };
+    this.switchTo(next, 1.2);
+  }
+
+  /** Mixer fader for one part (0..1.5, 1 = as composed). */
+  setPartLevel(part: Part, v: number): void {
+    this.levelsByPart[part] = v;
+    this.player?.setLevel(part, v);
+  }
+
+  partLevels(): Record<Part, number> {
+    const out = {} as Record<Part, number>;
+    for (const p of PARTS) out[p] = this.levelsByPart[p] ?? 1;
+    return out;
+  }
+
+  /** Replace the lead instrument of every song (studio), `undefined` = as composed. */
+  setLeadInstrument(inst: InstrumentId | undefined): void {
+    this.leadOverride = inst;
+    this.player?.setLead(inst);
+  }
+
+  private mood() {
+    return {
+      floor: this.state.floor,
+      theme: this.state.theme ?? null,
+      safe: !!this.state.safe,
+      focus: !!this.state.focus,
+      tension: this.state.tension,
+      danger: this.state.danger ?? 0,
+    };
+  }
+
+  private newPlayer(song: SongDef, at: number, fadeIn: number): SongPlayer {
+    const p = new SongPlayer(
+      this.ctx,
+      this.songBus,
+      song,
+      {
+        noise: this.noiseBuf,
+        echo: this.echoIn,
+        ...(this.hallIn ? { hall: this.hallIn } : {}),
+        levels: this.levelsByPart,
+        seed: this.seed,
+        length: this.prefs.length,
+        ...(this.leadOverride ? { lead: this.leadOverride } : {}),
+      },
+      at,
+      0,
+      fadeIn,
+    );
+    p.loop = !!this.jukebox?.loop && this.jukebox.id === song.id;
+    this.recent.push(song.id);
+    if (this.recent.length > 16) this.recent.shift();
+    this.mismatchSince = 0;
+    this.echo.delayTime.setTargetAtTime((60 / song.bpm) * 0.75, this.ctx.currentTime, 0.3);
+    for (const cb of this.songListeners) cb(song, !!this.jukebox);
+    return p;
+  }
+
+  /** Crossfade from the current song to `song`. */
+  private switchTo(song: SongDef, fade: number): void {
+    const now = this.ctx.currentTime;
+    if (this.player) {
+      this.player.stop(fade);
+      this.retiredPlayers.add(this.player);
+    }
+    this.player = this.newPlayer(song, now + 0.08, fade);
+  }
+
+  private stopSongs(fade: number): void {
+    if (!this.player) return;
+    this.player.stop(fade);
+    this.retiredPlayers.add(this.player);
+    this.player = null;
+  }
+
+  /** Song mode scheduling (called from `tick`). */
+  private songTick(): void {
+    const now = this.ctx.currentTime;
+    for (const p of this.retiredPlayers)
+      if (p.isStopped && p.endTime < now - 6) this.retiredPlayers.delete(p);
+    if (this.jukebox && !this.queued) {
+      const want = SONG_BY_ID.get(this.jukebox.id);
+      if (want && this.player?.song.id !== want.id) this.switchTo(want, 1.2);
+      if (this.player) this.player.loop = this.jukebox.loop;
+    }
+    let genres = styleGenres(this.activeStyle, this.mood());
+    const quick = this.styleSwitch;
+    this.styleSwitch = false;
+    if (!this.player) {
+      const song = pickSong(genres, this.recent, this.songRng);
+      if (song) this.player = this.newPlayer(song, now + 0.1, quick ? STYLE_SWITCH_FADE : 2.5);
+    } else if (this.player.finishedScheduling && now > this.player.endTime - 0.5) {
+      // The song ended: a short breath, then the next one. Never schedule into
+      // the past (the song may have ended while the tab was in the background).
+      const old = this.player;
+      this.retiredPlayers.add(old);
+      old.stop(4);
+      this.player = null;
+      const at = Math.max(old.endTime + 1.5, now + 0.1);
+      const q = this.queued;
+      this.queued = null;
+      if (q) {
+        this.jukebox = q.id ? { id: q.id, loop: q.loop } : null;
+        const song = q.id ? SONG_BY_ID.get(q.id) : undefined;
+        if (song) this.player = this.newPlayer(song, at, 0);
+        else if (!this.songMode) return;
+      }
+      if (!this.player && this.pendingStyle) {
+        // `afterSong`: the waiting style takes over now.
+        const style = this.pendingStyle;
+        this.pendingStyle = null;
+        this.activeStyle = style;
+        this.state.style = style;
+        if (!this.songMode) {
+          this.beat = 0;
+          this.plan = null;
+          this.nextTime = Math.max(this.nextTime, now + 0.1);
+          this.crossfade(now, 3);
+          return;
+        }
+        genres = styleGenres(style, this.mood());
+      }
+      if (!this.player) {
+        const next = this.jukebox
+          ? pickSong([old.song.genre], this.recent, this.songRng)
+          : pickSong(genres, this.recent, this.songRng);
+        if (this.jukebox && next) this.jukebox = { id: next.id, loop: false };
+        if (next) this.player = this.newPlayer(next, at, 0);
+      }
+    } else if (!this.jukebox && !genres.includes(this.player.song.genre)) {
+      if (quick) {
+        // The player picked another style: crossfade right away.
+        const next = pickSong(genres, this.recent, this.songRng);
+        if (next) this.switchTo(next, STYLE_SWITCH_FADE);
+      } else if (this.prefs.switchMode === "now") {
+        // The moment moved on: give it a while (shorter in danger / focus), then crossfade.
+        if (!this.mismatchSince) this.mismatchSince = now;
+        const patience = (this.state.danger ?? 0) > 0.3 ? 4 : this.state.focus ? 6 : 18;
+        if (now - this.mismatchSince > patience) {
+          const next = pickSong(genres, this.recent, this.songRng);
+          if (next) this.switchTo(next, 3);
+        }
+      }
+      // `afterSong`: the song always plays to its end.
+    } else {
+      this.mismatchSince = 0;
+    }
+    this.player?.tick(now + 0.7);
   }
 
   start(): void {
@@ -665,6 +1092,13 @@ export class MusicSystem {
 
   dispose(): void {
     this.stop(0.05);
+    this.player?.dispose();
+    this.player = null;
+    for (const p of this.retiredPlayers) p.dispose();
+    this.retiredPlayers.clear();
+    this.songListeners.clear();
+    this.songBus.disconnect();
+    this.hallIn?.disconnect();
     this.timers.forEach((t) => clearTimeout(t));
     this.timers.clear();
     this.retired.forEach((g) => g.disconnect());
@@ -679,11 +1113,14 @@ export class MusicSystem {
   }
 
   private tick(): void {
+    const songs = this.songMode;
+    if (songs) this.songTick();
+    else if (this.player) this.stopSongs(3);
     const horizon = this.ctx.currentTime + LOOKAHEAD;
     // Recover from a suspended context / backgrounded tab without a burst.
     if (this.nextTime < this.ctx.currentTime - 1) this.nextTime = this.ctx.currentTime + 0.05;
     while (this.nextTime < horizon) {
-      this.scheduleBeat(this.beat, this.nextTime);
+      this.scheduleBeat(this.beat, this.nextTime, songs);
       this.beat++;
       this.nextTime += 60 / this.theme.tempo;
     }
@@ -700,9 +1137,14 @@ export class MusicSystem {
     return this.plan.plan;
   }
 
-  private scheduleBeat(b: number, t: number): void {
+  private scheduleBeat(b: number, t: number, overlayOnly = false): void {
     const th = this.theme;
     const lv = this.levels;
+    if (overlayOnly) {
+      // Songs are playing: only the focus pulse and the danger heartbeat.
+      this.overlay(b, t, lv, th);
+      return;
+    }
     const beatLen = 60 / th.tempo;
     const plan = this.phraseAt(b);
     const phraseLen = th.progression.length * 8;
@@ -797,6 +1239,28 @@ export class MusicSystem {
     if (b % 2 === 0 && rng() < lv.shimmer * 0.45 * plan.shimmerMul) {
       const pick = chord[Math.floor(rng() * chord.length)]! + 36;
       this.note("sine", mtof(pick), t, beatLen * 3, 0.012, 0.8, 2, true);
+    }
+  }
+
+  /** Focus pulse + danger heartbeat over a playing song. */
+  private overlay(b: number, t: number, lv: LayerLevels, th: Theme): void {
+    if (lv.pulse > 0) {
+      const accent = b % 4 === 0;
+      this.note(
+        "sine",
+        mtof(th.root + (accent ? 36 : 31)),
+        t,
+        0.04,
+        0.012 * lv.pulse * (accent ? 1.3 : 1),
+        0.002,
+        0.12,
+        accent,
+      );
+    }
+    if (lv.heartbeat > 0 && b % 2 === 0) {
+      const g = 0.1 * lv.heartbeat;
+      this.note("sine", 55, t, 0.08, g, 0.004, 0.18, false);
+      this.note("sine", 49, t + 0.26, 0.07, g * 0.7, 0.004, 0.16, false);
     }
   }
 

@@ -7,6 +7,7 @@
  */
 import type { SynthTarget } from "@/lib/world/audio/synth";
 import type { RoomTheme } from "@/lib/world/types";
+import { SFX_V2 } from "@/lib/world/audio/sfx-v2";
 
 export const SFX_NAMES = [
   "footstep",
@@ -74,10 +75,39 @@ export const SFX_NAMES = [
   "elevator_cable",
   "door_hiss",
   "brownout_crackle",
+  // ── round 6: overhaul + studio ──
+  "secret",
+  "studio_on",
+  "tape_stop",
+  "record_start",
+  "switch_click",
+  // ── round 7: wardrobe replicator ──
+  "sew_rattle",
+  "replicator_ping",
 ] as const;
 export type SfxName = (typeof SFX_NAMES)[number];
 
-export const SURFACES = ["metal", "grate", "concrete", "tile", "carpet", "wood"] as const;
+/**
+ * Floor surfaces for footsteps. The first six come from the room theme
+ * (`surfaceForTheme`); the rest are cryo / cavern floors and spots found
+ * under the player (puddles, broken glass, rubber mats, rubble, cables,
+ * paper — see audio/surfaces.ts).
+ */
+export const SURFACES = [
+  "metal",
+  "grate",
+  "concrete",
+  "tile",
+  "carpet",
+  "wood",
+  "water",
+  "glass",
+  "rubber",
+  "gravel",
+  "ice",
+  "cable",
+  "paper",
+] as const;
 export type Surface = (typeof SURFACES)[number];
 
 export type BusName = "master" | "music" | "sfx" | "ambience" | "ui" | "voice";
@@ -100,6 +130,7 @@ export const SFX_BUS: Partial<Record<SfxName, BusName>> = {
   achievement: "ui",
   hint_pop: "ui",
   typewriter_tick: "ui",
+  switch_click: "ui",
 };
 
 /** Floor surface per room theme (for footsteps). */
@@ -119,8 +150,11 @@ export function surfaceForTheme(theme: RoomTheme | undefined): Surface {
     case "geothermal":
     case "storage":
       return "concrete";
-    case "lab":
     case "cryo":
+      return "ice";
+    case "greenhouse":
+      return "gravel";
+    case "lab":
     case "portal":
     case "anomaly":
     case "airlock":
@@ -152,49 +186,6 @@ const variant = (t: SynthTarget, n: number): number => Math.min(n - 1, Math.floo
 /** Random value in [lo, hi). */
 const between = (t: SynthTarget, lo: number, hi: number): number => lo + t.rand() * (hi - lo);
 
-function footstep(t: SynthTarget, p: SfxParams): void {
-  switch (p.surface ?? "metal") {
-    case "metal":
-      t.noise({ dur: 0.05, gain: 0.3, filter: "bandpass", freq: vary(t, 2600), q: 3 });
-      t.tone({ wave: "sine", freq: vary(t, 190), freqEnd: 120, dur: 0.08, gain: 0.16 });
-      t.tone({ wave: "triangle", freq: vary(t, 920, 0.15), dur: 0.12, gain: 0.025 });
-      break;
-    case "grate":
-      t.noise({ dur: 0.03, gain: 0.28, filter: "bandpass", freq: vary(t, 3400), q: 4 });
-      t.noise({ at: 0.028, dur: 0.03, gain: 0.2, filter: "bandpass", freq: vary(t, 2900), q: 4 });
-      t.tone({ wave: "square", freq: vary(t, 240), freqEnd: 200, dur: 0.05, gain: 0.03 });
-      break;
-    case "concrete":
-      t.noise({ dur: 0.07, gain: 0.38, filter: "lowpass", freq: vary(t, 900) });
-      t.tone({ wave: "sine", freq: vary(t, 95), freqEnd: 60, dur: 0.06, gain: 0.18 });
-      break;
-    case "tile":
-      t.noise({ dur: 0.025, gain: 0.3, filter: "highpass", freq: vary(t, 2200) });
-      t.noise({ at: 0.005, dur: 0.05, gain: 0.18, filter: "bandpass", freq: vary(t, 1300), q: 2 });
-      break;
-    case "carpet":
-      t.noise({ dur: 0.09, gain: 0.24, filter: "lowpass", freq: vary(t, 520), attack: 0.01 });
-      break;
-    case "wood":
-      // Hollow board knock, a soft heel scuff and (sometimes) a faint creak.
-      t.tone({ wave: "triangle", freq: vary(t, 210, 0.12), freqEnd: 140, dur: 0.07, gain: 0.14 });
-      t.noise({ dur: 0.05, gain: 0.22, filter: "bandpass", freq: vary(t, 750, 0.15), q: 1.4 });
-      if (t.rand() < 0.3) {
-        t.tone({
-          wave: "sawtooth",
-          freq: vary(t, 330, 0.15),
-          freqEnd: vary(t, 290, 0.1),
-          at: 0.05,
-          dur: 0.12,
-          gain: 0.008,
-          vibrato: { rate: vary(t, 22, 0.3), depth: 8 },
-          filter: { type: "bandpass", freq: 1100, q: 5 },
-        });
-      }
-      break;
-  }
-}
-
 /** Per-surface loudness for footsteps (carpet is soft, grating rings). */
 export const FOOTSTEP_GAIN: Record<Surface, number> = {
   metal: 0.55,
@@ -203,14 +194,14 @@ export const FOOTSTEP_GAIN: Record<Surface, number> = {
   tile: 0.5,
   carpet: 0.35,
   wood: 0.5,
+  water: 0.55,
+  glass: 0.5,
+  rubber: 0.4,
+  gravel: 0.5,
+  ice: 0.45,
+  cable: 0.42,
+  paper: 0.4,
 };
-
-function arp(t: SynthTarget, freqs: number[], step: number, dur: number, gain: number): void {
-  freqs.forEach((f, i) => {
-    t.tone({ wave: "triangle", freq: f, at: i * step, dur, gain, release: 0.08 });
-    t.tone({ wave: "sine", freq: f * 2, at: i * step, dur: dur * 0.8, gain: gain * 0.3 });
-  });
-}
 
 /** Hollow metal clunk (door ends, elevator brakes, gate latches). */
 function clunk(t: SynthTarget, at: number, weight: number): void {
@@ -705,42 +696,7 @@ const ROUND4_SFX = {
       attack: 0.1,
     });
   },
-  achievement: (t) => {
-    // Short triumphant CRT arpeggio: lowpassed square blips + a held chord.
-    const v = variant(t, 3);
-    const root = [523.3, 587.3, 466.2][v]! * vary(t, 1, 0.01);
-    const steps = [1, 1.26, 1.5, 2, 2.52];
-    steps.forEach((r, i) => {
-      t.tone({
-        wave: "square",
-        freq: root * r,
-        at: i * 0.065,
-        dur: 0.06,
-        gain: 0.05,
-        filter: { type: "lowpass", freq: 3200 },
-      });
-    });
-    for (const r of [1, 1.26, 1.5, 2]) {
-      t.tone({
-        wave: "triangle",
-        freq: root * r,
-        at: 0.34,
-        dur: 0.45,
-        gain: 0.04,
-        release: 0.5,
-      });
-    }
-    // CRT whine + scanline hiss.
-    t.tone({ wave: "sine", freq: 7800, dur: 0.8, gain: 0.006, release: 0.3 });
-    t.noise({ at: 0.3, dur: 0.3, gain: 0.02, filter: "highpass", freq: 6000, release: 0.3 });
-  },
-  hint_pop: (t) => {
-    const v = variant(t, 3);
-    const f = vary(t, [620, 740, 560][v]!, 0.05);
-    t.tone({ wave: "sine", freq: f, freqEnd: f * 2, dur: 0.06, gain: 0.07, attack: 0.002 });
-    t.tone({ wave: "sine", freq: f * 3, at: 0.05, dur: 0.1, gain: 0.03, release: 0.12 });
-    t.noise({ dur: 0.01, gain: 0.03, filter: "highpass", freq: 5000 });
-  },
+
   typewriter_tick: (t) => {
     const v = variant(t, 3);
     t.noise({
@@ -954,135 +910,6 @@ const ROUND5_SFX = {
 } satisfies Record<string, Recipe>;
 
 export const SFX: Record<SfxName, Recipe> = {
-  footstep,
-  pickup: (t) => {
-    t.tone({ wave: "triangle", freq: 660, freqEnd: 990, dur: 0.08, gain: 0.18 });
-    t.tone({ wave: "sine", freq: 1320, at: 0.07, dur: 0.14, gain: 0.14, release: 0.1 });
-  },
-  item_rare: (t) => {
-    arp(t, [784, 988, 1175, 1568], 0.07, 0.25, 0.12);
-    t.noise({ at: 0.1, dur: 0.5, gain: 0.05, filter: "highpass", freq: 7000, release: 0.3 });
-    t.tone({ wave: "sine", freq: 2349, at: 0.28, dur: 0.9, gain: 0.05, release: 0.5 });
-  },
-  build_stage: (t) => {
-    t.noise({ dur: 0.12, gain: 0.35, filter: "bandpass", freq: 1800, q: 2 });
-    t.tone({ wave: "square", freq: 140, freqEnd: 90, dur: 0.1, gain: 0.1 });
-    for (let i = 0; i < 6; i++) {
-      t.noise({
-        at: 0.16 + i * 0.045,
-        dur: 0.015,
-        gain: 0.22,
-        filter: "highpass",
-        freq: vary(t, 3500, 0.1),
-      });
-    }
-    t.noise({ at: 0.46, dur: 0.14, gain: 0.4, filter: "bandpass", freq: 1400, q: 2 });
-    t.tone({ wave: "triangle", freq: 330, at: 0.46, dur: 0.35, gain: 0.05, release: 0.3 });
-  },
-  device_on: (t) => {
-    t.tone({
-      wave: "sawtooth",
-      freq: 55,
-      freqEnd: 110,
-      dur: 0.9,
-      gain: 0.1,
-      attack: 0.3,
-      filter: { type: "lowpass", freq: 500 },
-    });
-    t.tone({ wave: "sine", freq: 110, freqEnd: 220, dur: 0.9, gain: 0.12, attack: 0.3 });
-    t.tone({ wave: "square", freq: 880, at: 0.85, dur: 0.05, gain: 0.04 });
-  },
-  device_off: (t) => {
-    t.tone({
-      wave: "sawtooth",
-      freq: 110,
-      freqEnd: 40,
-      dur: 0.7,
-      gain: 0.1,
-      filter: { type: "lowpass", freq: 400 },
-    });
-    t.tone({ wave: "sine", freq: 220, freqEnd: 60, dur: 0.7, gain: 0.1 });
-  },
-  power_up_cascade: (t) => {
-    for (let i = 0; i < 6; i++) {
-      t.noise({ at: i * 0.18, dur: 0.15, gain: 0.4, filter: "lowpass", freq: 320 });
-      t.tone({ wave: "sine", freq: 60 * (1 + i * 0.25), at: i * 0.18, dur: 0.3, gain: 0.18 });
-      t.tone({ wave: "square", freq: 1200 + i * 150, at: i * 0.18 + 0.05, dur: 0.03, gain: 0.03 });
-    }
-    t.tone({
-      wave: "sawtooth",
-      freq: 55,
-      at: 1.1,
-      dur: 1.6,
-      gain: 0.08,
-      attack: 0.4,
-      release: 0.8,
-      filter: { type: "lowpass", freq: 380 },
-    });
-    t.tone({ wave: "sine", freq: 110, at: 1.1, dur: 1.6, gain: 0.1, attack: 0.4, release: 0.8 });
-  },
-  brownout: (t) => {
-    t.tone({
-      wave: "sawtooth",
-      freq: 110,
-      freqEnd: 30,
-      dur: 1.2,
-      gain: 0.12,
-      vibrato: { rate: 7, depth: 9 },
-      filter: { type: "lowpass", freq: 500 },
-    });
-    t.noise({ dur: 0.6, gain: 0.18, filter: "lowpass", freq: 220 });
-    for (let i = 0; i < 3; i++) {
-      t.noise({ at: 0.2 + t.rand() * 0.8, dur: 0.02, gain: 0.3, filter: "highpass", freq: 4000 });
-    }
-  },
-  combine: (t) => {
-    t.tone({ wave: "sine", freq: 440, freqEnd: 880, dur: 0.25, gain: 0.12 });
-    t.tone({ wave: "sine", freq: 660, freqEnd: 330, dur: 0.25, gain: 0.1 });
-    t.noise({ dur: 0.3, gain: 0.08, filter: "bandpass", freq: 3000, freqEnd: 800, q: 2 });
-    t.tone({ wave: "triangle", freq: 587, at: 0.26, dur: 0.2, gain: 0.08, release: 0.15 });
-  },
-  prototype: (t) => {
-    for (let i = 0; i < 9; i++) {
-      t.tone({
-        wave: "sine",
-        freq: 1500 + t.rand() * 2200,
-        at: i * 0.045,
-        dur: 0.12,
-        gain: 0.06,
-        release: 0.1,
-      });
-    }
-    t.tone({ wave: "triangle", freq: 523, freqEnd: 1046, dur: 0.45, gain: 0.1, release: 0.3 });
-    t.noise({ dur: 0.6, gain: 0.04, filter: "highpass", freq: 8000, release: 0.3 });
-  },
-  explosion: (t) => {
-    t.noise({
-      dur: 1.2,
-      gain: 0.9,
-      filter: "lowpass",
-      freq: 3200,
-      freqEnd: 180,
-      attack: 0.004,
-      release: 0.6,
-    });
-    t.tone({ wave: "sine", freq: 85, freqEnd: 28, dur: 0.9, gain: 0.9, attack: 0.004 });
-    t.noise({ dur: 0.22, gain: 0.3, filter: "highpass", freq: 4200 });
-    for (let i = 0; i < 5; i++) {
-      t.noise({ at: 0.15 + t.rand() * 0.9, dur: 0.02, gain: 0.2, filter: "highpass", freq: 3000 });
-    }
-  },
-  puzzle_open: (t) => {
-    t.tone({ wave: "triangle", freq: 330, freqEnd: 660, dur: 0.2, gain: 0.12 });
-    t.tone({ wave: "sine", freq: 990, at: 0.12, dur: 0.15, gain: 0.08, release: 0.1 });
-  },
-  puzzle_solved: (t) => arp(t, [523, 659, 784, 1046], 0.09, 0.2, 0.13),
-  fail_buzz: (t) => {
-    for (const at of [0, 0.3]) {
-      t.tone({ wave: "square", freq: 110, at, dur: 0.22, gain: 0.07 });
-      t.tone({ wave: "square", freq: 116.5, at, dur: 0.22, gain: 0.07 });
-    }
-  },
   door_open: (t) => {
     t.noise({
       dur: 0.6,
@@ -1119,7 +946,6 @@ export const SFX: Record<SfxName, Recipe> = {
     t.tone({ wave: "sine", freq: 1318, at: 1.7, dur: 0.8, gain: 0.1, release: 0.5 });
     t.tone({ wave: "sine", freq: 1046, at: 1.85, dur: 0.9, gain: 0.1, release: 0.6 });
   },
-  keypad_beep: (t) => t.tone({ wave: "square", freq: 1200, dur: 0.06, gain: 0.1 }),
   note_paper: (t) => {
     t.noise({ dur: 0.15, gain: 0.18, filter: "bandpass", freq: 3000, freqEnd: 1500, q: 1.5 });
     t.noise({ at: 0.12, dur: 0.08, gain: 0.12, filter: "bandpass", freq: 5000, q: 1.5 });
@@ -1145,31 +971,6 @@ export const SFX: Record<SfxName, Recipe> = {
       vibrato: { rate: 4.2, depth: 6 },
     });
   },
-  ui_click: (t) => t.tone({ wave: "square", freq: 1800, freqEnd: 1200, dur: 0.025, gain: 0.06 }),
-  ui_hover: (t) => t.tone({ wave: "sine", freq: 2400, dur: 0.02, gain: 0.025 }),
-  ui_open: (t) => {
-    t.tone({ wave: "triangle", freq: 440, freqEnd: 880, dur: 0.1, gain: 0.08 });
-    t.noise({ dur: 0.08, gain: 0.03, filter: "bandpass", freq: 2000, freqEnd: 5000 });
-  },
-  ui_close: (t) => {
-    t.tone({ wave: "triangle", freq: 880, freqEnd: 440, dur: 0.1, gain: 0.08 });
-    t.noise({ dur: 0.08, gain: 0.03, filter: "bandpass", freq: 5000, freqEnd: 2000 });
-  },
-  toast: (t) => {
-    t.tone({ wave: "sine", freq: 880, dur: 0.08, gain: 0.06 });
-    t.tone({ wave: "sine", freq: 1320, at: 0.07, dur: 0.1, gain: 0.06, release: 0.08 });
-  },
-  insight: (t) => {
-    t.tone({ wave: "sine", freq: 1046, dur: 0.4, gain: 0.08, attack: 0.002, release: 0.4 });
-    t.tone({ wave: "sine", freq: 1568, at: 0.08, dur: 1.4, gain: 0.11, attack: 0.002, release: 1 });
-    t.tone({ wave: "sine", freq: 2352, at: 0.08, dur: 1.1, gain: 0.05, attack: 0.002 });
-    t.tone({ wave: "sine", freq: 3145, at: 0.1, dur: 0.9, gain: 0.03, attack: 0.002 });
-  },
-  blueprint: (t) => {
-    arp(t, [523, 659, 784, 1046], 0.05, 0.12, 0.07);
-    t.noise({ dur: 0.5, gain: 0.04, filter: "bandpass", freq: 1000, freqEnd: 6000, q: 3 });
-  },
-  mcp_blip: (t) => t.tone({ wave: "square", freq: 440, dur: 0.05, gain: 0.05 }),
   echo_whisper: (t) => {
     t.noise({
       dur: 1.8,
@@ -1288,8 +1089,11 @@ export const SFX: Record<SfxName, Recipe> = {
     t.tone({ wave: "sine", freq: 440, dur: 0.8, gain: 0.18, attack: 0.02, release: 0.5 });
     t.tone({ wave: "triangle", freq: 880, dur: 0.6, gain: 0.04, attack: 0.02, release: 0.4 });
   },
+
   ...ROUND4_SFX,
   ...ROUND5_SFX,
+  // Round 6 overhaul: replaces the event / device / UI / footstep recipes above.
+  ...SFX_V2,
 };
 
 /** Semitone ratio helper for `pitch` (e.g. handshake tones 3-6-4-8). */

@@ -64,6 +64,16 @@ export class WebAudioTarget implements SynthTarget {
     return g;
   }
 
+  /** Output for one sound: a stereo panner when `pan` is set and supported. */
+  private pan(pan: number | undefined, nodes: AudioNode[]): AudioNode {
+    if (!pan || typeof this.ctx.createStereoPanner !== "function") return this.out;
+    const p = this.ctx.createStereoPanner();
+    p.pan.value = Math.max(-1, Math.min(1, pan));
+    p.connect(this.out);
+    nodes.push(p);
+    return p;
+  }
+
   private track(src: AudioScheduledSourceNode, nodes: AudioNode[]): void {
     if (this.counter) this.counter.active++;
     src.onended = () => {
@@ -104,12 +114,19 @@ export class WebAudioTarget implements SynthTarget {
       const f = this.ctx.createBiquadFilter();
       f.type = s.filter.type;
       f.frequency.value = s.filter.freq;
+      if (s.filter.freqEnd !== undefined) {
+        f.frequency.setValueAtTime(s.filter.freq, start);
+        f.frequency.exponentialRampToValueAtTime(
+          Math.max(20, s.filter.freqEnd),
+          start + Math.max(0.01, s.dur),
+        );
+      }
       f.Q.value = s.filter.q ?? 0.7;
       head.connect(f);
       head = f;
       nodes.push(f);
     }
-    head.connect(env).connect(this.out);
+    head.connect(env).connect(this.pan(s.pan, nodes));
     const stop = start + Math.max(s.dur, attack) + release + 0.05;
     osc.start(start);
     osc.stop(stop);
@@ -136,9 +153,10 @@ export class WebAudioTarget implements SynthTarget {
     }
     f.Q.value = s.q ?? 0.8;
     const env = this.envelope(start, s.dur, s.gain, attack, release);
-    src.connect(f).connect(env).connect(this.out);
+    const extra: AudioNode[] = [];
+    src.connect(f).connect(env).connect(this.pan(s.pan, extra));
     src.start(start, this.rng() * Math.max(0, this.noiseBuf.duration - 0.5));
     src.stop(start + Math.max(s.dur, attack) + release + 0.05);
-    this.track(src, [src, f, env]);
+    this.track(src, [src, f, env, ...extra]);
   }
 }

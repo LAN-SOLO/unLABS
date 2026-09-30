@@ -2,9 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import * as THREE from "three";
-import { AudioSystem, SAFE_ROOM_THEMES, deviceEmitters } from "@/lib/world/audio";
+import { AudioSystem, SAFE_ROOM_THEMES, deviceEmitters, humCategory } from "@/lib/world/audio";
+import type { HumCategory } from "@/lib/world/audio/ambience";
 import type { StingKind } from "@/lib/world/audio/music";
 import type { SfxName, Surface } from "@/lib/world/audio/sfx";
+import { registerActiveAudio } from "@/lib/world/audio/active";
+import type { Footwear, MotionLayerKind } from "@/lib/world/audio/footfall";
+import { StepTracker } from "@/lib/world/audio/footsteps";
+import { surfaceUnder } from "@/lib/world/audio/surfaces";
+import { footwearOf, motionLayersOf } from "@/lib/world/wardrobe";
 import { DEVICE_BY_ID } from "@/lib/world/content/devices";
 import { ROOM_BY_ID } from "@/lib/world/content/map";
 import { power, progress, stagesDone } from "@/lib/world/game";
@@ -74,6 +80,17 @@ const PNEUMATIC_THEMES: ReadonlySet<string> = new Set([
   "lab",
 ]);
 
+/** Power-up pitch per device family (quantum bright, reactors deep). */
+const DEVICE_ON_PITCH: Record<HumCategory, number> = {
+  generator: 0.85,
+  server: 1.1,
+  quantum: 1.26,
+  reactor: 0.75,
+  machine: 1,
+  crystal: 1.5,
+  fan: 0.94,
+};
+
 /** Puzzle focus gives up by itself after this long (closed without a result). */
 const FOCUS_TIMEOUT_MS = 180_000;
 /** Minimum gap between two danger stings. */
@@ -138,6 +155,14 @@ export function useLabDirector(
     key: number;
   } | null>(null);
   const [cinematic, setCinematic] = useState(false);
+  /** The song that just started (now-playing toast), cleared after a few seconds. */
+  const [nowPlaying, setNowPlaying] = useState<{
+    id: string;
+    title: string;
+    genre: string;
+    jukebox: boolean;
+    key: number;
+  } | null>(null);
   const queue = useRef<SceneScript[]>([]);
   const runner = useRef<SceneRunner | null>(null);
   const prev = useRef<Snapshot | null>(null);
@@ -151,14 +176,41 @@ export function useLabDirector(
   /** Puzzle focus (music thins out); performance.now() when it started, 0 = off. */
   const focusSince = useRef(0);
   const lastDangerSting = useRef(-Infinity);
+  /** Footfall bookkeeping: cadence, turns, stops, landings (pure, see audio/footsteps.ts). */
+  const steps = useRef(new StepTracker());
+  const lastStep = useRef<{
+    surface: Surface;
+    footwear: Footwear;
+    layers: MotionLayerKind[];
+  } | null>(null);
   useEffect(() => {
+    // Arriving on another floor (ladder, elevator): the next step lands.
+    if (floorRef.current !== floor) steps.current.landNext();
     floorRef.current = floor;
   }, [floor]);
+  // `useWorld()` returns a new object on every render: loops and callbacks read it through a ref.
+  const worldRef = useRef(world);
+  useEffect(() => {
+    worldRef.current = world;
+  });
 
   // Audio lifecycle.
   useEffect(() => {
     const audio = new AudioSystem();
     audioRef.current = audio;
+    const unregister = registerActiveAudio(audio);
+    let npTimer = 0;
+    const offSong = audio.onSong((song, jukebox) => {
+      setNowPlaying({
+        id: song.id,
+        title: song.title,
+        genre: song.genre,
+        jukebox,
+        key: performance.now(),
+      });
+      window.clearTimeout(npTimer);
+      npTimer = window.setTimeout(() => setNowPlaying(null), 6000);
+    });
     const volumes = () => {
       const a = getSettings().audio;
       audio.setVolumes({
@@ -169,27 +221,24 @@ export function useLabDirector(
         ui: effectiveVolume(a, "ui") / Math.max(0.001, a.master),
         voice: effectiveVolume(a, "voice") / Math.max(0.001, a.master),
       });
+      audio.setMusicPrefs({ switchMode: a.musicSwitch, length: a.songLength });
     };
     volumes();
     const off = subscribeSettings(volumes);
-    // AudioContext may only start from a user gesture: every gesture
-    // (cheaply) re-resumes, which also recovers Safari's "interrupted" state.
-    const gesture = () => {
-      void audio.resume();
-      lastInputAt.current = performance.now();
-    };
-    // Hidden tab: mute + suspend; visible again: resume only if unlocked.
-    const vis = () => void audio.setHidden(document.hidden);
-    window.addEventListener("pointerdown", gesture);
-    window.addEventListener("keydown", gesture);
-    window.addEventListener("touchend", gesture);
-    document.addEventListener("visibilitychange", vis);
+    // AudioContext may only start from a user gesture: every gesture (cheaply)
+    // re-resumes, which also recovers Safari's "interrupted" state. Hidden tab,
+    // bfcache, focus and a watchdog keep the context in step with the page.
+    const unbind = audio.bindPageLifecycle({
+      onGesture: () => {
+        lastInputAt.current = performance.now();
+      },
+    });
     return () => {
       off();
-      window.removeEventListener("pointerdown", gesture);
-      window.removeEventListener("keydown", gesture);
-      window.removeEventListener("touchend", gesture);
-      document.removeEventListener("visibilitychange", vis);
+      offSong();
+      unbind();
+      unregister();
+      window.clearTimeout(npTimer);
       audio.dispose();
       audioRef.current = null;
     };
@@ -210,12 +259,13 @@ export function useLabDirector(
   }, []);
 
   const sound = useCallback(
-    (name: SfxName, at?: [number, number], gain?: number) => {
+    (name: SfxName, at?: [number, number], gain?: number, pitch?: number) => {
       const audio = audioRef.current;
       if (!audio) return;
-      const opts: { pos?: [number, number]; gain?: number } = {};
+      const opts: { pos?: [number, number]; gain?: number; pitch?: number } = {};
       if (at) opts.pos = at;
       if (gain !== undefined) opts.gain = gain;
+      if (pitch !== undefined) opts.pitch = pitch;
       audio.play(name, opts);
       const theme = roomRef.current ? ROOM_BY_ID.get(roomRef.current)?.theme : undefined;
       for (const c of foleyCompanions(name, theme)) {
@@ -231,10 +281,44 @@ export function useLabDirector(
     [setFocus, sting],
   );
 
+  /**
+   * A foot landed (engine callback). Refines the room's floor with decor
+   * spots under the player (rugs, puddles, glass …), picks the footwear set
+   * (Jade's shoes or the fixed setting) and the motion layers of what she
+   * wears, and lets the step tracker add scuffs on turns and landings.
+   */
   const footstep = useCallback((surface: Surface, at?: [number, number]) => {
-    const opts: { pos?: [number, number] } = {};
-    if (at) opts.pos = at;
-    audioRef.current?.footstep(surface, opts);
+    const audio = audioRef.current;
+    if (!audio) return;
+    const [x, z] = at ?? [0, 0];
+    const under = at ? surfaceUnder(floorRef.current, x, z, surface) : surface;
+    const mode = getSettings().audio.footsteps;
+    const look = worldRef.current.get().wardrobe?.look;
+    let footwear: Footwear = "boot";
+    let layers: MotionLayerKind[] = [];
+    try {
+      if (look) {
+        footwear = footwearOf(look);
+        layers = motionLayersOf(look);
+      }
+    } catch {
+      /* wardrobe data mid-migration: plain boots */
+    }
+    if (mode !== "auto") footwear = mode;
+    lastStep.current = { surface: under, footwear, layers };
+    for (const ev of steps.current.step(performance.now() / 1000, x, z)) {
+      audio.step({
+        surface: under,
+        footwear,
+        foot: ev.foot,
+        pace: ev.pace,
+        kind: ev.kind,
+        interval: ev.interval,
+        index: ev.index,
+        layers: ev.kind === "scuff" ? [] : layers,
+        ...(at ? { pos: at } : {}),
+      });
+    }
   }, []);
 
   const speak = useCallback(
@@ -290,7 +374,8 @@ export function useLabDirector(
       for (const id of now.online) {
         if (before.online.has(id)) continue;
         const p = devicePoint(id);
-        sound("device_on", p ? [p.x, p.z] : undefined);
+        // Each device family powers up in its own register.
+        sound("device_on", p ? [p.x, p.z] : undefined, undefined, DEVICE_ON_PITCH[humCategory(id)]);
         if (p && engine) engine.fx.emit("power_wave", p);
         const sc = sceneFor({ kind: "device_online", id });
         if (!sc || s.flags[sceneSeenFlag(sc.id)]) bark("device_online", { device: id });
@@ -375,8 +460,15 @@ export function useLabDirector(
     audioRef.current?.setRoomAcoustics(r);
   }, [room, world]);
 
-  // Scene runner + listener/music updates.
+  // Scene runner + listener/music updates. `useWorld()` returns a new object on
+  // every render, so the loop reads it through `worldRef` — depending on `world`
+  // restarted the loop (and its 0.25 s clock) on every render, and the music,
+  // ambient events and barks it drives never got their turn.
   useEffect(() => {
+    const world = {
+      get: () => worldRef.current.get(),
+      act: <T>(fn: (s: WorldState) => T) => worldRef.current.act(fn),
+    };
     let raf = 0;
     let last = performance.now();
     let slow = 0;
@@ -448,6 +540,22 @@ export function useLabDirector(
         }
       }
       runner.current?.update(dt);
+      // The player stopped walking: the trailing foot settles (once).
+      const settle = steps.current.poll(now / 1000);
+      const ls = lastStep.current;
+      if (settle && ls && audio) {
+        audio.step({
+          surface: ls.surface,
+          footwear: ls.footwear,
+          foot: settle.foot,
+          pace: settle.pace,
+          kind: "stop",
+          interval: settle.interval,
+          index: settle.index,
+          layers: ls.layers,
+          pos: settle.at,
+        });
+      }
       slow += dt;
       ambClock += dt;
       if (engine && audio && slow > 0.25) {
@@ -504,6 +612,8 @@ export function useLabDirector(
             tension,
             scene: null,
             safe: SAFE_ROOM_THEMES.has(theme ?? ""),
+            theme: theme ?? null,
+            style: getSettings().audio.musicStyle,
             motifs: !!s.insights.vier_toene || !!s.insights.handshake,
             focus: focusSince.current > 0,
             danger: here ? Math.min(1, 0.4 + here * 0.2) : 0,
@@ -514,7 +624,7 @@ export function useLabDirector(
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [engineRef, world, room, showBark, sound]);
+  }, [engineRef, room, showBark, sound]);
 
   const skipScene = useCallback(() => runner.current?.skip(), []);
 
@@ -526,10 +636,15 @@ export function useLabDirector(
     [queueScene],
   );
 
+  /** The audio system (studio jukebox, mixer, instruments); null before mount. */
+  const getAudio = useCallback(() => audioRef.current, []);
+
   return {
     sound,
     speak,
     footstep,
+    nowPlaying,
+    getAudio,
     subtitle,
     cinematic,
     skipScene,

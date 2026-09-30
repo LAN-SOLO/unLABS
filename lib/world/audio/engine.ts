@@ -13,8 +13,19 @@
  * `setEmitters([...])` keep the nearest six device voices (hum / fan /
  * crystal chime / quantum warble; brownout = pitch sag + crackle).
  * Adaptive score: `setMusicState` (focus / danger / floor darkness /
- * scenes) + `musicSting()`. `setHidden()` mutes and suspends while the
- * tab is hidden and only resumes a context the player already unlocked.
+ * scenes) + `musicSting()`.
+ *
+ * Page lifecycle (round 7): the context's running / suspended state is a
+ * *reconciliation* — `resume()`, `setHidden()`, gestures, `pagehide` /
+ * `pageshow`, `focus`, `statechange` and a 1 s watchdog all only record
+ * what is wanted (unlocked by a gesture and visible → running, else
+ * suspended) and queue one serialized `settle()` pass that drives the
+ * context there, re-checking after every await. A late `suspend()` promise
+ * can no longer win against an earlier return to the tab (the old bug: the
+ * tab came back before `suspend()` settled, `resume()` saw "running" and
+ * skipped, then the suspend landed → silence until reload). Hung promises
+ * time out; Safari's "interrupted" state is resumed like "suspended".
+ * `bindPageLifecycle()` wires all of it to window/document in one call.
  *
  * No audio files: every sound is synthesised (see sfx.ts, voice.ts,
  * ambience.ts, music.ts). The AudioContext is created lazily in
@@ -30,7 +41,15 @@ import {
   type DeviceEmitter,
   type DeviceHumSource,
 } from "@/lib/world/audio/ambience";
-import { MusicSystem, type MusicState, type StingKind } from "@/lib/world/audio/music";
+import {
+  MusicSystem,
+  type MusicState,
+  type NowPlaying,
+  type StingKind,
+} from "@/lib/world/audio/music";
+import { playDrum, type DrumPiece } from "@/lib/world/audio/songs/drums";
+import { playNote } from "@/lib/world/audio/songs/instruments";
+import type { InstrumentId, Kit, Part, SongDef } from "@/lib/world/audio/songs/types";
 import { RoomReverb, reverbFor, type ReverbSpec } from "@/lib/world/audio/reverb";
 import {
   FOOTSTEP_GAIN,
@@ -40,7 +59,16 @@ import {
   type SfxName,
   type Surface,
 } from "@/lib/world/audio/sfx";
-import { clamp, spatialize } from "@/lib/world/audio/synth";
+import { clamp, spatialize, type SynthTarget } from "@/lib/world/audio/synth";
+import {
+  footwearGain,
+  renderMotion,
+  renderStep,
+  type Footwear,
+  type MotionLayerKind,
+  type StepKind,
+} from "@/lib/world/audio/footfall";
+import type { MusicPrefs, MusicStatus } from "@/lib/world/audio/music";
 import {
   renderSpeech,
   speakerPitch,
@@ -77,6 +105,45 @@ export interface PlayOptions {
 }
 
 type AudioCtor = new () => AudioContext;
+
+/** One footfall for `AudioSystem.step()`. */
+export interface StepOptions {
+  surface: Surface;
+  footwear: Footwear;
+  foot?: 0 | 1;
+  pace?: number;
+  kind?: StepKind;
+  interval?: number;
+  /** Motion layers of worn pieces (keys, tools, …). */
+  layers?: readonly MotionLayerKind[];
+  /** Step counter for layers that sound every n-th step. */
+  index?: number;
+  pos?: readonly [number, number];
+  gain?: number;
+}
+
+/** Longest we wait for a `resume()` / `suspend()` promise before re-checking. */
+const LIFECYCLE_TIMEOUT_MS = 1500;
+/** Watchdog period: re-resume a context that stopped while it should run. */
+const WATCHDOG_MS = 1000;
+
+/** Resolve true when `p` settles in time, false on rejection or timeout. */
+function settled(p: Promise<unknown> | undefined, ms = LIFECYCLE_TIMEOUT_MS): Promise<boolean> {
+  if (!p || typeof (p as { then?: unknown }).then !== "function") return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), ms);
+    p.then(
+      () => {
+        clearTimeout(timer);
+        resolve(true);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(false);
+      },
+    );
+  });
+}
 
 function findAudioContext(): AudioCtor | null {
   const g = globalThis as { AudioContext?: AudioCtor; webkitAudioContext?: AudioCtor };
@@ -127,6 +194,15 @@ export class AudioSystem {
   private speechGain: GainNode | null = null;
   private readonly createContext: () => AudioContext | null;
   private readonly voiceLimit: number;
+  /** Serialized lifecycle work (resume / suspend never overlap). */
+  private opChain: Promise<void> = Promise.resolve();
+  private settling = 0;
+  private watchdog: ReturnType<typeof setInterval> | null = null;
+  /** Reads `document.hidden` (set by `bindPageLifecycle`) for the watchdog. */
+  private hiddenProbe: (() => boolean) | null = null;
+  private musicPrefs: MusicPrefs = { switchMode: "now", length: "standard" };
+  /** How often settle() had to call ctx.resume() (tests, dev handle). */
+  resumeCalls = 0;
 
   constructor(opts: AudioSystemOptions = {}) {
     this.volumes = { ...DEFAULT_VOLUMES, ...opts.volumes };
@@ -161,30 +237,27 @@ export class AudioSystem {
 
   /**
    * Create / resume the context. Call from a user gesture (first click or
-   * key press). Safe to call repeatedly.
+   * key press). Safe to call repeatedly. While the tab is hidden it only
+   * records the unlock; the context starts once the tab is visible.
    */
-  async resume(): Promise<void> {
-    if (this.disposed) return;
+  resume(): Promise<void> {
+    if (this.disposed) return Promise.resolve();
     this.unlocked = true;
-    if (this.hidden) return;
-    if (!this.graph) this.graph = this.build();
-    const g = this.graph;
-    if (!g) return;
-    // "suspended", or Safari's "interrupted" after a phone call / lock.
-    if (g.ctx.state !== "running" && g.ctx.state !== "closed") {
-      try {
-        await g.ctx.resume();
-      } catch {
-        return;
+    this.startWatchdog();
+    if (!this.hidden) {
+      // Inside the gesture's own call stack: create + kick the context
+      // synchronously (Safari / iOS only honour a resume made right here).
+      if (!this.graph) this.graph = this.build();
+      const g = this.graph;
+      if (g && g.ctx.state !== "running" && g.ctx.state !== "closed") {
+        try {
+          void g.ctx.resume().catch(() => undefined);
+        } catch {
+          /* settle() retries */
+        }
       }
     }
-    if (this.ambience) g.beds.set(ambienceFor(this.ambience.theme, this.ambience.powered));
-    if (this.musicState) {
-      g.music.setState(this.musicState);
-      if (!g.music.playing) g.music.start();
-    }
-    g.reverb.set(this.reverbSpec);
-    this.applyVolumes();
+    return this.reconcile();
   }
 
   /** The player has interacted at least once (context may be created). */
@@ -194,28 +267,150 @@ export class AudioSystem {
 
   /**
    * Tab visibility: fade out and suspend while hidden; on return resume
-   * only if the player already unlocked audio with a gesture.
+   * only if the player already unlocked audio with a gesture. Any order of
+   * calls ends in the state that matches the last one.
    */
-  async setHidden(hidden: boolean): Promise<void> {
-    if (this.hidden === hidden) return;
-    this.hidden = hidden;
-    this.applyVolumes();
-    if (hidden) {
-      await this.suspend();
-      return;
+  setHidden(hidden: boolean): Promise<void> {
+    if (this.disposed) return Promise.resolve();
+    if (this.hidden !== hidden) {
+      this.hidden = hidden;
+      this.applyVolumes();
     }
-    if (this.unlocked) await this.resume();
+    return this.reconcile();
+  }
+
+  get isHidden(): boolean {
+    return this.hidden;
   }
 
   /** Pause output (e.g. tab hidden). `resume()` continues. */
-  async suspend(): Promise<void> {
-    const g = this.graph;
-    if (!g || g.ctx.state !== "running") return;
+  suspend(): Promise<void> {
+    return this.setHidden(true);
+  }
+
+  /** Queue one settle pass behind whatever lifecycle work is in flight. */
+  private reconcile(): Promise<void> {
+    const run = this.opChain.then(() => this.settle());
+    this.opChain = run.catch(() => undefined);
+    return run;
+  }
+
+  /** Drive the context to the wanted state, re-checking after every await. */
+  private async settle(): Promise<void> {
+    this.settling++;
     try {
-      await g.ctx.suspend();
-    } catch {
-      /* ignore */
+      for (let i = 0; i < 4; i++) {
+        if (this.disposed) return;
+        const want = this.unlocked && !this.hidden;
+        if (want && !this.graph) this.graph = this.build();
+        const g = this.graph;
+        if (!g) return;
+        const state = g.ctx.state as string;
+        if (state === "closed") return;
+        const running = state === "running";
+        if (want === running) {
+          if (running) this.onRunning(g);
+          return;
+        }
+        let ok: boolean;
+        if (want) {
+          this.resumeCalls++;
+          ok = await settled(safeCall(() => g.ctx.resume()));
+        } else {
+          ok = await settled(safeCall(() => g.ctx.suspend()));
+        }
+        // A rejected / hung call and no change: leave it to the watchdog / next gesture.
+        if (!ok && (g.ctx.state as string) === state) return;
+      }
+    } finally {
+      this.settling--;
     }
+  }
+
+  /** The context runs (again): re-apply everything that needs a running context. */
+  private onRunning(g: Graph): void {
+    if (this.ambience) g.beds.set(ambienceFor(this.ambience.theme, this.ambience.powered));
+    if (this.musicState) {
+      g.music.setState(this.musicState);
+      if (!g.music.playing) g.music.start();
+    }
+    g.music.setPrefs(this.musicPrefs);
+    this.hookSongs();
+    g.reverb.set(this.reverbSpec);
+    this.updateEmitters();
+    this.applyVolumes();
+  }
+
+  private startWatchdog(): void {
+    if (this.watchdog || this.disposed) return;
+    this.watchdog = setInterval(() => this.watch(), WATCHDOG_MS);
+  }
+
+  /** Periodic check: visibility we may have missed, a context that stopped. */
+  private watch(): void {
+    if (this.disposed || this.settling > 0) return;
+    const probe = this.hiddenProbe;
+    if (probe) {
+      let h = this.hidden;
+      try {
+        h = probe();
+      } catch {
+        /* keep */
+      }
+      if (h !== this.hidden) {
+        void this.setHidden(h);
+        return;
+      }
+    }
+    const g = this.graph;
+    if (!g || !this.unlocked || this.hidden) return;
+    const state = g.ctx.state as string;
+    if (state !== "running" && state !== "closed") void this.reconcile();
+  }
+
+  /**
+   * Wire gestures and the page lifecycle (visibility, bfcache, focus,
+   * freeze / resume) to this system. Returns the unbind function.
+   */
+  bindPageLifecycle(
+    opts: {
+      win?: Window;
+      doc?: Document;
+      /** Called after every gesture (e.g. to start title music). */
+      onGesture?: () => void;
+    } = {},
+  ): () => void {
+    const win = opts.win ?? (typeof window !== "undefined" ? window : undefined);
+    const doc = opts.doc ?? (typeof document !== "undefined" ? document : undefined);
+    if (!win || !doc) return () => undefined;
+    const gesture = () => {
+      void this.resume();
+      opts.onGesture?.();
+    };
+    const sync = () => void this.setHidden(doc.hidden);
+    const hide = () => void this.setHidden(true);
+    this.hiddenProbe = () => doc.hidden;
+    const winEvents: [string, () => void][] = [
+      ["pointerdown", gesture],
+      ["keydown", gesture],
+      ["touchend", gesture],
+      ["pagehide", hide],
+      ["pageshow", sync],
+      ["focus", sync],
+    ];
+    const docEvents: [string, () => void][] = [
+      ["visibilitychange", sync],
+      ["freeze", hide],
+      ["resume", sync],
+    ];
+    for (const [e, f] of winEvents) win.addEventListener(e, f);
+    for (const [e, f] of docEvents) doc.addEventListener(e, f);
+    if (doc.hidden) sync();
+    return () => {
+      for (const [e, f] of winEvents) win.removeEventListener(e, f);
+      for (const [e, f] of docEvents) doc.removeEventListener(e, f);
+      if (this.hiddenProbe) this.hiddenProbe = null;
+    };
   }
 
   setVolumes(v: BusVolumes): void {
@@ -296,6 +491,37 @@ export class AudioSystem {
     });
   }
 
+  /**
+   * A designed footfall: footwear × surface, foot, pace, kind (step / scuff /
+   * stop / land) plus the motion layers of worn pieces — one panner, a few
+   * nodes. Gain follows the surface and the footwear set (sfx bus).
+   */
+  step(o: StepOptions): void {
+    const gain = (o.gain ?? 1) * FOOTSTEP_GAIN[o.surface] * footwearGain(o.footwear);
+    const params = {
+      surface: o.surface,
+      footwear: o.footwear,
+      foot: o.foot ?? 0,
+      pace: o.pace ?? 1,
+      kind: o.kind ?? "step",
+      interval: o.interval ?? 0.3,
+    } as const;
+    this.emit(
+      (t) => {
+        renderStep(t, params);
+        if (o.layers?.length)
+          renderMotion(t, o.layers, {
+            foot: params.foot,
+            pace: params.pace,
+            kind: params.kind,
+            index: o.index ?? 0,
+          });
+      },
+      "sfx",
+      { gain, ...(o.pos ? { pos: o.pos } : {}), panBias: params.foot === 0 ? -0.06 : 0.06 },
+    );
+  }
+
   /** Short musical cue in the current key (discovery, insight, solved, danger). */
   musicSting(kind: StingKind): void {
     const g = this.graph;
@@ -305,19 +531,29 @@ export class AudioSystem {
 
   /** Play a one-shot effect. */
   play(name: SfxName, opts: PlayOptions = {}): void {
-    const g = this.graph;
-    if (!g || g.ctx.state !== "running" || g.counter.full) return;
     const recipe = SFX[name];
     if (!recipe) return;
+    const params = opts.surface ? { surface: opts.surface } : {};
+    this.emit((t) => recipe(t, params), SFX_BUS[name] ?? "sfx", opts);
+  }
+
+  /** Render a recipe into a one-shot target on `busName` (spatialised, capped). */
+  private emit(
+    render: (t: SynthTarget) => void,
+    busName: BusName,
+    opts: PlayOptions & { panBias?: number },
+  ): void {
+    const g = this.graph;
+    if (!g || g.ctx.state !== "running" || g.counter.full) return;
     let gain = opts.gain ?? 1;
-    let pan = 0;
+    let pan = opts.panBias ?? 0;
     if (opts.pos) {
       const s = spatialize(opts.pos, opts.listener ?? this.listener, this.yaw);
       gain *= s.gain;
-      pan = s.pan;
+      pan = clamp(pan + s.pan, -1, 1);
       if (gain < 0.01) return;
     }
-    const bus = g.buses[SFX_BUS[name] ?? "sfx"];
+    const bus = g.buses[busName];
     let out: AudioNode = bus;
     let panner: StereoPannerNode | null = null;
     if (pan !== 0 && typeof g.ctx.createStereoPanner === "function") {
@@ -328,7 +564,7 @@ export class AudioSystem {
     }
     const t0 = g.ctx.currentTime + 0.005 + Math.max(0, opts.delay ?? 0);
     const target = new WebAudioTarget(g.ctx, out, g.noise, t0, opts.pitch ?? 1, gain, g.counter);
-    recipe(target, opts.surface ? { surface: opts.surface } : {});
+    render(target);
     if (panner) {
       const p = panner;
       const t = setTimeout(() => {
@@ -404,6 +640,124 @@ export class AudioSystem {
     if (!g.music.playing) g.music.start();
   }
 
+  // ── Songs, jukebox, studio ─────────────────────────────────────
+
+  /** The song playing now (null in scenes, generative mode or silence). */
+  nowPlaying(): NowPlaying | null {
+    return this.graph?.music.nowPlaying() ?? null;
+  }
+
+  private readonly songListeners = new Set<(song: SongDef, jukebox: boolean) => void>();
+  private songUnsub: (() => void) | null = null;
+
+  /** Subscribe to song changes (now-playing toast, studio). */
+  onSong(cb: (song: SongDef, jukebox: boolean) => void): () => void {
+    this.songListeners.add(cb);
+    this.hookSongs();
+    return () => this.songListeners.delete(cb);
+  }
+
+  private hookSongs(): void {
+    const g = this.graph;
+    if (!g || this.songUnsub) return;
+    this.songUnsub = g.music.onSong((song, jb) => {
+      for (const cb of this.songListeners) cb(song, jb);
+    });
+  }
+
+  /** Style-switch mode + song length (settings); applied now and on every restart. */
+  setMusicPrefs(prefs: Partial<MusicPrefs>): void {
+    this.musicPrefs = { ...this.musicPrefs, ...prefs };
+    this.graph?.music.setPrefs(this.musicPrefs);
+  }
+
+  /** Style in effect, a waiting style change and the current song (settings indicator). */
+  musicStatus(): MusicStatus | null {
+    const g = this.graph;
+    if (!g) return null;
+    return g.music.status();
+  }
+
+  /**
+   * Title screen with `afterSong`: play `id` after the current song (null =
+   * hand back to the generative / scene score then).
+   */
+  queueSong(id: string | null, loop = false): boolean {
+    const g = this.graph;
+    if (!g || g.ctx.state !== "running") return false;
+    const ok = g.music.queueSong(id, loop);
+    if (ok && id !== null && !g.music.playing) g.music.start();
+    return ok;
+  }
+
+  /** Studio jukebox: play a song now (crossfade). */
+  playSong(id: string, loop = false, fade = 1.2): boolean {
+    const g = this.graph;
+    if (!g || g.ctx.state !== "running") return false;
+    const ok = g.music.playSong(id, loop, fade);
+    // Outside the game (title screen) nobody has set a music state yet.
+    if (ok && !g.music.playing) g.music.start();
+    return ok;
+  }
+
+  /** Give song choice back to the game (`fadeNow`: fade the current song out right away). */
+  releaseJukebox(fadeNow?: number): void {
+    this.graph?.music.releaseJukebox(fadeNow);
+  }
+
+  setSongLoop(loop: boolean): void {
+    this.graph?.music.setLoop(loop);
+  }
+
+  skipSong(): void {
+    this.graph?.music.skip();
+  }
+
+  setPartLevel(part: Part, v: number): void {
+    this.graph?.music.setPartLevel(part, v);
+  }
+
+  partLevels(): Record<Part, number> | null {
+    return this.graph?.music.partLevels() ?? null;
+  }
+
+  setLeadInstrument(inst: InstrumentId | undefined): void {
+    this.graph?.music.setLeadInstrument(inst);
+  }
+
+  /** Play one instrument note on the music bus (studio keyboard / sequencer). */
+  studioNote(
+    inst: InstrumentId,
+    midi: number,
+    opts: { delay?: number; dur?: number; vel?: number; pan?: number } = {},
+  ): void {
+    const g = this.graph;
+    if (!g || g.ctx.state !== "running" || g.counter.full) return;
+    const t0 = g.ctx.currentTime + 0.01 + Math.max(0, opts.delay ?? 0);
+    const t = new WebAudioTarget(g.ctx, g.buses.music, g.noise, t0, 1, 1, g.counter);
+    playNote(t, inst, {
+      midi,
+      at: 0,
+      dur: opts.dur ?? 0.4,
+      vel: opts.vel ?? 0.9,
+      ...(opts.pan !== undefined ? { pan: opts.pan } : {}),
+    });
+  }
+
+  /** Play one drum hit on the music bus (studio pads / sequencer). */
+  studioDrum(kit: Kit, piece: DrumPiece, opts: { delay?: number; vel?: number } = {}): void {
+    const g = this.graph;
+    if (!g || g.ctx.state !== "running" || g.counter.full) return;
+    const t0 = g.ctx.currentTime + 0.01 + Math.max(0, opts.delay ?? 0);
+    playDrum(
+      new WebAudioTarget(g.ctx, g.buses.music, g.noise, t0, 1, 1, g.counter),
+      kit,
+      piece,
+      0,
+      opts.vel ?? 1,
+    );
+  }
+
   stopMusic(fade = 2): void {
     this.musicState = null;
     this.graph?.music.stop(fade);
@@ -412,6 +766,9 @@ export class AudioSystem {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    if (this.watchdog) clearInterval(this.watchdog);
+    this.watchdog = null;
+    this.hiddenProbe = null;
     for (const t of this.pannerTimers) clearTimeout(t);
     this.pannerTimers.clear();
     const g = this.graph;
@@ -419,6 +776,9 @@ export class AudioSystem {
     if (!g) return;
     this.speechGain?.disconnect();
     this.speechGain = null;
+    this.songUnsub?.();
+    this.songUnsub = null;
+    this.songListeners.clear();
     g.music.dispose();
     g.beds.dispose();
     g.hums.dispose();
@@ -480,6 +840,17 @@ export class AudioSystem {
         sends,
       };
       this.graph = graph;
+      graph.music.setPrefs(this.musicPrefs);
+      // The browser changed the state by itself (Safari "interrupted", an OS
+      // audio session, a device change): reconcile once it has settled.
+      const onState = () => {
+        if (this.disposed || this.graph !== graph) return;
+        const st = ctx.state as string;
+        const want = this.unlocked && !this.hidden;
+        if ((want && st !== "running") || (!want && st === "running"))
+          setTimeout(() => void this.reconcile(), 50);
+      };
+      if (typeof ctx.addEventListener === "function") ctx.addEventListener("statechange", onState);
       this.applyVolumes();
       return graph;
     } catch {
@@ -496,5 +867,14 @@ export class AudioSystem {
       const v = k === "master" && (this.muted || this.hidden) ? 0 : this.volumes[k];
       g.buses[k].gain.setTargetAtTime(v, now, 0.05);
     }
+  }
+}
+
+/** Call a context method that may throw synchronously (old Safari) as a promise. */
+function safeCall(f: () => Promise<void>): Promise<void> {
+  try {
+    return f();
+  } catch (e) {
+    return Promise.reject(e);
   }
 }

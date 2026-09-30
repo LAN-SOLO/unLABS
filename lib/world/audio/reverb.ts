@@ -54,7 +54,7 @@ const REFLECTIVE = new Set([
   "vault",
 ]);
 /** Vertical shafts: always at least "large". */
-const SHAFTS = new Set(["elevator", "shaft"]);
+const SHAFTS = new Set(["elevator", "shaft", "hub"]);
 
 /** Size bucket for a floor area in voxels² (rooms span roughly 300..2500). */
 export function sizeForArea(area: number): number {

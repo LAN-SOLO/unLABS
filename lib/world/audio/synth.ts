@@ -26,7 +26,10 @@ export interface ToneSpec {
   release?: number;
   detune?: number;
   vibrato?: { rate: number; depth: number };
-  filter?: { type: FilterKind; freq: number; q?: number };
+  /** Optional filter; `freqEnd` sweeps it exponentially over `dur` (filter envelope). */
+  filter?: { type: FilterKind; freq: number; q?: number; freqEnd?: number };
+  /** Stereo position -1..1 (music parts; ignored where no panner exists). */
+  pan?: number;
 }
 
 export interface NoiseSpec {
@@ -40,6 +43,8 @@ export interface NoiseSpec {
   q?: number;
   attack?: number;
   release?: number;
+  /** Stereo position -1..1 (music parts; ignored where no panner exists). */
+  pan?: number;
 }
 
 export interface SynthTarget {

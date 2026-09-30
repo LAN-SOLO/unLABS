@@ -316,6 +316,7 @@ const HUM_THEMES = new Set<string>([
   "workshop",
   "airlock",
   "elevator",
+  "hub",
   "storage",
   "audio",
   "lab",

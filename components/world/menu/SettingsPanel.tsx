@@ -1,6 +1,16 @@
 "use client";
 
 import { fmtNum } from "@/components/world/format";
+import { GENRE_LABEL, STYLE_LABEL, mmss } from "@/lib/world/audio/songs/labels";
+import {
+  FOOTSTEP_MODES,
+  MUSIC_STYLES,
+  MUSIC_SWITCH_MODES,
+  SONG_LENGTHS,
+} from "@/lib/world/audio/songs/styles";
+import { FOOTSTEP_MODE_LABEL, LENGTH_LABEL, SWITCH_LABEL } from "@/lib/world/audio/audio-labels";
+import { activeAudio } from "@/lib/world/audio/active";
+import type { MusicStatus } from "@/lib/world/audio/music";
 import { getLocale, setLocale, tr, LOCALES } from "@/lib/i18n";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ConfirmDialog, CrtButton, MenuPanel } from "@/components/world/menu/shared";
@@ -467,6 +477,51 @@ function CameraTab({ s, update }: { s: Settings; update: Update }) {
   );
 }
 
+/**
+ * What the music does right now: the song playing and, with "after the
+ * song", which style takes over when it ends. Reads the active audio system
+ * (title screen or game) twice a second; hidden while nothing plays.
+ */
+function MusicNowLine() {
+  const [st, setSt] = useState<MusicStatus | null>(null);
+  useEffect(() => {
+    const read = () => setSt(activeAudio()?.musicStatus() ?? null);
+    read();
+    const id = window.setInterval(read, 500);
+    return () => window.clearInterval(id);
+  }, []);
+  if (!st) return null;
+  const now = st.song
+    ? tr("Now playing: {title} ({genre}) · {pos} / {total}", {
+        title: st.song.title,
+        genre: GENRE_LABEL[st.song.genre],
+        pos: mmss(st.seconds),
+        total: mmss(st.total),
+      })
+    : st.style === "generative"
+      ? tr("Now playing: the generative score")
+      : null;
+  return (
+    <div
+      className="border-b border-[#33FF33]/10 py-1.5 text-[11px]"
+      aria-live="polite"
+      data-music-now
+    >
+      {now && <div className="text-[#33FF33]/70">♪ {now}</div>}
+      {st.pending && (
+        <div className="text-[#FFB800]">
+          {st.song
+            ? tr("Switches after this song ({left} left) → {style}", {
+                left: mmss(Math.max(0, st.total - st.seconds)),
+                style: STYLE_LABEL[st.pending],
+              })
+            : tr("Next: {style}", { style: STYLE_LABEL[st.pending] })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AudioTab({ s, update }: { s: Settings; update: Update }) {
   const a = s.audio;
   const channels = [
@@ -480,6 +535,53 @@ function AudioTab({ s, update }: { s: Settings; update: Update }) {
   return (
     <>
       <Toggle label={tr("Mute")} value={a.mute} onChange={(v) => update({ audio: { mute: v } })} />
+      <Choice
+        label={tr("Music style")}
+        hint={tr(
+          "Adaptive picks songs that fit the room and the moment; a genre plays only that; generative is the original endless score",
+        )}
+        value={a.musicStyle}
+        options={MUSIC_STYLES}
+        format={(v) => STYLE_LABEL[v]}
+        onChange={(v) => update({ audio: { musicStyle: v } })}
+      />
+      <Choice
+        label={tr("Style change")}
+        hint={
+          a.musicSwitch === "now"
+            ? tr(
+                "Right away: a new style crossfades to a fitting song within about 1.5 seconds (a song that already fits keeps playing).",
+              )
+            : tr(
+                "After the song: the current piece always plays to its end, then the next one comes from the new style. The room never cuts a song short either.",
+              )
+        }
+        value={a.musicSwitch}
+        options={MUSIC_SWITCH_MODES}
+        format={(v) => SWITCH_LABEL[v]}
+        onChange={(v) => update({ audio: { musicSwitch: v } })}
+      />
+      <MusicNowLine />
+      <Choice
+        label={tr("Song length")}
+        hint={tr(
+          "Long and epic add variation passes (breakdowns, solos, drums dropping out, a key shift) before the outro. Applies from the next song.",
+        )}
+        value={a.songLength}
+        options={SONG_LENGTHS}
+        format={(v) => LENGTH_LABEL[v]}
+        onChange={(v) => update({ audio: { songLength: v } })}
+      />
+      <Choice
+        label={tr("Footsteps")}
+        hint={tr(
+          "Auto uses the shoes Jade is wearing (and what jingles on her); a fixed set always sounds the same. Volume follows Effects.",
+        )}
+        value={a.footsteps}
+        options={FOOTSTEP_MODES}
+        format={(v) => FOOTSTEP_MODE_LABEL[v]}
+        onChange={(v) => update({ audio: { footsteps: v } })}
+      />
       {channels.map(([key, label]) => (
         <div key={key} className="flex items-center gap-2">
           <div className="flex-1">
