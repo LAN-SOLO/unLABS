@@ -95,6 +95,44 @@
   invalid enum values (breaking the crystal-mint burn); `credit_balance`
   was missing its auth guard. All repaired in migration 20260808000001.
 
+## 0.3.1-beta — 2026-09-30
+
+### Changed
+
+- **Jade Lawrence redesigned from reference photos.** Taller and slimmer
+  (5.67 units), pale skin, silver eyeshadow with a black winged liner, dark
+  brown eyes, a closed smile and a new copper **updo** (`hair_updo`, new
+  `copper` colourway on every hairstyle). First-day look: white stand-collar
+  shirt with a grey-black geometric collar lining (`shirt_collar_geo`) under
+  the lab coat — **no goggles**; glasses and goggles are optional
+  accessories only. Old saves still wearing the old first-day look move to
+  the new one (save format v7).
+- **Damien Fridge redesigned and hidden.** Tall and heavy-set, slicked-back
+  grey-blond hair with undercut and knot, a long pointed grey beard, winged
+  liner, white collared shirt, no glasses. In the game he appears **only
+  veiled** — a flickering figure of static (`lib/world/models/veil.ts`) at
+  the echo, in scenes, the return ending, on screens and in the 1989 photo.
+  He becomes recognisable only once `damien_found` is set, which is reserved
+  for a future story arc (`lib/world/damien.ts`); nothing sets it yet.
+
+### Added
+
+- **18 signature looks** (`lib/world/content/looks.ts`, character menu →
+  Looks): complete outfits — 2 from the start, 4 from the replicator, 5 from
+  hidden pieces and 7 unlocked by special events (studio, all bots awake,
+  Halo ending, all four endings, all 30 slices, the secret ending, Damien's
+  echo). 22 new wardrobe pieces, 2 achievements, hints and barks.
+- **Beta Lab save links.** `/world#beta-save=…` imports a generated save
+  after a confirmation dialog (slot picker, overwrite warning, restorable
+  backup); the link survives the login redirect.
+
+### Security
+
+- Audit 2026-09-30 (`docs/AUDIT.md`): desktop hardening (SCRAM Postgres
+  passwords per install, gateway origin/host checks, loopback-only server,
+  sandboxed window, pinned binary checksums, Electron 44), database
+  hardening migration, Next.js 16.3.7.
+
 ## 0.3.0-beta — 2026-09-30
 
 ### Added
