@@ -4,6 +4,8 @@
  * Usage: npx ts-node scripts/build-desktop.ts [--mac] [--win] [--all]
  *
  * Steps:
+ * 0. Verify the bundled migrations carry all game content of the local
+ *    Supabase Docker DB (scripts/check-desktop-db.sh; skipped without Docker)
  * 1. Download platform binaries
  * 2. Build Next.js production bundle
  * 3. Compile Electron TypeScript
@@ -34,6 +36,9 @@ async function main(): Promise<void> {
     console.log("  --all   Build both");
     process.exit(1);
   }
+
+  // 0. Every content table in Docker must be reproduced by the bundled migrations
+  run("bash scripts/check-desktop-db.sh", "Step 0: Verify database content is bundled");
 
   // 1. Download binaries
   run("npx ts-node scripts/download-binaries.ts", "Step 1: Download platform binaries");
