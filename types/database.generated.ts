@@ -832,6 +832,110 @@ export type Database = {
         };
         Relationships: [];
       };
+      lab_board_posts: {
+        Row: {
+          author_id: string;
+          author_name: string;
+          body: string;
+          created_at: string;
+          deleted_at: string | null;
+          expires_at: string;
+          hidden: boolean;
+          id: string;
+          report_count: number;
+        };
+        Insert: {
+          author_id: string;
+          author_name: string;
+          body: string;
+          created_at?: string;
+          deleted_at?: string | null;
+          expires_at?: string;
+          hidden?: boolean;
+          id?: string;
+          report_count?: number;
+        };
+        Update: {
+          author_id?: string;
+          author_name?: string;
+          body?: string;
+          created_at?: string;
+          deleted_at?: string | null;
+          expires_at?: string;
+          hidden?: boolean;
+          id?: string;
+          report_count?: number;
+        };
+        Relationships: [];
+      };
+      lab_board_reports: {
+        Row: {
+          created_at: string;
+          post_id: string;
+          reporter_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          post_id: string;
+          reporter_id: string;
+        };
+        Update: {
+          created_at?: string;
+          post_id?: string;
+          reporter_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "lab_board_reports_post_id_fkey";
+            columns: ["post_id"];
+            isOneToOne: false;
+            referencedRelation: "lab_board_posts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      lab_messages: {
+        Row: {
+          body: string;
+          created_at: string;
+          id: string;
+          read_at: string | null;
+          recipient_deleted: boolean;
+          recipient_id: string;
+          recipient_name: string;
+          sender_deleted: boolean;
+          sender_id: string;
+          sender_name: string;
+          subject: string;
+        };
+        Insert: {
+          body: string;
+          created_at?: string;
+          id?: string;
+          read_at?: string | null;
+          recipient_deleted?: boolean;
+          recipient_id: string;
+          recipient_name: string;
+          sender_deleted?: boolean;
+          sender_id: string;
+          sender_name: string;
+          subject: string;
+        };
+        Update: {
+          body?: string;
+          created_at?: string;
+          id?: string;
+          read_at?: string | null;
+          recipient_deleted?: boolean;
+          recipient_id?: string;
+          recipient_name?: string;
+          sender_deleted?: boolean;
+          sender_id?: string;
+          sender_name?: string;
+          subject?: string;
+        };
+        Relationships: [];
+      };
       marketplace_listings: {
         Row: {
           buyer_id: string | null;
@@ -2764,7 +2868,10 @@ export type Database = {
         Args: { retention_days?: number };
         Returns: number;
       };
-      cleanup_usage_logs: { Args: { retention_days?: number }; Returns: number };
+      cleanup_usage_logs: {
+        Args: { retention_days?: number };
+        Returns: number;
+      };
       cleanup_volatility_snapshots: {
         Args: { retention_days?: number };
         Returns: number;
@@ -2782,6 +2889,20 @@ export type Database = {
         Returns: {
           error_message: string;
           new_balance: number;
+          success: boolean;
+        }[];
+      };
+      delete_lab_board_post: {
+        Args: { p_post_id: string };
+        Returns: {
+          error_message: string;
+          success: boolean;
+        }[];
+      };
+      delete_lab_message: {
+        Args: { p_message_id: string };
+        Returns: {
+          error_message: string;
           success: boolean;
         }[];
       };
@@ -2824,6 +2945,8 @@ export type Database = {
           success: boolean;
         }[];
       };
+      lab_clean_text: { Args: { p_text: string }; Returns: string };
+      lab_display_name: { Args: { p_uid: string }; Returns: string };
       log_pref_change: {
         Args: {
           p_area: string;
@@ -2834,6 +2957,13 @@ export type Database = {
           p_player_id: string;
         };
         Returns: string;
+      };
+      mark_lab_message_read: {
+        Args: { p_message_id: string };
+        Returns: {
+          error_message: string;
+          success: boolean;
+        }[];
       };
       market_buy: {
         Args: { p_listing_id: string };
@@ -2861,9 +2991,25 @@ export type Database = {
           success: boolean;
         }[];
       };
+      post_lab_board: {
+        Args: { p_body: string };
+        Returns: {
+          error_message: string;
+          post_id: string;
+          success: boolean;
+        }[];
+      };
       record_app_launch: {
         Args: { p_app_id: string; p_player_id: string; p_source: string };
         Returns: undefined;
+      };
+      report_lab_board_post: {
+        Args: { p_post_id: string };
+        Returns: {
+          error_message: string;
+          hidden: boolean;
+          success: boolean;
+        }[];
       };
       reserve_burn_and_award: {
         Args: {
@@ -2891,8 +3037,20 @@ export type Database = {
         Args: { p_area?: string; p_player_id: string };
         Returns: undefined;
       };
+      send_lab_message: {
+        Args: { p_body: string; p_subject: string; p_to_username: string };
+        Returns: {
+          error_message: string;
+          message_id: string;
+          success: boolean;
+        }[];
+      };
       slice_merge: {
-        Args: { p_crystal_id: string; p_pos_absorb: number; p_pos_keep: number };
+        Args: {
+          p_crystal_id: string;
+          p_pos_absorb: number;
+          p_pos_keep: number;
+        };
         Returns: {
           error_message: string;
           fee: number;

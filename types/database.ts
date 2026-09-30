@@ -88,6 +88,9 @@ export type DbUserSecurityPolicies = Tables<"user_security_policies">;
 export type DbDisplayTheme = Tables<"display_themes">;
 export type DbDisplayFont = Tables<"display_fonts">;
 export type DbSoundProfile = Tables<"sound_profiles">;
+export type DbLabMessage = Tables<"lab_messages">;
+export type DbLabBoardPost = Tables<"lab_board_posts">;
+export type DbLabBoardReport = Tables<"lab_board_reports">;
 
 // Joined types
 export type CrystalWithSlices = Crystal & {
