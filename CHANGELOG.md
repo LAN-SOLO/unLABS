@@ -95,6 +95,66 @@
   invalid enum values (breaking the crystal-mint burn); `credit_balance`
   was missing its auth guard. All repaired in migration 20260808000001.
 
+## 0.3.0-beta — 2026-09-30
+
+### Added
+
+- **Jade's wardrobe (Lab World).** 79 pieces in 13 slots (clothes, gadgets,
+  accessories) with 185 colourways, shown on her 3D model, the X-ray twin
+  and baked menu icons. 17 starter pieces, 21 hidden finds, 36 replicator
+  patterns, 5 rewards (slices, awake bots, explosions, Damien's studio).
+  Clothes, shoes and hair change at the wardrobe in Jade's Quarters; gadgets
+  and accessories anywhere. Data `lib/world/content/wardrobe.ts`, rules
+  `lib/world/wardrobe.ts`.
+- **Character menu (key O).** Also via the HUD button, the pause menu, the
+  inventory, the wardrobe and the replicator. Tabs Wardrobe (rotating
+  preview, live hover preview, “Surprise me”, colour swatches), Outfits
+  (4 named presets), Collection (progress, filters, “???” hints) and
+  Replicator.
+- **Replicator “Needle's Eye” (NDL-0).** Jade's self-built wardrobe
+  replicator in her quarters (needs 50 W to start a job). It fabricates
+  pieces, refines salvage into textiles (7 recipes), dyes colourways once
+  and recycles unworn pieces for half their fabric. One job at a time; it
+  keeps running while Jade walks the lab. Lore, an intro card, a model with
+  animated needle, dye carousel and LED, and the sfx `sew_rattle` and
+  `replicator_ping`.
+- **Textiles and hidden finds.** Four new resources: fabric scraps, polymer
+  fibre, pigment and glow thread. They come from 8 refilling sources, Jade's
+  sewing box and 5 existing containers. The 21 finds are `wear:<id>` pickups
+  on all six levels. Three are gated (Nexus online, first drone flight,
+  B4C-0N awake) and two lie in secret rooms.
+- **Wardrobe extras.** 9 achievements (branch “Wardrobe”, incl. the hidden
+  “Dress Code: Optional”), 16 barks reacting to `worn_<id>` flags, 3
+  first-time hints and 2 handbook entries.
+- **Audio round 7.** New settings: _Style change_ (right away / after the
+  song, with a now-playing line), _Song length_ (standard / long ≈ 10 min,
+  the default / epic 20+ min, via seeded variation passes) and _Footsteps_
+  (auto by shoes or a fixed set). Footsteps are rebuilt as 7 footwear sets ×
+  13 surfaces, with motion layers from worn pieces and decor-based surface
+  detection (puddles, glass, rubble, cables, paper, rubber mats, rugs).
+  Cryo floors are now ice and greenhouse floors gravel. The studio Sounds
+  tab gains a footwear selector, the 13 surfaces and a Replicator group.
+- **Merch drop 3: Bot squad.** 23 new products (15 tees, 6 hoodies, 2 kids).
+  Their designs come from the game's voxel models through a new
+  voxel-to-SVG pipeline (`scripts/merch/`). The shop gets a new collection.
+
+### Changed
+
+- **Save format v6.** Adds `wardrobe`. The migration 5 → 6 starts old saves
+  with the first-day look and the starter pieces.
+- Jade's Quarters: the study corner moved to the NW corner and Jade's
+  Locker to (135, 26), to make room for the replicator.
+
+### Fixed
+
+- **Audio going silent after switching tabs.** Returning to the tab before
+  the pending `suspend()` had settled made `resume()` skip. The late suspend
+  then muted the game until a reload. Audio state is now reconciled
+  serially after every lifecycle trigger. Hung promises time out after
+  1.5 s, a 1 s watchdog catches missed events, and the first gesture
+  resumes synchronously (iOS). Music skips the bars it missed instead of
+  bursting.
+
 ## v0.1.27-beta (2026-06-06)
 
 ### Fixed
