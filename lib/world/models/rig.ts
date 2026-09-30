@@ -35,7 +35,11 @@
  *
  * Animation layers (all pure functions of time + small state):
  *  - `characterPose(kind, t, speed, opts)` — one pose kind at pose-clock t;
- *  - `gaitPose` / `advanceGait` — phase-coherent walk ↔ run locomotion;
+ *  - `gaitPose` / `advanceGait` — phase-coherent walk ↔ run locomotion with
+ *    IK-planted feet (cadence from `gaitHz`, stride sized so nothing skates);
+ *  - "sit" / "lie" — sit-down / lie-down choreographies with their own
+ *    stand-up / get-up exits (`sampleTrack`), placed by the engine via
+ *    SIT_SEAT_HEIGHT / SIT_SEAT_OFFSET / LIE_BACK_HEIGHT and `seatRootProgress`;
  *  - `PoseTrack` (`poseTrack`, `switchPose`, `sampleTrack`) — eased,
  *    interruptible cross-fades between kinds;
  *  - `animateCharacter` — track + locomotion + blinks in one call;
@@ -43,7 +47,9 @@
  */
 import { C } from "@/lib/world/content/palette";
 import type { Vec3 } from "@/lib/world/models/anim";
+import { DEFAULT_LOOK, type JadeLook } from "@/lib/world/content/wardrobe";
 import { Model } from "@/lib/world/models/core";
+import { buildJadeRig } from "@/lib/world/models/jade-rig";
 
 export const RIG_PART_NAMES = [
   "hips",
@@ -121,7 +127,9 @@ export type CharacterPoseKind =
   // Floor transitions and reactions.
   | "ride"
   | "climb"
-  | "startle";
+  | "startle"
+  // Resting on a bed / bench (placed by the engine, see LIE_BACK_HEIGHT).
+  | "lie";
 
 export const POSE_KINDS: readonly CharacterPoseKind[] = [
   "idle",
@@ -143,6 +151,7 @@ export const POSE_KINDS: readonly CharacterPoseKind[] = [
   "ride",
   "climb",
   "startle",
+  "lie",
 ];
 
 /**
@@ -151,9 +160,21 @@ export const POSE_KINDS: readonly CharacterPoseKind[] = [
  * the rigs are flagged `fine` and meshed as authored.
  */
 export const CHARACTER_SCALE = 0.09;
-/** Walk cadence (full cycles per second, i.e. two steps). `characterPose("walk")` is periodic in 1 / WALK_HZ. */
-export const WALK_HZ = 1.8;
-/** Walker speed (world units / s) that maps to a full-stride walk. */
+/**
+ * Walk cadence at WALK_FULL_SPEED (full cycles per second, i.e. two steps).
+ * `characterPose("walk", t, WALK_FULL_SPEED)` is periodic in 1 / WALK_HZ.
+ *
+ * Foot plant: Jade's legs are 24 rig voxels (2.16 units) long and the walker
+ * moves at 13 units / s, i.e. 144 voxels / s. With the stance foot planted
+ * for half a cycle (WALK_STANCE) and gliding back by one step (2·Z voxels),
+ * the cadence has to be speed · stance / (2·Z): 3 Hz gives a 12-voxel
+ * half step (±30° of leg swing) — a brisk, planted stride with a 2.6-voxel
+ * (≈ 4 % of her height) vertical bob. `gaitHz` derives
+ * the cadence for any speed and `gaitPose` sizes the step from it, so the
+ * stance foot never skates (tests/world/rig-gait.test.ts measures it).
+ */
+export const WALK_HZ = 3;
+/** Walker speed (world units / s) that maps to a full-stride walk (the walker's `speed`). */
 export const WALK_FULL_SPEED = 13;
 /** Length of the "interact" gesture in seconds (t = time since it started). */
 export const INTERACT_DURATION = 0.6;
@@ -502,267 +523,14 @@ function hairShell(
 
 // ── Jade Lawrence ───────────────────────────────────────────────
 
-const JADE_OUTFIT: Outfit = {
-  pants: C.pants_dark,
-  fold: C.carpet_blue,
-  gap: C.hair_black,
-  boot: C.leather,
-  bootDark: C.walnut,
-  sole: C.rubber,
-  lace: C.leather_worn,
-};
-
-/** Hips (w16 h6 d10): trousers under the open coat, belt with a brass buckle, tools on the belt. */
-function jadeHips(): Model {
-  const m = new Model(16, 6, 10);
-  m.box(0, 0, 0, 15, 3, 9, C.pants_dark);
-  roundEdges(m, 0, 15, 0, 9, 0, 3);
-  // Coat shell: sides and back, open front panels.
-  m.box(0, 0, 1, 1, 3, 8, C.coat_white).box(14, 0, 1, 15, 3, 8, C.coat_white);
-  m.box(1, 0, 0, 14, 3, 1, C.coat_white);
-  m.box(2, 0, 8, 3, 3, 9, C.coat_white).box(12, 0, 8, 13, 3, 9, C.coat_white);
-  m.box(3, 0, 9, 3, 3, 9, C.coat_shadow).box(12, 0, 9, 12, 3, 9, C.coat_shadow);
-  // Belt, buckle, belt loops.
-  m.box(4, 2, 9, 11, 3, 9, C.leather_black);
-  m.box(7, 2, 9, 8, 3, 9, C.brass).set(7, 3, 9, C.gold);
-  m.set(5, 3, 9, C.pants_dark).set(10, 3, 9, C.pants_dark);
-  // Fly fold, a tape measure and a key carabiner.
-  m.box(7, 0, 9, 7, 1, 9, C.carpet_blue);
-  m.box(10, 0, 9, 11, 1, 9, C.safety_yellow).set(11, 1, 9, C.paint_black);
-  m.box(4, 0, 9, 4, 1, 9, C.steel).set(5, 0, 9, C.chrome);
-  // Back vent of the coat.
-  m.box(7, 0, 0, 8, 3, 0, C.coat_shadow);
-  m.box(2, 4, 2, 13, 5, 7, C.sweater_teal);
-  return m;
-}
-
 /**
- * Torso (w16 h16 d12): the open lab coat over a teal cable-knit sweater,
- * folded lapels, the "J. LAWRENCE" badge with photo on the right chest, a
- * breast pocket with pens, a film dosimeter on the left lapel, back seam
- * and yoke, rounded shoulders.
+ * Jade Lawrence wearing `look` (content/wardrobe.ts). The default look —
+ * lab coat, teal sweater, amber goggles, auburn ponytail — is the original
+ * model voxel for voxel. The art lives in models/jade-*.ts (composition:
+ * jade-rig.ts, public API: jade-look.ts).
  */
-function jadeTorso(): Model {
-  const m = new Model(16, 16, 12);
-  m.box(0, 0, 0, 15, 15, 9, C.coat_white);
-  roundEdges(m, 0, 15, 0, 9, 0, 15);
-  // Shoulders slope into the arms.
-  m.box(0, 15, 0, 1, 15, 9, 0).box(14, 15, 0, 15, 15, 9, 0);
-  m.box(0, 14, 0, 0, 14, 9, 0).box(15, 14, 0, 15, 14, 9, 0);
-  // Open coat over the sweater: a narrow strip low, a V widening at the lapels.
-  for (let y = 0; y <= 15; y++) {
-    const [a, b] = y <= 9 ? [6, 9] : y === 10 ? [5, 10] : [4, 11];
-    m.box(a, y, 9, b, y, 9, C.sweater_teal);
-    m.set(a - 1, y, 9, C.coat_shadow).set(b + 1, y, 9, C.coat_shadow);
-  }
-  // Cable knit: two vertical cables and purl dots; the crew-neck rib.
-  for (let y = 0; y <= 13; y++) {
-    tint(m, 7, y, 9, y % 3 === 0 ? C.paint_teal : C.sweater_teal);
-    tint(m, 8, y, 9, y % 3 === 1 ? C.paint_teal : C.sweater_teal);
-  }
-  for (let y = 11; y <= 13; y += 2) m.set(5, y, 9, C.paint_teal).set(10, y, 9, C.paint_teal);
-  m.box(5, 14, 9, 10, 15, 9, C.paint_teal);
-  m.box(6, 15, 8, 9, 15, 9, C.paint_teal);
-  // Folded lapels stand proud of the chest.
-  for (let y = 10; y <= 15; y++) {
-    const w = y >= 13 ? 2 : 1;
-    m.box(4 - w, y, 10, 3, y, 10, C.coat_white).box(12, y, 10, 11 + w, y, 10, C.coat_white);
-  }
-  m.box(1, 10, 10, 3, 10, 10, C.coat_shadow).box(12, 10, 10, 14, 10, 10, C.coat_shadow);
-  m.set(3, 14, 10, 0).set(12, 14, 10, 0);
-  // ID badge "J. LAWRENCE" on the right chest: clip, blue header, photo, name lines.
-  m.box(0, 3, 10, 3, 9, 10, C.paper);
-  m.box(0, 8, 10, 3, 9, 10, C.badge_blue);
-  m.set(1, 9, 10, C.paper).set(2, 9, 10, C.paper);
-  m.box(0, 5, 10, 1, 7, 10, C.skin);
-  m.set(0, 7, 10, C.hair_auburn).set(1, 7, 10, C.hair_auburn);
-  m.set(2, 7, 10, C.paint_black).set(3, 6, 10, C.paint_black).set(2, 5, 10, C.paint_black);
-  m.box(0, 4, 10, 3, 4, 10, C.paint_black);
-  m.set(1, 3, 10, C.paint_black).set(3, 3, 10, C.paint_black);
-  m.box(1, 10, 10, 2, 11, 10, C.steel);
-  // Breast pocket with pens on the left chest.
-  m.box(11, 2, 9, 14, 2, 9, C.coat_shadow);
-  m.box(11, 3, 9, 11, 6, 9, C.coat_shadow).box(14, 3, 9, 14, 6, 9, C.coat_shadow);
-  m.box(11, 7, 9, 14, 7, 9, C.coat_shadow);
-  m.box(12, 6, 10, 12, 8, 10, C.safety_blue).set(12, 6, 10, C.chrome);
-  m.box(13, 6, 10, 13, 9, 10, C.safety_red).set(13, 6, 10, C.chrome).set(13, 9, 10, C.chrome);
-  // Placket buttons, film dosimeter on the left lapel.
-  m.set(5, 2, 9, C.steel).set(5, 6, 9, C.steel);
-  m.box(12, 12, 11, 13, 13, 11, C.safety_yellow)
-    .set(12, 11, 11, C.paint_black)
-    .set(13, 11, 11, C.paint_black);
-  // Back seam, yoke, a half belt with two buttons; sleeve-head seams.
-  m.box(7, 0, 0, 8, 5, 0, C.coat_shadow);
-  m.box(2, 12, 0, 13, 12, 0, C.coat_shadow);
-  m.box(4, 4, 0, 11, 4, 0, C.coat_shadow);
-  m.set(4, 4, 0, C.steel).set(11, 4, 0, C.steel);
-  for (let z = 1; z <= 8; z++) {
-    tint(m, 1, 13, z, C.coat_shadow);
-    tint(m, 14, 13, z, C.coat_shadow);
-  }
-  // Folds under the arms.
-  for (const [y, z] of [
-    [9, 3],
-    [8, 4],
-    [5, 6],
-  ] as const) {
-    tint(m, 0, y, z, C.coat_shadow);
-    tint(m, 15, y, z, C.coat_shadow);
-  }
-  return m;
-}
-
-/** Face mask for Jade's hair: true where skin shows (face, ears, neck). */
-function jadeFace(x: number, y: number, z: number): boolean {
-  if (y <= 2) return true;
-  // Fringe sweeps across the forehead towards her left (+x).
-  if (y >= 14) return false;
-  if (y === 13) return z >= 11 && x <= 5;
-  // Right side: hair tucked behind the ear shows the ear and temple.
-  if (x <= 2) return z >= 7 && y <= 12;
-  // Left side: the jaw-length curtain.
-  if (x >= 12) return false;
-  if (x === 11) return z >= 12 && y <= 10;
-  return z >= 10;
-}
-
-function jadeHead(): Model {
-  const H = C.hair_auburn;
-  const DARK = C.wood_red;
-  const LIGHT = C.rust;
-  const m = headVolume(C.skin, C.skin_shadow);
-  hairShell(m, jadeFace, (x, y, z) => {
-    // Strands: colour runs in 3-row locks, lighter towards the crown.
-    const n = hash01(x * 13 + z * 7, Math.floor((y + x) / 3));
-    return n < 0.2 ? DARK : n > (y > 13 ? 0.72 : 0.86) ? LIGHT : H;
-  });
-  capHead(m);
-  // Face: cheeks, eyes, nose, mouth, chin.
-  const face: readonly string[] = [
-    // x 2..11, rows 12 (top) … 2 (bottom); z = 13 (x 2 / 11 at z 12).
-    "..........",
-    "LLLL..LLLL", // 10: lash line
-    "WGGW..WGGW", // 9
-    "WGPW..WPGW", // 8
-    "....SS....", // 7: nose bridge shading
-    ".b..NN..b.", // 6: blush, nose
-    "....ss....", // 5: nostrils
-    "..sMMMMs..", // 4: mouth
-    "...lMMl...", // 3: lower lip
-    "..........", // 2
-  ];
-  const pal: Record<string, number> = {
-    L: C.walnut_dk,
-    W: C.eye_white,
-    G: C.eye_green,
-    P: C.hair_black,
-    S: C.skin_light,
-    N: C.skin,
-    s: C.skin_shadow,
-    M: C.lips,
-    l: C.skin_light,
-    b: C.paper_pink,
-  };
-  face.forEach((row, r) => {
-    const y = 11 - r;
-    for (let k = 0; k < row.length; k++) {
-      const c = pal[row[k]!];
-      if (!c) continue;
-      const x = 2 + k;
-      const z = m.grid.get(x, y, 13) ? 13 : 12;
-      m.set(x, y, z, c);
-    }
-  });
-  // Nose tip and bridge stand proud.
-  m.box(6, 5, 14, 7, 7, 14, C.skin).set(6, 5, 14, C.skin_shadow).set(7, 5, 14, C.skin_shadow);
-  m.set(6, 7, 14, C.skin_light);
-  // Jaw shading under the chin.
-  for (let x = 4; x <= 9; x++) tint(m, x, 2, 11, C.skin_shadow);
-  // Right ear, the pencil behind it and a small gold stud.
-  m.box(1, 7, 7, 1, 9, 8, C.skin).set(1, 8, 7, C.skin_shadow);
-  m.box(0, 10, 5, 0, 10, 10, C.paper_yellow)
-    .set(0, 10, 11, C.paper_pink)
-    .set(0, 10, 4, C.wood_light);
-  m.set(1, 6, 8, C.gold);
-  // Loose strands: down the left temple and over the jaw, a flyaway on the crown.
-  m.box(12, 3, 13, 12, 9, 13, DARK).set(13, 4, 12, DARK).set(11, 10, 14, DARK);
-  m.set(6, 17, 14, LIGHT).set(7, 17, 13, LIGHT);
-  m.box(8, 13, 13, 10, 13, 14, H).set(11, 12, 14, H).set(9, 12, 14, DARK);
-  // Amber goggles pushed up on the forehead: frames, lenses (solid, non-glowing), bridge, strap.
-  for (const x0 of [2, 8]) {
-    m.box(x0, 14, 14, x0 + 3, 16, 14, C.goggles);
-    m.box(x0 + 1, 14, 15, x0 + 2, 16, 15, C.fabric_mustard);
-    m.set(x0 + 1, 16, 15, C.paper_yellow);
-    m.box(x0, 15, 15, x0, 15, 15, C.goggles).box(x0 + 3, 15, 15, x0 + 3, 15, 15, C.goggles);
-  }
-  m.box(6, 15, 14, 7, 15, 14, C.door_frame_dk);
-  // Strap round the head, just under the crown.
-  for (let z = 1; z <= 13; z++) {
-    tint(m, 1, 15, z, C.leather_black);
-    tint(m, 12, 15, z, C.leather_black);
-  }
-  for (let x = 2; x <= 11; x++) tint(m, x, 15, 1, C.leather_black);
-  return m;
-}
-
-/** Brows (w10 h2 d2): arched, tapered tails. */
-function jadeBrows(): Model {
-  const m = new Model(10, 2, 2);
-  m.box(1, 1, 0, 3, 1, 1, C.wood_red).set(0, 0, 1, C.hair_auburn).set(0, 0, 0, C.wood_red);
-  m.box(6, 1, 0, 8, 1, 1, C.wood_red).set(9, 0, 1, C.hair_auburn).set(9, 0, 0, C.wood_red);
-  m.set(3, 0, 1, C.wood_red).set(6, 0, 1, C.wood_red);
-  return m;
-}
-
-/** Low ponytail with a teal tie (w6 h12 d4), hanging from the back of the head. */
-function jadePonytail(): Model {
-  const m = new Model(6, 12, 4);
-  m.box(1, 10, 0, 4, 11, 3, C.sweater_teal).set(1, 11, 0, C.paint_teal).set(4, 10, 3, C.paint_teal);
-  m.box(0, 6, 0, 5, 9, 3, C.hair_auburn);
-  m.box(1, 2, 0, 4, 5, 3, C.hair_auburn);
-  m.box(2, 0, 1, 3, 1, 2, C.hair_auburn);
-  roundEdges(m, 0, 5, 0, 3, 6, 9);
-  roundEdges(m, 1, 4, 0, 3, 2, 5);
-  for (let y = 0; y <= 9; y++)
-    for (let x = 0; x < 6; x++)
-      for (let z = 0; z < 4; z++) {
-        const s = (x * 5 + z * 3) % 4;
-        if (m.grid.get(x, y, z) && s === 0) m.set(x, y, z, y % 3 ? C.wood_red : C.rust);
-      }
-  m.set(5, 4, 2, C.wood_red).set(5, 3, 2, C.wood_red); // stray strand escaping the tie
-  return m;
-}
-
-/** Coat skirt below the hips (w20 h8 d14): sides, back and front edges, flared hem, pockets. */
-function jadeCoatTail(): Model {
-  const m = new Model(20, 8, 14);
-  // Flare: the hem (rows 0..1) is one voxel wider than the top.
-  m.box(2, 2, 2, 17, 7, 3, C.coat_white);
-  m.box(2, 2, 2, 3, 7, 11, C.coat_white).box(16, 2, 2, 17, 7, 11, C.coat_white);
-  m.box(1, 0, 1, 18, 1, 2, C.coat_white);
-  m.box(1, 0, 1, 2, 1, 12, C.coat_white).box(17, 0, 1, 18, 1, 12, C.coat_white);
-  m.box(3, 0, 12, 3, 1, 12, C.coat_white).box(16, 0, 12, 16, 1, 12, C.coat_white);
-  // Hip pockets with flaps on the sides, the back vent, fold shading on the hem.
-  m.box(1, 4, 6, 1, 6, 9, C.coat_shadow).box(1, 6, 5, 1, 6, 10, C.coat_white);
-  m.box(18, 4, 6, 18, 6, 9, C.coat_shadow).box(18, 6, 5, 18, 6, 10, C.coat_white);
-  m.box(9, 0, 1, 10, 4, 1, 0);
-  m.box(9, 2, 2, 10, 4, 2, C.coat_shadow);
-  for (const z of [4, 8]) {
-    tint(m, 1, 0, z, C.coat_shadow);
-    tint(m, 18, 0, z, C.coat_shadow);
-  }
-  for (const x of [5, 13]) tint(m, x, 0, 1, C.coat_shadow);
-  // Hem wear: scuffed grime at the back, a torn corner, a scorch by the vent.
-  m.set(4, 0, 1, C.grime).set(6, 0, 1, C.dust).set(14, 0, 1, C.grime).set(1, 0, 10, C.grime);
-  m.set(12, 0, 1, C.dust);
-  m.box(18, 0, 1, 18, 0, 2, 0);
-  m.set(12, 2, 2, C.grime).set(11, 3, 2, C.grime);
-  // Screwdriver in the right hip pocket, handle sticking out.
-  m.box(1, 6, 7, 1, 7, 7, C.steel).box(0, 6, 7, 0, 7, 7, C.safety_yellow);
-  m.set(0, 7, 7, C.paint_black);
-  // Blue nitrile glove poking out of the left hip pocket.
-  m.box(18, 6, 8, 19, 7, 8, C.paint_sky).set(19, 5, 8, C.safety_blue).set(19, 6, 9, C.paint_sky);
-  return m;
+export function jadeRig(look: JadeLook = DEFAULT_LOOK): CharacterRigDef {
+  return buildJadeRig(look);
 }
 
 /** Sleeve colours and details for the arms. */
@@ -827,75 +595,6 @@ function forearm(s: ArmStyle, watch: number | null): Model {
     f.box(1, 4, 2, 1, 4, 3, watch).set(1, 5, 2, C.chrome).set(1, 5, 3, C.chrome);
   }
   return f;
-}
-
-const JADE_ARMS: ArmStyle = {
-  sleeve: C.coat_white,
-  shade: C.coat_shadow,
-  cuff: C.coat_shadow,
-  wrist: C.sweater_teal,
-  wristShade: C.paint_teal,
-  skin: C.skin,
-  skinShade: C.skin_shadow,
-};
-
-function jadeArms(): [Model, Model, Model] {
-  return [
-    upperArm(JADE_ARMS, true),
-    forearm(JADE_ARMS, null),
-    mirrorX(forearm(JADE_ARMS, C.screen_cyan)),
-  ];
-}
-
-/** Jade Lawrence: lab coat, teal sweater, amber goggles, auburn ponytail. */
-export function jadeRig(): CharacterRigDef {
-  const s = CHARACTER_SCALE;
-  const [up, fore, foreL] = jadeArms();
-  const parts: RigPart[] = [
-    {
-      name: "hips",
-      model: jadeHips(),
-      parent: null,
-      pivot: [0, HIP_Y, 0],
-      origin: [8, 0, 5],
-      scale: s,
-    },
-    {
-      name: "torso",
-      model: jadeTorso(),
-      parent: "hips",
-      pivot: [8, 4, 5],
-      origin: [8, 0, 5],
-      scale: s,
-    },
-    {
-      name: "head",
-      model: jadeHead(),
-      parent: "torso",
-      pivot: [8, 16, 5],
-      origin: [7, 0, 7],
-      scale: s,
-    },
-    {
-      name: "hairBack",
-      model: jadePonytail(),
-      parent: "head",
-      pivot: [7, 11, 0],
-      origin: [3, 12, 4],
-      scale: s,
-    },
-    ...faceParts(jadeBrows(), C.skin_shadow, C.walnut_dk, s),
-    ...limbs(up, fore, JADE_OUTFIT, 16, 16, 15, s, foreL),
-    {
-      name: "coatTail",
-      model: jadeCoatTail(),
-      parent: "hips",
-      pivot: [8, 0, 1],
-      origin: [10, 8, 3],
-      scale: s,
-    },
-  ];
-  return { id: "jade", parts, scale: s, hologram: false, fine: true };
 }
 
 // ── Damien Fridge ───────────────────────────────────────────────
@@ -1325,7 +1024,7 @@ export function rigBounds(def: CharacterRigDef, pose?: Partial<CharacterPose>): 
 const TAU = Math.PI * 2;
 
 /** Run cadence (full cycles per second). `characterPose("run")` is periodic in 1 / RUN_HZ. */
-export const RUN_HZ = 2.6;
+export const RUN_HZ = 3.2;
 /** Walker speed (world units / s) at which `gaitPose` is a full run (walk below WALK_FULL_SPEED). */
 export const RUN_FULL_SPEED = 20;
 /** Length of the "crouch" pick-up in seconds (t = time since it started). */
@@ -1365,6 +1064,8 @@ export interface PoseOptions {
   idleFor?: number;
   /** Per-character seed: de-synchronises blinks, fidgets and idle loops between characters. */
   seed?: number;
+  /** The seat "sit" sits on (legs reach for the floor / footrest, see `sitFit`). */
+  seat?: SeatSpec;
 }
 
 // ── Small maths ─────────────────────────────────────────────────
@@ -1598,7 +1299,7 @@ function applyFidget(p: CharacterPose, f: FidgetState): void {
     case "goggles": {
       // Right hand to the forehead, nudge the goggles up the hair, a small frown.
       const push = plateau(u, 1.0, 1.45, 0.25);
-      add(p, "upperArmR", [-2.3 - 0.12 * push, 0, 0.6], undefined, w);
+      add(p, "upperArmR", [-2.5 - 0.12 * push, 0, 0.3], undefined, w);
       add(p, "forearmR", [-0.6 + 0.15 * push, 0.4, 0], undefined, w);
       add(p, "head", [-0.1 - 0.08 * push, -0.08, 0], undefined, w);
       add(p, "torso", [-0.02, -0.05, 0], undefined, w);
@@ -1639,92 +1340,197 @@ function idlePose(t: number, o: PoseOptions): CharacterPose {
   return p;
 }
 
-// ── Locomotion ──────────────────────────────────────────────────
+// ── Leg and arm kinematics ──────────────────────────────────────
+//
+// Planar (sagittal y/z) two-bone IK in character space, rig voxels. A
+// segment's "pitch" is the rot.x that swings a hanging (−y) segment onto a
+// direction: pitch > 0 points it backwards (−z), < 0 forwards.
 
-/** Walk cycle at `phase` (cycles; one cycle = two steps). Stance foot stays planted. */
-function walkShape(phase: number, speed: number): CharacterPose {
-  const p = restPose();
-  const a = clamp(speed / WALK_FULL_SPEED, 0, 1.25);
-  const ph = TAU * phase;
-  const s = Math.sin(ph);
-  const c = Math.cos(ph);
-  const s2 = Math.sin(2 * ph);
-  // Legs: R thigh leads when s > 0; the knee flexes most mid-swing.
-  const swing = 0.55 * a;
-  add(p, "thighR", [-swing * s, 0, 0]);
-  add(p, "thighL", [swing * s, 0, 0]);
-  add(p, "shinR", [a * (0.12 + 0.95 * Math.max(0, c) ** 1.5), 0, 0]);
-  add(p, "shinL", [a * (0.12 + 0.95 * Math.max(0, -c) ** 1.5), 0, 0]);
-  // Pelvis: drops at double support (keeps the stance foot planted), twists with
-  // the leading leg, rolls and sways over the stance leg.
-  const drop = LEG_LEN * (1 - Math.cos(swing * s)) + 0.35 * a * (1 - Math.abs(c));
-  add(p, "hips", [0, 0.12 * a * s, 0.05 * a * c], [0.35 * a * c, -drop, 0]);
-  add(p, "thighR", [0, -0.12 * a * s, -0.05 * a * c]);
-  add(p, "thighL", [0, -0.12 * a * s, -0.05 * a * c]);
-  // Torso leans into the stride and counter-rotates; head bobs and stabilises.
-  add(p, "torso", [0.07 * a + 0.03 * a * Math.abs(c), -0.24 * a * s, -0.04 * a * c]);
-  add(p, "head", [-0.05 * a + 0.04 * a * s2, 0.12 * a * s, 0.02 * a * c]);
-  // Arms: contra-lateral swing, elbows bend more on the forward swing.
-  const arm = 0.5 * a;
-  add(p, "upperArmR", [arm * s, 0, -0.1 - 0.04 * a]);
-  add(p, "upperArmL", [-arm * s, 0, 0.1 + 0.04 * a]);
-  add(p, "forearmR", [-0.18 - a * (0.25 + 0.45 * Math.max(0, -s)), 0, 0]);
-  add(p, "forearmL", [-0.18 - a * (0.25 + 0.45 * Math.max(0, s)), 0, 0]);
-  // Secondary motion lags behind the body.
-  add(p, "coatTail", [
-    0.14 * a + 0.1 * a * Math.sin(2 * ph - 0.9),
-    0,
-    0.06 * a * Math.sin(ph - 0.9),
-  ]);
-  add(p, "hairBack", [
-    0.2 * a + 0.12 * a * Math.sin(2 * ph - 1.1),
-    0,
-    0.12 * a * Math.sin(ph - 1.1),
-  ]);
-  return p;
+/** Thigh and shin length (rig voxels): hip → knee, knee → sole. */
+const SEG = HIP_Y / 2;
+/** Sole extent in front of / behind the shin axis (rig voxels): toe cap and heel. */
+const SOLE_TOE = 5;
+const SOLE_HEEL = 4;
+/** Upper arm (shoulder → elbow) and forearm (elbow → palm) length, rig voxels. */
+const UPPER_ARM = 9;
+const FOREARM = 8.5;
+/** Shoulder joint above the torso joint, torso joint above the hips joint (rig voxels, sagittal). */
+const SHOULDER_UP = 15;
+const TORSO_UP = 4;
+
+function pitchOf(dz: number, dy: number): number {
+  return Math.atan2(-dz, -dy);
 }
 
-/** Run cycle at `phase` (cycles), amplitude a (1 = full sprint). Same leg phasing as the walk. */
-function runShape(phase: number, a: number): CharacterPose {
-  const p = restPose();
-  const ph = TAU * phase;
-  const s = Math.sin(ph);
-  const c = Math.cos(ph);
-  const s2 = Math.sin(2 * ph);
-  const swing = 0.8 * a;
-  add(p, "thighR", [-swing * s - 0.12 * a, 0, 0]);
-  add(p, "thighL", [swing * s - 0.12 * a, 0, 0]);
-  // Knees: high recovery on the swing leg, a kick-back after push-off.
-  add(p, "shinR", [a * (0.3 + 1.3 * Math.max(0, c) ** 1.3 + 0.35 * Math.max(0, -s)), 0, 0]);
-  add(p, "shinL", [a * (0.3 + 1.3 * Math.max(0, -c) ** 1.3 + 0.35 * Math.max(0, s)), 0, 0]);
-  // Pelvis: the stance leg carries it at mid-stance (s = 0); with the legs spread
-  // it sinks so both feet only just leave the floor (a short flight phase).
-  add(
-    p,
-    "hips",
-    [0, 0.14 * a * s, 0.05 * a * c],
-    [0.2 * a * c, a * (0.2 - 2 * Math.abs(s) ** 1.2), 0],
-  );
-  add(p, "thighR", [0, -0.14 * a * s, -0.04 * a * c]);
-  add(p, "thighL", [0, -0.14 * a * s, -0.04 * a * c]);
-  add(p, "torso", [0.2 * a + 0.04 * a * Math.abs(c), -0.3 * a * s, -0.03 * a * c]);
-  add(p, "head", [-0.13 * a + 0.05 * a * s2, 0.15 * a * s, 0.02 * a * c]);
-  // Arms pump, elbows at ~90°.
-  add(p, "upperArmR", [0.8 * a * s - 0.1 * a, 0, -0.14]);
-  add(p, "upperArmL", [-0.8 * a * s - 0.1 * a, 0, 0.14]);
-  add(p, "forearmR", [-0.3 - a * (1.0 + 0.35 * Math.max(0, -s)), 0, 0.08]);
-  add(p, "forearmL", [-0.3 - a * (1.0 + 0.35 * Math.max(0, s)), 0, -0.08]);
-  add(p, "coatTail", [
-    0.38 * a + 0.2 * a * Math.sin(2 * ph - 0.9),
-    0,
-    0.1 * a * Math.sin(ph - 0.9),
-  ]);
-  add(p, "hairBack", [
-    0.5 * a + 0.2 * a * Math.sin(2 * ph - 1.1),
-    0,
-    0.18 * a * Math.sin(ph - 1.1),
-  ]);
-  return p;
+/** (y, z) of a segment of length l at pitch a, starting at (y, z). */
+function along(y: number, z: number, l: number, a: number): [number, number] {
+  return [y - l * Math.cos(a), z - l * Math.sin(a)];
+}
+
+/**
+ * Lowest sole point relative to the sole centre under the shin axis, for a
+ * shin pitch (≤ 0). `toe` scales how much of a forward-tipped toe counts:
+ * 1 = roll up onto the toes (crouching), < 1 lets the toe cap sink a little
+ * into the floor instead — there is no ankle, and a fully compensated toe
+ * would force a deeper knee bend, which tips the toe further (a feedback
+ * loop that makes every stance look crouched).
+ */
+function soleDrop(shin: number, toe = 1): number {
+  const s = Math.sin(shin);
+  return Math.min(-SOLE_TOE * s * toe, SOLE_HEEL * s);
+}
+
+/** Share of the toe dip compensated while walking / standing (see `soleDrop`). */
+const TOE_GIVE = 0.4;
+
+/**
+ * Soft IK reach: distances approach the full limb length `l` asymptotically
+ * (the last 3 %), so a limb near full stretch never snaps its joint straight
+ * (acos has an infinite slope at 1). The target then falls a hair short.
+ */
+function softReach(d: number, l: number): number {
+  const s = 0.97 * l;
+  if (d <= s) return d;
+  return s + (l - s) * (1 - Math.exp(-(d - s) / (l - s)));
+}
+
+/**
+ * Two-bone leg IK: hip joint (hy, hz) → foot. `fy` is where the LOWEST sole
+ * point should be (the foot rolls heel → toe: there is no ankle), `fz` the
+ * sole centre. Returns the world pitches [thigh, shin]; the knee always
+ * bends forward; out of reach the leg straightens towards the target.
+ */
+function legIK(hy: number, hz: number, fy: number, fz: number, toe = TOE_GIVE): [number, number] {
+  let ty = fy;
+  let out: [number, number] = [0, 0];
+  for (let i = 0; i < 4; i++) {
+    const dz = fz - hz;
+    const dy = ty - hy;
+    const d = Math.min(Math.hypot(dz, dy), 2 * SEG);
+    const base = pitchOf(dz, dy);
+    const bend = Math.acos(clamp(d / (2 * SEG), -1, 1));
+    out = [base - bend, base + bend];
+    ty = fy - soleDrop(out[1], toe);
+  }
+  return out;
+}
+
+/**
+ * Two-bone arm IK: shoulder (sy, sz) → palm (ty, tz). World pitches
+ * [upper, fore]; the elbow bends backwards / outwards. Out of reach the arm
+ * straightens towards the target.
+ */
+function armIK(sy: number, sz: number, ty: number, tz: number): [number, number] {
+  const dz = tz - sz;
+  const dy = ty - sy;
+  const d = softReach(Math.hypot(dz, dy), UPPER_ARM + FOREARM);
+  const base = pitchOf(dz, dy);
+  const cosA = (UPPER_ARM * UPPER_ARM + d * d - FOREARM * FOREARM) / (2 * UPPER_ARM * d || 1);
+  const a = Math.acos(clamp(cosA, -1, 1));
+  const cosB = (UPPER_ARM * UPPER_ARM + FOREARM * FOREARM - d * d) / (2 * UPPER_ARM * FOREARM);
+  const elbow = Math.PI - Math.acos(clamp(cosB, -1, 1));
+  return [base + a, base + a - elbow];
+}
+
+function setPitch(p: CharacterPose, n: RigPartName, pitch: number): void {
+  const e = p[n];
+  e.rot = [pitch, e.rot[1], e.rot[2]];
+}
+
+/** Write world leg pitches (from `legIK`) under a hips pitch. */
+function setLeg(p: CharacterPose, side: "R" | "L", hipsPitch: number, leg: [number, number]): void {
+  setPitch(p, side === "R" ? "thighR" : "thighL", leg[0] - hipsPitch);
+  setPitch(p, side === "R" ? "shinR" : "shinL", leg[1] - leg[0]);
+}
+
+/** Write world arm pitches (from `armIK`) under the torso's world pitch; `inward` rolls the arm towards the body. */
+function setArm(
+  p: CharacterPose,
+  side: "R" | "L",
+  torsoPitch: number,
+  arm: [number, number],
+  inward = 0,
+  w = 1,
+): void {
+  const up = side === "R" ? "upperArmR" : "upperArmL";
+  const fo = side === "R" ? "forearmR" : "forearmL";
+  const k = side === "R" ? 1 : -1;
+  const lerpTo = (e: PartPose, v: Vec3): Vec3 => lerp3(e.rot, v, w);
+  p[up].rot = lerpTo(p[up], [arm[0] - torsoPitch, p[up].rot[1] * (1 - w), k * inward]);
+  p[fo].rot = lerpTo(p[fo], [arm[1] - arm[0], p[fo].rot[1] * (1 - w), p[fo].rot[2] * (1 - w)]);
+}
+
+interface Placement {
+  /** Hips joint in character space (rig voxels). */
+  y: number;
+  z: number;
+  x?: number;
+  /** Pelvis pitch (rad; < 0 tips it back). */
+  pitch: number;
+  /** Lift of the hip joints inside the pelvis (rig voxels, hips frame): a seated buttock tuck. */
+  thighLift?: number;
+}
+
+/** Hip-joint (legs) position (y, z) for a placement. */
+function legRoot(b: Placement): [number, number] {
+  const l = b.thighLift ?? 0;
+  return [b.y + l * Math.cos(b.pitch), b.z + l * Math.sin(b.pitch)];
+}
+
+/** Put the hips joint at an absolute place (keeps any yaw / roll already on the hips). */
+function placeHips(p: CharacterPose, b: Placement): void {
+  p.hips.rot = [b.pitch, p.hips.rot[1], p.hips.rot[2]];
+  p.hips.pos = [b.x ?? 0, b.y - HIP_Y, b.z];
+  const l = b.thighLift ?? 0;
+  if (l) {
+    p.thighR.pos = [0, l, 0];
+    p.thighL.pos = [0, l, 0];
+  }
+}
+
+/** Place the hips and plant both feet (lowest sole point at y, sole centre at z). */
+function plantFeet(
+  p: CharacterPose,
+  b: Placement,
+  footR: [number, number],
+  footL: [number, number] = footR,
+  toe = TOE_GIVE,
+): void {
+  placeHips(p, b);
+  const [hy, hz] = legRoot(b);
+  setLeg(p, "R", b.pitch, legIK(hy, hz, footR[0], footR[1], toe));
+  setLeg(p, "L", b.pitch, legIK(hy, hz, footL[0], footL[1], toe));
+}
+
+/** Shoulder (y, z) for a hips placement and a torso pitch relative to the hips. */
+function shoulderAt(b: Placement, torsoPitch: number): [number, number] {
+  const [ty, tz] = along(b.y, b.z, -TORSO_UP, b.pitch);
+  return along(ty, tz, -SHOULDER_UP, b.pitch + torsoPitch);
+}
+
+// ── Locomotion ──────────────────────────────────────────────────
+
+/** Share of a gait cycle each foot is planted: walking … running (the rest is swing / flight). */
+const WALK_STANCE = 0.5;
+const RUN_STANCE = 0.32;
+/** Longest half step (rig voxels) before the cadence rises instead of the stride. */
+const MAX_HALF_STEP = 14;
+/** Hip → lowest sole distance at heel strike (a hair short of a straight leg). */
+const LEG_REACH = 2 * SEG - 0.1;
+/** The right heel strikes at this gait phase (cycles); the left half a cycle later. */
+const R_CONTACT = 0.25;
+
+interface Gait {
+  /** Cadence (cycles / s). */
+  hz: number;
+  /** Planted share of the cycle. */
+  stance: number;
+  /** Half step (rig voxels): the planted foot glides from +half to −half. */
+  half: number;
+  /** Walk amplitude 0..1 (speed / WALK_FULL_SPEED). */
+  a: number;
+  /** Run weight 0..1. */
+  r: number;
 }
 
 /** 0 at walking speed … 1 at RUN_FULL_SPEED. */
@@ -1732,9 +1538,31 @@ export function runWeight(speed: number): number {
   return smoothstep(WALK_FULL_SPEED, RUN_FULL_SPEED, speed);
 }
 
-/** Gait cadence (cycles / s) at `speed`: WALK_HZ → RUN_HZ. */
+function gaitOf(speed: number): Gait {
+  const v = Math.max(0, speed);
+  const r = runWeight(v);
+  const a = clamp(v / WALK_FULL_SPEED, 0, 1);
+  const walkHz = WALK_HZ * (0.55 + 0.45 * a);
+  const runHz = RUN_HZ * Math.sqrt(clamp(v / RUN_FULL_SPEED, 0.5, 2));
+  const stance = WALK_STANCE + (RUN_STANCE - WALK_STANCE) * r;
+  const vox = v / CHARACTER_SCALE;
+  const hz = Math.max(walkHz + (runHz - walkHz) * r, (vox * stance) / (2 * MAX_HALF_STEP));
+  return { hz, stance, half: (vox * stance) / (2 * hz), a, r };
+}
+
+/**
+ * Gait cadence (cycles / s) at `speed` (world units / s). Stride length
+ * follows from it: half step = speed · stance / (2 · cadence), so the
+ * planted foot moves back exactly as fast as the walker moves forward.
+ */
 export function gaitHz(speed: number): number {
-  return WALK_HZ + (RUN_HZ - WALK_HZ) * runWeight(speed);
+  return gaitOf(speed).hz;
+}
+
+/** Planted foot speed (world units / s) relative to the hips for `speed`: equals `speed` (no skating). */
+export function stanceFootSpeed(speed: number): number {
+  const g = gaitOf(speed);
+  return (2 * g.half * g.hz * CHARACTER_SCALE) / g.stance;
 }
 
 /**
@@ -1745,14 +1573,114 @@ export function advanceGait(phase: number, dt: number, speed: number): number {
   return mod(phase + dt * gaitHz(speed), 1);
 }
 
+/** Hips height (rig voxels) through the cycle: low at heel strike, high mid-stance (walk); sinks mid-stance and floats in flight (run). */
+function gaitHipY(g: Gait, phase: number): number {
+  // Nearly straight over the stance foot (there is no ankle: a bent knee would
+  // tip the toes into the floor); fully straight when standing still.
+  const reach = 2 * SEG - (2 * SEG - LEG_REACH) * Math.max(g.a, g.r);
+  const hC = Math.sqrt(reach * reach - g.half * g.half);
+  const q = mod(phase - R_CONTACT, 0.5);
+  const mid = reach;
+  const walk = hC + (mid - hC) * Math.sin(Math.PI * (q / 0.5)) ** 2;
+  if (g.r <= 0) return walk;
+  const run =
+    q < g.stance
+      ? hC - 0.6 * Math.sin((Math.PI * q) / g.stance)
+      : hC + 1.1 * Math.sin((Math.PI * (q - g.stance)) / (0.5 - g.stance));
+  return walk + (run - walk) * g.r;
+}
+
+/** Foot target [lowest sole y, sole z] at leg phase ψ (0 = heel strike). */
+function gaitFoot(g: Gait, psi: number): [number, number] {
+  if (psi < g.stance) return [0, g.half * (1 - (2 * psi) / g.stance)];
+  const u = (psi - g.stance) / (1 - g.stance);
+  // Swing: the foot peels up behind (a heel kick when running) and reaches forward to land.
+  const lift = 3.8 * smoothstep(0, 0.6, g.a) * (1 - g.r) + 4.5 * g.r;
+  const shape = u ** (1 - 0.15 * g.r);
+  return [lift * Math.sin(Math.PI * shape), -g.half * Math.cos(Math.PI * u)];
+}
+
 /**
- * Phase-coherent locomotion: the walk cycle up to WALK_FULL_SPEED, blending
- * into the run cycle towards RUN_FULL_SPEED (same phase → no leg pops).
+ * Phase-coherent locomotion at `speed` (world units / s): a planted walk
+ * that turns into a run with a flight phase towards RUN_FULL_SPEED. The legs
+ * are solved with IK onto a stance foot that glides back at exactly the
+ * walker's speed, so feet never skate; heel strike and toe-off come from the
+ * shin angle (the sole rolls). Contact poses at phase R_CONTACT (right) and
+ * R_CONTACT + 0.5 (left), passing poses in between.
  */
 export function gaitPose(phase: number, speed: number): CharacterPose {
-  const walk = walkShape(phase, Math.min(speed, WALK_FULL_SPEED));
-  const r = runWeight(speed);
-  return r > 0 ? blendPose(walk, runShape(phase, 1), r) : walk;
+  const g = gaitOf(speed);
+  const { a, r } = g;
+  const amp = Math.max(a, r);
+  const p = restPose();
+  const ph = TAU * (phase - R_CONTACT);
+  // +1 when the right foot is forward (its heel strike), −1 when it is back.
+  const fwdR = Math.cos(ph);
+  // +1 at the right leg's mid-stance, −1 at the left's.
+  const stR = Math.cos(TAU * (phase - R_CONTACT - g.stance / 2));
+  // Pelvis: twists with the leading leg, sways over and drops away from the stance leg.
+  const yaw = (0.12 * a + 0.05 * r) * fwdR;
+  const roll = -(0.05 * a + 0.03 * r) * stR;
+  const sway = -(0.9 * a + 0.4 * r) * stR;
+  const pitch = 0.1 * r;
+  p.hips.rot = [0, yaw, roll];
+  const hipY = gaitHipY(g, phase);
+  const b: Placement = { y: hipY, z: 0, x: sway, pitch };
+  placeHips(p, b);
+  const psiR = mod(phase - R_CONTACT, 1);
+  const psiL = mod(phase - R_CONTACT - 0.5, 1);
+  const fR = gaitFoot(g, psiR);
+  const fL = gaitFoot(g, psiL);
+  // Running rolls further onto the forefoot (see soleDrop).
+  const toe = TOE_GIVE + 0.1 * r;
+  setLeg(p, "R", pitch, legIK(hipY, 0, fR[0], fR[1], toe));
+  setLeg(p, "L", pitch, legIK(hipY, 0, fL[0], fL[1], toe));
+  // Legs undo the pelvis twist / roll / sway so the feet track straight.
+  const fix = -Math.atan2(sway, hipY) - roll;
+  add(p, "thighR", [0, -yaw, fix]);
+  add(p, "thighL", [0, -yaw, fix]);
+  // Torso: leans into the stride, shoulders counter-rotate; head stays level and forward.
+  const tPitch = 0.05 + 0.03 * a + 0.12 * r;
+  const tYaw = -1.9 * yaw;
+  add(p, "torso", [tPitch, tYaw, -0.6 * roll]);
+  const bob = (hipY - gaitHipY(g, phase + 0.125)) / 40;
+  add(p, "head", [-0.7 * (tPitch + pitch) + bob, -(yaw + tYaw), 0.4 * roll]);
+  // Arms swing against the legs (a touch late), elbows bend more on the forward swing.
+  const swing = 0.42 * a * (1 - r) + 0.8 * r;
+  const armR = swing * Math.cos(ph - 0.25);
+  const out = 0.1 + 0.04 * amp;
+  add(p, "upperArmR", [armR - 0.08 * r, 0.1 * r, -out]);
+  add(p, "upperArmL", [-armR - 0.08 * r, -0.1 * r, out]);
+  const elbow = (0.22 + 0.25 * a) * (1 - r) + 1.35 * r;
+  const fwdBend = 0.35 * (1 - 0.4 * r);
+  add(p, "forearmR", [
+    -elbow - fwdBend * Math.max(0, -armR / Math.max(swing, 1e-6)) * amp,
+    0,
+    0.06 * r,
+  ]);
+  add(p, "forearmL", [
+    -elbow - fwdBend * Math.max(0, armR / Math.max(swing, 1e-6)) * amp,
+    0,
+    -0.06 * r,
+  ]);
+  // Secondary motion lags behind the body.
+  add(p, "coatTail", [
+    0.1 * a + 0.3 * r + (0.07 * a + 0.12 * r) * Math.sin(2 * ph - 0.9),
+    0,
+    0.06 * amp * Math.sin(ph - 0.9) - 0.5 * roll,
+  ]);
+  add(p, "hairBack", [
+    0.14 * a + 0.4 * r + (0.1 * a + 0.16 * r) * Math.sin(2 * ph - 1.1),
+    0,
+    0.1 * amp * Math.sin(ph - 1.1),
+  ]);
+  return p;
+}
+
+/** "run" as a pose kind: at least a full run; periodic in 1 / gaitHz of that speed (RUN_HZ at rest). */
+function runPose(t: number, speed: number): CharacterPose {
+  const v = Math.max(speed, RUN_FULL_SPEED);
+  return gaitPose(gaitHz(v) * t, v);
 }
 
 // ── Gestures and activities ─────────────────────────────────────
@@ -1860,34 +1788,451 @@ function celebratePose(t: number, o: PoseOptions): CharacterPose {
   return p;
 }
 
-function sitPose(t: number, o: PoseOptions): CharacterPose {
+// ── Sitting and lying ───────────────────────────────────────────
+//
+// Both are placed by the engine: it moves the ROOT (feet / floor point of the
+// character) so the seat or mattress meets the contact the constants below
+// describe, over SIT_ENTER_DURATION / LIE_ENTER_DURATION (and back over the
+// *_EXIT_DURATION), ideally with `seatRootProgress` as the easing so the
+// root travel matches the body.
+
+/** Thigh half-thickness (rig voxels): a level thigh's underside lies this far below its axis. */
+const THIGH_HALF = 3;
+/** Seated hip joint (legs): height above the root and z from the root (rig voxels). */
+const SIT_HIP_Y = 12;
+const SIT_HIP_Z = -12;
+/** Pelvis rolled back a little when seated; the hip joints tuck up into it so the buttocks meet the seat. */
+const SIT_PELVIS = -0.16;
+const SIT_TUCK = 1.5;
+/** Hip joint height while lying (rig voxels): the back (5 voxels behind the joint) rests on the root plane. */
+const LIE_HIP_Y = 5;
+/** Hips / torso depth behind the joint (rig voxels). */
+const BACK_DEPTH = 5;
+
+/**
+ * "sit": height (world units) of the seat contact — the underside of the
+ * level thighs / buttocks — above the root while the root stands on the
+ * floor. The feet rest flat on the floor under the knees at the root's
+ * x/z. Seat higher than this → the engine lifts the root by the difference
+ * (the feet then dangle a little).
+ */
+export const SIT_SEAT_HEIGHT = (SIT_HIP_Y - THIGH_HALF) * CHARACTER_SCALE;
+/**
+ * "sit": local +z offset (world units, negative = behind the feet) of the
+ * seat contact point — directly under the hip joints, i.e. the centre of
+ * the buttocks — from the root. The engine places the root so that
+ * root + rotate(facing) · (0, SIT_SEAT_HEIGHT, SIT_SEAT_OFFSET) is on the
+ * seat's sit point; she faces away from the backrest, feet in front.
+ */
+export const SIT_SEAT_OFFSET = SIT_HIP_Z * CHARACTER_SCALE;
+/**
+ * "lie": height (world units) of the back contact (the back of the hips and
+ * torso) above the root. Lying on her back along local z: hip joints at
+ * the root's x/z, head towards −z, feet towards +z. The engine puts the
+ * root at mattress height − LIE_BACK_HEIGHT; heels, arms, coat and head
+ * never go below the back contact.
+ */
+export const LIE_BACK_HEIGHT = (LIE_HIP_Y - BACK_DEPTH) * CHARACTER_SCALE;
+/** Sit-down: a glance back at the seat, lowering with a forward lean, hands onto the thighs (s). */
+export const SIT_ENTER_DURATION = 1.2;
+/** Stand-up from a seat (s): lean forward, push on the thighs, rise (the `transitionDuration` out of "sit"). */
+export const SIT_EXIT_DURATION = 1.0;
+/** Lie-down: sit on the bed edge (first ~40 %), then swing the legs up and lie back (s). */
+export const LIE_ENTER_DURATION = 2.2;
+/** Get-up from lying (s): sit up and swing the legs off (first ~55 %), then stand (the `transitionDuration` out of "lie"). */
+export const LIE_EXIT_DURATION = 1.8;
+
+/**
+ * A seat for "sit" (world units): `height` of the seat surface above the
+ * floor, `footrest` height of something to put the feet on (a stool rail,
+ * a chair base; 0 = the floor), `sink` how far the buttocks may press into
+ * a soft cushion so the feet reach down (default 0).
+ */
+export interface SeatSpec {
+  height: number;
+  footrest?: number;
+  sink?: number;
+}
+
+/** How a seat is sat on: root lift (world), where the feet go (rig voxels, root space), planted or hanging. */
+export interface SeatFit {
+  /** Lift of the root above the floor (world units, may be < 0 for very low seats). */
+  lift: number;
+  /** Sole target (y, z) relative to the root, rig voxels. */
+  foot: [number, number];
+  /** Feet on the floor / footrest (else they hang from the seat edge). */
+  planted: boolean;
+}
+
+/** Leg reach used to plant the feet (rig voxels; just under full stretch, see `softReach`). */
+const SIT_REACH = 2 * SEG * 0.97;
+/** Feet may fall this short of the floor and still count as planted (toes, soft reach), rig voxels. */
+const SIT_TOE_SLACK = 1.5;
+
+/**
+ * Fit the seated body to a seat. The lab's seats sit at about her knee
+ * height (~1.0–1.25 vs a knee of ~1.1): on a low seat she sits
+ * with level thighs and shins upright; the higher the seat, the more the
+ * legs straighten and reach forward and down (she perches on the front
+ * edge), and a soft cushion gives up to `sink`. Only when even that cannot
+ * reach the floor / footrest do the feet hang.
+ */
+export function sitFit(seat?: SeatSpec): SeatFit {
+  const k = 1 / CHARACTER_SCALE;
+  const s = (seat?.height ?? SIT_SEAT_HEIGHT) * k;
+  const f = (seat?.footrest ?? 0) * k;
+  // Hip joint above the floor with level thighs on the seat.
+  const h0 = s + THIGH_HALF;
+  // A soft seat gives until the knees can bend a little (never deeper than `sink`).
+  const sink = clamp(h0 - f - (SIT_REACH - 4), 0, (seat?.sink ?? 0) * k);
+  const h = h0 - sink;
+  const v = h - f;
+  const lift = (h - SIT_HIP_Y) * CHARACTER_SCALE;
+  const planted = v <= SIT_REACH + SIT_TOE_SLACK;
+  let dy: number;
+  let dz: number;
+  if (planted) {
+    // Feet as far forward as the legs allow, never past the upright shin (12).
+    dy = -v;
+    dz = clamp(Math.sqrt(Math.max(0, SIT_REACH * SIT_REACH - v * v)), 0, -SIT_HIP_Z);
+  } else {
+    // Hanging from the edge: knees a little bent, shins down.
+    dy = -(SIT_REACH - 2);
+    dz = 6;
+  }
+  return { lift, foot: [SIT_HIP_Y + dy, SIT_HIP_Z + dz], planted };
+}
+
+/** Descent 0 (standing) … 1 (seated) of the sit-down at pose clock t. */
+function sitDescent(t: number): number {
+  return easeInOut((t - 0.15) / 0.95);
+}
+
+/** Lie-down stages at pose clock t: a = sat down on the edge, b = reclined. */
+function lieStages(t: number): [number, number] {
+  return [easeInOut(t / 0.9), easeInOut((t - 0.75) / 1.3)];
+}
+
+/**
+ * Root travel for the engine while sitting down / lying down / getting up
+ * (0 = where the move starts, 1 = where it ends; enter: standing spot →
+ * seat root, exit: seat root → standing spot). `pos` eases the root
+ * position (incl. height), `yaw` its facing. `t` is seconds since the
+ * switch (the pose clock for "enter"; for "exit" time since switching away).
+ */
+export function seatRootProgress(
+  kind: "sit" | "lie",
+  dir: "enter" | "exit",
+  t: number,
+): { pos: number; yaw: number } {
+  if (kind === "sit") {
+    if (dir === "enter") return { pos: sitDescent(t), yaw: smoothstep(0, 0.45, t) };
+    return { pos: easeInOut((t / SIT_EXIT_DURATION - 0.15) / 0.7), yaw: 0 };
+  }
+  if (dir === "enter") {
+    const [a, b] = lieStages(t);
+    return { pos: a, yaw: b };
+  }
+  const u = t / LIE_EXIT_DURATION;
+  return { pos: easeInOut((u - 0.45) / 0.5), yaw: easeInOut(u / 0.55) };
+}
+
+/** Hips placement of the sit-down at descent d. */
+function sitPlacement(d: number): Placement {
+  const ly = HIP_Y + (SIT_HIP_Y - HIP_Y) * smoothstep(0.05, 1, d);
+  const lz = SIT_HIP_Z * smoothstep(0, 0.85, d);
+  const pitch = SIT_PELVIS * smoothstep(0.5, 1, d);
+  const tuck = SIT_TUCK * smoothstep(0.6, 1, d);
+  return {
+    y: ly - tuck * Math.cos(pitch),
+    z: lz - tuck * Math.sin(pitch),
+    pitch,
+    thighLift: tuck,
+  };
+}
+
+/** Palm target on the top of a seated thigh (y, z), `k` = 0 near the hip … 1 at the knee. */
+function thighTop(b: Placement, k: number): [number, number] {
+  const [hy, hz] = legRoot(b);
+  return [hy + THIGH_HALF + 1.2, hz + 3 + 7 * k];
+}
+
+interface SitState {
+  /** Descent 0..1. */
+  d: number;
+  /** Extra forward lean of the torso (rad): balance while lowering / rising. */
+  lean: number;
+  /** Glance back at the seat 0..1. */
+  look: number;
+  /** Right hand reaching back for the seat 0..1. */
+  reach: number;
+  /** Hands pushing on the thighs to rise 0..1. */
+  push: number;
+  /** Seated idle layer 0..1. */
+  idle: number;
+  /** Settling onto the seat 0..1. */
+  give: number;
+}
+
+function sitBody(s: SitState, t: number, o: PoseOptions): CharacterPose {
   const seed = o.seed ?? 0;
   const ts = t + seed * 4.3;
   const p = restPose();
-  const b = breathing(p, ts);
-  // Thighs level, shins down: the hip joint sits at shin height (a chair seat).
-  add(p, "hips", [-0.04, 0, 0], [0, -(LEG_LEN - 6.5), -0.5]);
-  add(p, "thighR", [-1.5, 0, -0.04]);
-  add(p, "thighL", [-1.5, 0, 0.04]);
-  add(p, "shinR", [1.45, 0, 0.03]);
-  add(p, "shinL", [1.45, 0, -0.03]);
-  add(p, "torso", [0.04, 0, 0]);
-  add(p, "upperArmR", [-0.35 + 0.02 * b, 0, -0.05]);
-  add(p, "upperArmL", [-0.35 + 0.02 * b, 0, 0.05]);
-  add(p, "forearmR", [-0.75, 0, 0.1]);
-  add(p, "forearmL", [-0.75, 0, -0.1]);
-  add(p, "coatTail", [0.8, 0, 0]);
-  add(p, "head", [0.05, 0.25 * plateau(mod(ts, 9), 4, 5.5, 0.6), 0]);
-  // Fingers drum on the knee now and then; one foot bounces.
-  const drum = plateau(mod(ts, 13), 7, 10, 0.5);
-  add(p, "forearmR", [0.06 * drum * Math.sin(TAU * 4.2 * ts), 0, 0]);
-  add(p, "shinL", [-0.08 * drum * (0.5 + 0.5 * Math.sin(TAU * 2.1 * ts)), 0, 0]);
-  // Lean back and stretch once in a long while.
-  const lean = plateau(mod(ts, 23), 15, 18, 0.8);
-  add(p, "torso", [-0.12, 0, 0], undefined, lean);
-  add(p, "head", [-0.1, 0, 0], undefined, lean);
-  face(p, t, seed, { raise: 0.1 * lean });
+  const b = sitPlacement(s.d);
+  // Feet: from the standing spot to the floor / footrest under the seat (the
+  // root rises with the same easing, see seatRootProgress).
+  const fit = sitFit(o.seat);
+  plantFeet(p, b, [fit.foot[0] * s.d, fit.foot[1] * s.d], undefined, fit.planted ? 1 : TOE_GIVE);
+  // Feet a touch apart, knees follow.
+  add(p, "thighR", [0, 0, -0.05 * s.d]);
+  add(p, "thighL", [0, 0, 0.05 * s.d]);
+  const br = Math.sin(TAU * 0.22 * ts);
+  const tPitch = -b.pitch + 0.05 * s.d + s.lean;
+  p.torso.rot = [tPitch + 0.012 * br, 0, 0];
+  p.torso.pos = [0, 0.2 * br, 0];
+  add(p, "head", [-0.65 * s.lean - 0.02 * br, 0, 0]);
+  // Glance back / down over the right shoulder at the seat.
+  add(p, "head", [0.3, -0.6, -0.05], undefined, s.look);
+  add(p, "torso", [0, -0.18, 0], undefined, s.look);
+  // Arms: relaxed and slightly forward for balance, then onto the thighs.
+  relaxedArms(p, br);
+  add(p, "upperArmR", [-0.5 * s.lean, 0, 0]);
+  add(p, "upperArmL", [-0.5 * s.lean, 0, 0]);
+  add(p, "upperArmR", [0.55, 0, -0.25], undefined, s.reach);
+  add(p, "forearmR", [-0.2, 0, 0], undefined, s.reach);
+  const onThighs = smoothstep(0.45, 0.95, s.d) * (1 - s.reach);
+  if (onThighs > 0) {
+    const worldT = b.pitch + tPitch;
+    const [sy, sz] = shoulderAt(b, tPitch);
+    const k = 0.72 + 0.2 * s.push;
+    const [ty, tz] = thighTop(b, k);
+    setArm(p, "R", worldT, armIK(sy, sz, ty + 0.3 * br, tz), 0.32, onThighs);
+    setArm(p, "L", worldT, armIK(sy, sz, ty + 0.3 * br, tz), 0.32, onThighs);
+  }
+  // Coat skirt drapes back over the seat; ponytail hangs.
+  add(p, "coatTail", [-1.45 * s.d, 0, 0], [0, 0.9 * s.d, 0]);
+  add(p, "hairBack", [0.04 + 0.1 * s.lean, 0, 0]);
+  if (s.idle > 0) {
+    const w = s.idle;
+    // Looks around now and then.
+    const look = 0.3 * plateau(mod(ts, 9), 4, 5.5, 0.6) - 0.22 * plateau(mod(ts, 9), 7, 7.8, 0.4);
+    add(p, "head", [0.03, look, 0.04 * look], undefined, w);
+    add(p, "torso", [0, 0.1 * look, 0], undefined, w);
+    // Fingers drum on the thigh; the left foot taps.
+    const drum = plateau(mod(ts, 13), 7, 10, 0.5);
+    add(p, "forearmR", [0.07 * drum * Math.sin(TAU * 4.2 * ts), 0, 0], undefined, w);
+    const tap = drum * (0.5 + 0.5 * Math.sin(TAU * 2.1 * ts));
+    add(p, "shinL", [-0.1 * tap, 0, 0], undefined, w);
+    add(p, "thighL", [-0.04 * tap, 0, 0], undefined, w);
+    // Leans back into the seat and rolls the shoulders once in a long while.
+    const back = plateau(mod(ts, 23), 15, 18.5, 0.8);
+    add(p, "torso", [-0.14, 0, 0], undefined, w * back);
+    add(p, "head", [-0.06, 0, 0], undefined, w * back);
+    add(p, "upperArmR", [0, 0, 0], [0, 0.35 * back * Math.max(0, Math.sin(TAU * 0.8 * ts)), 0], w);
+    add(
+      p,
+      "upperArmL",
+      [0, 0, 0],
+      [0, 0.35 * back * Math.max(0, Math.sin(TAU * 0.8 * ts + 1)), 0],
+      w,
+    );
+  }
+  add(p, "hips", [0, 0, 0], [0, -0.2 * s.give, 0]);
+  add(p, "head", [0.06 * s.give, 0, 0]);
+  face(p, t, seed, { raise: 0.25 * s.look + 0.1 * s.push });
   return p;
+}
+
+/** Sit-down state at pose clock t. */
+function sitState(t: number): SitState {
+  const e = SIT_ENTER_DURATION;
+  return {
+    d: sitDescent(t),
+    lean: 0.5 * Math.sin(Math.PI * clamp((t - 0.15) / 0.95, 0, 1)) ** 1.2,
+    look: plateau(t, 0.12, 0.5, 0.15),
+    reach: plateau(t, 0.25, 0.7, 0.2),
+    push: 0,
+    idle: smoothstep(e - 0.1, e + 0.6, t),
+    // A small give as the weight lands on the seat.
+    give: plateau(t, 1.08, 1.16, 0.1),
+  };
+}
+
+function sitPose(t: number, o: PoseOptions): CharacterPose {
+  return sitBody(sitState(t), t, o);
+}
+
+/**
+ * Stand up from a seat: `s0` = the sit-down state at the switch (it may
+ * not have finished), u = 0..1 through SIT_EXIT_DURATION.
+ */
+function sitExitPose(s0: SitState, u: number, t: number, o: PoseOptions): CharacterPose {
+  const rise = easeInOut((u - 0.15) / 0.7);
+  const fade = 1 - smoothstep(0, 0.3, u);
+  return sitBody(
+    {
+      d: s0.d * (1 - rise),
+      lean: s0.lean * fade + 0.55 * s0.d * Math.sin(Math.PI * clamp(u / 0.85, 0, 1)) ** 0.9,
+      look: s0.look * fade,
+      reach: s0.reach * fade,
+      push: s0.d * plateau(u, 0.2, 0.5, 0.15),
+      idle: s0.idle * fade,
+      give: s0.give * fade,
+    },
+    t,
+    o,
+  );
+}
+
+interface LieState {
+  /** Sat down on the edge 0..1. */
+  a: number;
+  /** Reclined 0..1. */
+  b: number;
+  /** Arms supporting the body (elbows back) 0..1. */
+  prop: number;
+  /** Lying idle layer 0..1. */
+  idle: number;
+}
+
+/** Hip-joint height (rig voxels) when sat on the bed edge. */
+const EDGE_HIP_Y = THIGH_HALF + 0.5;
+
+function lieBody(s: LieState, t: number, o: PoseOptions): CharacterPose {
+  const seed = o.seed ?? 0;
+  const ts = t + seed * 5.9;
+  const p = restPose();
+  const { a, b } = s;
+  const br = Math.sin(TAU * 0.18 * ts);
+  // Pelvis: standing → sat on the edge (rolled back a little) → on the back.
+  const pitch = SIT_PELVIS * smoothstep(0.4, 1, a) * (1 - b) + (-Math.PI / 2) * easeInOut(b);
+  const tuck = SIT_TUCK * smoothstep(0.5, 1, a) * (1 - b);
+  const ly = HIP_Y + (EDGE_HIP_Y - HIP_Y) * a + (LIE_HIP_Y - EDGE_HIP_Y) * b;
+  const place: Placement = {
+    y: ly - tuck * Math.cos(pitch),
+    z: -tuck * Math.sin(pitch),
+    pitch,
+    thighLift: tuck,
+  };
+  placeHips(p, place);
+  const [hy, hz] = legRoot(place);
+  // Legs: planted → hanging over the edge → swung up and stretched out along +z.
+  const knee = s.idle * plateau(mod(ts, 19), 9, 15, 1.2);
+  const lying = (side: "R" | "L"): [number, number] => {
+    const up = side === "R" ? knee : 0;
+    const splay = side === "R" ? 0 : 0.5;
+    return legIK(hy, hz, 0, 23 + splay - 9 * up);
+  };
+  for (const side of ["R", "L"] as const) {
+    const stand = legIK(hy, hz, 0, 0);
+    const hang: [number, number] = [-Math.PI / 2 + 0.06, 0.3];
+    const la = smoothstep(0.15, 0.9, a);
+    const lb = easeInOut(clamp(b / 0.8, 0, 1));
+    const lie = lying(side);
+    const th = stand[0] + (hang[0] - stand[0]) * la + (lie[0] - hang[0]) * lb;
+    const sh = stand[1] + (hang[1] - stand[1]) * la + (lie[1] - hang[1]) * lb;
+    setLeg(p, side, pitch, [th, sh]);
+  }
+  // Toes fall outwards when relaxed.
+  add(p, "thighR", [0, -0.12 * b, -0.03]);
+  add(p, "thighL", [0, 0.12 * b, 0.03]);
+  // Torso: upright on the edge (a slight forward lean while lowering), then lies back.
+  const lowering = 0.35 * Math.sin(Math.PI * a) * (1 - b);
+  // Keep the torso upright relative to the world until the recline, then follow the hips.
+  p.torso.rot = [
+    -(SIT_PELVIS * smoothstep(0.4, 1, a)) * (1 - b) + lowering + 0.02 * br * (1 - b),
+    0,
+    0,
+  ];
+  // Lying, the chest rises with the breath (hips-local +z is up).
+  p.torso.pos = [0, 0, 0.3 * (0.5 + 0.5 * br) * b];
+  // Head: chin tucked onto the pillow when down; looks where it lies down first.
+  // A pillow: the head rests a voxel up, chin tucked a little.
+  add(p, "head", [0.3 * b - 0.5 * lowering, 0, 0], [0, 0, 0.6 * b]);
+  add(p, "head", [0.25, -0.35, 0], undefined, plateau(a, 0.1, 0.5, 0.2) * (1 - b));
+  const turn =
+    s.idle * (0.4 * plateau(mod(ts, 27), 12, 20, 1.5) - 0.3 * plateau(mod(ts, 27), 3, 6, 1));
+  add(p, "head", [0, turn, 0]);
+  // Ponytail spreads on the pillow; coat skirt flat under the thighs.
+  add(p, "hairBack", [0.04 - 0.34 * b, 0, 0], [0, 0, b]);
+  add(p, "coatTail", [-1.45 * a * (1 - b) + 0.25 * b, 0, 0], [0, 0.9 * a * (1 - b), 1.5 * b]);
+  // Arms: hang → support on the mattress (elbows back) → folded on the stomach.
+  relaxedArms(p, br);
+  const worldT = pitch + p.torso.rot[0];
+  const [sy, sz] = shoulderAt(place, p.torso.rot[0]);
+  if (s.prop > 0) {
+    // Palms on the mattress beside the hips, arms behind the body.
+    const target: [number, number] = [hy - THIGH_HALF + 1, hz - 6];
+    setArm(p, "R", worldT, armIK(sy, sz, target[0], target[1]), -0.25, s.prop);
+    setArm(p, "L", worldT, armIK(sy, sz, target[0], target[1]), -0.25, s.prop);
+  }
+  const fold = smoothstep(0.7, 1, b) * (1 - s.prop);
+  if (fold > 0) {
+    // Hands rest on the stomach and rise with the breath.
+    const belly: [number, number] = [LIE_HIP_Y + BACK_DEPTH + 3.4 + 0.35 * br, -8];
+    setArm(p, "R", worldT, armIK(sy, sz, belly[0], belly[1] + 1), 0.55, fold);
+    setArm(p, "L", worldT, armIK(sy, sz, belly[0] + 0.6, belly[1] - 1), 0.55, fold);
+  }
+  // Eyes drift shut after a while; they open now and then.
+  const shut =
+    s.idle * smoothstep(3, 5, t) * (1 - plateau(mod(ts, 25), 17, 19.5, 0.4)) * (1 - 0.6 * knee);
+  face(p, t, seed, { raise: -0.1 * shut });
+  if (shut > 0) {
+    const lid = p.lids.pos ?? [0, 0, 0];
+    p.lids.pos = [lid[0], lid[1], Math.max(lid[2], LID_TRAVEL * shut)];
+  }
+  return p;
+}
+
+/** Lie-down state at pose clock t. */
+function lieState(t: number): LieState {
+  const [a, b] = lieStages(t);
+  return {
+    a,
+    b,
+    prop: plateau(t, 0.95, 1.7, 0.3),
+    idle: smoothstep(LIE_ENTER_DURATION - 0.2, LIE_ENTER_DURATION + 0.6, t),
+  };
+}
+
+function liePose(t: number, o: PoseOptions): CharacterPose {
+  return lieBody(lieState(t), t, o);
+}
+
+/** Get up from lying: `s0` = the lie-down state at the switch, u = 0..1 through LIE_EXIT_DURATION. */
+function lieExitPose(s0: LieState, u: number, t: number, o: PoseOptions): CharacterPose {
+  const up = easeInOut(u / 0.55);
+  const stand = easeInOut((u - 0.45) / 0.5);
+  const fade = 1 - smoothstep(0, 0.25, u);
+  return lieBody(
+    {
+      a: s0.a * (1 - stand),
+      b: s0.b * (1 - up),
+      // Elbows back to push up while sitting up (or keep a support already there).
+      prop: Math.max(s0.prop * fade, s0.b * plateau(u, 0.2, 0.42, 0.15)),
+      idle: s0.idle * fade,
+    },
+    t,
+    o,
+  );
+}
+
+/**
+ * Pose of a seat kind ("sit" / "lie") being left: the stand-up / get-up
+ * choreography from however far it had got when the switch happened.
+ * `u` = 0..1 through the exit.
+ */
+function seatExit(
+  from: PoseTrack,
+  switchedAt: number,
+  now: number,
+  u: number,
+  o: PoseOptions,
+): CharacterPose {
+  const t0 = switchedAt - from.start;
+  const t = now - from.start;
+  if (from.kind === "sit") return sitExitPose(sitState(t0), u, t, o);
+  return lieExitPose(lieState(t0), u, t, o);
 }
 
 function drinkPose(t: number, o: PoseOptions): CharacterPose {
@@ -1940,8 +2285,9 @@ function listenPose(t: number, o: PoseOptions): CharacterPose {
   add(p, "head", [0.08 + 0.07 * groove * Math.sin(beat), 0.22, 0.2]);
   add(p, "torso", [0.05, 0.08, 0.02 * groove * Math.sin(beat / 2)]);
   const tap = groove * Math.max(0, Math.sin(beat)) ** 2;
-  add(p, "thighL", [-0.06 * tap, 0, 0]);
-  add(p, "shinL", [-0.1 * tap, 0, 0]);
+  // Heel tap: the knee dips forward, the toe stays down (no ankle to lift the toes).
+  add(p, "thighL", [-0.07 * tap, 0, 0]);
+  add(p, "shinL", [0.14 * tap, 0, 0]);
   face(p, t, seed, { raise: 0.25, tilt: 0.12 });
   return p;
 }
@@ -1979,25 +2325,37 @@ function crouchPose(t: number, o: PoseOptions): CharacterPose {
   const e =
     t < 0 || t > CROUCH_DURATION
       ? 0
-      : smoothstep(0, 0.4, t) * (1 - smoothstep(0.75, CROUCH_DURATION, t));
+      : smoothstep(0, 0.42, t) * (1 - smoothstep(0.75, CROUCH_DURATION, t));
   if (e === 0) return p;
-  // Knees bend by th, shins by 2·th: the feet stay under the hips. There is no
-  // ankle, so the soles tip forward: the hips drop only until the toes touch.
-  const th = 1.25 * e;
-  add(p, "thighR", [-th, 0, -0.08 * e]);
-  add(p, "thighL", [-th, 0, 0.08 * e]);
-  add(p, "shinR", [2 * th, 0, 0]);
-  add(p, "shinL", [2 * th, 0, 0]);
-  add(p, "hips", [0, 0, 0], [0, -(LEG_LEN * (1 - Math.cos(th)) - 2.5 * Math.sin(th)), 0]);
-  // Lean over the knees; the right hand reaches the floor and closes.
-  const grab = plateau(t, 0.5, 0.7, 0.1);
-  add(p, "torso", [0.85, 0.1, 0], undefined, e);
-  add(p, "head", [-0.35, -0.1, 0], undefined, e);
-  add(p, "upperArmR", [-0.55, 0, 0.12], undefined, e);
-  add(p, "forearmR", [-0.2 - 0.25 * grab, 0, 0], undefined, e);
-  add(p, "upperArmL", [0.1, 0, -0.05], undefined, e);
-  add(p, "forearmL", [-0.8, 0, 0], undefined, e);
-  add(p, "coatTail", [0.9, 0, 0], undefined, e);
+  // Squat with planted feet (IK): hips down and back, up on the balls of the
+  // feet, knees apart; the pelvis tips forward and the back leans over the knees.
+  const place: Placement = {
+    y: HIP_Y - 14.5 * e,
+    z: -4.5 * e,
+    x: (p.hips.pos?.[0] ?? 0) * (1 - e),
+    pitch: 0.45 * e,
+  };
+  // Solve on a copy and ease the legs over from the idle stance (no pop at e → 0).
+  const squat = blendPose(p, p, 0);
+  plantFeet(squat, place, [0, 0], [0, 0], 1);
+  const k = smoothstep(0, 0.35, e);
+  for (const n of ["hips", "thighR", "thighL", "shinR", "shinL"] as const)
+    p[n] = blendPart(p[n], squat[n], k);
+  add(p, "thighR", [0, 0, -0.14 * e]);
+  add(p, "thighL", [0, 0, 0.14 * e]);
+  const lean = 0.75 * e;
+  p.torso.rot = lerp3(p.torso.rot, [lean, 0.1, 0], e);
+  add(p, "head", [-0.7, -0.1, 0], undefined, e);
+  // The right hand reaches the floor in front of the feet and closes on the item.
+  const grab = plateau(t, 0.5, 0.72, 0.1);
+  const [sy, sz] = shoulderAt(place, lean);
+  setArm(p, "R", place.pitch + lean, armIK(sy, sz, 1.5 + 2 * (1 - grab), 9), 0.12, e);
+  add(p, "forearmR", [-0.25 * grab, 0, 0], undefined, e);
+  // The left forearm rests on the left knee.
+  add(p, "upperArmL", [-0.2, 0, 0.05], undefined, e);
+  add(p, "forearmL", [-1.0, 0, -0.1], undefined, e);
+  // Coat skirt folds up over the thighs, ponytail swings forward.
+  add(p, "coatTail", [-1.2, 0, 0], [0, 0.4, 0], e);
   add(p, "hairBack", [0.3, 0, 0], undefined, e);
   return p;
 }
@@ -2051,7 +2409,7 @@ function carryPose(t: number, o: PoseOptions, speed: number): CharacterPose {
   const seed = o.seed ?? 0;
   let p: CharacterPose;
   if (speed > 0) {
-    p = walkShape(WALK_HZ * t, speed);
+    p = gaitPose(gaitHz(speed) * t, speed);
   } else {
     p = restPose();
     breathing(p, t + seed * 7.31);
@@ -2189,9 +2547,9 @@ export function characterPose(
     case "idle":
       return idlePose(t, opts);
     case "walk":
-      return walkShape(WALK_HZ * t, speed);
+      return gaitPose(gaitHz(speed) * t, speed);
     case "run":
-      return runShape(RUN_HZ * t, speed > 0 ? clamp(speed / RUN_FULL_SPEED, 0.2, 1.2) : 1);
+      return runPose(t, speed);
     case "interact":
       return interactPose(t, opts);
     case "talk":
@@ -2202,6 +2560,8 @@ export function characterPose(
       return celebratePose(t, opts);
     case "sit":
       return sitPose(t, opts);
+    case "lie":
+      return liePose(t, opts);
     case "drink":
       return drinkPose(t, opts);
     case "read":
@@ -2254,15 +2614,28 @@ export function poseTrack(kind: CharacterPoseKind, now: number): PoseTrack {
   return { kind, start: now, blendStart: now, blendDur: 0, from: null };
 }
 
-/** Default cross-fade length between two kinds (s). */
+/**
+ * Default cross-fade length between two kinds (s). Leaving "sit" / "lie"
+ * plays the stand-up / get-up (SIT_EXIT_DURATION / LIE_EXIT_DURATION);
+ * entering them is short because their own clock starts from standing.
+ */
 export function transitionDuration(from: CharacterPoseKind, to: CharacterPoseKind): number {
-  if (from === "sit" || to === "sit" || from === "crouch" || to === "crouch") return 0.45;
+  if (from === "lie") return LIE_EXIT_DURATION;
+  if (from === "sit") return SIT_EXIT_DURATION;
+  if (to === "sit" || to === "lie") return 0.4;
+  if (from === "crouch" || to === "crouch") return 0.35;
   // Hands onto / off the rungs.
   if (from === "climb" || to === "climb") return 0.45;
   // Big arm poses need a little longer to come down into the reach.
   if (to === "interact") return from === "wave" || from === "celebrate" ? 0.3 : 0.2;
-  if (to === "celebrate" || to === "wave") return 0.3;
+  // Throwing an arm overhead: a little longer.
+  if (to === "celebrate" || to === "wave") return 0.4;
   return 0.3;
+}
+
+/** Kinds whose exit is a choreography (stand up / get up) rather than a cross-fade. */
+function isSeatKind(k: CharacterPoseKind): boolean {
+  return k === "sit" || k === "lie";
 }
 
 /** Eased weight (0..1) of `track.kind` over its predecessor at `now`. */
@@ -2328,7 +2701,18 @@ export function sampleTrack(
   if (!track.from) return cur;
   const w = trackWeight(track, now);
   if (w >= 1) return cur;
-  return blendPose(sampleTrack(track.from, now, speed, opts), cur, w);
+  const from = track.from;
+  if (isSeatKind(from.kind) && !from.snapshot && track.blendDur > 0) {
+    // Stand up / get up first, then ease into the new kind.
+    const u = clamp((now - track.blendStart) / track.blendDur, 0, 1);
+    let leaving = seatExit(from, track.blendStart, now, u, opts);
+    // The seat kind may itself still have been fading in: keep that fade.
+    const wf = trackWeight(from, now);
+    if (from.from && wf < 1)
+      leaving = blendPose(sampleTrack(from.from, now, speed, opts), leaving, wf);
+    return blendPose(leaving, cur, smoothstep(0.72, 1, u));
+  }
+  return blendPose(sampleTrack(from, now, speed, opts), cur, w);
 }
 
 /**
@@ -2400,6 +2784,18 @@ export interface CharacterAnimInput {
   load?: number;
   /** Cage rattle 0..1 (travel speed): a fine tremor through torso and head. */
   rattle?: number;
+  /** Seat under a "sit" pose (height above the floor etc., see `sitFit`). */
+  seat?: SeatSpec;
+  /**
+   * Smoothed forward acceleration of the walker (world units / s²): > 0
+   * leans into a start, < 0 sits back into a stop. Optional.
+   */
+  accel?: number;
+  /**
+   * Smoothed turn rate of the facing (rad / s, + = the walker's facing
+   * angle growing, i.e. turning to her left): banks into the curve. Optional.
+   */
+  turnRate?: number;
 }
 
 /** Largest head + torso turn for `look` (rad). */
@@ -2507,12 +2903,28 @@ export function animateCharacter(i: CharacterAnimInput): CharacterPose {
   const seed = i.seed ?? 0;
   const opts: PoseOptions = { seed };
   if (i.idleFor !== undefined) opts.idleFor = i.idleFor;
+  if (i.seat) opts.seat = i.seat;
   const upper = sampleTrack(i.track, i.now, 0, opts);
-  // Stride amplitude fades with walkW (not with speed), so stopping never pops;
-  // speed above WALK_FULL_SPEED blends towards the run.
-  const gait = gaitPose(i.gaitPhase, Math.max(i.speed, WALK_FULL_SPEED));
+  // The stride follows the real speed (planted feet, see gaitPose); walkW only
+  // fades the whole locomotion layer in and out.
+  const speed = Math.max(0, i.speed);
+  const gait = gaitPose(i.gaitPhase, speed);
   const pose = i.walkW > 0 ? blendLocomotion(upper, gait, i.walkW, i.track.kind) : upper;
   const still = 1 - clamp(i.walkW, 0, 1);
+  const moving = clamp(i.walkW, 0, 1);
+  if (moving > 0 && (i.accel || i.turnRate)) {
+    // Lean into acceleration (sit back when braking) and bank into turns
+    // around the feet: the hips shift so the soles stay where they are.
+    const lean = clamp((i.accel ?? 0) / 90, -0.12, 0.16) * moving;
+    add(pose, "torso", [lean, 0, 0]);
+    add(pose, "head", [-0.5 * lean, 0, 0]);
+    const bank =
+      clamp(-(i.turnRate ?? 0) * 0.035 * clamp(speed / WALK_FULL_SPEED, 0, 1.5), -0.14, 0.14) *
+      moving;
+    const hipY = HIP_Y + (pose.hips.pos?.[1] ?? 0);
+    add(pose, "hips", [0, 0, bank], [(-hipY * Math.sin(bank)) / RIG_UNIT, 0, 0]);
+    add(pose, "head", [0, 0, -0.6 * bank]);
+  }
   if (i.look && i.look.weight > 0) {
     const w = clamp(i.look.weight, 0, 1) * (1 - 0.6 * (1 - still));
     const yaw = clamp(i.look.yaw, -HEAD_LOOK_MAX, HEAD_LOOK_MAX) * w;
@@ -2522,9 +2934,12 @@ export function animateCharacter(i: CharacterAnimInput): CharacterPose {
   const chill = clamp(i.chill ?? 0, 0, 1) * still;
   if (chill > 0) applyChill(pose, i.now, chill);
   if (i.load || i.rattle) applyCage(pose, i.now, clamp(i.load ?? 0, -1, 1), i.rattle ?? 0);
+  // Blinks run on the global clock; resting eyes (lying down) stay shut on top.
+  const shut =
+    i.track.kind === "lie" ? (upper.lids.pos?.[2] ?? 0) * trackWeight(i.track, i.now) : 0;
   pose.lids = {
     rot: [0, 0, 0],
-    pos: [0, 0, LID_TRAVEL * blinkAmount(i.now, seed)],
+    pos: [0, 0, Math.max(LID_TRAVEL * blinkAmount(i.now, seed), shut)],
   };
   return pose;
 }
@@ -2668,7 +3083,7 @@ const TYPING_DECOR = /terminal|keyboard|synth|console|computer|laptop|typewriter
 
 /**
  * Pose for a decor action verb (see `content/decor-actions.ts`):
- * trinken → drink, lesen → read, hören → listen, sitzen → sit,
+ * trinken → drink, lesen → read, hören → listen, sitzen → sit, liegen → lie,
  * ansehen → think, benutzen → typing at keyboards / synths / terminals, else work.
  */
 export function poseForDecorVerb(verb: string, decorId = ""): CharacterPoseKind {
@@ -2681,6 +3096,8 @@ export function poseForDecorVerb(verb: string, decorId = ""): CharacterPoseKind 
       return "listen";
     case "sitzen":
       return "sit";
+    case "liegen":
+      return "lie";
     case "ansehen":
       return "think";
     case "benutzen":
