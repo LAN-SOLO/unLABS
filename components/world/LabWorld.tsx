@@ -122,6 +122,8 @@ import {
 } from "@/lib/world/save";
 import { subscribeTerminalEvents } from "@/lib/world/bridge";
 import { TerminalOverlay, absorbTerminalIntoWorld } from "@/components/world/TerminalOverlay";
+import { BetaSaveDialog } from "@/components/world/menu/BetaSaveDialog";
+import { readBetaSaveHash, stripBetaSaveHash, takeParkedBetaSave } from "@/lib/world/beta-save";
 import { useWorld } from "@/components/world/useWorld";
 import { useLabDirector } from "@/components/world/useLabDirector";
 import { BARK_SPEAKERS, type BarkContext } from "@/lib/world/barks";
@@ -1863,6 +1865,32 @@ export function LabWorld() {
   const [progress, setProgress] = useState(0);
   /** The terminal overlay opened from the title screen (no world loaded yet). */
   const [titleConsole, setTitleConsole] = useState(false);
+  /** Code from a `#beta-save=` link (Beta Lab), waiting for the player's confirmation. */
+  const [betaCode, setBetaCode] = useState<string | null>(null);
+
+  // Beta-save links: read the fragment once, drop it from the address bar at
+  // once (never left behind in history / bookmarks), then ask before importing.
+  useEffect(() => {
+    const take = () => {
+      const code = readBetaSaveHash(window.location.hash);
+      if (code === null) {
+        // Parked by the login page when the link needed a login first.
+        const parked = takeParkedBetaSave(window.sessionStorage);
+        if (parked !== null) setBetaCode(parked);
+        return;
+      }
+      const { pathname, search, hash } = window.location;
+      window.history.replaceState(
+        window.history.state,
+        "",
+        pathname + search + stripBetaSaveHash(hash),
+      );
+      setBetaCode(code);
+    };
+    take();
+    window.addEventListener("hashchange", take);
+    return () => window.removeEventListener("hashchange", take);
+  }, []);
 
   const startPlay = useCallback(() => {
     setPhase("loading");
@@ -1889,8 +1917,19 @@ export function LabWorld() {
             onNewGame={startPlay}
             onLoad={startPlay}
             onTerminal={() => setTitleConsole(true)}
+            blocked={betaCode !== null}
           />
         </UiScale>
+      )}
+      {betaCode !== null && phase !== "loading" && (
+        <BetaSaveDialog
+          code={betaCode}
+          onCancel={() => setBetaCode(null)}
+          onLoaded={() => {
+            setBetaCode(null);
+            startPlay();
+          }}
+        />
       )}
       {phase === "title" && titleConsole && (
         <TerminalOverlay onClose={() => setTitleConsole(false)} />

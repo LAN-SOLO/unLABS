@@ -538,10 +538,25 @@ export type ImportResult =
   | { ok: false; error: string };
 
 /** Largest import accepted (characters). */
-const MAX_IMPORT = 8_000_000;
+export const MAX_IMPORT = 8_000_000;
 
-/** Import an exported code (base64 envelope, or raw JSON state/envelope) into slot `id`. */
-export function importSave(id: SlotId, text: string): ImportResult {
+export type ParsedImport =
+  | {
+      ok: true;
+      state: WorldState;
+      /** Label carried by an export envelope (trimmed to 40 characters). */
+      label?: string;
+      /** Entries dropped or repaired while reading. */
+      repaired: number;
+    }
+  | { ok: false; error: string };
+
+/**
+ * Pure: read an exported code (base64 envelope, or raw JSON state/envelope)
+ * into a migrated, sanitised state without touching storage. `importSave`
+ * and the beta-save link preview both go through here.
+ */
+export function parseImport(text: string): ParsedImport {
   const trimmed = text.trim();
   if (!trimmed) return { ok: false, error: tr("No save code entered.") };
   if (trimmed.length > MAX_IMPORT) return { ok: false, error: tr("Save code is too large.") };
@@ -565,20 +580,67 @@ export function importSave(id: SlotId, text: string): ImportResult {
           : tr("Not a valid _unLAB save."),
     };
   }
-  const s = r.state;
+  const label =
+    isRecord(raw) && isRecord(raw.meta) && typeof raw.meta.label === "string"
+      ? raw.meta.label.slice(0, 40)
+      : undefined;
+  return { ok: true, state: r.state, repaired: r.issues.length, ...(label ? { label } : {}) };
+}
+
+/** Import an exported code (base64 envelope, or raw JSON state/envelope) into slot `id`. */
+export function importSave(id: SlotId, text: string): ImportResult {
+  const p = parseImport(text);
+  if (!p.ok) return p;
+  const s = p.state;
   bump(id);
   if (id === "auto") rotateBackup(id);
   if (!write(slotKey(id), JSON.stringify(s))) {
     return { ok: false, error: tr("Storage full or blocked.") };
   }
   remove(corruptKey(id));
-  const label =
-    isRecord(raw) && isRecord(raw.meta) && typeof raw.meta.label === "string"
-      ? raw.meta.label.slice(0, 40)
-      : undefined;
-  const meta = computeMeta(s, label);
+  const meta = computeMeta(s, p.label);
   setMeta(id, meta);
-  return { ok: true, meta, repaired: r.issues.length };
+  return { ok: true, meta, repaired: p.repaired };
+}
+
+// ── Manual-slot backup (beta-save links) ─────────────────────────
+
+/**
+ * Keep the current readable save of a manual slot as its backup
+ * (`<slot key>.bak`) before something external overwrites it. Returns false
+ * when there was nothing to keep. Restore with `restoreBackup`.
+ */
+export function backupSlot(id: SlotId): boolean {
+  if (id === "auto") return false;
+  const cur = read(slotKey(id));
+  if (cur === null || !readSave(parse(cur)).ok) return false;
+  return write(backupKey(id), cur);
+}
+
+/** Meta of a manual slot's restorable backup (null if there is none). */
+export function backupMeta(id: SlotId): SlotMeta | null {
+  if (id === "auto") return null;
+  const r = readSave(parse(read(backupKey(id))));
+  return r.ok ? computeMeta(r.state, undefined, new Date(0)) : null;
+}
+
+/**
+ * Swap a manual slot with its backup (so a restore can be undone the same
+ * way). An empty slot simply gets the backup back.
+ */
+export function restoreBackup(id: SlotId): boolean {
+  if (id === "auto") return false;
+  const bak = read(backupKey(id));
+  const r = readSave(parse(bak));
+  if (bak === null || !r.ok) return false;
+  const cur = read(slotKey(id));
+  bump(id);
+  if (!write(slotKey(id), JSON.stringify(r.state))) return false;
+  if (cur !== null && readSave(parse(cur)).ok) write(backupKey(id), cur);
+  else remove(backupKey(id));
+  remove(corruptKey(id));
+  setMeta(id, computeMeta(r.state));
+  return true;
 }
 
 // ── Formatting helpers ───────────────────────────────────────────

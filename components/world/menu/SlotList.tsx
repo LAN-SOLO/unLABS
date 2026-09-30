@@ -11,6 +11,7 @@ import {
 import { FLOORS_TOP_DOWN } from "@/lib/world/content/map";
 import { endingStats, isPostgame, type EndingStats } from "@/lib/world/postgame";
 import {
+  backupMeta,
   deleteSlot,
   exportSave,
   formatPlayTime,
@@ -18,8 +19,10 @@ import {
   importSave,
   listSlots,
   loadSlot,
+  restoreBackup,
   type SlotId,
   type SlotInfo,
+  type SlotMeta,
 } from "@/lib/world/save";
 import { useSettings } from "@/lib/world/settings";
 import { tr } from "@/lib/i18n";
@@ -136,7 +139,10 @@ export function SlotList({
   const [settings] = useSettings();
   const [rev, setRev] = useState(0);
   const [confirm, setConfirm] = useState<
-    { kind: "overwrite"; id: SlotId } | { kind: "delete"; id: SlotId } | null
+    | { kind: "overwrite"; id: SlotId }
+    | { kind: "delete"; id: SlotId }
+    | { kind: "restore"; id: SlotId }
+    | null
   >(null);
   const [transfer, setTransfer] = useState<{ kind: "export" | "import"; id: SlotId } | null>(null);
   const [now] = useState(() => Date.now());
@@ -153,6 +159,16 @@ export function SlotList({
       if (info.empty) continue;
       const d = slotDetails(info.id);
       if (d) out.set(info.id, d);
+    }
+    return out;
+  }, [slots]);
+
+  /** Restorable backups of manual slots (kept when a beta-save link overwrote the slot). */
+  const backups = useMemo(() => {
+    const out = new Map<SlotId, SlotMeta>();
+    for (const info of slots) {
+      const m = backupMeta(info.id);
+      if (m) out.set(info.id, m);
     }
     return out;
   }, [slots]);
@@ -329,6 +345,11 @@ export function SlotList({
                   {tr("Import")}
                 </CrtButton>
               )}
+              {backups.has(info.id) && (
+                <CrtButton onClick={() => setConfirm({ kind: "restore", id: info.id })}>
+                  {tr("Restore backup")}
+                </CrtButton>
+              )}
               {(!info.empty || info.corrupt) && (
                 <CrtButton tone="red" onClick={() => setConfirm({ kind: "delete", id: info.id })}>
                   {tr("Delete")}
@@ -368,6 +389,26 @@ export function SlotList({
           onCancel={() => setConfirm(null)}
           onConfirm={() => {
             deleteSlot(confirm.id);
+            setConfirm(null);
+            refresh();
+          }}
+        />
+      )}
+      {confirm?.kind === "restore" && (
+        <ConfirmDialog
+          z={z + 10}
+          title={tr("Restore backup?")}
+          text={tr(
+            "{slot} gets its previous save back ({label}). The current save becomes the backup, so you can switch back.",
+            {
+              slot: slots.find((s) => s.id === confirm.id)?.name ?? "",
+              label: backups.get(confirm.id)?.label ?? "",
+            },
+          )}
+          confirmLabel={tr("Restore")}
+          onCancel={() => setConfirm(null)}
+          onConfirm={() => {
+            restoreBackup(confirm.id);
             setConfirm(null);
             refresh();
           }}

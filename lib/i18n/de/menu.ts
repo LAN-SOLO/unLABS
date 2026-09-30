@@ -412,4 +412,19 @@ export const DE_MENU: Record<string, string> = {
   "Neurology · the question that started it all": "Neurologie · die Frage, mit der alles begann",
   "The surface": "Die Oberfläche",
   "for 2,561 days of peace": "für 2.561 Tage Ruhe",
+  // ── Beta-save links (BetaSaveDialog) + slot backups ──
+  "Load test save?": "Test-Spielstand laden?",
+  "A link from the _unLABS Beta Lab wants to load a save state.":
+    "Ein Link aus dem _unLABS Beta Lab möchte einen Spielstand laden.",
+  "Checking save code …": "Spielstand-Code wird geprüft …",
+  "{n} outdated entries will be cleaned up.": "{n} veraltete Einträge werden bereinigt.",
+  "Load into which slot?": "In welchen Speicherplatz laden?",
+  "{slot} is not empty. Its current save is kept as a backup: Load → {slot} → Restore backup.":
+    "{slot} ist belegt. Der bisherige Spielstand bleibt als Backup erhalten: Laden → {slot} → Backup wiederherstellen.",
+  "Import & load": "Importieren & laden",
+  "Restore backup": "Backup wiederherstellen",
+  "Restore backup?": "Backup wiederherstellen?",
+  "{slot} gets its previous save back ({label}). The current save becomes the backup, so you can switch back.":
+    "{slot} bekommt seinen vorherigen Spielstand zurück ({label}). Der aktuelle Spielstand wird zum Backup, du kannst also zurückwechseln.",
+  Restore: "Wiederherstellen",
 };

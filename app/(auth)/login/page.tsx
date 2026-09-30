@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { login } from "../actions";
 import { BootSequence } from "@/components/BootSequence";
 import { useAuthNext } from "../use-auth-next";
+import { parkBetaSave, readBetaSaveHash, stripBetaSaveHash } from "@/lib/world/beta-save";
 
 function sameOriginReferrer(): boolean {
   try {
@@ -20,6 +21,20 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { next, embed, withNext } = useAuthNext();
+
+  // A Beta Lab save link that needed a login first: keep the code for this tab
+  // (the Lab World still asks before importing) and clear it from the address bar.
+  useEffect(() => {
+    const code = readBetaSaveHash(window.location.hash);
+    if (code === null) return;
+    parkBetaSave(code, window.sessionStorage);
+    const { pathname, search, hash } = window.location;
+    window.history.replaceState(
+      window.history.state,
+      "",
+      pathname + search + stripBetaSaveHash(hash),
+    );
+  }, []);
 
   const handleBootComplete = () => {
     setShowBoot(false);

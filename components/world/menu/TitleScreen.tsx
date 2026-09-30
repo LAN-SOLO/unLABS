@@ -157,9 +157,17 @@ export interface TitleScreenProps {
   onLoad(slot: SlotId): void;
   /** Leave to the big _unOS terminal (`/terminal`). */
   onTerminal(): void;
+  /** A dialog on top (e.g. a beta-save link) owns the keyboard. */
+  blocked?: boolean;
 }
 
-export function TitleScreen({ onContinue, onNewGame, onLoad, onTerminal }: TitleScreenProps) {
+export function TitleScreen({
+  onContinue,
+  onNewGame,
+  onLoad,
+  onTerminal,
+  blocked = false,
+}: TitleScreenProps) {
   const [s] = useSettings();
   const [view, setView] = useState<View>("main");
   // Client-only read of localStorage (false during SSR, re-read on every render).
@@ -222,7 +230,7 @@ export function TitleScreen({ onContinue, onNewGame, onLoad, onTerminal }: Title
       onSelect: () => (isElectron() ? setView("quit") : quitGame(onTerminal)),
     },
   ];
-  const [index, setIndex] = useMenuNav(items, main);
+  const [index, setIndex] = useMenuNav(items, main && !blocked);
 
   // Once a save is detected (client-only), put the cursor on "Continue".
   useEffect(() => {
