@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "child_process";
 import { join } from "path";
 import { app } from "electron";
+import { childEnv } from "./postgres";
 
 let nextProcess: ChildProcess | null = null;
 
@@ -21,7 +22,8 @@ async function waitForReady(port: number, timeoutMs: number = 60000): Promise<vo
 export async function startNextServer(port: number): Promise<void> {
   // In packaged app, node_modules is inside the asar. We need to use
   // the Node.js binary from Electron and require next/dist/bin/next-start
-  const appDir = app.isPackaged ? join(app.getAppPath()) : join(__dirname, "..");
+  // Dev: this file runs from dist-electron/services/, the project root is two up.
+  const appDir = app.isPackaged ? join(app.getAppPath()) : join(__dirname, "..", "..");
 
   // Use process.execPath (the Electron/Node binary) to run next start
   const nextBin = join(appDir, "node_modules", "next", "dist", "bin", "next");
@@ -29,7 +31,7 @@ export async function startNextServer(port: number): Promise<void> {
   nextProcess = spawn(process.execPath, [nextBin, "start", "-p", String(port), "-H", "127.0.0.1"], {
     cwd: appDir,
     env: {
-      ...process.env,
+      ...childEnv(),
       PORT: String(port),
       HOSTNAME: "127.0.0.1",
       ELECTRON_RUN_AS_NODE: "1", // Makes Electron act as plain Node.js

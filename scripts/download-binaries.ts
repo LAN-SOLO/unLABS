@@ -6,9 +6,10 @@
  * Downloads are placed in bin/{platform}/.
  */
 
-import { execSync } from "child_process";
-import { existsSync, mkdirSync, chmodSync, readdirSync } from "fs";
-import { join } from "path";
+import { execFileSync, execSync } from "child_process";
+import { createHash } from "crypto";
+import { existsSync, mkdirSync, chmodSync, readdirSync, readFileSync } from "fs";
+import { basename, join } from "path";
 
 const ROOT = join(__dirname, "..");
 
@@ -18,13 +19,41 @@ const POSTGRES_VERSION = "17.2.0";
 const POSTGREST_VERSION = "12.2.8";
 const GOTRUE_VERSION = "2.188.1"; // Supabase Auth
 
+// ── Pinned checksums ──────────────────────────────────────────────────
+//
+// SHA-256 of every archive we ship, verified before extraction. The
+// Postgres JARs were cross-checked against Maven Central's .sha1 files
+// (2026-09-30). A mismatch aborts the build: a tampered mirror, a TLS
+// interceptor or a re-tagged release must never reach players.
+
+const SHA256: Record<string, string> = {
+  [`embedded-postgres-binaries-darwin-arm64v8-${POSTGRES_VERSION}.jar`]:
+    "9b96314f5c352c71e238a22c0d5fe48e7fecd83fb27e3765f848d6afd5f4318d",
+  [`embedded-postgres-binaries-darwin-amd64-${POSTGRES_VERSION}.jar`]:
+    "8064415ff98fd1bed7a585cfeff3b1895ecbaa470d6e17389644dadcdd399907",
+  [`embedded-postgres-binaries-windows-amd64-${POSTGRES_VERSION}.jar`]:
+    "41a2c287c4ca14691e9af4e6bdd719aca231983fcac8a43d01c99e1bca613859",
+  [`postgrest-v${POSTGREST_VERSION}-macos-aarch64.tar.xz`]:
+    "249515871678560c615be6ee7c64c54cfe944b4916141ce71445b92b289aedaf",
+  [`postgrest-v${POSTGREST_VERSION}-windows-x86-64.zip`]:
+    "077349a572279a4cf99ff306032f665ccba018e78cc4386d13237960094d7b8d",
+  [`auth-v${GOTRUE_VERSION}-darwin-arm64.tar.gz`]:
+    "aeadc0226ceab5f5d525311887667521047589dc7d1a407488c7ae08fa060892",
+};
+
 // ── Platform detection ────────────────────────────────────────────────
 
 type Platform = "darwin-arm64" | "darwin-x64" | "win32-x64";
+const PLATFORMS: readonly Platform[] = ["darwin-arm64", "darwin-x64", "win32-x64"];
 
 function detectPlatform(): Platform {
   const arg = process.argv.find((a) => a.startsWith("--platform="));
-  if (arg) return arg.split("=")[1] as Platform;
+  if (arg) {
+    const value = arg.split("=")[1];
+    const match = PLATFORMS.find((p) => p === value);
+    if (!match) throw new Error(`Unknown --platform=${value} (use ${PLATFORMS.join(", ")})`);
+    return match;
+  }
 
   const platform = process.platform;
   const arch = process.arch;
@@ -42,9 +71,25 @@ function ensureDir(dir: string): void {
   mkdirSync(dir, { recursive: true });
 }
 
+/** HTTPS-only download (also for redirects), verified against SHA256 before use. */
 function download(url: string, dest: string): void {
   console.log(`  Downloading: ${url}`);
-  execSync(`curl -fSL -o "${dest}" "${url}"`, { stdio: "inherit" });
+  execFileSync(
+    "curl",
+    ["--proto", "=https", "--proto-redir", "=https", "--tlsv1.2", "-fSL", "-o", dest, url],
+    {
+      stdio: "inherit",
+    },
+  );
+  const name = basename(new URL(url).pathname);
+  const expected = SHA256[name];
+  if (!expected)
+    throw new Error(`No pinned SHA-256 for ${name} — add it after verifying the release.`);
+  const actual = createHash("sha256").update(readFileSync(dest)).digest("hex");
+  if (actual !== expected) {
+    throw new Error(`Checksum mismatch for ${name}\n  expected ${expected}\n  got      ${actual}`);
+  }
+  console.log(`  SHA-256 ok (${name})`);
 }
 
 function extract(archive: string, dest: string): void {
@@ -187,12 +232,16 @@ function downloadGoTrue(platform: Platform, binDir: string): void {
   if (platform === "darwin-arm64") {
     os = "darwin";
     arch = "arm64";
-  } else if (platform === "darwin-x64") {
-    os = "darwin";
-    arch = "amd64";
   } else {
-    os = "windows";
-    arch = "amd64";
+    // supabase/auth publishes no Windows or Intel-Mac release binaries
+    // (only linux x86/arm64 and darwin-arm64). Build it from the tagged
+    // source with Go and place it here:
+    //   git clone --depth 1 -b v<GOTRUE_VERSION> https://github.com/supabase/auth
+    //   cd auth && GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -o gotrue.exe .
+    throw new Error(
+      `No official GoTrue v${GOTRUE_VERSION} binary for ${platform}. ` +
+        `Build it from source (see scripts/download-binaries.ts) into ${binPath}.`,
+    );
   }
 
   const fileExt = platform.startsWith("win") ? "tar.gz" : "tar.gz";

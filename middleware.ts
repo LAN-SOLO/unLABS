@@ -1,8 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 import { loginUrlFor, nextOrDefault } from "@/lib/auth/next";
+import { isLoopbackHost } from "@/lib/auth/loopback";
 
 export async function middleware(request: NextRequest) {
+  // Desktop build: the bundled server answers only to its loopback address
+  // (blocks DNS rebinding from web pages the player visits).
+  if (process.env.ELECTRON_RUN === "true" && !isLoopbackHost(request.headers.get("host"))) {
+    return new NextResponse("Forbidden", { status: 403 });
+  }
+
   const { supabaseResponse, user } = await updateSession(request);
 
   // Protect game routes - require authentication

@@ -40,6 +40,7 @@ import { join } from "path";
 const ORPHAN_RECOVERY_CUTOFF = "20260521000001";
 
 /**
+ * @param dbPassword Per-install superuser password (see hardenPostgresAuth).
  * @param runSqlFiles If false, only creates schemas and roles. If true, runs SQL migration files.
  * @param sentinelPath Optional path to the legacy first-run sentinel — used to seed the
  *                     migration tracking table for users upgrading from a build that
@@ -50,6 +51,7 @@ const ORPHAN_RECOVERY_CUTOFF = "20260521000001";
  */
 export async function runMigrations(
   pgPort: number,
+  dbPassword: string,
   migrationsDir: string,
   runSqlFiles: boolean = true,
   sentinelPath?: string,
@@ -62,6 +64,7 @@ export async function runMigrations(
     host: "127.0.0.1",
     port: pgPort,
     user: "postgres",
+    password: dbPassword,
     database: "unlabs",
   });
 
@@ -93,7 +96,8 @@ export async function runMigrations(
     await executeIgnoringErrors(client, `CREATE ROLE service_role NOLOGIN BYPASSRLS`);
     await executeIgnoringErrors(
       client,
-      `CREATE ROLE authenticator LOGIN PASSWORD 'postgres' NOINHERIT`,
+      // Real password is (re)set by hardenPostgresAuth() on every boot.
+      `CREATE ROLE authenticator LOGIN PASSWORD '${dbPassword.replace(/[^0-9a-f]/g, "")}' NOINHERIT`,
     );
     await executeIgnoringErrors(client, `GRANT anon TO authenticator`);
     await executeIgnoringErrors(client, `GRANT authenticated TO authenticator`);

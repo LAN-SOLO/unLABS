@@ -1,16 +1,21 @@
-import { app, ipcMain } from "electron";
+import { app, ipcMain, screen, type IpcMainEvent } from "electron";
 import { join } from "path";
-import { existsSync, writeFileSync, readFileSync, mkdirSync } from "fs";
+import { existsSync, writeFileSync } from "fs";
 import { createMainWindow, getMainWindow } from "./window";
 import { getAppVersion } from "./version";
-import { startPostgres, stopPostgres, createDatabase } from "./services/postgres";
+import {
+  startPostgres,
+  stopPostgres,
+  createDatabase,
+  hardenPostgresAuth,
+} from "./services/postgres";
 import { startGoTrue, stopGoTrue } from "./services/gotrue";
 import { ensurePostgrestSchemaReady, startPostgREST, stopPostgREST } from "./services/postgrest";
 import { startGateway, stopGateway } from "./services/gateway";
 import { startNextServer, stopNextServer } from "./services/nextServer";
 import { runMigrations } from "./services/migrator";
-import { generateJwtSecret, generateAnonKey, generateServiceRoleKey } from "./config/jwt";
-// localUser module kept for reference but login now handled via setup page
+import { generateAnonKey, generateServiceRoleKey } from "./config/jwt";
+import { loadOrCreateSecret } from "./config/secrets";
 
 // ── State ─────────────────────────────────────────────────────────────
 
@@ -26,6 +31,14 @@ let ports: ServicePorts;
 let jwtSecret: string;
 let anonKey: string;
 let serviceRoleKey: string;
+let dbPassword: string;
+let operatorSecret: string;
+
+// Test hook: run against a throw-away profile (e.g. smoke tests) without
+// touching the player's real data.
+if (process.env.UNLABS_USER_DATA_DIR) {
+  app.setPath("userData", process.env.UNLABS_USER_DATA_DIR);
+}
 
 // ── Paths ─────────────────────────────────────────────────────────────
 
@@ -119,35 +132,47 @@ async function allocatePorts(): Promise<ServicePorts> {
 
 // ── JWT setup ─────────────────────────────────────────────────────────
 
-function setupJwt(): void {
-  const secretPath = getJwtSecretPath();
-  if (existsSync(secretPath)) {
-    jwtSecret = readFileSync(secretPath, "utf-8").trim();
-  } else {
-    jwtSecret = generateJwtSecret();
-    mkdirSync(getUserDataPath(), { recursive: true });
-    writeFileSync(secretPath, jwtSecret, "utf-8");
-  }
+function setupSecrets(): void {
+  jwtSecret = loadOrCreateSecret(getJwtSecretPath());
+  dbPassword = loadOrCreateSecret(join(getUserDataPath(), "db-secret"));
+  operatorSecret = loadOrCreateSecret(join(getUserDataPath(), "operator-secret"));
   anonKey = generateAnonKey(jwtSecret);
   serviceRoleKey = generateServiceRoleKey(jwtSecret);
 }
 
 // ── IPC handlers ──────────────────────────────────────────────────────
 
+/** IPC is only answered for the main window's top frame showing the game server. */
+function fromGame(event: IpcMainEvent): boolean {
+  const w = getMainWindow();
+  const frame = event.senderFrame;
+  if (!w || event.sender !== w.webContents || !frame || frame.parent !== null) return false;
+  try {
+    return new URL(frame.url).origin === `http://127.0.0.1:${ports.next}`;
+  } catch {
+    return false;
+  }
+}
+
 function setupIpc(): void {
   ipcMain.on("get-version", (event) => {
-    event.returnValue = getAppVersion();
+    event.returnValue = fromGame(event) ? getAppVersion() : null;
   });
   ipcMain.on("get-supabase-url", (event) => {
-    event.returnValue = `http://127.0.0.1:${ports.gateway}`;
+    event.returnValue = fromGame(event) ? `http://127.0.0.1:${ports.gateway}` : null;
   });
   ipcMain.on("get-supabase-anon-key", (event) => {
-    event.returnValue = anonKey;
+    event.returnValue = fromGame(event) ? anonKey : null;
   });
-  ipcMain.on("resize-window", (_event, width: number, height: number) => {
+  ipcMain.on("resize-window", (event, width: unknown, height: unknown) => {
     const w = getMainWindow();
-    if (!w) return;
-    w.setSize(Math.round(width), Math.round(height));
+    if (!w || !fromGame(event)) return;
+    if (typeof width !== "number" || typeof height !== "number") return;
+    if (!Number.isFinite(width) || !Number.isFinite(height)) return;
+    const area = screen.getDisplayMatching(w.getBounds()).workAreaSize;
+    const clamp = (v: number, min: number, max: number) =>
+      Math.round(Math.min(Math.max(v, min), Math.max(min, max)));
+    w.setSize(clamp(width, 1024, area.width), clamp(height, 720, area.height));
     w.center();
   });
 }
@@ -179,9 +204,9 @@ async function startup(): Promise<void> {
   ports = await allocatePorts();
   console.log("[electron] Ports:", ports);
 
-  // 2. Setup JWT
-  setupJwt();
-  console.log("[electron] JWT secret ready");
+  // 2. Per-install secrets (JWT, database password, operator logins)
+  setupSecrets();
+  console.log("[electron] Secrets ready");
 
   // 3. Setup IPC handlers
   setupIpc();
@@ -189,7 +214,7 @@ async function startup(): Promise<void> {
   // 4. Start PostgreSQL
   const binDir = getBinDir();
   const dataDir = getDataDir();
-  await startPostgres(binDir, dataDir, ports.postgres, isFirstRun);
+  await startPostgres(binDir, dataDir, ports.postgres, isFirstRun, dbPassword);
   console.log(`[electron] PostgreSQL running on port ${ports.postgres}`);
 
   // 4b. Create database on first run OR orphan recovery (idempotent — the
@@ -197,16 +222,27 @@ async function startup(): Promise<void> {
   // also re-applied here through executeIgnoringErrors-wrapped statements,
   // so re-running them on an already-initialized cluster is safe.
   if (isFirstRun || isOrphanRecovery) {
-    await createDatabase(ports.postgres);
+    await createDatabase(ports.postgres, dbPassword);
     console.log('[electron] Database "unlabs" ready');
 
     const migrationsDir = getMigrationsDir();
-    await runMigrations(ports.postgres, migrationsDir, false); // schemas + roles only
+    await runMigrations(ports.postgres, dbPassword, migrationsDir, false); // schemas + roles only
     console.log("[electron] Schemas and roles ready");
   }
 
+  // 4c. Password auth only — also migrates clusters created with --auth=trust.
+  await hardenPostgresAuth(ports.postgres, dataDir, dbPassword);
+  console.log("[electron] PostgreSQL auth hardened");
+
   // 5. Start GoTrue (runs its own migrations to populate auth.users etc.)
-  await startGoTrue(binDir, ports.gotrue, ports.postgres, jwtSecret);
+  await startGoTrue(
+    binDir,
+    ports.gotrue,
+    ports.postgres,
+    jwtSecret,
+    dbPassword,
+    `http://127.0.0.1:${ports.next}`,
+  );
   console.log(`[electron] GoTrue running on port ${ports.gotrue}`);
 
   // 6. Run app migrations on every launch. The migrator tracks which files
@@ -217,7 +253,14 @@ async function startup(): Promise<void> {
   {
     const migrationsDir = getMigrationsDir();
     const sentinelPath = getSentinelPath();
-    await runMigrations(ports.postgres, migrationsDir, true, sentinelPath, isOrphanRecovery);
+    await runMigrations(
+      ports.postgres,
+      dbPassword,
+      migrationsDir,
+      true,
+      sentinelPath,
+      isOrphanRecovery,
+    );
     // Write the sentinel after first run AND after orphan recovery — both
     // states are now considered "initialized" so the next launch takes the
     // fast non-first-run path.
@@ -228,16 +271,25 @@ async function startup(): Promise<void> {
   }
 
   // 7. Start PostgREST
-  await startPostgREST(binDir, getUserDataPath(), ports.postgrest, ports.postgres, jwtSecret);
+  await startPostgREST(
+    binDir,
+    getUserDataPath(),
+    ports.postgrest,
+    ports.postgres,
+    jwtSecret,
+    dbPassword,
+  );
   console.log(`[electron] PostgREST running on port ${ports.postgrest}`);
   // Block until PostgREST resolves the canary column (profiles.tutorial_state).
   // A single fire-and-forget NOTIFY isn't enough to win the race against
   // the initial-introspect — the renderer can launch a query before the
   // reload lands. Probe + retry NOTIFY until verified.
-  await ensurePostgrestSchemaReady(ports.postgres, ports.postgrest);
+  await ensurePostgrestSchemaReady(ports.postgres, dbPassword, ports.postgrest);
 
   // 8. Start API Gateway
-  await startGateway(ports.gateway, ports.gotrue, ports.postgrest);
+  await startGateway(ports.gateway, ports.gotrue, ports.postgrest, [
+    `http://127.0.0.1:${ports.next}`,
+  ]);
   console.log(`[electron] Gateway running on port ${ports.gateway}`);
 
   // 9. Set environment for Next.js
@@ -246,20 +298,29 @@ async function startup(): Promise<void> {
   process.env.SUPABASE_SERVICE_ROLE_KEY = serviceRoleKey;
   process.env.NEXT_PUBLIC_APP_URL = `http://127.0.0.1:${ports.next}`;
   process.env.ELECTRON_RUN = "true";
+  process.env.LOCAL_OPERATOR_SECRET = operatorSecret;
 
   // 10. Start Next.js
   await startNextServer(ports.next);
   console.log(`[electron] Next.js running on port ${ports.next}`);
 
   // 11. Always show setup page — it handles both existing and new users
-  const win = createMainWindow(ports.next, "/setup");
+  createMainWindow(ports.next, "/setup");
 
   console.log("[electron] Ready! (setup mode)");
 }
 
 // ── Shutdown ──────────────────────────────────────────────────────────
 
-async function shutdown(): Promise<void> {
+let shutdownPromise: Promise<void> | null = null;
+
+/** Stops every bundled service exactly once, however many quit events fire. */
+function shutdown(): Promise<void> {
+  shutdownPromise ??= stopServices();
+  return shutdownPromise;
+}
+
+async function stopServices(): Promise<void> {
   console.log("[electron] Shutting down...");
   stopNextServer();
   stopGateway();
@@ -270,6 +331,19 @@ async function shutdown(): Promise<void> {
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────
+
+// One instance only: a second launch would collide on the pinned gateway
+// port and the Postgres data directory — focus the running game instead.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  process.exit(0);
+}
+app.on("second-instance", () => {
+  const w = getMainWindow();
+  if (!w) return;
+  if (w.isMinimized()) w.restore();
+  w.focus();
+});
 
 app
   .whenReady()
@@ -301,6 +375,15 @@ app.on("window-all-closed", () => {
   shutdown().finally(() => app.quit());
 });
 
-app.on("before-quit", () => {
-  shutdown().catch(console.error);
+let servicesStopped = false;
+app.on("before-quit", (event) => {
+  if (servicesStopped) return;
+  // Keep the process alive until Postgres has shut down cleanly.
+  event.preventDefault();
+  shutdown()
+    .catch(console.error)
+    .finally(() => {
+      servicesStopped = true;
+      app.quit();
+    });
 });

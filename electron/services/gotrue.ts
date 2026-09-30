@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "child_process";
 import { join } from "path";
+import { childEnv } from "./postgres";
 
 let gotrueProcess: ChildProcess | null = null;
 
@@ -27,27 +28,28 @@ export async function startGoTrue(
   port: number,
   pgPort: number,
   jwtSecret: string,
+  dbPassword: string,
+  siteUrl: string,
 ): Promise<void> {
   const binary = goTrueBin(binDir);
 
   const gotrueEnv = {
-    ...process.env,
+    ...childEnv(),
     GOTRUE_DB_DRIVER: "postgres",
-    GOTRUE_DB_DATABASE_URL: `postgres://postgres:postgres@127.0.0.1:${pgPort}/unlabs?sslmode=disable&search_path=auth`,
+    GOTRUE_DB_DATABASE_URL: `postgres://postgres:${dbPassword}@127.0.0.1:${pgPort}/unlabs?sslmode=disable&search_path=auth`,
     GOTRUE_API_HOST: "127.0.0.1",
     GOTRUE_API_PORT: String(port),
     GOTRUE_JWT_SECRET: jwtSecret,
     GOTRUE_JWT_EXP: "3600",
     GOTRUE_JWT_DEFAULT_GROUP_NAME: "authenticated",
-    GOTRUE_SITE_URL: "http://127.0.0.1:3000",
+    GOTRUE_SITE_URL: siteUrl,
     GOTRUE_EXTERNAL_EMAIL_ENABLED: "true",
     GOTRUE_MAILER_AUTOCONFIRM: "true",
     GOTRUE_DISABLE_SIGNUP: "false",
     GOTRUE_LOG_LEVEL: "warn",
     API_EXTERNAL_URL: `http://127.0.0.1:${port}`,
     GOTRUE_API_EXTERNAL_URL: `http://127.0.0.1:${port}`,
-    DATABASE_URL: `postgres://postgres:postgres@127.0.0.1:${pgPort}/unlabs?sslmode=disable&search_path=auth`,
-    GOTRUE_RATE_LIMIT_HEADER: "X-Forwarded-For",
+    DATABASE_URL: `postgres://postgres:${dbPassword}@127.0.0.1:${pgPort}/unlabs?sslmode=disable&search_path=auth`,
     GOTRUE_DB_NAMESPACE: "auth",
   };
 

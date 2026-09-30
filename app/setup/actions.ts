@@ -4,12 +4,31 @@
  * Setup actions — Desktop-only onboarding flow.
  *
  * These actions create a local operator user (via GoTrue), sign in as
- * an existing user, or import a save file.
+ * an existing user, or import a save file. They are refused outside the
+ * desktop app's bundled server (see isLocalOperatorMode): on a web
+ * deployment they would let anyone list, log into or delete accounts.
  */
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import {
+  LOCAL_OPERATOR_DOMAIN,
+  isLocalOperatorMode,
+  localOperatorEmail,
+  localOperatorPassword,
+} from "@/lib/auth/localOperator";
+import { isLoopbackHost } from "@/lib/auth/loopback";
+
+const DESKTOP_ONLY = "Local operators are only available in the desktop app.";
+const MAX_SAVE_BYTES = 8 * 1024 * 1024;
+
+/** Desktop server, reached directly on the loopback interface. */
+async function allowed(): Promise<boolean> {
+  if (!isLocalOperatorMode()) return false;
+  return isLoopbackHost((await headers()).get("host"));
+}
 
 /**
  * List existing local operator profiles.
@@ -25,6 +44,7 @@ export async function listOperators(): Promise<{
   }>;
   error?: string;
 }> {
+  if (!(await allowed())) return { operators: [], error: DESKTOP_ONLY };
   const supabase = await createClient();
 
   const { data, error } = await supabase
@@ -105,14 +125,18 @@ export async function listOperators(): Promise<{
  * deterministic local email/password pattern.
  */
 export async function signInOperator(formData: FormData) {
+  if (!(await allowed())) return { error: DESKTOP_ONLY };
   const supabase = await createClient();
 
-  const email = formData.get("email") as string;
+  const rawEmail = formData.get("email");
+  const email = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
   if (!email) return { error: "No email provided" };
+  if (!email.endsWith(`@${LOCAL_OPERATOR_DOMAIN}`)) return { error: "Operator not found" };
 
-  // In desktop mode, we use a well-known password for all local users.
-  // First try signing in with the standard local password.
-  const standardPassword = "unstable-local-operator";
+  // Local operators have no password prompt: the password is derived from
+  // this install's secret (older builds used one fixed password for all).
+  const standardPassword = localOperatorPassword(email);
+  if (!standardPassword) return { error: "Server configuration error" };
 
   // Try sign in directly
   const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -178,6 +202,7 @@ export async function signInOperator(formData: FormData) {
  * Requires typing the username to confirm.
  */
 export async function deleteOperator(formData: FormData) {
+  if (!(await allowed())) return { error: DESKTOP_ONLY };
   const operatorId = formData.get("operatorId") as string;
   const confirmUsername = formData.get("confirmUsername") as string;
   const expectedUsername = formData.get("expectedUsername") as string;
@@ -222,14 +247,16 @@ export async function deleteOperator(formData: FormData) {
  * Create a new local operator user.
  */
 export async function createOperator(formData: FormData) {
+  if (!(await allowed())) return { error: DESKTOP_ONLY };
   const supabase = await createClient();
 
   const username = (formData.get("username") as string)?.trim() || "operator";
   const displayName = (formData.get("displayName") as string)?.trim() || username;
 
-  // In desktop mode, use a deterministic email and standard password
-  const email = `${username.toLowerCase().replace(/[^a-z0-9]/g, "")}@unstablelabs.local`;
-  const password = "unstable-local-operator";
+  // In desktop mode, use a deterministic email and a per-install password
+  const email = localOperatorEmail(username);
+  const password = localOperatorPassword(email);
+  if (!password) return { error: "Server configuration error" };
 
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -270,18 +297,26 @@ export async function createOperator(formData: FormData) {
  * writes the imported save data into player_saves.
  */
 export async function importSaveFile(formData: FormData) {
+  if (!(await allowed())) return { error: DESKTOP_ONLY };
   const supabase = await createClient();
 
   const username = (formData.get("username") as string)?.trim() || "operator";
-  const saveDataRaw = formData.get("saveData") as string;
+  const saveDataRaw = formData.get("saveData");
 
-  if (!saveDataRaw) {
+  if (typeof saveDataRaw !== "string" || !saveDataRaw) {
     return { error: "No save data provided" };
+  }
+  if (saveDataRaw.length > MAX_SAVE_BYTES) {
+    return { error: "Save file is too large." };
   }
 
   let saveData: Record<string, unknown>;
   try {
-    saveData = JSON.parse(saveDataRaw);
+    const parsed: unknown = JSON.parse(saveDataRaw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { error: "Invalid save file format. Expected a JSON object." };
+    }
+    saveData = parsed as Record<string, unknown>;
   } catch {
     return { error: "Invalid save file format. Expected JSON." };
   }
@@ -293,8 +328,9 @@ export async function importSaveFile(formData: FormData) {
 
   if (!user) {
     // Create a new user first
-    const email = `${username.toLowerCase().replace(/[^a-z0-9]/g, "")}@unstablelabs.local`;
-    const password = "unstable-local-operator";
+    const email = localOperatorEmail(username);
+    const password = localOperatorPassword(email);
+    if (!password) return { error: "Server configuration error" };
 
     const { data, error } = await supabase.auth.signUp({
       email,

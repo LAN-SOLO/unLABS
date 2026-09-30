@@ -90,7 +90,7 @@ const config: Configuration = {
         arch: ["x64"],
       },
     ],
-    // icon: 'public/icon.ico', // TODO: add custom icon
+    icon: "public/icon.ico",
     artifactName: "UnstableLabs-Setup-${version}.exe",
     extraResources: [{ from: "bin/win32-x64", to: "bin", filter: ["**/*"] }],
   },
@@ -100,8 +100,12 @@ const config: Configuration = {
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
     shortcutName: "UnstableLabs",
-    // installerIcon: 'public/icon.ico', // TODO: add custom icon
-    // uninstallerIcon: 'public/icon.ico',
+    installerIcon: "public/icon.ico",
+    uninstallerIcon: "public/icon.ico",
+    // Per-user install (no admin prompt); the game's data (pgdata, secrets)
+    // lives in %APPDATA%\UnstableLabs and survives updates/uninstall.
+    perMachine: false,
+    deleteAppDataOnUninstall: false,
     license: undefined,
   },
 };

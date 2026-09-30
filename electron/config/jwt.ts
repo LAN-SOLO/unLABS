@@ -1,12 +1,6 @@
-import { randomBytes } from "crypto";
 import * as jwt from "jsonwebtoken";
 
-/**
- * Generate a random 32-byte hex JWT secret.
- */
-export function generateJwtSecret(): string {
-  return randomBytes(32).toString("hex");
-}
+// The secret itself is created per install by config/secrets.ts.
 
 /**
  * Generate the anon key — a JWT that PostgREST uses for unauthenticated requests.

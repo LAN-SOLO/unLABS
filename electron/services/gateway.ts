@@ -12,10 +12,24 @@ export async function startGateway(
   port: number,
   gotruePort: number,
   postgrestPort: number,
+  appOrigins: readonly string[],
 ): Promise<void> {
+  const hosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`]);
+  const origins = new Set(appOrigins);
   return new Promise<void>((resolve) => {
     server = createServer((req: IncomingMessage, res: ServerResponse) => {
       const url = req.url ?? "/";
+
+      // Only the game may talk to the local database. Browsers always send
+      // Origin on cross-origin requests, so a web page the player visits in
+      // their normal browser is rejected here; a foreign Host header means
+      // DNS rebinding. Server-side calls from Next.js send no Origin.
+      const origin = req.headers.origin;
+      if (!hosts.has(req.headers.host ?? "") || (origin !== undefined && !origins.has(origin))) {
+        res.writeHead(403, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ error: "Forbidden" }));
+        return;
+      }
 
       let targetPort: number;
       let targetPath: string;
@@ -43,7 +57,7 @@ export async function startGateway(
           path: targetPath,
           method: req.method,
           headers: {
-            ...req.headers,
+            ...forwardHeaders(req),
             host: `127.0.0.1:${targetPort}`,
           },
         },
@@ -68,6 +82,15 @@ export async function startGateway(
       resolve();
     });
   });
+}
+
+/** Request headers minus client-supplied proxy headers (rate-limit spoofing). */
+function forwardHeaders(req: IncomingMessage): IncomingMessage["headers"] {
+  const headers = { ...req.headers };
+  delete headers["x-forwarded-for"];
+  delete headers["x-forwarded-host"];
+  delete headers["x-real-ip"];
+  return headers;
 }
 
 export function stopGateway(): void {

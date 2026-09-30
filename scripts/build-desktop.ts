@@ -17,11 +17,11 @@ import { join } from "path";
 
 const ROOT = join(__dirname, "..");
 
-function run(cmd: string, label: string): void {
+function run(cmd: string, label: string, env: NodeJS.ProcessEnv = {}): void {
   console.log(`\n${"=".repeat(60)}`);
   console.log(`  ${label}`);
   console.log(`${"=".repeat(60)}\n`);
-  execSync(cmd, { cwd: ROOT, stdio: "inherit" });
+  execSync(cmd, { cwd: ROOT, stdio: "inherit", env: { ...process.env, ...env } });
 }
 
 async function main(): Promise<void> {
@@ -41,10 +41,20 @@ async function main(): Promise<void> {
   run("bash scripts/check-desktop-db.sh", "Step 0: Verify database content is bundled");
 
   // 1. Download binaries
-  run("npx ts-node scripts/download-binaries.ts", "Step 1: Download platform binaries");
+  if (buildMac)
+    run(
+      "npx ts-node scripts/download-binaries.ts --platform=darwin-arm64",
+      "Step 1a: Binaries (macOS)",
+    );
+  if (buildWin)
+    run(
+      "npx ts-node scripts/download-binaries.ts --platform=win32-x64",
+      "Step 1b: Binaries (Windows)",
+    );
 
   // 2. Build Next.js
-  run("pnpm build", "Step 2: Build Next.js production bundle");
+  // UNLABS_DESKTOP_BUILD lets the CSP allow the bundled gateway (next.config.mjs).
+  run("pnpm build", "Step 2: Build Next.js production bundle", { UNLABS_DESKTOP_BUILD: "1" });
 
   // 3. Compile Electron TypeScript
   run("npx tsc -p electron/tsconfig.json", "Step 3: Compile Electron main process");

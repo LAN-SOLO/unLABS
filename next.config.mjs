@@ -4,6 +4,15 @@ import { readFileSync } from "fs";
 
 const pkg = JSON.parse(readFileSync("./package.json", "utf-8"));
 
+// Desktop build: the renderer talks to the bundled Supabase gateway, which is
+// pinned to 127.0.0.1:54321 (electron/main.ts). Headers are frozen into the
+// routes manifest at `next build`, so scripts/build-desktop.ts sets
+// UNLABS_DESKTOP_BUILD=1 for that build.
+const desktopConnect =
+  process.env.UNLABS_DESKTOP_BUILD === "1" || process.env.ELECTRON_RUN === "true"
+    ? " http://127.0.0.1:54321"
+    : "";
+
 const securityHeaders = [
   {
     key: "X-DNS-Prefetch-Control",
@@ -43,7 +52,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.mainnet-beta.solana.com https://rpc.ankr.com${process.env.ELECTRON_RUN === "true" ? " http://127.0.0.1:*" : ""}`,
+      `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.mainnet-beta.solana.com https://rpc.ankr.com${desktopConnect}`,
       "frame-ancestors 'self'",
       "form-action 'self'",
       "base-uri 'self'",

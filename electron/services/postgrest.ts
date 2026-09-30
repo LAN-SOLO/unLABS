@@ -1,6 +1,8 @@
 import { spawn, type ChildProcess } from "child_process";
 import { writeFileSync } from "fs";
 import { join } from "path";
+import { restrictFile } from "../config/secrets";
+import { childEnv } from "./postgres";
 
 let postgrestProcess: ChildProcess | null = null;
 
@@ -29,13 +31,14 @@ export async function startPostgREST(
   port: number,
   pgPort: number,
   jwtSecret: string,
+  dbPassword: string,
 ): Promise<void> {
   const binary = postGrestBin(binDir);
 
   // Generate config file
   const configPath = join(userDataDir, "postgrest.conf");
   const config = [
-    `db-uri = "postgres://authenticator:postgres@127.0.0.1:${pgPort}/unlabs"`,
+    `db-uri = "postgres://authenticator:${dbPassword}@127.0.0.1:${pgPort}/unlabs"`,
     `db-schemas = "public,storage"`,
     `db-anon-role = "anon"`,
     `jwt-secret = "${jwtSecret}"`,
@@ -43,10 +46,13 @@ export async function startPostgREST(
     `server-port = ${port}`,
     `db-extra-search-path = "public,extensions"`,
   ].join("\n");
-  writeFileSync(configPath, config, "utf-8");
+  // Holds the JWT secret and the DB password — owner-only.
+  writeFileSync(configPath, config, { encoding: "utf-8", mode: 0o600 });
+  restrictFile(configPath);
 
   postgrestProcess = spawn(binary, [configPath], {
     stdio: ["pipe", "pipe", "pipe"],
+    env: childEnv(),
   });
 
   postgrestProcess.on("error", (err) => {
@@ -68,12 +74,13 @@ export function stopPostgREST(): void {
   }
 }
 
-async function sendNotifyReload(pgPort: number): Promise<void> {
+async function sendNotifyReload(pgPort: number, dbPassword: string): Promise<void> {
   const { Client } = await import("pg");
   const client = new Client({
     host: "127.0.0.1",
     port: pgPort,
     user: "postgres",
+    password: dbPassword,
     database: "unlabs",
   });
   await client.connect();
@@ -104,6 +111,7 @@ async function sendNotifyReload(pgPort: number): Promise<void> {
  */
 export async function ensurePostgrestSchemaReady(
   pgPort: number,
+  dbPassword: string,
   postgrestPort: number,
   timeoutMs: number = 10_000,
 ): Promise<void> {
@@ -129,7 +137,7 @@ export async function ensurePostgrestSchemaReady(
     }
 
     try {
-      await sendNotifyReload(pgPort);
+      await sendNotifyReload(pgPort, dbPassword);
       attempts++;
     } catch (err) {
       console.warn(
