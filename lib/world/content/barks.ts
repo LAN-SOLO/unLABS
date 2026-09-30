@@ -1598,6 +1598,8 @@ const BIO_BARKS: BarkDef[] = group("bio", "bio_low", { cooldown: 600 }, [
 // ── Wardrobe (what Jade wears; `worn_<item>` flags, lib/world/wardrobe.ts) ──
 
 const worn = (item: string) => ({ flag: `worn_${item}` });
+/** Jade wears exactly this signature look (content/looks.ts, `look_on_<id>` flags). */
+const lookOn = (id: string) => ({ flag: `look_on_${id}` });
 const WEAR_W = 4;
 
 const WEAR_BARKS: BarkDef[] = [
@@ -1659,6 +1661,40 @@ const WEAR_BARKS: BarkDef[] = [
       tr("The pendant hums along with the crystal. Or the crystal hums along with me."),
       { when: worn("crystal_pendant") },
     ],
+    [
+      "mcp",
+      tr(
+        "Formal attire detected. The lab has no dress code, Dr. Lawrence. It approves nevertheless.",
+      ),
+      { when: lookOn("gala_night") },
+    ],
+    [
+      "pa",
+      tr("A containment drill is in progress on this level. This is a drill. Probably."),
+      { when: lookOn("containment_drill") },
+    ],
+    [
+      "jade",
+      tr("1989. The year somebody in Cottbus decided a lab needed a crystal."),
+      { when: lookOn("cottbus_1989") },
+    ],
+    [
+      "b4c0n",
+      tr("Neon! You are glowing on seventeen frequencies, Dr. Lawrence. I checked them all."),
+      { when: lookOn("neon_festival") },
+    ],
+    [
+      "jade",
+      tr("His shirt still smells of solder. I roll the sleeves the way he did."),
+      { when: worn("shirt_damien") },
+    ],
+    [
+      "mcp",
+      tr(
+        "Hazmat suit detected. Please tell me which hazard, Dr. Lawrence. I would like to be alarmed in an informed way.",
+      ),
+      { when: worn("hazmat_suit") },
+    ],
   ]),
   ...group("wear.room", "enter_room", { cooldown: 900, weight: WEAR_W }, [
     [
@@ -1685,6 +1721,21 @@ const WEAR_BARKS: BarkDef[] = [
       "c8br41n",
       tr("The circlet hums at 847 hertz. So do I. We should talk, the three of us."),
       { when: worn("crystal_tiara"), on: { floor: 5 } },
+    ],
+    [
+      "jade",
+      tr("The mantle is heavy. The Forge was heavier."),
+      { when: worn("forge_mantle"), on: { floor: 3 } },
+    ],
+    [
+      "mcp",
+      tr("Umbrella not found. Sou'wester accepted. Dripping, Dr. Lawrence, is now optional."),
+      { when: worn("sou_wester"), on: { floor: 1 } },
+    ],
+    [
+      "jade",
+      tr("Snow boots on grating. Somewhere up there it is winter, and I am dressed for it."),
+      { when: worn("winter_boots") },
     ],
   ]),
 ];

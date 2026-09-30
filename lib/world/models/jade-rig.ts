@@ -13,10 +13,11 @@
  * `pivot - parent.origin` — the joint's rest position, which every pose
  * table relies on — never changes for any look.
  *
- * The default look reproduces the original Jade voxel for voxel (dense
- * parts). Any other look drops the hidden interior voxels of every part
- * (`hollow`), which keeps the budgets (< 10000 posed voxels, ≤ 2600 per
- * part) with helmets, backpacks and buddies on.
+ * After painting, every part is fitted to Jade's tall, slim build
+ * (`HIPS_FIT` … `ARM_FIT`, see below). The first-day look keeps dense parts;
+ * any other look drops the hidden interior voxels of every part (`hollow`),
+ * which keeps the budgets (< 10000 posed voxels, ≤ 2600 per part) with
+ * helmets, backpacks and buddies on.
  *
  * Only type imports from rig.ts (rig.ts imports this module for `jadeRig`).
  */
@@ -40,7 +41,10 @@ import {
   Canvas,
   JADE_HIP_Y,
   JADE_SCALE,
+  fitCanvas,
+  fitPoint,
   resolveLook,
+  type Fit,
   type LookCtx,
   type V3,
 } from "@/lib/world/models/jade-kit";
@@ -98,13 +102,40 @@ function assemble(specs: PartSpec[], hollow: boolean): RigPart[] {
   });
 }
 
+// ── Build: tall and slim ────────────────────────────────────────
+//
+// Every part is painted at the classic sizes (jade-wear / jade-hair /
+// jade-gear / jade-accessories keep their frames), then fitted: the hips
+// lose four columns and a front layer and gain a row (a higher waist, so
+// the legs read longer) while the torso gives that row back below the chest
+// and loses two columns and a layer (narrow shoulders); the arms lose their
+// inner column; the head loses its outer hair columns and a layer at the
+// back (a smaller head on a longer body). The joints the poses rely on
+// (hip height, shoulders, thigh, shin, upper arm, forearm, the back's depth)
+// stay exactly where they were, so every pose, seat, bed and gait is exact.
+
+/** Hips 16×6×10 → 12×7×9. */
+export const HIPS_FIT: Fit = { dropX: [1, 2, 13, 14], dropZ: [5], dupY: [1] };
+/** Torso 16×16×12 → 14×15×11 (the shoulders stay at the same height above the hips). */
+export const TORSO_FIT: Fit = { dropX: [1, 14], dropZ: [5], dropY: [1] };
+/** Head 14×18×16 → 12×18×15: the outer hair columns and a layer at the back of the skull. */
+export const HEAD_FIT: Fit = { dropX: [0, 13], dropZ: [2] };
+/** Upper arm / forearm (right frame, inner side +x) 6 → 5 wide. */
+export const ARM_FIT: Fit = { dropX: [5] };
+/** The coat skirt follows the hips (tail x = hips x + 2, z = hips z + 2). */
+const TAIL_FIT: Fit = { dropX: [3, 4, 15, 16], dropZ: [7] };
+
+/** Width of a fitted arm (the left arm is its mirror image). */
+const ARM_W = 5;
+const mirrorPoint = (p: V3): V3 => [ARM_W - p[0], p[1], p[2]];
+
 // ── Parts ───────────────────────────────────────────────────────
 
 function hips(ctx: LookCtx): Canvas {
   const k = new Canvas(16, 6, 10);
   hipsClothes(k, ctx);
   beltGear(k, ctx);
-  return k;
+  return fitCanvas(k, HIPS_FIT);
 }
 
 function torso(ctx: LookCtx): Canvas {
@@ -113,7 +144,7 @@ function torso(ctx: LookCtx): Canvas {
   backGear(k, ctx.back);
   neckGear(k, ctx.neck);
   buddyGear(k, ctx.buddy);
-  return k;
+  return fitCanvas(k, TORSO_FIT);
 }
 
 function head(ctx: LookCtx): Canvas {
@@ -121,7 +152,7 @@ function head(ctx: LookCtx): Canvas {
   headWithHair(k, ctx);
   faceGear(k, ctx.face);
   headGear(k, ctx.head);
-  return k;
+  return fitCanvas(k, HEAD_FIT);
 }
 
 function forearm(ctx: LookCtx, left: boolean): Canvas {
@@ -129,13 +160,14 @@ function forearm(ctx: LookCtx, left: boolean): Canvas {
   forearmClothes(k, ctx);
   handWithGloves(k, ctx);
   if (left) wristGear(k, ctx.wrist, glovesCoverWrist(ctx));
-  return left ? k.mirrorX() : k;
+  const f = fitCanvas(k, ARM_FIT);
+  return left ? f.mirrorX() : f;
 }
 
 function upperArm(ctx: LookCtx): Canvas {
   const k = new Canvas(6, 10, 6);
   upperArmClothes(k, ctx);
-  return k;
+  return fitCanvas(k, ARM_FIT);
 }
 
 function thigh(ctx: LookCtx): Canvas {
@@ -152,30 +184,35 @@ function shin(ctx: LookCtx): Canvas {
 
 /** Coat skirt, or a single voxel buried in the hips when nothing hangs there. */
 function coatTail(ctx: LookCtx): { canvas: Canvas; origin: V3 } {
+  const origin = fitPoint(TAIL_FIT, [10, 8, 3]);
   const k = new Canvas(20, 8, 14);
-  if (coatTailClothes(k, ctx)) return { canvas: k, origin: [10, 8, 3] };
+  if (coatTailClothes(k, ctx)) return { canvas: fitCanvas(k, TAIL_FIT), origin };
   const p = new Canvas(1, 1, 1);
   p.clip = null;
-  // Hips voxel (8, 2, 5) in the tail frame: hips - pivot + origin.
-  p.set(10, 10, 7, ctx.legs?.t.main ?? 1);
-  return { canvas: p, origin: [10, 8, 3] };
+  // Hips voxel (8, 2, 6) in the tail frame (hips - pivot + origin), inside the fitted hips too.
+  p.set(10, 10, 8, ctx.legs?.t.main ?? 1);
+  return { canvas: fitCanvas(p, TAIL_FIT), origin };
 }
 
 // ── The rig ─────────────────────────────────────────────────────
 
-const UPPER_ARM_ORIGIN: V3 = [3, 9, 3];
-const FOREARM_ORIGIN: V3 = [3, 10, 3];
-const ELBOW_PIVOT: V3 = [3, 0, 3];
+const UPPER_ARM_ORIGIN: V3 = fitPoint(ARM_FIT, [3, 9, 3]);
+const FOREARM_ORIGIN: V3 = fitPoint(ARM_FIT, [3, 10, 3]);
+const ELBOW_PIVOT: V3 = fitPoint(ARM_FIT, [3, 0, 3]);
 const THIGH_ORIGIN: V3 = [3, 12, 3];
 const SHIN_ORIGIN: V3 = [3, 12, 5];
 const KNEE_PIVOT: V3 = [3, 0, 3];
+/** Shoulder joints: the fitted arm (5 wide, joint 2 from its inner face) hangs flush with the torso. */
+const TORSO_W = 16 - (TORSO_FIT.dropX?.length ?? 0);
+const SHOULDER_Y = fitPoint(TORSO_FIT, [0, 15, 0])[1];
+const SHOULDER_Z = fitPoint(TORSO_FIT, [0, 0, 5])[2];
 
 export interface JadeRigOptions {
   /** Drop hidden interior voxels (default: every look except DEFAULT_LOOK). */
   hollow?: boolean;
 }
 
-/** Jade Lawrence wearing `look` (DEFAULT_LOOK: the original model, voxel for voxel). */
+/** Jade Lawrence wearing `look` (DEFAULT_LOOK: the first-day look, dense parts). */
 export function buildJadeRig(
   look: JadeLook = DEFAULT_LOOK,
   opts: JadeRigOptions = {},
@@ -183,41 +220,59 @@ export function buildJadeRig(
   const shown = shownLook(look);
   const ctx = resolveLook(shown);
   const hollow = opts.hollow ?? lookKey(shown) !== DEFAULT_KEY;
-  const hair = hairBackCanvas(ctx);
+  const hair = hairBackCanvas(ctx, HEAD_FIT);
   const tail = coatTail(ctx);
   const up = upperArm(ctx);
   const th = thigh(ctx);
   const sh = shin(ctx);
   const specs: PartSpec[] = [
-    { name: "hips", canvas: hips(ctx), parent: null, pivot: [0, JADE_HIP_Y, 0], origin: [8, 0, 5] },
-    { name: "torso", canvas: torso(ctx), parent: "hips", pivot: [8, 4, 5], origin: [8, 0, 5] },
-    { name: "head", canvas: head(ctx), parent: "torso", pivot: [8, 16, 5], origin: [7, 0, 7] },
+    {
+      name: "hips",
+      canvas: hips(ctx),
+      parent: null,
+      pivot: [0, JADE_HIP_Y, 0],
+      origin: fitPoint(HIPS_FIT, [8, 0, 5]),
+    },
+    {
+      name: "torso",
+      canvas: torso(ctx),
+      parent: "hips",
+      pivot: fitPoint(HIPS_FIT, [8, 4, 5]),
+      origin: fitPoint(TORSO_FIT, [8, 0, 5]),
+    },
+    {
+      name: "head",
+      canvas: head(ctx),
+      parent: "torso",
+      pivot: fitPoint(TORSO_FIT, [8, 16, 5]),
+      origin: fitPoint(HEAD_FIT, [7, 0, 7]),
+    },
     {
       name: "hairBack",
       canvas: hair.canvas,
       parent: "head",
-      pivot: [7, 11, 0],
+      pivot: fitPoint(HEAD_FIT, [7, 11, 0]),
       origin: hair.origin,
     },
     {
       name: "brows",
       canvas: browsCanvas(ctx),
       parent: "head",
-      pivot: [7, 12, 13.3],
+      pivot: fitPoint(HEAD_FIT, [7, 12, 13.3]),
       origin: [5, 1, 1],
     },
     {
       name: "lids",
       canvas: lidsCanvas(),
       parent: "head",
-      pivot: [7, 9, 11.9],
+      pivot: fitPoint(HEAD_FIT, [7, 9, 11.9]),
       origin: [5, 1, 0.5],
     },
     {
       name: "upperArmR",
       canvas: up,
       parent: "torso",
-      pivot: [-3, 15, 5],
+      pivot: [-3, SHOULDER_Y, SHOULDER_Z],
       origin: UPPER_ARM_ORIGIN,
     },
     {
@@ -231,23 +286,29 @@ export function buildJadeRig(
       name: "upperArmL",
       canvas: up.mirrorX(),
       parent: "torso",
-      pivot: [19, 15, 5],
-      origin: UPPER_ARM_ORIGIN,
+      pivot: [TORSO_W + 3, SHOULDER_Y, SHOULDER_Z],
+      origin: mirrorPoint(UPPER_ARM_ORIGIN),
     },
     {
       name: "forearmL",
       canvas: forearm(ctx, true),
       parent: "upperArmL",
-      pivot: ELBOW_PIVOT,
-      origin: FOREARM_ORIGIN,
+      pivot: mirrorPoint(ELBOW_PIVOT),
+      origin: mirrorPoint(FOREARM_ORIGIN),
     },
-    { name: "thighR", canvas: th, parent: "hips", pivot: [5, 0, 5], origin: THIGH_ORIGIN },
+    {
+      name: "thighR",
+      canvas: th,
+      parent: "hips",
+      pivot: fitPoint(HIPS_FIT, [5, 0, 5]),
+      origin: THIGH_ORIGIN,
+    },
     { name: "shinR", canvas: sh, parent: "thighR", pivot: KNEE_PIVOT, origin: SHIN_ORIGIN },
     {
       name: "thighL",
       canvas: th.mirrorX(),
       parent: "hips",
-      pivot: [11, 0, 5],
+      pivot: fitPoint(HIPS_FIT, [11, 0, 5]),
       origin: THIGH_ORIGIN,
     },
     {
@@ -261,7 +322,7 @@ export function buildJadeRig(
       name: "coatTail",
       canvas: tail.canvas,
       parent: "hips",
-      pivot: [8, 0, 1],
+      pivot: fitPoint(HIPS_FIT, [8, 0, 1]),
       origin: tail.origin,
     },
   ];

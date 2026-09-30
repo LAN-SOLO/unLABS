@@ -1879,10 +1879,12 @@ const PLANNED_PICKUPS: readonly PickupDef[] = [
   // Level −1
   wear("tee_residual", 1, 100, 43, "bundle", tr("Shirt behind the Rack")),
   wear("raincoat", 1, 151, 50, "bundle", tr("Coat on a Pipe")),
+  wear("sou_wester", 1, 146, 50, "bundle", tr("Hat on a Hook")),
   wear("hair_braids", 1, 104, 117, "bundle", tr("Hair Tie with a Note")),
   wear("lanyard_keys", 1, 151, 109, "bundle", tr("Janitor's Hook")),
   // Level −2
   wear("hardhat", 2, 74, 146, "crate", tr("Safety Gear Crate")),
+  wear("track_pants", 2, 84, 140, "bundle", tr("Folded Tarp")),
   wear("propeller_cap", 2, 104, 111, "bundle", tr("Behind the Vent Grille"), {
     hidden: { counter: "drone_runs", min: 1 },
   }),
@@ -1897,9 +1899,13 @@ const PLANNED_PICKUPS: readonly PickupDef[] = [
   wear("flannel", 4, 52, 42, "bundle", tr("Shirt over a Chair")),
   wear("hair_space_buns", 4, 144, 148, "bundle", tr("Two Hair Ties")),
   wear("round_glasses", 4, 52, 93, "bundle", tr("Reading Glasses")),
+  wear("pearl_necklace", 4, 40, 95, "bundle", tr("Jewellery Box")),
+  wear("skirt_gown", 4, 40, 146, "bundle", tr("Garment Bag")),
+  wear("sunglasses", 4, 148, 146, "bundle", tr("Sunglasses")),
   wear("buddy_plush", 4, 124, 91, "bundle", tr("Plush Toy")),
   // Level −4
   wear("hoodie_night_shift", 5, 54, 77, "bundle", tr("Crew Hoodie")),
+  wear("track_jacket", 5, 60, 76, "bundle", tr("Old Sports Bag")),
   wear("fanny_pack", 5, 146, 86, "crate", tr("Lost-and-Found Box")),
 
   // ── Textile sources for the wardrobe replicator (refill over time) ──

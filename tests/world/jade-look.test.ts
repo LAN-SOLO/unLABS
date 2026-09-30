@@ -32,8 +32,15 @@ function rigHash(def: CharacterRigDef): string {
   return h.digest("hex");
 }
 
-/** Snapshot of `jadeRig()` taken before the wardrobe existed. */
-const ORIGINAL_JADE = "bc604e04a60db609ab0cf94956442c004853246eb3baaaa175ad68221e78f82f";
+/**
+ * Snapshot of the first-day `jadeRig()`. It used to pin the 2025 model
+ * (bc604e04…: teal sweater, auburn ponytail, amber goggles). The 2026 rework
+ * changed her on purpose — tall and slim (fitted parts), pale skin with
+ * silver lids and a winged liner, the copper updo, the stand-collar shirt,
+ * no goggles, dark brown eyes — so the pin moved with it. Update it only for a deliberate
+ * change of the first-day look.
+ */
+const FIRST_DAY_JADE = "26758063da5752bf5d12bb0edf20493c9a35a74894ce87e3e3e9e0169142f48e";
 
 const wear = (w: WearItem, cw: string): JadeLook => ({
   ...DEFAULT_LOOK,
@@ -52,11 +59,19 @@ const emissive = (def: CharacterRigDef) =>
 const part = (def: CharacterRigDef, name: string) => def.parts.find((p) => p.name === name)!;
 
 describe("jade's wardrobe looks", () => {
-  it("the default look is the original model, voxel for voxel", () => {
-    expect(rigHash(jadeRig())).toBe(ORIGINAL_JADE);
-    expect(rigHash(jadeRig(DEFAULT_LOOK))).toBe(ORIGINAL_JADE);
-    expect(rigHash(jadeLookRig(DEFAULT_LOOK))).toBe(ORIGINAL_JADE);
+  it("the first-day look is pinned voxel for voxel", () => {
+    expect(rigHash(jadeRig())).toBe(FIRST_DAY_JADE);
+    expect(rigHash(jadeRig(DEFAULT_LOOK))).toBe(FIRST_DAY_JADE);
+    expect(rigHash(jadeLookRig(DEFAULT_LOOK))).toBe(FIRST_DAY_JADE);
     expect(JADE_SCALE).toBe(CHARACTER_SCALE);
+  });
+
+  it("the first-day look: stand-collar shirt, lab coat, copper updo, no goggles or glasses", () => {
+    expect(DEFAULT_LOOK.top).toEqual({ item: "shirt_collar_geo", colorway: "white" });
+    expect(DEFAULT_LOOK.outer?.item).toBe("labcoat");
+    expect(DEFAULT_LOOK.hair).toEqual({ item: "hair_updo", colorway: "copper" });
+    expect(DEFAULT_LOOK.head).toBeNull();
+    expect(DEFAULT_LOOK.face).toBeNull();
   });
 
   it("every piece in every colourway builds within budget with joints in place", () => {
@@ -124,10 +139,32 @@ describe("jade's wardrobe looks", () => {
       jadeLookGrid({ ...DEFAULT_LOOK, head: helmet, face: null }).count(),
     );
     // Under the welding helmet the ponytail is tucked away (placeholder voxel only).
-    expect(part(a, "hairBack").model.grid.count()).toBe(1);
+    const pony = { item: "hair_ponytail", colorway: "copper" };
+    const tucked = jadeRig({ ...DEFAULT_LOOK, hair: pony, head: helmet });
+    expect(part(tucked, "hairBack").model.grid.count()).toBe(1);
     // A cap keeps the ponytail.
-    const cap = jadeRig({ ...DEFAULT_LOOK, head: { item: "cap", colorway: "black" } });
+    const cap = jadeRig({ ...DEFAULT_LOOK, hair: pony, head: { item: "cap", colorway: "black" } });
     expect(part(cap, "hairBack").model.grid.count()).toBeGreaterThan(50);
+    // The updo's pompadour and bun hide under crown gear like buns do, and stay under bands.
+    const bare = jadeLookGrid({ ...DEFAULT_LOOK, head: null }).sy;
+    const loose = jadeLookGrid({
+      ...DEFAULT_LOOK,
+      hair: { item: "hair_loose", colorway: "copper" },
+    });
+    expect(bare).toBeGreaterThan(loose.sy);
+    for (const hat of ["beanie", "hardhat", "sou_wester"]) {
+      const w = WEAR_ITEMS.find((x) => x.id === hat)!;
+      const hatOn = { item: hat, colorway: w.colorways[0]!.id };
+      expect(jadeLookGrid({ ...DEFAULT_LOOK, head: hatOn }).sy, hat).toBe(
+        jadeLookGrid({
+          ...DEFAULT_LOOK,
+          hair: { item: "hair_loose", colorway: "copper" },
+          head: hatOn,
+        }).sy,
+      );
+    }
+    const phones = { item: "headphones", colorway: "black" };
+    expect(jadeLookGrid({ ...DEFAULT_LOOK, head: phones }).sy).toBeGreaterThanOrEqual(bare);
     // Buns hide under a beanie: the head is not taller than with the beanie over the ponytail.
     const bun = { item: "hair_bun", colorway: "auburn" };
     const beanie = { item: "beanie", colorway: "teal" };
@@ -177,6 +214,7 @@ describe("jade's wardrobe looks", () => {
         expect(wearItemGrid(w.id, cw.id).count(), `${w.id}.${cw.id}`).toBeGreaterThan(8);
     const g = jadeLookGrid(DEFAULT_LOOK);
     expect(g.sy).toBeGreaterThanOrEqual(62);
+    expect(g.sy).toBeLessThanOrEqual(64);
     expect(g.count()).toBeGreaterThan(3000);
     expect(wearItemGrid("nope", "x").count()).toBe(0);
   });
@@ -184,11 +222,11 @@ describe("jade's wardrobe looks", () => {
   it("look keys are stable and distinguish looks", () => {
     const k = jadeLookKey(DEFAULT_LOOK);
     expect(jadeLookKey({ ...DEFAULT_LOOK })).toBe(k);
-    expect(k).toContain("top=sweater_teal.teal");
+    expect(k).toContain("top=shirt_collar_geo.white");
     expect(k).toContain("face=-");
     expect(jadeLookKey({ ...DEFAULT_LOOK, belt: null })).not.toBe(k);
     expect(
-      jadeLookKey({ ...DEFAULT_LOOK, top: { item: "sweater_teal", colorway: "oat" } }),
+      jadeLookKey({ ...DEFAULT_LOOK, top: { item: "shirt_collar_geo", colorway: "black" } }),
     ).not.toBe(k);
   });
 });

@@ -209,6 +209,20 @@ const craft = (
 export const WEAR_ITEMS: readonly WearItem[] = [
   // ── Tops ──
   {
+    id: "shirt_collar_geo",
+    slot: "top",
+    name: tr("Stand-collar shirt"),
+    blurb: tr(
+      "Crisp white, a stand-up collar lined with a grey-black shard pattern. Her first-day shirt, and most days after.",
+    ),
+    source: START,
+    colorways: [
+      cw("white", tr("colour::White"), "white", "paint_white_dk", "paint_black"),
+      cw("black", tr("colour::Black"), "paint_black", "black", "paint_gray_lt"),
+      cw("sky", tr("colour::Sky"), "paint_sky", "safety_blue", "paint_black"),
+    ],
+  },
+  {
     id: "sweater_teal",
     slot: "top",
     name: tr("Cable-knit sweater"),
@@ -358,6 +372,52 @@ export const WEAR_ITEMS: readonly WearItem[] = [
       cw("white", tr("colour::White"), "paint_white", "paint_white_dk", "grime"),
     ],
   },
+  {
+    id: "shirt_damien",
+    slot: "top",
+    name: tr("Damien's white shirt"),
+    blurb: tr(
+      "Two sizes too big, sleeves rolled, a pencil in the pocket and a coffee ring nobody could wash out. It still smells of solder.",
+    ),
+    source: {
+      kind: "reward",
+      when: { insight: "damien_echo" },
+      hint: tr("Hear Damien's echo."),
+    },
+    colorways: [cw("white", tr("colour::White"), "paint_white", "paint_white_dk", "beige_dk")],
+  },
+  {
+    id: "sweater_nordic",
+    slot: "top",
+    name: tr("Nordic sweater"),
+    blurb: tr(
+      "Star yoke, rib cuffs, wool that argues back. For the surface, and for the cold archive.",
+    ),
+    source: craft({ stoffreste: 3, farbpigment: 2 }, 45),
+    colorways: [
+      cw("red", tr("colour::Red"), "fabric_red", "fabric_red_shade", "paint_white"),
+      cw("navy", tr("colour::Navy"), "paint_navy", "black", "paint_white"),
+      cw("cream", tr("colour::Cream"), "paint_cream", "beige", "fabric_red"),
+    ],
+  },
+  {
+    id: "top_neon",
+    slot: "top",
+    name: tr("Neon mesh top"),
+    blurb: tr(
+      "Black mesh with glowing seams. The bots insisted there be a party. There was a party.",
+    ),
+    source: {
+      kind: "reward",
+      when: { counter: "bots_awake", min: 10 },
+      hint: tr("Wake all ten lore bots."),
+    },
+    glows: true,
+    colorways: [
+      cw("pink", tr("colour::Neon pink"), "paint_black", "black", "neon_pink"),
+      cw("cyan", tr("colour::Neon cyan"), "paint_black", "black", "screen_cyan"),
+    ],
+  },
 
   // ── Jackets ──
   {
@@ -449,6 +509,81 @@ export const WEAR_ITEMS: readonly WearItem[] = [
 
   // ── Trousers ──
   {
+    id: "parka",
+    slot: "outer",
+    name: tr("Expedition parka"),
+    blurb: tr(
+      "Quilted to the knees, a fur-rimmed hood, eleven pockets. Rated for the surface in January, or the cryo bay in any month.",
+    ),
+    source: craft({ stoffreste: 4, polymerfaser: 3 }, 70),
+    layer: "rustle",
+    colorways: [
+      cw("olive", tr("colour::Olive"), "olive", "olive_dk", "paint_cream"),
+      cw("navy", tr("colour::Navy"), "paint_navy", "black", "paint_cream"),
+      cw("red", tr("colour::Red"), "fabric_red", "fabric_red_shade", "paint_cream"),
+    ],
+  },
+  {
+    id: "track_jacket",
+    slot: "outer",
+    name: tr("Track jacket 1989"),
+    blurb: tr(
+      "Shell suit, Cottbus, 1989: turquoise and violet, a zip that sings. Somebody kept it for thirty-seven years.",
+    ),
+    source: find(
+      tr(
+        "The first shaft crew left a sports bag in the rubble tunnel. It has waited there since 1989.",
+      ),
+    ),
+    layer: "rustle",
+    colorways: [
+      cw(
+        "turquoise",
+        tr("colour::Turquoise & violet"),
+        "paint_teal",
+        "purple_paint",
+        "paint_white",
+      ),
+      cw("red", tr("colour::Red & white"), "safety_red", "fabric_red_shade", "paint_white"),
+    ],
+  },
+  {
+    id: "hazmat_suit",
+    slot: "outer",
+    name: tr("Hazmat suit"),
+    blurb: tr(
+      "Taped seams, a window for the badge, a hood that is never up when it should be. Drill procedure: walk, do not run.",
+    ),
+    source: craft(
+      { polymerfaser: 4, membran: 1 },
+      80,
+      { device: "EMC-001", state: "built" },
+      tr("Build the Exotic Matter Containment first — the suit copies its seal rating."),
+    ),
+    layer: "rustle",
+    colorways: [
+      cw("yellow", tr("colour::Yellow"), "safety_yellow", "fabric_mustard", "paint_black"),
+      cw("white", tr("colour::White"), "paint_white", "paint_white_dk", "safety_orange"),
+    ],
+  },
+  {
+    id: "forge_mantle",
+    slot: "outer",
+    name: tr("Forge mantle"),
+    blurb: tr(
+      "Charcoal wool to the shins, gold at every edge, a Halo shard at the throat. Made for one night at the Infinity Forge.",
+    ),
+    source: {
+      kind: "reward",
+      when: { flag: "ending_halo" },
+      hint: tr("Something will happen at the Infinity Forge."),
+    },
+    glows: true,
+    colorways: [cw("forge", tr("colour::Forge charcoal"), "paint_black_lt", "paint_black", "gold")],
+  },
+
+  // ── Trousers ──
+  {
     id: "cargo_dark",
     slot: "legs",
     name: tr("Work trousers"),
@@ -515,6 +650,52 @@ export const WEAR_ITEMS: readonly WearItem[] = [
     colorways: [
       cw("grey", tr("colour::Heather grey"), "fabric_gray", "fabric_gray_shade", "paint_white"),
       cw("black", tr("colour::Black"), "paint_black", "black", "paint_white"),
+    ],
+  },
+
+  // ── Shoes ──
+  {
+    id: "skirt_gown",
+    slot: "legs",
+    name: tr("Evening skirt"),
+    blurb: tr(
+      "Satin to mid-calf, a sash, a swish on every stair. Packed for a gala the lab never had.",
+    ),
+    source: find(
+      tr("A garment bag hangs in the room where the lab's radio once talked to the world."),
+    ),
+    colorways: [
+      cw("midnight", tr("colour::Midnight"), "paint_navy", "black", "gold"),
+      cw("emerald", tr("colour::Emerald"), "fabric_green", "fabric_green_shade", "gold"),
+      cw("wine", tr("colour::Wine"), "fabric_red", "fabric_red_shade", "paint_cream"),
+    ],
+  },
+  {
+    id: "track_pants",
+    slot: "legs",
+    name: tr("Track pants 1989"),
+    blurb: tr("Three stripes, a crackle on every step, cuffs that hold the ankle like a promise."),
+    source: find(
+      tr(
+        "The track suit came in two parts. The trousers ended up in the drone hangar, folded into a tarp.",
+      ),
+    ),
+    colorways: [
+      cw("violet", tr("colour::Violet"), "purple_paint", "purple_paint_dk", "paint_white"),
+      cw("navy", tr("colour::Navy"), "paint_navy", "black", "paint_white"),
+    ],
+  },
+  {
+    id: "leggings_sport",
+    slot: "legs",
+    name: tr("Running leggings"),
+    blurb: tr(
+      "A reflective stripe, a key pocket, zero drag. The long corridor on Level 0 is exactly 140 m.",
+    ),
+    source: craft({ polymerfaser: 2, stoffreste: 1 }, 25),
+    colorways: [
+      cw("black", tr("colour::Black"), "paint_black", "black", "safety_orange"),
+      cw("teal", tr("colour::Teal"), "paint_teal", "paint_teal_dk", "paint_white"),
     ],
   },
 
@@ -619,10 +800,45 @@ export const WEAR_ITEMS: readonly WearItem[] = [
     step: "skate",
     colorways: [cw("white", tr("colour::White"), "paint_white", "paint_white_dk", "paint_pink")],
   },
+  {
+    id: "court_shoes",
+    slot: "feet",
+    name: tr("Court shoes"),
+    blurb: tr("A low heel, a pointed toe, a click the MCP can hear three rooms away."),
+    source: craft({ stoffreste: 1, polymerfaser: 1, farbpigment: 1 }, 30),
+    step: "clog",
+    colorways: [
+      cw("black", tr("colour::Black"), "paint_black", "black", "chrome_lt"),
+      cw("red", tr("colour::Red"), "safety_red", "fabric_red_shade", "chrome_lt"),
+      cw("gold", tr("colour::Gold"), "gold", "brass_dk", "paint_black"),
+    ],
+  },
+  {
+    id: "winter_boots",
+    slot: "feet",
+    name: tr("Snow boots"),
+    blurb: tr(
+      "Padded to the calf, a fur cuff, a sole like a tractor tyre. The cryo bay has met its match.",
+    ),
+    source: craft({ stoffreste: 2, polymerfaser: 2 }, 40),
+    step: "boot",
+    colorways: [
+      cw("brown", tr("colour::Brown"), "leather", "walnut", "paint_cream"),
+      cw("grey", tr("colour::Grey"), "fabric_gray", "fabric_gray_shade", "paint_white"),
+    ],
+  },
 
   // ── Hairstyles (tones = hair colour; dyes cost pigment) ──
   ...(
     [
+      [
+        "updo",
+        tr("High updo"),
+        tr(
+          "Sides pulled up, a pompadour rolled high into a bun, a few waves that never stay put. Twenty pins, one minute, no mirror.",
+        ),
+        START,
+      ],
       [
         "ponytail",
         tr("Low ponytail"),
@@ -677,6 +893,13 @@ export const WEAR_ITEMS: readonly WearItem[] = [
       blurb,
       source,
       colorways: [
+        cw(
+          "copper",
+          tr("colour::Copper orange"),
+          "hair_copper",
+          "hair_copper_dk",
+          "hair_copper_lt",
+        ),
         cw("auburn", tr("colour::Auburn"), "hair_auburn", "wood_red", "rust"),
         cw("brown", tr("colour::Brown"), "hair_brown", "walnut", "wood"),
         cw("black", tr("colour::Black"), "hair_black", "paint_black", "paint_black_lt"),
@@ -822,6 +1045,45 @@ export const WEAR_ITEMS: readonly WearItem[] = [
     glows: true,
     colorways: [cw("halo", tr("colour::Halo"), "crystal_cyan", "halo_glow", "gold_lt")],
   },
+  {
+    id: "sou_wester",
+    slot: "head",
+    name: tr("Sou'wester"),
+    blurb: tr(
+      "Yellow oilskin, a brim that is longer at the back. The cooling floors drip down the neck otherwise.",
+    ),
+    source: find(tr("A rain hat waits on a hook by the pumps of the cooling level.")),
+    coversHair: true,
+    colorways: [
+      cw("yellow", tr("colour::Yellow"), "safety_yellow", "fabric_mustard", "paint_black"),
+      cw("navy", tr("colour::Navy"), "paint_navy", "black", "paint_white"),
+    ],
+  },
+  {
+    id: "flower_crown",
+    slot: "head",
+    name: tr("Neon flower crown"),
+    blurb: tr("Glow-thread petals round the updo. K2-LDR wove it, then denied everything."),
+    source: {
+      kind: "reward",
+      when: { counter: "bots_awake", min: 10 },
+      hint: tr("Wake all ten lore bots."),
+    },
+    glows: true,
+    colorways: [cw("neon", tr("colour::Neon"), "neon_pink", "led_green", "screen_cyan")],
+  },
+  {
+    id: "sweatband",
+    slot: "head",
+    name: tr("Sweatband"),
+    blurb: tr("Terry towelling, a stripe, a small crystal stitched on. It has seen every lap."),
+    source: craft({ stoffreste: 1 }, 10),
+    colorways: [
+      cw("white", tr("colour::White"), "paint_white", "paint_white_dk", "safety_red"),
+      cw("teal", tr("colour::Teal"), "sweater_teal", "paint_teal", "paint_white"),
+      cw("black", tr("colour::Black"), "paint_black", "black", "safety_orange"),
+    ],
+  },
 
   // ── Face ──
   {
@@ -901,6 +1163,17 @@ export const WEAR_ITEMS: readonly WearItem[] = [
       tr("The costume box of the 2018 Christmas party was archived. Deep, cold and off the plans."),
     ),
     colorways: [cw("brown", tr("colour::Brown"), "hair_brown", "walnut", "walnut")],
+  },
+  {
+    id: "sunglasses",
+    slot: "face",
+    name: tr("Sunglasses"),
+    blurb: tr("Square frames, dark lenses, 1989. Pointless underground. Worn anyway."),
+    source: find(tr("A pair of sunglasses lies on the observatory console, pointing at the sky.")),
+    colorways: [
+      cw("black", tr("colour::Black"), "paint_black", "black", "glass_dark"),
+      cw("neon", tr("colour::Neon"), "paint_pink", "purple_paint", "glass_dark"),
+    ],
   },
 
   // ── Gloves ──
@@ -1041,6 +1314,19 @@ export const WEAR_ITEMS: readonly WearItem[] = [
 
   // ── Neck ──
   {
+    id: "gig_bag",
+    slot: "back",
+    name: tr("Gig bag"),
+    blurb: tr(
+      "A padded guitar bag, Damien's studio sticker on the pocket. The guitar is still inside, out of tune.",
+    ),
+    source: { kind: "reward", when: { flag: "studio_open" }, hint: tr("Find Damien's studio.") },
+    layer: "rustle",
+    colorways: [cw("black", tr("colour::Black"), "paint_black", "black", "steel")],
+  },
+
+  // ── Neck ──
+  {
     id: "scarf",
     slot: "neck",
     name: tr("Wool scarf"),
@@ -1090,6 +1376,35 @@ export const WEAR_ITEMS: readonly WearItem[] = [
       cw("black", tr("colour::Black"), "paint_black", "black", "paint_black"),
       cw("red", tr("colour::Red"), "safety_red", "fabric_red_shade", "fabric_red_shade"),
       cw("dots", tr("colour::Polka dots"), "paint_navy", "paint_white", "paint_white"),
+    ],
+  },
+  {
+    id: "pearl_necklace",
+    slot: "neck",
+    name: tr("Pearl necklace"),
+    blurb: tr(
+      "One strand, one knot between each pearl. It belonged to somebody who dressed up for experiments.",
+    ),
+    source: find(
+      tr("A jewellery box waits between the library shelves — a present nobody ever unwrapped."),
+    ),
+    colorways: [cw("pearl", tr("colour::Pearl"), "paint_white", "paint_cream", "white")],
+  },
+  {
+    id: "tie_loose",
+    slot: "neck",
+    name: tr("Loosened tie"),
+    blurb: tr(
+      "Skinny, black, knot pulled down two fingers. Damien wore it to every meeting and to none of the photos.",
+    ),
+    source: {
+      kind: "reward",
+      when: { insight: "damien_echo" },
+      hint: tr("Hear Damien's echo."),
+    },
+    colorways: [
+      cw("black", tr("colour::Black"), "paint_black", "black", "paint_black_lt"),
+      cw("wine", tr("colour::Wine"), "fabric_red_shade", "wood_red", "fabric_red"),
     ],
   },
 
@@ -1177,6 +1492,17 @@ export const WEAR_ITEMS: readonly WearItem[] = [
     ),
     colorways: [cw("rainbow", tr("colour::Rainbow"), "cable_red", "cable_yellow", "safety_blue")],
   },
+  {
+    id: "glow_bands",
+    slot: "wrist",
+    name: tr("Glow bangles"),
+    blurb: tr(
+      "Five bangles of spun glow thread. They charge in the lamp light and fade by morning.",
+    ),
+    source: craft({ leuchtfaden: 1, polymerfaser: 1, farbpigment: 1 }, 20),
+    glows: true,
+    colorways: [cw("neon", tr("colour::Neon"), "neon_pink", "screen_cyan", "led_green")],
+  },
 
   // ── Shoulder buddies ──
   {
@@ -1226,8 +1552,34 @@ export const WEAR_BY_ID: ReadonlyMap<string, WearItem> = new Map(WEAR_ITEMS.map(
 /** Everything Jade wears: one item id (and colourway id) per slot, `null` = nothing. */
 export type JadeLook = Record<WearSlot, { item: string; colorway: string } | null>;
 
-/** The look from the title screen and every screenshot so far (models must reproduce it exactly). */
+/**
+ * Jade's first-day look (title screen, new games): the stand-collar shirt
+ * under the lab coat — the collar shows over the lapels — her copper updo,
+ * no goggles or glasses (they are accessories now). Pinned by
+ * tests/world/jade-look.test.ts.
+ */
 export const DEFAULT_LOOK: JadeLook = {
+  top: { item: "shirt_collar_geo", colorway: "white" },
+  outer: { item: "labcoat", colorway: "white" },
+  legs: { item: "cargo_dark", colorway: "dark" },
+  feet: { item: "boots_leather", colorway: "brown" },
+  hair: { item: "hair_updo", colorway: "copper" },
+  head: null,
+  face: null,
+  hands: null,
+  back: null,
+  neck: null,
+  belt: { item: "toolbelt", colorway: "leather" },
+  wrist: { item: "watch", colorway: "cyan" },
+  buddy: null,
+};
+
+/**
+ * The first-day look of saves before the 2026 rework (SAVE_VERSION 6):
+ * teal sweater, ponytail, amber goggles. The v6 → v7 migration moves a
+ * save still wearing exactly this to `DEFAULT_LOOK`.
+ */
+export const LEGACY_DEFAULT_LOOK: JadeLook = {
   top: { item: "sweater_teal", colorway: "teal" },
   outer: { item: "labcoat", colorway: "white" },
   legs: { item: "cargo_dark", colorway: "dark" },

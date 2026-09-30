@@ -96,7 +96,7 @@ export const STARTER_DEVICES = ["MCP-000", "CLK-001", "VNT-001", "BTK-001", "UEC
  * Bump it together with a new migration step whenever the persisted shape
  * or the meaning of a field changes.
  */
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 export function initialState(): WorldState {
   const s: WorldState = {

@@ -203,12 +203,14 @@ export const DETAIL_DECOR: DecorDef[] = [
     return m;
   }),
   fine("photo_cottbus", SMALL, () => {
-    // Jade & Damien, Cottbus 1989 — two figures under a pale sky.
+    // Jade & Damien, Cottbus 1989 — two figures under a pale sky. His half of
+    // the print is bleached out (over-exposed): Damien stays unrecognisable
+    // until he has been found (lib/world/damien.ts).
     const m = new Model(4, 5, 2);
     m.box(0, 0, 1, 3, 4, 1, C.brass);
     m.box(1, 1, 1, 2, 3, 1, C.paint_sky);
-    m.set(1, 1, 1, C.hair_auburn).set(2, 1, 1, C.hair_black);
-    m.set(1, 2, 1, C.skin).set(2, 2, 1, C.skin_shadow);
+    m.set(1, 1, 1, C.hair_copper).set(1, 2, 1, C.skin_pale);
+    m.set(2, 1, 1, C.paint_cream).set(2, 2, 1, C.paper).set(2, 3, 1, C.paint_white);
     m.box(1, 0, 0, 2, 0, 0, C.brass); // stand
     return m;
   }),

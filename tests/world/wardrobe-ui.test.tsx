@@ -9,7 +9,7 @@ import type { WorldApi } from "@/components/world/panels";
 import { CharacterMenu, type CharacterTab } from "@/components/world/wardrobe/CharacterMenu";
 import { PauseMenu } from "@/components/world/menu";
 import { addItem, initialState } from "@/lib/world/game";
-import { grantWear } from "@/lib/world/wardrobe";
+import { grantWear, wardrobeTick } from "@/lib/world/wardrobe";
 import { _resetSettingsCache } from "@/lib/world/settings";
 import type { WorldState } from "@/lib/world/types";
 
@@ -85,7 +85,7 @@ describe("character menu — wardrobe", () => {
       screen.getAllByText(/changed at the wardrobe in Jade's quarters/).length,
     ).toBeGreaterThan(0);
     fireEvent.click(piece("turtleneck"));
-    expect(state.wardrobe.look.top?.item).toBe("sweater_teal");
+    expect(state.wardrobe.look.top?.item).toBe("shirt_collar_geo");
     expect(screen.getByRole("status").textContent).toMatch(/wardrobe/);
   });
 
@@ -108,7 +108,7 @@ describe("character menu — wardrobe", () => {
       .querySelector("[data-jade-preview]")!
       .getAttribute("data-jade-preview");
     expect(hovered).not.toBe(before);
-    expect(state.wardrobe.look.top?.item).toBe("sweater_teal");
+    expect(state.wardrobe.look.top?.item).toBe("shirt_collar_geo");
     fireEvent.click(piece("turtleneck"));
     expect(state.wardrobe.look.top?.item).toBe("turtleneck");
     fireEvent.click(document.querySelector('[data-colorway="navy"]')!);
@@ -149,7 +149,7 @@ describe("character menu — outfits and collection", () => {
     expect(state.wardrobe.presets[0]?.name).toBe("Monday");
     state.wardrobe.look.top = { item: "turtleneck", colorway: "black" };
     fireEvent.click(within(card).getByRole("button", { name: "Put on" }));
-    expect(state.wardrobe.look.top?.item).toBe("sweater_teal");
+    expect(state.wardrobe.look.top?.item).toBe("shirt_collar_geo");
   });
 
   it("hides unfound pieces behind their hint", () => {
@@ -221,5 +221,49 @@ describe("pause menu", () => {
     );
     fireEvent.click(screen.getByText("Character"));
     expect(onCharacter).toHaveBeenCalled();
+  });
+});
+
+describe("character menu — looks", () => {
+  const look = (id: string) => document.querySelector<HTMLElement>(`[data-look="${id}"]`)!;
+  const wearBtn = () => screen.getByRole("button", { name: "Wear this look" }) as HTMLButtonElement;
+
+  it("lists all eighteen looks; locked ones with a hint, the secret one hidden", () => {
+    const { state } = setup({ tab: "looks" }, (s) => void wardrobeTick(s));
+    expect(document.querySelectorAll("[data-look]")).toHaveLength(18);
+    expect(state.flags.used_looks_tab).toBe(true);
+    expect(look("weekend").textContent).toMatch(/Weekend/);
+    expect(look("gala_night").textContent).toMatch(/Still missing/);
+    expect(look("night_shift").textContent).toMatch(/Replicate/);
+    expect(look("crystal_0089").textContent).toMatch(/\?\?\? — a secret look/);
+    expect(look("crystal_0089").textContent).not.toMatch(/Crystal #0089/);
+    fireEvent.click(look("gala_night"));
+    expect(wearBtn().disabled).toBe(true);
+  });
+
+  it("puts a whole look on at the wardrobe", () => {
+    const { state } = setup({ tab: "looks", atWardrobe: true }, (s) => void wardrobeTick(s));
+    fireEvent.click(look("weekend"));
+    fireEvent.click(wearBtn());
+    expect(state.wardrobe.look.top?.item).toBe("tee_unlab");
+    expect(state.wardrobe.look.outer).toBeNull();
+    expect(state.wardrobe.looksWorn.weekend).toBe(true);
+    expect(screen.getByRole("status").textContent).toMatch(/Weekend/);
+  });
+
+  it("away from the wardrobe explains that the clothes wait there", () => {
+    const { state } = setup({ tab: "looks" }, (s) => void wardrobeTick(s));
+    fireEvent.click(look("weekend"));
+    expect(screen.getAllByText(/Away from the wardrobe only gadgets/).length).toBeGreaterThan(0);
+    fireEvent.click(wearBtn());
+    expect(state.wardrobe.look.belt).toBeNull();
+    expect(state.wardrobe.look.top?.item).toBe("shirt_collar_geo");
+    expect(screen.getByRole("status").textContent).toMatch(/clothes wait at the wardrobe/);
+    // The lab look only adds gadgets to the first-day clothes: it goes on anywhere.
+    fireEvent.click(look("lab_lead"));
+    fireEvent.click(wearBtn());
+    expect(state.wardrobe.look.head?.item).toBe("goggles_amber");
+    expect(state.wardrobe.look.hands?.item).toBe("nitrile");
+    expect(state.wardrobe.looksWorn.lab_lead).toBe(true);
   });
 });

@@ -9,6 +9,7 @@ import { getSettings } from "@/lib/world/settings";
 import { ACHIEVEMENT_BY_ID, evaluateAchievements } from "@/lib/world/achievements";
 import { ITEM_BY_ID } from "@/lib/world/content/items";
 import { REFINE_RECIPES, WEAR_BY_ID, WEAR_ITEM_PREFIX } from "@/lib/world/content/wardrobe";
+import { LOOK_BY_ID } from "@/lib/world/content/looks";
 import { wardrobeTick, type JobResult } from "@/lib/world/wardrobe";
 import type { WorldState } from "@/lib/world/types";
 
@@ -103,7 +104,7 @@ export function useWorld() {
       }
       // Jade's wardrobe: the replicator finishes its job, reward pieces arrive.
       const wt = wardrobeTick(s);
-      if (wt.job || wt.rewards.length) {
+      if (wt.job || wt.rewards.length || wt.looks.length) {
         if (wt.job) {
           const t = replicatorPing(wt.job);
           toastRef.current?.(t.text, "good", t.item);
@@ -113,6 +114,13 @@ export function useWorld() {
             tr("New in the wardrobe: {name}", { name: WEAR_BY_ID.get(id)?.name ?? id }),
             "good",
             `${WEAR_ITEM_PREFIX}${id}`,
+          );
+        for (const id of wt.looks)
+          toastRef.current?.(
+            tr("New look unlocked: {name} — see Looks in the character menu (O).", {
+              name: LOOK_BY_ID.get(id)?.name ?? id,
+            }),
+            "insight",
           );
         for (const id of evaluateAchievements(s)) {
           const a = ACHIEVEMENT_BY_ID.get(id);

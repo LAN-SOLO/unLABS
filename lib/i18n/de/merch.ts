@@ -138,8 +138,8 @@ export const DE_MERCH: Record<string, string> = {
   "The _unstables in interference lines. We say “we”. Never “I”.":
     "Die _unstables in Interferenzlinien. Wir sagen »wir«. Nie »ich«.",
   "Resonance Pattern D.F.": "Resonanzmuster D.F.",
-  "Damien's hologram echo on the back. Always ask why first.":
-    "Damiens Hologramm-Echo auf dem Rücken. Frag immer zuerst warum.",
+  "Damien's echo on the back — a figure in the static. Always ask why first.":
+    "Damiens Echo auf dem Rücken — eine Gestalt im Rauschen. Frag immer zuerst warum.",
   "Junior Lab Assistant": "Junior-Laborassistenz",
   "Lab ID with B4C-0N. Access level: snacks.": "Laborausweis mit B4C-0N. Zugangsstufe: Snacks.",
   "Please Do Not Eat": "Bitte nicht essen",

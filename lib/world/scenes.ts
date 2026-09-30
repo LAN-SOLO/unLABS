@@ -76,6 +76,14 @@ export type SceneStep =
     }
   /** Lawrence's body language during the scene (engine `setPlayerMode`). */
   | { kind: "pose"; pose: CharacterPoseKind }
+  /**
+   * A figure materialising with its feet at `at`: built up from the feet over
+   * `build` seconds, held for `hold`, gone at the latest when the scene ends.
+   * Damien is veiled until he has been found (lib/world/damien.ts) — the
+   * host decides, the script never reveals him. Non-blocking; hosts without
+   * it skip the figure.
+   */
+  | { kind: "figure"; who: "damien"; at: Vec3Tuple; build: number; hold: number }
   | { kind: "flag"; flag: string };
 
 /** Upper bound for in-game moments (everything but the cold open and the endings). */
@@ -220,6 +228,15 @@ const fade = (to: number, seconds: number): SceneStep => ({
 });
 const shake = (strength: number): SceneStep => ({ kind: "shake", strength });
 const pose = (p: CharacterPoseKind): SceneStep => ({ kind: "pose", pose: p });
+const figure = (at: Vec3Tuple, build: number, hold: number): SceneStep => ({
+  kind: "figure",
+  who: "damien",
+  at,
+  build,
+  hold,
+});
+/** Top of the teleport pad's disc above the device anchor (TLP-001, rows 0..6 at 0.25). */
+const TLP_PAD_TOP = 0.75;
 const title = (t: string, sub: string | undefined, seconds: number, async = false): SceneStep => ({
   kind: "title",
   title: t,
@@ -1044,6 +1061,7 @@ function endingRueckkehr(): SceneScript {
           ];
         if (i === 2)
           // The beam — and Damien, built up from the pad: feet, chest, head.
+          // He arrives veiled: a figure in the static, not yet a face.
           return [
             music("ending_rueckkehr", 0.9),
             sfx("teleport", pos),
@@ -1051,6 +1069,7 @@ function endingRueckkehr(): SceneScript {
             shake(0.5),
             wait(0.5),
             fx("teleport", pos, { color: 0xfff4e0, scale: 1.3 }),
+            figure(up(pos, TLP_PAD_TOP), 1.6, 14),
             cam([{ target: up(pos, 1), zoom: 16, yaw: Q * 5, duration: 3, ease: "out" }]),
             ...[0.5, 1.5, 2.5, 3.5].flatMap((h) => [
               fx("pickup_glint", up(pos, h - 2), { color: 0xfff4e0, scale: 0.8 }),
@@ -1304,6 +1323,8 @@ export interface SceneCallbacks {
   title?(title: string, sub: string | undefined, seconds: number): void;
   /** Player body language (engine `setPlayerMode`); reset to "idle" in `end`. */
   pose?(pose: CharacterPoseKind): void;
+  /** A materialising figure (engine `showFigure`); hosts clear it in `end`. */
+  figure?(who: "damien", at: Vec3Tuple, build: number, hold: number): void;
   begin?(script: SceneScript): void;
   end?(script: SceneScript, skipped: boolean): void;
 }
@@ -1456,6 +1477,9 @@ export class SceneRunner {
         break;
       case "pose":
         cb.pose?.(step.pose);
+        break;
+      case "figure":
+        cb.figure?.(step.who, step.at, step.build, step.hold);
         break;
       case "wait":
         break;

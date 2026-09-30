@@ -256,6 +256,16 @@ const ENTRIES = {
   // bucket, so a glowing part never gains an extra material (draw call).
   led_bezel: ["#0e0e0e", "emit"],
   scan_dim: ["#0b1c0b", "emit"],
+  // Jade Lawrence (2026 rework): pale skin, vivid copper hair, silver lids.
+  skin_pale: ["#f4d9c6", "solid"],
+  skin_pale_shade: ["#dcb29a", "solid"],
+  skin_pale_light: ["#fdebdf", "solid"],
+  hair_copper: ["#e2561c", "solid"],
+  hair_copper_dk: ["#b23d14", "solid"],
+  hair_copper_lt: ["#f5813a", "solid"],
+  lid_silver: ["#eef0f5", "solid"],
+  // Jade's eyes (reference photo 2026-10): dark brown. Appended so existing indices stay stable.
+  eye_brown: ["#4a2c1c", "solid"],
 } as const satisfies Record<string, readonly [string, MaterialClass]>;
 
 export type ColorName = keyof typeof ENTRIES;

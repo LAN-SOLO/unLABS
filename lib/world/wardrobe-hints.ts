@@ -9,6 +9,7 @@
  * replicator once Jade is in her quarters with power on the grid.
  */
 import { tr } from "@/lib/i18n";
+import { LOOK_BY_ID } from "@/lib/world/content/looks";
 import {
   REPLICATOR_INTRO_FLAG,
   REPLICATOR_POWER,
@@ -26,6 +27,12 @@ import type { WorldState } from "@/lib/world/types";
 
 /** Set the first time the character menu is opened (UI). */
 export const WARDROBE_MENU_FLAG = "used_wardrobe_menu";
+/** Set the first time the Looks tab is opened (UI). */
+export const LOOKS_TAB_FLAG = "used_looks_tab";
+
+/** A look beyond the two starter looks is unlocked. */
+const earnedLook = (s: WorldState): boolean =>
+  Object.keys(s.wardrobe.looks).some((id) => LOOK_BY_ID.get(id)?.unlock.kind !== "start");
 
 interface WardrobeHintDef {
   id: string;
@@ -56,6 +63,17 @@ export const WARDROBE_HINTS: readonly WardrobeHintDef[] = [
       hasTextile(s)
         ? tr(
             "Fabric scraps, polymer fibre, pigment and glow thread are for Jade's wardrobe replicator. Laundry baskets and rag bins refill over time; salvage can be refined at the replicator.",
+          )
+        : null,
+  },
+  {
+    id: "wear_looks",
+    title: tr("Signature looks"),
+    keys: ["O"],
+    when: (s) =>
+      earnedLook(s) && !s.flags[LOOKS_TAB_FLAG]
+        ? tr(
+            "Jade has a new signature look. The Looks tab in the character menu (O) puts a whole outfit on in one go — the clothes part at the wardrobe.",
           )
         : null,
   },

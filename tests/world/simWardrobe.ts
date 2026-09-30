@@ -18,11 +18,16 @@ import {
   WEAR_ITEMS,
   WEAR_SLOTS,
   type WearItem,
+  type WearSlot,
 } from "@/lib/world/content/wardrobe";
 import { PROPS } from "@/lib/world/content/map";
 import { count, evalCond } from "@/lib/world/game";
+import { isUnlocked } from "@/lib/world/achievements";
+import { SIGNATURE_LOOKS } from "@/lib/world/content/looks";
 import {
   colorwayAvailable,
+  lookUnlocked,
+  wearLook,
   craftStatus,
   dyeStatus,
   equip,
@@ -88,6 +93,12 @@ function startNextJob(s: WorldState, o: WardrobeRoutineOptions): void {
   const wanted = WEAR_ITEMS.filter(
     (w) => w.source.kind === "craft" && !ownsWear(s, w.id) && (!o.textileOnly || textileOnly(w)),
   );
+  // The first dye as soon as one is affordable (a player tries the colours early).
+  if (!(s.counters.wear_dyed ?? 0))
+    for (const w of WEAR_ITEMS)
+      for (const c of w.colorways)
+        if (c.dye && dyeStatus(s, w.id, c.id).state === "ready")
+          return void startDye(s, w.id, c.id);
   for (const w of wanted)
     if (craftStatus(s, w.id).state === "ready") return void startCraft(s, w.id);
   const dyed = Object.keys(s.wardrobe.dyes).length;
@@ -110,10 +121,31 @@ function startNextJob(s: WorldState, o: WardrobeRoutineOptions): void {
 }
 
 /**
- * At the wardrobe: something other than the first-day look in every slot,
- * a dyed colour, then the secret combination.
+ * At the wardrobe, one thing per visit (achievements are counted between
+ * visits): something other than the first-day look in every slot and a dyed
+ * colour, then the secret combination, then every unlocked signature look
+ * in turn.
  */
 function dressUp(s: WorldState): void {
+  if (!isUnlocked(s, "von_kopf_bis_fuss")) {
+    headToToe(s);
+    return;
+  }
+  const secret: [WearSlot, string][] = [
+    ["head", "propeller_cap"],
+    ["feet", "slippers"],
+    ["face", "fake_mustache"],
+  ];
+  if (!isUnlocked(s, "dresscode_optional") && secret.every(([, id]) => ownsWear(s, id))) {
+    for (const [slot, id] of secret) equip(s, slot, id, undefined, true);
+    return;
+  }
+  const next = SIGNATURE_LOOKS.find((l) => lookUnlocked(s, l.id) && !s.wardrobe.looksWorn[l.id]);
+  if (next) wearLook(s, next.id, true);
+}
+
+/** Something other than the first-day look in every slot, and a dyed colour once there is one. */
+function headToToe(s: WorldState): void {
   for (const slot of WEAR_SLOTS) {
     const first = DEFAULT_LOOK[slot];
     const alt = WEAR_ITEMS.find(
@@ -129,12 +161,4 @@ function dressUp(s: WorldState): void {
     const w = WEAR_BY_ID.get(item);
     if (w && !["head", "feet", "face"].includes(w.slot)) equip(s, w.slot, item, cw, true);
   }
-  const secret: [string, string][] = [
-    ["head", "propeller_cap"],
-    ["feet", "slippers"],
-    ["face", "fake_mustache"],
-  ];
-  if (secret.every(([, id]) => ownsWear(s, id)))
-    for (const [slot, id] of secret)
-      equip(s, slot as (typeof WEAR_SLOTS)[number], id, undefined, true);
 }

@@ -64,7 +64,8 @@ import {
   type WorldState,
 } from "@/lib/world/types";
 import { CORE } from "@/lib/world/content/floorplan";
-import { sanitizeWardrobe } from "@/lib/world/wardrobe";
+import { cloneLook, sanitizeWardrobe } from "@/lib/world/wardrobe";
+import { DEFAULT_LOOK, LEGACY_DEFAULT_LOOK, WEAR_SLOTS } from "@/lib/world/content/wardrobe";
 
 type Raw = Record<string, unknown>;
 
@@ -137,7 +138,29 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     wardrobe: isRecord(raw.wardrobe) ? raw.wardrobe : {},
     version: 6,
   }),
+  // v6 → v7: Jade's rework (tall and slim, copper updo, stand-collar shirt,
+  // no goggles) and her signature looks. A save still wearing exactly the
+  // old first-day look moves to the new one; any other look stays as the
+  // player dressed her. Owned pieces are kept, the new starter pieces are
+  // added by sanitizeWardrobe, looks start locked (the game unlocks them).
+  6: (raw) => {
+    const w: Raw = isRecord(raw.wardrobe) ? { ...raw.wardrobe } : {};
+    if (isRecord(w.look) && isLegacyDefaultLook(w.look)) w.look = cloneLook(DEFAULT_LOOK);
+    w.looks = isRecord(w.looks) ? w.looks : {};
+    w.looksWorn = isRecord(w.looksWorn) ? w.looksWorn : {};
+    return { ...raw, wardrobe: w, version: 7 };
+  },
 };
+
+/** A raw look equal to `LEGACY_DEFAULT_LOOK` in every slot (item and colourway). */
+function isLegacyDefaultLook(raw: Raw): boolean {
+  return WEAR_SLOTS.every((slot) => {
+    const want = LEGACY_DEFAULT_LOOK[slot];
+    const have = raw[slot];
+    if (want === null) return have === null || have === undefined;
+    return isRecord(have) && have.item === want.item && have.colorway === want.colorway;
+  });
+}
 
 export type MigrateResult =
   | { ok: true; data: Raw; from: number }

@@ -523,8 +523,10 @@ export function useLabDirector(
               window.setTimeout(() => setTitleCard(null), secs * 1000);
             },
             pose: (p) => engine.setPlayerMode(p),
+            figure: (who, at, build, hold) => engine.showFigure(who, at, build, hold),
             end: (script) => {
               engine.setPlayerMode("idle");
+              engine.clearFigure();
               setTitleCard(null);
               engine.director.end(!!script.keepFade);
               if (script.keepFade) window.setTimeout(() => engine.director.fadeTo(0, 1.5), 400);

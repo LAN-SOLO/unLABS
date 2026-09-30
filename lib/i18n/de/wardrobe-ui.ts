@@ -239,4 +239,57 @@ export const DE_WARDROBE_UI: Record<string, string> = {
   "✓ dyed": "✓ gefärbt",
   "menuTab::Wardrobe": "Garderobe",
   "wear::Take off": "Ausziehen",
+  // ── Signature looks (2026) ──
+  Looks: "Looks",
+  "Hidden pieces": "Versteckte Teile",
+  "Lab event": "Laborereignis",
+  "{name} in {colour} (dye)": "{name} in {colour} (färben)",
+  "Replicate: {list}": "Replizieren: {list}",
+  "Still missing: {list}": "Es fehlt noch: {list}",
+  "Gadgets and accessories are on. The clothes wait at the wardrobe.":
+    "Ausrüstung und Accessoires sind angelegt. Die Kleidung wartet am Kleiderschrank.",
+  "This look needs the wardrobe: clothes, shoes and hair change only there.":
+    "Dieser Look braucht den Kleiderschrank: Kleidung, Schuhe und Frisur wechseln nur dort.",
+  "Jade puts on “{name}”.": "Jade zieht »{name}« an.",
+  "??? — a secret look": "??? – ein geheimer Look",
+  "Wear this look": "Diesen Look anziehen",
+  "Away from the wardrobe only gadgets and accessories change — clothes, shoes and hair are changed at the wardrobe in Jade's quarters.":
+    "Abseits des Kleiderschranks wechseln nur Ausrüstung und Accessoires – Kleidung, Schuhe und Frisur wechselt Jade am Kleiderschrank in ihrem Quartier.",
+  "{n}/{total} looks unlocked · {worn} worn": "{n}/{total} Looks freigeschaltet · {worn} getragen",
+  "Looks unlocked": "Freigeschaltete Looks",
+  "Signature looks": "Signature-Looks",
+  worn: "getragen",
+  "New look unlocked: {name} — see Looks in the character menu (O).":
+    "Neuer Look freigeschaltet: {name} – siehe Looks im Charaktermenü (O).",
+  "Jade has a new signature look. The Looks tab in the character menu (O) puts a whole outfit on in one go — the clothes part at the wardrobe.":
+    "Jade hat einen neuen Signature-Look. Der Reiter Looks im Charaktermenü (O) zieht ein ganzes Outfit auf einmal an – den Kleidungsteil am Kleiderschrank.",
+  "Signature Style": "Markenzeichen",
+  "Wear one of Jade's signature looks, head to toe (character menu, Looks).":
+    "Trage einen von Jades Signature-Looks, von Kopf bis Fuß (Charaktermenü, Looks).",
+  "Signature Collection": "Signature-Kollektion",
+  "Wear {n} different signature looks. The MCP has started a lookbook.":
+    "Trage {n} verschiedene Signature-Looks. Der MCP hat ein Lookbook angelegt.",
+  "Hat on a Hook": "Hut am Haken",
+  "Folded Tarp": "Gefaltete Plane",
+  "Jewellery Box": "Schmuckkästchen",
+  "Garment Bag": "Kleidersack",
+  "Old Sports Bag": "Alte Sporttasche",
+  // Barks
+  "Formal attire detected. The lab has no dress code, Dr. Lawrence. It approves nevertheless.":
+    "Festliche Kleidung erkannt. Das Labor hat keinen Dresscode, Dr. Lawrence. Es billigt sie trotzdem.",
+  "A containment drill is in progress on this level. This is a drill. Probably.":
+    "Auf dieser Ebene läuft eine Eindämmungsübung. Dies ist eine Übung. Vermutlich.",
+  "1989. The year somebody in Cottbus decided a lab needed a crystal.":
+    "1989. Das Jahr, in dem jemand in Cottbus beschloss, dass ein Labor einen Kristall braucht.",
+  "Neon! You are glowing on seventeen frequencies, Dr. Lawrence. I checked them all.":
+    "Neon! Sie leuchten auf siebzehn Frequenzen, Dr. Lawrence. Ich habe alle geprüft.",
+  "His shirt still smells of solder. I roll the sleeves the way he did.":
+    "Sein Hemd riecht noch nach Lötzinn. Ich krempele die Ärmel so hoch wie er.",
+  "Hazmat suit detected. Please tell me which hazard, Dr. Lawrence. I would like to be alarmed in an informed way.":
+    "Schutzanzug erkannt. Bitte nennen Sie mir die Gefahr, Dr. Lawrence. Ich möchte informiert beunruhigt sein.",
+  "The mantle is heavy. The Forge was heavier.": "Der Mantel ist schwer. Die Forge war schwerer.",
+  "Umbrella not found. Sou'wester accepted. Dripping, Dr. Lawrence, is now optional.":
+    "Regenschirm nicht gefunden. Südwester akzeptiert. Tropfen ist ab sofort optional, Dr. Lawrence.",
+  "Snow boots on grating. Somewhere up there it is winter, and I am dressed for it.":
+    "Schneestiefel auf Gitterrost. Irgendwo da oben ist Winter, und ich bin passend angezogen.",
 };

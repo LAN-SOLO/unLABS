@@ -442,4 +442,162 @@ export const DE_WARDROBE: Record<string, string> = {
     "Das Bot-Depot. Sobald seine Bewohner wach sind, taucht dort, wo sie laden, etwas Kleines auf.",
   "Needle's Eye, NDL-0. Built it in 2018 from a scrapped industrial sewing head, the spare gantry of the first fabricator and Damien's bathroom mirror. He never noticed.":
     "Nadelöhr, NDL-0. 2018 gebaut aus einem ausrangierten Industrienähkopf, dem Ersatzportal des ersten Fabrikators und Damiens Badezimmerspiegel. Er hat es nie gemerkt.",
+  // ── 2026: Jade's rework, new pieces ──
+  "Stand-collar shirt": "Stehkragenhemd",
+  "Crisp white, a stand-up collar lined with a grey-black shard pattern. Her first-day shirt, and most days after.":
+    "Frisch gebügeltes Weiß, ein Stehkragen, innen mit grau-schwarzem Scherbenmuster gefüttert. Ihr Hemd vom ersten Tag – und von den meisten Tagen danach.",
+  "Damien's white shirt": "Damiens weißes Hemd",
+  "Two sizes too big, sleeves rolled, a pencil in the pocket and a coffee ring nobody could wash out. It still smells of solder.":
+    "Zwei Nummern zu groß, Ärmel hochgekrempelt, ein Bleistift in der Brusttasche und ein Kaffeerand, den niemand herausgewaschen bekam. Es riecht noch nach Lötzinn.",
+  "Hear Damien's echo.": "Höre Damiens Echo.",
+  "Nordic sweater": "Norwegerpullover",
+  "Star yoke, rib cuffs, wool that argues back. For the surface, and for the cold archive.":
+    "Sternenpasse, Rippbündchen, Wolle mit Widerworten. Für die Oberfläche – und fürs Kältearchiv.",
+  "Neon mesh top": "Neon-Netzshirt",
+  "Black mesh with glowing seams. The bots insisted there be a party. There was a party.":
+    "Schwarzes Netz mit leuchtenden Nähten. Die Bots bestanden auf einer Party. Es gab eine Party.",
+  "colour::Neon pink": "Neonpink",
+  "colour::Neon cyan": "Neoncyan",
+  "Expedition parka": "Expeditionsparka",
+  "Quilted to the knees, a fur-rimmed hood, eleven pockets. Rated for the surface in January, or the cryo bay in any month.":
+    "Gesteppt bis zu den Knien, Kapuze mit Fellrand, elf Taschen. Zugelassen für die Oberfläche im Januar – oder die Kryokammer in jedem Monat.",
+  "Track jacket 1989": "Trainingsjacke 1989",
+  "Shell suit, Cottbus, 1989: turquoise and violet, a zip that sings. Somebody kept it for thirty-seven years.":
+    "Ballonseide, Cottbus, 1989: Türkis und Violett, ein Reißverschluss, der singt. Jemand hat sie siebenunddreißig Jahre aufbewahrt.",
+  "The first shaft crew left a sports bag in the rubble tunnel. It has waited there since 1989.":
+    "Die erste Schachtmannschaft hat im Geröllstollen eine Sporttasche vergessen. Sie wartet dort seit 1989.",
+  "colour::Turquoise & violet": "Türkis & Violett",
+  "colour::Red & white": "Rot & Weiß",
+  "Hazmat suit": "Schutzanzug",
+  "Taped seams, a window for the badge, a hood that is never up when it should be. Drill procedure: walk, do not run.":
+    "Verklebte Nähte, ein Fenster für den Ausweis, eine Kapuze, die nie oben ist, wenn sie es sein sollte. Übungsvorschrift: gehen, nicht rennen.",
+  "Build the Exotic Matter Containment first — the suit copies its seal rating.":
+    "Baue zuerst das Exotic Matter Containment – der Anzug übernimmt seine Dichtklasse.",
+  "Forge mantle": "Schmiedemantel",
+  "Charcoal wool to the shins, gold at every edge, a Halo shard at the throat. Made for one night at the Infinity Forge.":
+    "Anthrazitwolle bis zu den Schienbeinen, Gold an jeder Kante, ein Halo-Splitter am Hals. Gemacht für eine Nacht an der Infinity Forge.",
+  "Something will happen at the Infinity Forge.": "An der Infinity Forge wird etwas geschehen.",
+  "colour::Forge charcoal": "Schmiede-Anthrazit",
+  "Evening skirt": "Abendrock",
+  "Satin to mid-calf, a sash, a swish on every stair. Packed for a gala the lab never had.":
+    "Satin bis zur Wade, eine Schärpe, ein Rascheln auf jeder Stufe. Eingepackt für eine Gala, die das Labor nie hatte.",
+  "A garment bag hangs in the room where the lab's radio once talked to the world.":
+    "Ein Kleidersack hängt in dem Raum, in dem der Funk des Labors einst mit der Welt sprach.",
+  "colour::Midnight": "Mitternacht",
+  "colour::Emerald": "Smaragd",
+  "colour::Wine": "Weinrot",
+  "Track pants 1989": "Trainingshose 1989",
+  "Three stripes, a crackle on every step, cuffs that hold the ankle like a promise.":
+    "Drei Streifen, ein Knistern bei jedem Schritt, Bündchen, die den Knöchel halten wie ein Versprechen.",
+  "The track suit came in two parts. The trousers ended up in the drone hangar, folded into a tarp.":
+    "Der Trainingsanzug kam in zwei Teilen. Die Hose landete im Drohnenhangar, eingeschlagen in eine Plane.",
+  "Running leggings": "Laufleggings",
+  "A reflective stripe, a key pocket, zero drag. The long corridor on Level 0 is exactly 140 m.":
+    "Ein Reflexstreifen, eine Schlüsseltasche, null Luftwiderstand. Der lange Flur auf Ebene 0 misst genau 140 m.",
+  "Court shoes": "Pumps",
+  "A low heel, a pointed toe, a click the MCP can hear three rooms away.":
+    "Ein niedriger Absatz, eine spitze Kappe, ein Klacken, das der MCP drei Räume weit hört.",
+  "colour::Gold": "Gold",
+  "Snow boots": "Schneestiefel",
+  "Padded to the calf, a fur cuff, a sole like a tractor tyre. The cryo bay has met its match.":
+    "Gepolstert bis zur Wade, ein Fellrand, eine Sohle wie ein Traktorreifen. Die Kryokammer hat ihren Meister gefunden.",
+  "High updo": "Hochsteckfrisur",
+  "Sides pulled up, a pompadour rolled high into a bun, a few waves that never stay put. Twenty pins, one minute, no mirror.":
+    "Die Seiten hochgesteckt, eine Tolle, hoch zum Dutt gerollt, ein paar Wellen, die nie halten. Zwanzig Nadeln, eine Minute, kein Spiegel.",
+  "colour::Copper orange": "Kupferorange",
+  "Sou'wester": "Südwester",
+  "Yellow oilskin, a brim that is longer at the back. The cooling floors drip down the neck otherwise.":
+    "Gelbes Ölzeug, eine Krempe, die hinten länger ist. Sonst tropfen die Kühlebenen in den Nacken.",
+  "A rain hat waits on a hook by the pumps of the cooling level.":
+    "Ein Regenhut wartet an einem Haken bei den Pumpen der Kühlebene.",
+  "Neon flower crown": "Neon-Blumenkranz",
+  "Glow-thread petals round the updo. K2-LDR wove it, then denied everything.":
+    "Blütenblätter aus Leuchtfaden um die Hochsteckfrisur. K2-LDR hat ihn geflochten und dann alles abgestritten.",
+  Sweatband: "Schweißband",
+  "Terry towelling, a stripe, a small crystal stitched on. It has seen every lap.":
+    "Frottee, ein Streifen, ein kleiner aufgestickter Kristall. Es hat jede Runde gesehen.",
+  Sunglasses: "Sonnenbrille",
+  "Square frames, dark lenses, 1989. Pointless underground. Worn anyway.":
+    "Eckige Fassung, dunkle Gläser, 1989. Unter der Erde sinnlos. Trotzdem getragen.",
+  "A pair of sunglasses lies on the observatory console, pointing at the sky.":
+    "Eine Sonnenbrille liegt auf der Konsole des Observatoriums, zum Himmel gerichtet.",
+  "Gig bag": "Gigbag",
+  "A padded guitar bag, Damien's studio sticker on the pocket. The guitar is still inside, out of tune.":
+    "Eine gepolsterte Gitarrentasche, Damiens Studioaufkleber auf der Tasche. Die Gitarre steckt noch drin, verstimmt.",
+  "Pearl necklace": "Perlenkette",
+  "One strand, one knot between each pearl. It belonged to somebody who dressed up for experiments.":
+    "Ein Strang, ein Knoten zwischen jeder Perle. Sie gehörte jemandem, der sich für Experimente schick machte.",
+  "A jewellery box waits between the library shelves — a present nobody ever unwrapped.":
+    "Ein Schmuckkästchen wartet zwischen den Regalen der Bibliothek – ein Geschenk, das nie jemand ausgepackt hat.",
+  "colour::Pearl": "Perlweiß",
+  "Loosened tie": "Gelockerte Krawatte",
+  "Skinny, black, knot pulled down two fingers. Damien wore it to every meeting and to none of the photos.":
+    "Schmal, schwarz, der Knoten zwei Finger tief gezogen. Damien trug sie zu jedem Meeting und auf keinem Foto.",
+  "Glow bangles": "Leuchtarmreifen",
+  "Five bangles of spun glow thread. They charge in the lamp light and fade by morning.":
+    "Fünf Armreifen aus gesponnenem Leuchtfaden. Sie laden sich im Lampenlicht auf und verblassen bis zum Morgen.",
+
+  // ── Signature looks (content/looks.ts) ──
+  "Lead Researcher": "Leitende Forscherin",
+  "Shirt, coat, gloves, goggles pushed up. The version of Jade the grant committee met.":
+    "Hemd, Kittel, Handschuhe, Schutzbrille hochgeschoben. Die Jade, die der Förderausschuss kennengelernt hat.",
+  Weekend: "Wochenende",
+  "Tee, jeans, hair down. Down here a weekend is a state of mind.":
+    "Shirt, Jeans, Haare offen. Hier unten ist ein Wochenende eine Geisteshaltung.",
+  "Night Shift": "Nachtschicht",
+  "Soft layers, a headlamp, fingerless gloves for the keyboard at 03:27.":
+    "Weiche Lagen, eine Stirnlampe, fingerlose Handschuhe für die Tastatur um 03:27.",
+  "Morning Laps": "Morgenrunden",
+  "Leggings, a sweatband, a ponytail that keeps time. Level 0 has the longest corridor.":
+    "Leggings, ein Schweißband, ein Pferdeschwanz, der den Takt hält. Ebene 0 hat den längsten Flur.",
+  "Surface Winter": "Winter an der Oberfläche",
+  "Parka, star sweater, snow boots, a scarf far too long. For the day she goes up.":
+    "Parka, Sternenpullover, Schneestiefel, ein viel zu langer Schal. Für den Tag, an dem sie nach oben geht.",
+  "Containment Drill": "Eindämmungsübung",
+  "Hazmat suit, respirator, hi-vis. Walk, do not run. The MCP times it anyway.":
+    "Schutzanzug, Atemschutz, Warnhose. Gehen, nicht rennen. Der MCP stoppt trotzdem die Zeit.",
+  "Cottbus 1989": "Cottbus 1989",
+  "Shell suit, sunglasses, bum bag. The year the lab's first crystal was a rumour.":
+    "Ballonseide, Sonnenbrille, Bauchtasche. Das Jahr, in dem der erste Kristall des Labors ein Gerücht war.",
+  "Cooling Floor Drizzle": "Nieselregen auf der Kühlebene",
+  "Slicker, sou'wester, wellies, braids. Level −1 drips; Jade is ready.":
+    "Regenjacke, Südwester, Gummistiefel, Zöpfe. Ebene −1 tropft; Jade ist bereit.",
+  "Gala Night": "Galaabend",
+  "Black turtleneck, satin skirt, pearls, the updo at its highest. Nobody sent invitations.":
+    "Schwarzer Rollkragen, Satinrock, Perlen, die Hochsteckfrisur so hoch wie nie. Einladungen hat niemand verschickt.",
+  "Field Expedition": "Feldexpedition",
+  "Flannel, bomber, headlamp, a pack for three days. The deep floors are a continent.":
+    "Flanell, Bomberjacke, Stirnlampe, Gepäck für drei Tage. Die tiefen Ebenen sind ein Kontinent.",
+  "The Archivist": "Die Archivarin",
+  "Cardigan, plaid, reading glasses, a bun with a pencil. Files first, questions later.":
+    "Strickjacke, Karorock, Lesebrille, ein Dutt mit Bleistift. Erst die Akten, dann die Fragen.",
+  "Studio Session": "Studiosession",
+  "Headphones, the gig bag, all black. Damien's studio remembers how to sound.":
+    "Kopfhörer, Gigbag, ganz in Schwarz. Damiens Studio erinnert sich, wie es klingt.",
+  "Somewhere in the lab a room is waiting for a tune.":
+    "Irgendwo im Labor wartet ein Raum auf eine Melodie.",
+  "Neon Festival": "Neonfestival",
+  "Glowing mesh, a flower crown, neon everything. Ten bots, one party, zero permits.":
+    "Leuchtendes Netz, ein Blumenkranz, alles in Neon. Zehn Bots, eine Party, null Genehmigungen.",
+  "Wake every lore bot in the lab — they have plans.":
+    "Wecke jeden Lore-Bot im Labor – sie haben Pläne.",
+  "Infinity Forge Ceremony": "Zeremonie an der Infinity Forge",
+  "The forge mantle over the black shirt, a crystal at the throat. For the night the Halo answered.":
+    "Der Schmiedemantel über dem schwarzen Hemd, ein Kristall am Hals. Für die Nacht, in der der Halo antwortete.",
+  "Hero of the Halo": "Heldin des Halo",
+  "Cape, visor, servo gloves, cerulean hair. Every ending, one outfit.":
+    "Umhang, Visier, Servohandschuhe, ceruleanblaues Haar. Jedes Ende, ein Outfit.",
+  "See every ending the lab has on record.": "Erlebe jedes Ende, das das Labor verzeichnet.",
+  "Keeper of #0089": "Hüterin von #0089",
+  "The circlet, a white cape, silver hair. All thirty slices, home again.":
+    "Der Stirnreif, ein weißer Umhang, silbernes Haar. Alle dreißig Slices, wieder zu Hause.",
+  "Bring every slice of Crystal #0089 home.": "Bring jeden Slice von Kristall #0089 nach Hause.",
+  "Night-black coat, amber visor, cerulean updo. What Jade wore when the crystal spoke.":
+    "Nachtschwarzer Kittel, bernsteinfarbenes Visier, ceruleanblaue Hochsteckfrisur. Was Jade trug, als der Kristall sprach.",
+  "Not every ending is on the record.": "Nicht jedes Ende steht im Verzeichnis.",
+  "For Damien": "Für Damien",
+  "His old white shirt, his tie, her boots. She rolls the sleeves the way he did.":
+    "Sein altes weißes Hemd, seine Krawatte, ihre Stiefel. Sie krempelt die Ärmel so hoch wie er.",
+  "Listen for an echo in the lab.": "Horch auf ein Echo im Labor.",
+  "New look for Jade: {name}": "Neuer Look für Jade: {name}",
 };

@@ -237,41 +237,61 @@ export function haloIntent(ink: Ink): string {
   return s;
 }
 
+/**
+ * Damien's echo as the game shows it: veiled. Until he has been found
+ * (lib/world/damien.ts) nobody sees his face — the motif is his silhouette
+ * (tall, broad, the wedge of the long beard) as a mosaic of cold static,
+ * the same idea as `veilGrid` in lib/world/models/veil.ts.
+ */
+const DAMIEN_MASK: readonly string[] = [
+  "......######......",
+  ".....########.....",
+  ".....########.....",
+  ".....########.....",
+  ".....########.....",
+  "......######......",
+  "......######......",
+  "..#####.##.#####..",
+  ".######.##.######.",
+  "#######.##.#######",
+  "########..########",
+  "##################",
+  "##################",
+  "##################",
+  "##################",
+  "##################",
+];
+
+/** Deterministic noise letter per cell: c cyan, g glass, t teal, s steel, w white, . dropout. */
+function veilRows(mask: readonly string[], seed: number): string[] {
+  const rnd = rng(seed);
+  const letters = "cccggggttssw";
+  return mask.map((row, j) => {
+    let out = "";
+    for (let i = 0; i < row.length; i++) {
+      const r = rnd();
+      if (row[i] !== "#" || r < 0.12) out += ".";
+      else out += letters[Math.floor(rnd() * letters.length)] ?? "c";
+    }
+    // A torn row slides one cell sideways.
+    return j % 5 === 3 ? `.${out.slice(0, -1)}` : out;
+  });
+}
+
 const DAMIEN: Sprite = {
   id: "damien",
   name: "D.F.",
-  rows: [
-    ".....HHHHHH.....",
-    "....HHHHHHHH....",
-    "...HHssssssHH...",
-    "...HBBBssBBBH...",
-    "...GGGGssGGGG...",
-    "...GooGGGGooG...",
-    "...GGGGssGGGG...",
-    "...ssssnnssss...",
-    "...BsssnnsssB...",
-    "...BBBmmmmBBB...",
-    "...BBBBBBBBBB...",
-    "....BBBBBBBB....",
-    ".....BBBBBB.....",
-    "..wwwwcccwwww...",
-    ".wwwwwcccwwwww..",
-    "wwwwwwcccwwwwww.",
-  ],
+  rows: veilRows(DAMIEN_MASK, 89),
   map: (ink) => ({
-    H: ink.light ? "#5fb8c4" : "#B8F6FF",
-    s: ink.light ? "#2a8b99" : "#4FD8E8",
-    B: ink.light ? "#8fd0da" : "#DDFBFF",
-    G: ink.light ? "#0090A8" : "#00F0FF",
-    o: ink.light ? "#0d4a55" : "#0B5560",
-    n: ink.light ? "#1f6f7a" : "#2FB6C6",
-    m: ink.light ? "#0d4a55" : "#0B5560",
-    w: ink.light ? "#1f6f7a" : "#1F9BAA",
-    c: ink.light ? "#5fb8c4" : "#8CEFFF",
+    c: ink.light ? "#0090A8" : "#00F0FF",
+    g: ink.light ? "#5fb8c4" : "#9FD8FF",
+    t: ink.light ? "#1f6f7a" : "#1F6F78",
+    s: ink.light ? "#3d4f55" : "#50565D",
+    w: ink.light ? "#8fd0da" : "#E0FFFF",
   }),
 };
 
-/** Hoodie back: Damien's hologram echo. */
+/** Hoodie back: Damien's echo — veiled, a figure in the static. */
 export function damienEcho(ink: Ink): string {
   let s = "";
   s += text(165, 40, "RESONANCE PATTERN", {

@@ -29,6 +29,12 @@ import {
   type WearItem,
   type WearSlot,
 } from "@/lib/world/content/wardrobe";
+import {
+  LOOK_BY_ID,
+  LOOK_ON_FLAG_PREFIX,
+  SIGNATURE_LOOKS,
+  type SignatureLook,
+} from "@/lib/world/content/looks";
 import { BOT_QUESTS } from "@/lib/world/content/story";
 import { addItem, evalCond, log, removeItem } from "@/lib/world/game";
 import type { Condition, WardrobeState, WorldState } from "@/lib/world/types";
@@ -55,6 +61,8 @@ export function initialWardrobe(): WardrobeState {
     crafted: 0,
     seen: {},
     job: null,
+    looks: {},
+    looksWorn: {},
   };
 }
 
@@ -167,8 +175,14 @@ export function syncWornFlags(s: WorldState): void {
   const look = visibleLook(s.wardrobe.look);
   const want = new Set<string>();
   for (const slot of WEAR_SLOTS) if (look[slot]) want.add(`${WORN_FLAG_PREFIX}${look[slot]!.item}`);
+  const on = wearingLook(s.wardrobe.look);
+  if (on) {
+    want.add(`${LOOK_ON_FLAG_PREFIX}${on}`);
+    if (s.wardrobe.looks[on] !== undefined) s.wardrobe.looksWorn[on] = true;
+  }
   for (const k of Object.keys(s.flags))
-    if (k.startsWith(WORN_FLAG_PREFIX) && !want.has(k)) delete s.flags[k];
+    if ((k.startsWith(WORN_FLAG_PREFIX) || k.startsWith(LOOK_ON_FLAG_PREFIX)) && !want.has(k))
+      delete s.flags[k];
   for (const k of want) s.flags[k] = true;
 }
 
@@ -546,6 +560,13 @@ export function sanitizeWardrobe(raw: unknown): WardrobeState {
           : WEAR_BY_ID.has(j.id.split(".")[0] ?? "");
     if (valid) base.job = { kind: j.kind, id: j.id, start: j.start, done: j.done };
   }
+  if (isRec(raw.looks))
+    for (const [k, v] of Object.entries(raw.looks))
+      if (LOOK_BY_ID.has(k) && typeof v === "number" && Number.isFinite(v) && v >= 0)
+        base.looks[k] = Math.round(v);
+  if (isRec(raw.looksWorn))
+    for (const [k, v] of Object.entries(raw.looksWorn))
+      if (v && LOOK_BY_ID.has(k)) base.looksWorn[k] = true;
   return base;
 }
 
@@ -572,12 +593,20 @@ export interface WardrobeTick {
   job: JobResult | null;
   /** Reward pieces handed over just now. */
   rewards: string[];
+  /** Signature looks unlocked just now. */
+  looks: string[];
 }
 
-/** Cheap periodic check (once a second is plenty): finish the job, hand out rewards. */
+/**
+ * Cheap periodic check (once a second is plenty): finish the job, hand out
+ * rewards, unlock signature looks, mirror what Jade wears into flags.
+ */
 export function wardrobeTick(s: WorldState): WardrobeTick {
+  const job = finishJob(s);
+  const rewards = syncWearRewards(s);
+  const looks = syncLooks(s);
   syncWornFlags(s);
-  return { job: finishJob(s), rewards: syncWearRewards(s) };
+  return { job, rewards, looks };
 }
 
 /** Mark pieces as looked at (the menu stops calling them “new”). */
@@ -666,4 +695,110 @@ export function sourceProgress(
 ): { owned: number; total: number } {
   const list = WEAR_ITEMS.filter((w) => w.source.kind === kind);
   return { owned: list.filter((w) => s.wardrobe.owned[w.id]).length, total: list.length };
+}
+
+// ── Signature looks (content/looks.ts) ──────────────────────────
+
+/** Same item and colourway in every slot. */
+export function sameLook(a: JadeLook, b: JadeLook): boolean {
+  return WEAR_SLOTS.every(
+    (k) => a[k]?.item === b[k]?.item && (a[k] === null || a[k]!.colorway === b[k]!.colorway),
+  );
+}
+
+/** The signature look Jade wears exactly right now, or null. */
+export function wearingLook(look: JadeLook): string | null {
+  return SIGNATURE_LOOKS.find((l) => sameLook(l.look, look))?.id ?? null;
+}
+
+export function lookUnlocked(s: WorldState, id: string): boolean {
+  return s.wardrobe.looks[id] !== undefined;
+}
+
+export interface LookNeeds {
+  /** Pieces not owned yet. */
+  pieces: string[];
+  /** Dyed colourways not paid for yet (`<item>.<colourway>`). */
+  dyes: string[];
+}
+
+/** What Jade still lacks to wear a look (pieces, dyed colours). */
+export function lookMissing(s: WorldState, l: SignatureLook): LookNeeds {
+  const out: LookNeeds = { pieces: [], dyes: [] };
+  for (const slot of WEAR_SLOTS) {
+    const e = l.look[slot];
+    if (!e) continue;
+    if (!ownsWear(s, e.item)) out.pieces.push(e.item);
+    const c = WEAR_BY_ID.get(e.item)?.colorways.find((x) => x.id === e.colorway);
+    if (c?.dye && !s.wardrobe.dyes[`${e.item}.${e.colorway}`])
+      out.dyes.push(`${e.item}.${e.colorway}`);
+  }
+  return out;
+}
+
+/** Can the look unlock now (event condition, or every piece and colour owned)? */
+export function lookReady(s: WorldState, l: SignatureLook): boolean {
+  if (l.unlock.kind === "event") return evalWearCond(s, l.unlock.when);
+  const m = lookMissing(s, l);
+  return m.pieces.length === 0 && m.dyes.length === 0;
+}
+
+/** Unlock a look: event looks hand over every missing piece and dyed colour. */
+export function unlockLook(s: WorldState, id: string): boolean {
+  const l = LOOK_BY_ID.get(id);
+  if (!l || lookUnlocked(s, id)) return false;
+  const m = lookMissing(s, l);
+  for (const piece of m.pieces) grantWear(s, piece, "reward");
+  for (const key of m.dyes) s.wardrobe.dyes[key] = true;
+  s.wardrobe.looks[id] = Math.max(0, Math.round(s.playTime));
+  s.flags[`look_${id}`] = true;
+  log(s, tr("New look for Jade: {name}", { name: l.name }));
+  return true;
+}
+
+/** Unlock every look whose rule holds now. Returns the new ids. */
+export function syncLooks(s: WorldState): string[] {
+  const out: string[] = [];
+  for (const l of SIGNATURE_LOOKS)
+    if (!lookUnlocked(s, l.id) && lookReady(s, l) && unlockLook(s, l.id)) out.push(l.id);
+  return out;
+}
+
+export interface WearLookResult {
+  /** Slots that changed. */
+  changed: WearSlot[];
+  /** Clothes, shoes or hair left as they were (away from the wardrobe). */
+  waiting: boolean;
+}
+
+/**
+ * Put on a signature look in one go. Away from the wardrobe only gadgets
+ * and accessories change (`waiting` then says the clothes wait there).
+ */
+export function wearLook(s: WorldState, id: string, atWardrobe: boolean): WearLookResult {
+  const l = LOOK_BY_ID.get(id);
+  if (!l || !lookUnlocked(s, id)) return { changed: [], waiting: false };
+  const changed: WearSlot[] = [];
+  let waiting = false;
+  for (const slot of WEAR_SLOTS) {
+    const want = l.look[slot];
+    const have = s.wardrobe.look[slot];
+    if (want?.item === have?.item && (want === null || want.colorway === have?.colorway)) continue;
+    if (WEAR_SLOT_BY_ID.get(slot)!.wardrobeOnly && !atWardrobe) {
+      waiting = true;
+      continue;
+    }
+    if (equip(s, slot, want?.item ?? null, want?.colorway, atWardrobe)) changed.push(slot);
+  }
+  syncWornFlags(s);
+  return { changed, waiting };
+}
+
+/** Looks unlocked / worn / total (menus, achievements). */
+export function looksProgress(s: WorldState): { unlocked: number; worn: number; total: number } {
+  return {
+    unlocked: SIGNATURE_LOOKS.filter((l) => lookUnlocked(s, l.id)).length,
+    worn: SIGNATURE_LOOKS.filter((l) => s.wardrobe.looksWorn[l.id]).length,
+    total: SIGNATURE_LOOKS.length,
+  };
 }

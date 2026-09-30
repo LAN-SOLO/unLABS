@@ -27,7 +27,9 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
-import { C } from "@/lib/world/content/palette";
+import { C, LAB_PALETTE } from "@/lib/world/content/palette";
+import { SKIN, SKIN_LIGHT, SKIN_SHADE, fitPoint } from "@/lib/world/models/jade-kit";
+import { HEAD_FIT } from "@/lib/world/models/jade-rig";
 import { MOUTH_ART, type EmoteIcon, type MouthShape } from "@/lib/world/emotion";
 import {
   animTransform,
@@ -992,16 +994,16 @@ export class TitleDiorama {
       const m = new THREE.Matrix4();
       for (let r = 0; r < 3; r++)
         for (let c = 0; c < 6; c++) {
-          const x = 4 + c;
-          const y = 4 - r;
-          const front = head.model.grid.get(x, y, 13) ? 14 : 13;
+          // Mouth cells in the painted head frame, moved like the head was fitted (jade-rig).
+          const [x, y, z13] = fitPoint(HEAD_FIT, [4 + c, 4 - r, 13]);
+          const front = head.model.grid.get(x, y, z13) ? z13 + 1 : z13;
           m.makeTranslation(
             x + 0.5 - head.origin[0],
             y + 0.5 - head.origin[1],
             front - head.origin[2] + 0.07,
           );
           mouth.setMatrixAt(r * 6 + c, m);
-          mouth.setColorAt(r * 6 + c, new THREE.Color(C.skin));
+          mouth.setColorAt(r * 6 + c, new THREE.Color(paletteHex(SKIN)));
         }
       headJoint.add(mouth);
       this.mouth = mouth;
@@ -1013,9 +1015,9 @@ export class TitleDiorama {
     if (!this.mouth || shape === this.mouthShape) return;
     this.mouthShape = shape;
     const pal: Record<string, number> = {
-      ".": C.skin,
-      s: C.skin_shadow,
-      l: C.skin_light,
+      ".": SKIN,
+      s: SKIN_SHADE,
+      l: SKIN_LIGHT,
       M: C.lips,
       d: C.hair_black,
       W: C.eye_white,
@@ -1023,7 +1025,7 @@ export class TitleDiorama {
     const col = new THREE.Color();
     MOUTH_ART[shape].forEach((row, r) => {
       for (let c = 0; c < 6; c++) {
-        col.set(pal[row[c]!] ?? C.skin);
+        col.set(paletteHex(pal[row[c]!] ?? SKIN));
         this.mouth!.setColorAt(r * 6 + c, col);
       }
     });
@@ -1479,4 +1481,10 @@ export class TitleDiorama {
     this.overlay?.remove();
     this.scene.clear();
   }
+}
+
+/** sRGB hex of a lab palette index (instance colours of the mouth overlay). */
+function paletteHex(index: number): number {
+  const [r, g, b] = LAB_PALETTE.get(index);
+  return (r << 16) | (g << 8) | b;
 }

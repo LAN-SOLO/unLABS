@@ -523,6 +523,10 @@ export interface WardrobeState {
   seen: Record<string, true>;
   /** The replicator's running job (play-time seconds). */
   job: { kind: "craft" | "refine" | "dye"; id: string; start: number; done: number } | null;
+  /** Signature looks unlocked (content/looks.ts id → play time when unlocked). */
+  looks: Record<string, number>;
+  /** Signature looks worn at least once (exactly, every slot). */
+  looksWorn: Record<string, true>;
 }
 
 /** Where a memo lives: in Jade's head (knowledge panel), on her computer, or pinned to a board (decor placement id). */

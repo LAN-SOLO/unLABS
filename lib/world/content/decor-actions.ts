@@ -889,7 +889,7 @@ export const DECOR_ACTIONS: readonly DecorActionDef[] = [
       {
         once: true,
         text: tr(
-          "Cottbus, winter 1989. Two people on a staircase, bundled up, one of them laughing too early. We talked for fourteen hours, until the heating went off at midnight.",
+          "Cottbus, winter 1989. Two people on a staircase, bundled up, one of them laughing too early. We talked for fourteen hours, until the heating went off at midnight. His half of the print has bleached out, as if the light went straight through him — all that's left is the white of his shirt and that beard he already swore he'd never shave.",
         ),
         effects: { flags: ["decor_foto_1989"] },
       },

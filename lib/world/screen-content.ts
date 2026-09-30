@@ -27,6 +27,7 @@ import { topObjective } from "@/lib/world/quests";
 import { unreadMail } from "@/lib/world/terminal-lite";
 import { SPECTRUM_HEX } from "@/lib/world/traits";
 import { BOARD_CAPACITY } from "@/lib/world/memos";
+import { isDamienRevealed } from "@/lib/world/damien";
 import { SPECTRUM, type FloorId, type MemoSourceKind, type WorldState } from "@/lib/world/types";
 
 /** The subset of a 2D context the screens use (real canvases and test stubs both fit). */
@@ -121,6 +122,8 @@ export interface ScreenInfo {
   solved: ReadonlySet<string>;
   /** 0..1 — how much of Damien's trail is known. */
   damienSignal: number;
+  /** Damien has been found (lib/world/damien.ts): his face may resolve. */
+  damienRevealed: boolean;
   /** 0..1 — how much of the signal thread is known. */
   signalLevel: number;
   /** "H_L_" — Jade's margin notes found so far. */
@@ -180,6 +183,7 @@ interface BaseInfo {
   puzzlesSolved: number;
   solved: ReadonlySet<string>;
   damienSignal: number;
+  damienRevealed: boolean;
   signalLevel: number;
   haloLetters: string;
   endings: number;
@@ -307,6 +311,7 @@ function baseInfo(s: WorldState): BaseInfo {
     puzzlesSolved: PUZZLES.filter((z) => s.puzzles[z.id]).length,
     solved: new Set(Object.keys(s.puzzles).filter((k) => s.puzzles[k])),
     damienSignal: Math.max(fraction(s, DAMIEN_THREAD), countTrue(s.endings) > 0 ? 1 : 0),
+    damienRevealed: isDamienRevealed(s),
     signalLevel: fraction(s, SIGNAL_THREAD),
     haloLetters: ["h", "a", "l", "o"]
       .map((c) => (s.insights[`halo_${c}`] ? c.toUpperCase() : "_"))
@@ -399,6 +404,7 @@ export function screenInfo(
     puzzlesTotal: PUZZLES.length,
     solved: b.solved,
     damienSignal: b.damienSignal,
+    damienRevealed: b.damienRevealed,
     signalLevel: b.signalLevel,
     haloLetters: b.haloLetters,
     endings: b.endings,
@@ -1474,6 +1480,27 @@ function drawReactor(f: Frame): void {
   }
 }
 
+/**
+ * Damien's silhouette in screen pixels: 1 head, 2 beard, 3 body, 0 outside.
+ * Tall and broad, the long beard a wedge below the chin.
+ */
+function damienShape(x: number, y: number, cx: number, hy: number, hr: number): number {
+  const dx = x - cx;
+  if (Math.hypot(dx / 0.86, y - hy) < hr) return 1;
+  const by0 = hy + hr * 0.35;
+  const by1 = hy + hr * 2.7;
+  if (y >= by0 && y <= by1 && Math.abs(dx) < hr * 0.82 * (1 - (y - by0) / (by1 - by0))) return 2;
+  const sy = hy + hr * 1.2;
+  if (y > sy && Math.abs(dx) < Math.min(hr * 2.3, hr * 1.5 + (y - sy) * 1.4)) return 3;
+  return 0;
+}
+
+/**
+ * Damien's screen (workstation, Echo Recorder). Until he has been found he
+ * is only a coarse mosaic of static in his shape — the blocks settle a
+ * little as more of his trail is known, but never into a face. Found, the
+ * portrait resolves: slicked-back hair, the winged eyes, the long beard.
+ */
 function drawDamien(f: Frame): void {
   const { w, h, t, pal, info } = f;
   const step = Math.floor(t * 12);
@@ -1485,21 +1512,46 @@ function drawDamien(f: Frame): void {
   const sig = info.damienSignal;
   const cx = w / 2 + Math.sin(t * 7) * (hash3(step, 3) > 0.8 ? 3 : 0);
   const hr = Math.min(w, h) * 0.14;
-  const hy = h * 0.34;
-  // The figure resolves as more of his trail is known.
-  const dropout = 0.55 - 0.4 * sig;
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x += 1) {
-      const inHead = Math.hypot(x - cx, (y - hy) * 0.9) < hr;
-      const sy = hy + hr * 1.3;
-      const half = hr * 0.7 + (y - sy) * 0.9;
-      const inBody = y > sy && Math.abs(x - cx) < Math.min(hr * 2.4, half);
-      if (!inHead && !inBody) continue;
-      const drop = hash3(x, y, step + 5);
-      const tear = hash3(y, step) > 0.93;
-      if (drop < dropout || tear) continue;
-      px(f, x + (tear ? 2 : 0), y, drop > 0.93 ? pal.hot : pal.fg);
+  const hy = h * 0.3;
+  if (!info.damienRevealed) {
+    // The veil: blocks of static in his silhouette, torn rows, dropouts.
+    const c = Math.max(2, Math.round(hr / 2));
+    const slow = Math.floor(t * 6);
+    const dropout = Math.max(0.24, 0.46 - 0.22 * sig);
+    for (let j = 0; j * c < h; j++) {
+      const tear = hash3(j, slow, 9) > 0.88 ? (hash3(j, slow) > 0.5 ? c : -c) : 0;
+      for (let i = 0; i * c < w; i++) {
+        const x = i * c;
+        const y = j * c;
+        if (!damienShape(x + c / 2, y + c / 2, cx, hy, hr)) continue;
+        const n = hash3(i, j, slow + 5);
+        if (n < dropout) continue;
+        const col = n > 0.95 ? pal.hot : n > 0.7 ? pal.fg : n > 0.45 ? pal.dim : pal.faint;
+        rect(f, x + tear, y, c, c, col);
+      }
     }
+  } else {
+    // Found: the portrait resolves (a light flicker of static stays).
+    const eyeY = hy - hr * 0.1;
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const region = damienShape(x, y, cx, hy, hr);
+        if (!region) continue;
+        const n = hash3(x, y, step + 5);
+        if (n < 0.06) continue;
+        let col = pal.fg;
+        if (region === 1) {
+          const dx = Math.abs(x - cx);
+          if (y < hy - hr * 0.45) col = (x + Math.floor(y / 2)) % 3 ? pal.dim : pal.faint;
+          else if (Math.abs(y - eyeY) < 1 && dx > hr * 0.15 && dx < hr * 0.62) col = pal.bg;
+          else if (Math.round(y) === Math.round(eyeY - 1) && dx > hr * 0.55 && dx < hr * 0.75)
+            col = pal.bg; // the wing
+          else if (y > hy + hr * 0.2) col = n > 0.5 ? pal.dim : pal.fg; // moustache and beard
+        } else if (region === 2) col = x % 2 ? pal.dim : n > 0.7 ? pal.hot : pal.fg;
+        else col = Math.abs(x - cx) < 1 ? pal.dim : n > 0.9 ? pal.faint : pal.fg;
+        px(f, x, y, col);
+      }
+  }
   if (blink(t, 1.2, 0.7)) {
     const label = info.endings > 0 ? tr("[PRESENT]") : `[D.F. ${Math.round(sig * 100)}%]`;
     const lw = label.length * GLYPH_W;

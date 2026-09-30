@@ -104,9 +104,9 @@ import {
   poseTrack,
   restartPose,
   switchPose,
-  damienRig,
   jadeRig,
   jointRestPosition,
+  restOrigins,
   LIE_BACK_HEIGHT,
   LIE_ENTER_DURATION,
   LIE_EXIT_DURATION,
@@ -163,6 +163,8 @@ import {
   roomFramingOffset,
 } from "@/lib/world/render/atmosphere";
 import { mcpAvatarVisual } from "@/lib/world/models/characters";
+import { damienFigureRigs } from "@/lib/world/models/veil";
+import { isDamienRevealed } from "@/lib/world/damien";
 import { ScreenSystem, type ScreenRef } from "@/lib/world/render/screens";
 import { screenInfo } from "@/lib/world/screen-content";
 import {
@@ -455,6 +457,13 @@ interface NpcView {
   goal: [number, number];
   wait: number;
   rig?: CharacterRig;
+  /**
+   * Damien's echo: every frame of his figure (the first is `rig`). While he is
+   * veiled these are noise frames the engine flips between; revealed, one.
+   */
+  frames?: CharacterRig[];
+  /** Veiled (not yet found): mosaic shimmer and glitch jitter. */
+  veiled?: boolean;
   visual?: VisualRig;
   track?: PoseTrack;
   wasNear?: boolean;
@@ -488,6 +497,21 @@ interface CharacterRig {
   root: THREE.Group;
   joints: Map<string, THREE.Group>;
   rest: Map<string, THREE.Vector3>;
+}
+
+/** A figure a scene materialises (see `LabEngine.showFigure`). */
+interface SceneFigure {
+  group: THREE.Group;
+  frames: CharacterRig[];
+  veiled: boolean;
+  /** Part meshes with the height (world units) their lowest voxel rests at. */
+  parts: { mesh: THREE.Object3D; bottom: number }[];
+  height: number;
+  age: number;
+  build: number;
+  hold: number;
+  track: PoseTrack;
+  view: FloorView;
 }
 
 export type PlayerMode = CharacterPoseKind;
@@ -622,6 +646,8 @@ export class LabEngine {
   private readonly materials = createVoxelMaterials();
   private readonly floors = new Map<FloorId, FloorView>();
   private active!: FloorView;
+  /** Scene figure (SceneStep "figure"): Damien materialising, veiled until found. */
+  private figure: SceneFigure | null = null;
   private readonly walker: Walker;
   private readonly player: CharacterRig;
   private readonly xray: THREE.Group;
@@ -2008,6 +2034,103 @@ export class LabEngine {
     }
   }
 
+  /**
+   * Materialise Damien with his feet at `at` (scene coordinates): built up
+   * from the feet over `build` seconds, gone after `hold`. He stays veiled
+   * until he has been found (lib/world/damien.ts); the host decides, the
+   * scene script never reveals him. One figure at a time.
+   */
+  showFigure(
+    _who: "damien",
+    at: readonly [number, number, number],
+    build: number,
+    hold: number,
+  ): void {
+    this.clearFigure();
+    const veiled = !isDamienRevealed(this.getState());
+    const defs = damienFigureRigs(!veiled);
+    const group = new THREE.Group();
+    group.position.set(at[0], at[1], at[2]);
+    const parts: SceneFigure["parts"] = [];
+    let height = 0;
+    const frames = defs.map((def) => {
+      const rig = this.buildCharacter(def);
+      const rest = restOrigins(def);
+      for (const part of def.parts) {
+        const joint = rig.joints.get(part.name);
+        const mesh = joint?.children.find((c) => c.userData.rigPart === part.name);
+        const y = rest.get(part.name)?.[1] ?? 0;
+        if (!mesh) continue;
+        const bottom = Math.max(0, (y - part.origin[1]) * def.scale);
+        height = Math.max(height, (y - part.origin[1] + part.model.h) * def.scale);
+        mesh.visible = false;
+        parts.push({ mesh, bottom });
+      }
+      group.add(rig.root);
+      return rig;
+    });
+    const glow = new VirtualLight(veiled ? "#00ffff" : "#fff4e0", 26, 9, 2);
+    glow.position.y = 3;
+    group.add(glow);
+    this.active.group.add(group);
+    this.active.lightsDirty = true;
+    this.figure = {
+      group,
+      frames,
+      veiled,
+      parts,
+      height,
+      age: 0,
+      build: Math.max(0.01, build),
+      hold: Math.max(0, hold),
+      track: poseTrack("idle", 0),
+      view: this.active,
+    };
+  }
+
+  /** Remove the scene figure (scene end / skip). */
+  clearFigure(): void {
+    const f = this.figure;
+    if (!f) return;
+    this.figure = null;
+    this.clearGroup(f.group);
+    f.group.removeFromParent();
+    f.view.lightsDirty = true;
+  }
+
+  /** Build-up, pose and veil shimmer of the scene figure. */
+  private animateFigure(dt: number, t: number): void {
+    const f = this.figure;
+    if (!f) return;
+    f.age += dt;
+    if (f.age > f.build + f.hold) {
+      this.clearFigure();
+      return;
+    }
+    // From the feet up: a part appears once the build line passes its lowest voxel.
+    const line = Math.min(1, f.age / f.build) * (f.height + 0.2);
+    for (const p of f.parts) p.mesh.visible = p.bottom <= line;
+    const [px, , pz] = this.walker.position;
+    const g = f.group;
+    g.rotation.y = turnToward(
+      g.rotation.y,
+      Math.atan2(px - g.position.x, pz - g.position.z),
+      dt,
+      2,
+      2,
+    );
+    const pose = animateCharacter({
+      track: f.track,
+      now: f.age,
+      gaitPhase: 0,
+      speed: 0,
+      walkW: 0,
+      idleFor: f.age,
+      seed: 7,
+    });
+    this.driveFigure(f.frames, f.veiled, pose, t, 3);
+  }
+
   /** What Lawrence's body language shows (set by the UI: dialogue → talk, …). */
   setPlayerMode(mode: PlayerMode): void {
     // The ride / climb owns the body until the gate opens (overlays close as it starts).
@@ -2375,9 +2498,18 @@ export class LabEngine {
       let botAwake = true;
       let botBody: THREE.Group | undefined;
       let botScreens: ScreenRef[] = [];
+      let frames: CharacterRig[] | undefined;
+      let veiled = false;
       if (npc.id === "damien") {
-        rig = this.buildCharacter(damienRig(true));
-        g.add(rig.root);
+        // Veiled until he has been found (lib/world/damien.ts): noise frames of
+        // his silhouette; revealed, his hologram.
+        veiled = !isDamienRevealed(this.getState());
+        frames = damienFigureRigs(!veiled).map((d) => this.buildCharacter(d));
+        frames.forEach((f, i) => {
+          f.root.visible = i === 0;
+          g.add(f.root);
+        });
+        rig = frames[0];
         const glow = new VirtualLight("#00ffff", 30, 10, 2);
         glow.position.y = 3;
         g.add(glow);
@@ -2414,6 +2546,10 @@ export class LabEngine {
         blob: npc.id === "unstables" ? 0 : npc.id === "damien" ? 1.6 : 1.9,
       };
       if (rig) nv.rig = rig;
+      if (frames) {
+        nv.frames = frames;
+        nv.veiled = veiled;
+      }
       if (botRig) {
         nv.visual = botRig;
         nv.awake = botAwake;
@@ -4146,6 +4282,7 @@ export class LabEngine {
       (v.rift.material as THREE.MeshBasicMaterial).opacity = 0.14 + Math.sin(t * 2) * 0.05;
     }
     this.animateNpcs(v, dt, t);
+    this.animateFigure(dt, t);
   }
 
   private driftPoints(pts: THREE.Points, t: number, amp: number): void {
@@ -4175,6 +4312,34 @@ export class LabEngine {
     otherRadii: this.npcRadii,
     playerRadius: WALKER.radius,
   };
+
+  /**
+   * Damien's figure (echo NPC and scene figure): pose and show one frame.
+   * Veiled (not yet found, lib/world/damien.ts) the noise frames flip
+   * irregularly — a mosaic of static — and on a glitch the body jumps
+   * sideways and squashes; revealed, his hologram only flickers. With
+   * reduceFlicker one frame holds steady, with reduceMotion nothing jitters.
+   */
+  private driveFigure(
+    frames: readonly CharacterRig[],
+    veiled: boolean,
+    pose: CharacterPose,
+    t: number,
+    seed: number,
+  ): void {
+    const a = this.settings.accessibility;
+    const on = a.reduceFlicker || Math.sin(t * 17 + seed) > -0.92;
+    const k = veiled && !a.reduceFlicker ? Math.floor(t * 6 + Math.sin(t * 2.3 + seed) * 1.5) : 0;
+    const shown = ((k % frames.length) + frames.length) % frames.length;
+    const glitch = veiled && !a.reduceMotion && Math.sin(t * 11.3 + seed * 3) > 0.9;
+    frames.forEach((f, i) => {
+      f.root.visible = on && i === shown;
+      if (i !== shown) return;
+      this.applyPose(f, pose);
+      f.root.position.x = glitch ? Math.sin(t * 97 + seed) * 0.16 : 0;
+      f.root.scale.y = glitch ? 1 + Math.sin(t * 61) * 0.035 : 1;
+    });
+  }
 
   /** Bots think, walk, work and watch; Damien's echo talks; the MCP eye follows Lawrence. */
   private animateNpcs(v: FloorView, dt: number, t: number): void {
@@ -4210,10 +4375,6 @@ export class LabEngine {
           4,
           3,
         );
-        // Flicker the body only — hiding the group would stop this loop from
-        // ever showing it again until the next sync.
-        npc.rig.root.visible =
-          this.settings.accessibility.reduceFlicker || Math.sin(t * 17) > -0.92;
         let track = npc.track ?? poseTrack("think", t);
         if (near && !npc.wasNear) {
           track = switchPose(track, "wave", t);
@@ -4225,8 +4386,11 @@ export class LabEngine {
         }
         npc.track = track;
         npc.wasNear = near;
-        this.applyPose(
-          npc.rig,
+        // Flicker / veil the body only — hiding the group would stop this loop
+        // from ever showing it again until the next sync.
+        this.driveFigure(
+          npc.frames ?? [npc.rig],
+          !!npc.veiled,
           animateCharacter({
             track,
             now: t,
@@ -4236,6 +4400,8 @@ export class LabEngine {
             idleFor: t,
             seed: 7,
           }),
+          t,
+          npc.seed,
         );
         continue;
       }

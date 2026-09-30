@@ -25,7 +25,8 @@ import { BOT_QUESTS, ENDINGS, NPCS } from "@/lib/world/content/story";
 import { isBuilt, isOnline, log, power } from "@/lib/world/game";
 import { bioBalanced } from "@/lib/world/biorhythm";
 import { WEAR_SLOTS } from "@/lib/world/content/wardrobe";
-import { wardrobeStats } from "@/lib/world/wardrobe";
+import { looksProgress, wardrobeStats } from "@/lib/world/wardrobe";
+import { LOOKS_WORN_GOAL } from "@/lib/world/content/looks";
 import type { WorldState } from "@/lib/world/types";
 
 export type AchievementBranch =
@@ -723,6 +724,27 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
       s.wardrobe.look.head?.item === "propeller_cap" &&
       s.wardrobe.look.feet?.item === "slippers" &&
       s.wardrobe.look.face?.item === "fake_mustache",
+  },
+  {
+    id: "signaturstil",
+    title: tr("Signature Style"),
+    description: tr("Wear one of Jade's signature looks, head to toe (character menu, Looks)."),
+    branch: "garderobe",
+    check: (s) => looksProgress(s).worn >= 1,
+  },
+  {
+    id: "stilsammlung",
+    title: tr("Signature Collection"),
+    description: tr("Wear {n} different signature looks. The MCP has started a lookbook.", {
+      n: LOOKS_WORN_GOAL,
+    }),
+    branch: "garderobe",
+    requires: ["signaturstil"],
+    check: (s) => looksProgress(s).worn >= LOOKS_WORN_GOAL,
+    progress: (s) => ({
+      current: Math.min(LOOKS_WORN_GOAL, looksProgress(s).worn),
+      target: LOOKS_WORN_GOAL,
+    }),
   },
 ];
 

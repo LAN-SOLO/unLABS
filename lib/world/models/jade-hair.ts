@@ -10,25 +10,31 @@
  * Colours come from the hair colourway: main strands, shade (dark locks,
  * brows), accent (sun-lightened strands).
  *
- * Headgear that `coversHair` tucks buns away (and the welding helmet the
- * whole hairBack); a cap keeps the ponytail, which comes out at the back.
+ * Headgear that `coversHair` tucks buns and the updo's pompadour away (and
+ * the welding helmet the whole hairBack); a cap keeps the ponytail, which
+ * comes out at the back. Jade's default is the copper updo (`hair_updo`);
+ * her face: pale skin, silver lids, a black winged liner, a smile.
  */
 import { C } from "@/lib/world/content/palette";
 import { WEAR_BY_ID } from "@/lib/world/content/wardrobe";
 import {
   Canvas,
   SKIN,
+  SKIN_LIGHT,
   SKIN_SHADE,
+  fitCanvas,
+  fitPoint,
   hash01,
   roundEdges,
   tint,
+  type Fit,
   type LookCtx,
   type Tone,
   type V3,
 } from "@/lib/world/models/jade-kit";
 
-/** Hair tones of the default auburn (brows stay natural under a dye). */
-const AUBURN: Tone = { main: C.hair_auburn, shade: C.wood_red, accent: C.rust };
+/** Jade's natural vivid copper (brows stay natural under a dye). */
+const COPPER: Tone = { main: C.hair_copper, shade: C.hair_copper_dk, accent: C.hair_copper_lt };
 /** The teal hair tie. */
 const TIE = C.sweater_teal;
 const TIE_DK = C.paint_teal;
@@ -52,6 +58,8 @@ export interface HairStyle {
   crown?: (k: Canvas, t: Tone) => void;
   /** What hangs from the hairBack joint, drawn in HEAD coordinates; null = nothing. */
   back?: (k: Canvas, t: Tone) => void;
+  /** Crown gear the crown stays visible under (bands that simply go over it). */
+  keepCrownUnder?: ReadonlySet<string>;
 }
 
 // ── Head volume ─────────────────────────────────────────────────
@@ -176,6 +184,15 @@ function pulledBack(x: number, y: number, z: number): boolean {
   if (y === 13) return z >= 11;
   return z >= 10;
 }
+
+/** Swept up: streaks run up the sides and back over the top. */
+const swept = (t: Tone) => (x: number, y: number, z: number) => {
+  const side = x <= 3 || x >= 10;
+  const n = side
+    ? hash01(z * 7 + (x < 7 ? 3 : 5), Math.floor(y / 6))
+    : hash01(x * 11 + 3, Math.floor(y / 3));
+  return n < 0.18 ? t.shade : n > 0.85 ? t.accent : t.main;
+};
 
 function tuftBack(t: Tone): (k: Canvas) => void {
   return (k) => k.set(7, 9, 7, t.main);
@@ -457,7 +474,80 @@ const UNDERCUT: HairStyle = {
   },
 };
 
+/**
+ * Jade's updo: the sides pulled up, a big pompadour rolled up and back
+ * from the hairline into a high bun, loose wavy strands at the temples
+ * and the nape. The volume is `crown` (tucked away under hats and helmets).
+ */
+const UPDO: HairStyle = {
+  // Pulled back off the face, the nape free (the hair is all swept up).
+  face: (x, y, z) => pulledBack(x, y, z) || (y <= 4 && z <= 6),
+  strand: swept,
+  ears: [true, true],
+  pencil: false,
+  keepCrownUnder: new Set(["headphones", "antenna_band"]),
+  // Sleek sides and back: the shell lies flat on the scalp below the crown.
+  trim: (k) => cropTo(k, (_x, y) => y <= 13),
+  extras: (k, t) => {
+    k.free(() => {
+      // Loose waves at both temples, in front of the ears.
+      for (let y = 4; y <= 12; y++) {
+        const z = 11 + (Math.floor(y / 2) % 2);
+        k.set(1, y, z, y % 3 ? t.main : t.accent).set(12, y, z + (y > 9 ? 0 : -1), t.main);
+        if (y <= 6) k.set(1, y, z - 1, t.shade);
+      }
+      k.set(12, 4, 10, t.accent).set(12, 5, 11, t.shade);
+      // A few strands escaping at the nape.
+      for (const [x, y, z] of [
+        [5, 4, 2],
+        [5, 3, 1],
+        [6, 2, 2],
+        [9, 4, 2],
+        [9, 3, 2],
+        [8, 2, 1],
+      ] as const)
+        k.set(x, y, z, (x + y) % 2 ? t.shade : t.main);
+    });
+  },
+  crown: (k, t) => {
+    k.free(() => {
+      // The pompadour: a thick roll over the forehead, swept up and back.
+      for (let y = 13; y <= 20; y++)
+        for (let z = 5; z <= 15; z++)
+          for (let x = 1; x <= 12; x++) {
+            const e =
+              ((x + 0.5 - 7) / 5.3) ** 2 +
+              ((y + 0.5 - 16.4) / 2.5) ** 2 +
+              ((z + 0.5 - 10.6) / 3.9) ** 2;
+            if (e > 1) continue;
+            // Combed back: streaks run front to back.
+            const streak = hash01(x * 5 + 1, Math.floor(y / 2));
+            const c =
+              y >= 17 && streak > 0.45
+                ? t.accent
+                : y <= 14 && z >= 12
+                  ? t.shade
+                  : streak < 0.25
+                    ? t.shade
+                    : t.main;
+            k.set(x, y, z, c);
+          }
+      // The high bun behind it, twisted, with a dark pin.
+      k.sphere(7, 16.4, 5, 2.4, t.main);
+      k.forEach((x, y, z) => {
+        const d = Math.hypot(x - 7, y - 16.4, z - 5);
+        if (d > 2.7 || y < 14) return;
+        const a = Math.atan2(y - 16.4, x - 7) + d * 1.2;
+        if (Math.sin(a * 2) > 0.6) k.set(x, y, z, t.shade);
+        else if (Math.sin(a * 2 + 1.9) > 0.9) k.set(x, y, z, t.accent);
+      });
+      k.box(9, 17, 3, 10, 17, 3, C.paint_black).set(11, 17, 3, C.gold);
+    });
+  },
+};
+
 export const HAIR_STYLES: Readonly<Record<string, HairStyle>> = {
+  hair_updo: UPDO,
   hair_ponytail: PONYTAIL,
   hair_bun: BUN,
   hair_loose: LOOSE,
@@ -468,8 +558,10 @@ export const HAIR_STYLES: Readonly<Record<string, HairStyle>> = {
   hair_undercut: UNDERCUT,
 };
 
-/** Headgear that sits on the crown (buns are tucked away under it). */
-const CROWN_GEAR = new Set([
+/** Headgear that sits on the crown (buns and the updo are tucked away under it). */
+export const CROWN_GEAR: ReadonlySet<string> = new Set([
+  "sou_wester",
+  "fur_hat",
   "hardhat",
   "welding_helmet",
   "beanie",
@@ -480,19 +572,19 @@ const CROWN_GEAR = new Set([
 ]);
 
 export function hairTone(ctx: LookCtx): Tone {
-  return ctx.hair?.t ?? AUBURN;
+  return ctx.hair?.t ?? COPPER;
 }
 
 /** Brows keep Jade's natural colour under a dye. */
 export function browTone(ctx: LookCtx): Tone {
   const h = ctx.hair;
-  if (!h) return AUBURN;
+  if (!h) return COPPER;
   const cw = WEAR_BY_ID.get(h.id)?.colorways.find((c) => C[c.tones.main] === h.t.main);
-  return cw?.dye ? AUBURN : h.t;
+  return cw?.dye ? COPPER : h.t;
 }
 
 function styleOf(ctx: LookCtx): HairStyle {
-  return HAIR_STYLES[ctx.hair?.id ?? ""] ?? PONYTAIL;
+  return HAIR_STYLES[ctx.hair?.id ?? ""] ?? UPDO;
 }
 
 // ── The head ────────────────────────────────────────────────────
@@ -502,34 +594,36 @@ export function headWithHair(k: Canvas, ctx: LookCtx): void {
   const t = hairTone(ctx);
   const style = styleOf(ctx);
   const headId = ctx.head?.id ?? "";
-  headVolume(k, C.skin, C.skin_shadow);
+  headVolume(k, SKIN, SKIN_SHADE);
   hairShell(k, style.face, style.strand(t));
   style.trim?.(k, t);
   capHead(k);
-  // Face: cheeks, eyes, nose, mouth, chin.
+  // Face: silver lids with a black winged liner, green eyes, round
+  // cheeks, a closed-mouth smile.
   const face: readonly string[] = [
-    // x 2..11, rows 12 (top) … 2 (bottom); z = 13 (x 2 / 11 at z 12).
-    "..........",
-    "LLLL..LLLL", // 10: lash line
+    // x 2..11, rows 11 (top) … 2 (bottom); z = 13 (x 2 / 11 at z 12).
+    "LEEE..EEEL", // 11: silver eyeshadow, the wings flick up at the outer corners
+    ".LLL..LLL.", // 10: liner
     "WGGW..WGGW", // 9
     "WGPW..WPGW", // 8
-    "....SS....", // 7: nose bridge shading
-    ".b..NN..b.", // 6: blush, nose
+    "....SS....", // 7: nose bridge light
+    ".b..NN..b.", // 6: round cheeks, nose
     "....ss....", // 5: nostrils
-    "..sMMMMs..", // 4: mouth
-    "...lMMl...", // 3: lower lip
+    "..M....M..", // 4: the corners of the smile turn up
+    "...MMMM...", // 3: closed-mouth smile (same cells as MOUTH_ART "smile")
     "..........", // 2
   ];
   const pal: Record<string, number> = {
-    L: C.walnut_dk,
+    L: C.paint_black,
+    E: C.lid_silver,
     W: C.eye_white,
-    G: C.eye_green,
+    G: C.eye_brown,
     P: C.hair_black,
-    S: C.skin_light,
-    N: C.skin,
-    s: C.skin_shadow,
+    S: SKIN_LIGHT,
+    N: SKIN,
+    s: SKIN_SHADE,
     M: C.lips,
-    l: C.skin_light,
+    l: SKIN_LIGHT,
     b: C.paper_pink,
   };
   face.forEach((row, r) => {
@@ -543,14 +637,14 @@ export function headWithHair(k: Canvas, ctx: LookCtx): void {
     }
   });
   // Nose tip and bridge stand proud.
-  k.box(6, 5, 14, 7, 7, 14, C.skin).set(6, 5, 14, C.skin_shadow).set(7, 5, 14, C.skin_shadow);
-  k.set(6, 7, 14, C.skin_light);
+  k.box(6, 5, 14, 7, 7, 14, SKIN).set(6, 5, 14, SKIN_SHADE).set(7, 5, 14, SKIN_SHADE);
+  k.set(6, 7, 14, SKIN_LIGHT);
   // Jaw shading under the chin.
-  for (let x = 4; x <= 9; x++) tint(k, x, 2, 11, C.skin_shadow);
+  for (let x = 4; x <= 9; x++) tint(k, x, 2, 11, SKIN_SHADE);
   const cups = headId === "headphones";
   if (style.ears[0] && !cups) {
     // Right ear, the pencil behind it and a small gold stud.
-    k.box(1, 7, 7, 1, 9, 8, C.skin).set(1, 8, 7, C.skin_shadow);
+    k.box(1, 7, 7, 1, 9, 8, SKIN).set(1, 8, 7, SKIN_SHADE);
     if (style.pencil && !ctx.head?.item.coversHair)
       k.box(0, 10, 5, 0, 10, 10, C.paper_yellow)
         .set(0, 10, 11, C.paper_pink)
@@ -558,15 +652,20 @@ export function headWithHair(k: Canvas, ctx: LookCtx): void {
     k.set(1, 6, 8, C.gold);
   }
   if (style.ears[1] && !cups) {
-    k.box(12, 7, 7, 12, 9, 8, C.skin).set(12, 8, 7, C.skin_shadow);
+    k.box(12, 7, 7, 12, 9, 8, SKIN).set(12, 8, 7, SKIN_SHADE);
     k.set(12, 6, 8, C.gold);
   }
   style.extras?.(k, t);
-  if (style.crown && !CROWN_GEAR.has(headId)) style.crown(k, t);
+  if (style.crown && (!CROWN_GEAR.has(headId) || style.keepCrownUnder?.has(headId)))
+    style.crown(k, t);
 }
 
-/** Placeholder hairBack voxel buried in the skull (styles with nothing hanging). */
-export function hairBackCanvas(ctx: LookCtx): { canvas: Canvas; origin: V3 } {
+/**
+ * What hangs from the hairBack joint: the ponytail (own frame), a style's
+ * back drawn in head coordinates (fitted like the head, `headFit`), or a
+ * placeholder voxel buried in the skull (styles with nothing hanging).
+ */
+export function hairBackCanvas(ctx: LookCtx, headFit: Fit = {}): { canvas: Canvas; origin: V3 } {
   const t = hairTone(ctx);
   const style = styleOf(ctx);
   const tucked = ctx.head?.id === "welding_helmet";
@@ -576,24 +675,26 @@ export function hairBackCanvas(ctx: LookCtx): { canvas: Canvas; origin: V3 } {
   k.clip = null;
   if (!tucked && style.back) style.back(k, t);
   if (!k.count()) tuftBack(t)(k);
-  return { canvas: k, origin: [7, 11, 0] };
+  return { canvas: fitCanvas(k, headFit), origin: fitPoint(headFit, [7, 11, 0]) };
 }
 
-/** Brows (w10 h2 d2): arched, tapered tails. */
+/**
+ * Brows (w10 h2 d2): light, slim arches in the top row (the row below stays
+ * free for the winged liner), a softer tail at the outer ends.
+ */
 export function browsCanvas(ctx: LookCtx): Canvas {
   const t = browTone(ctx);
   const m = new Canvas(10, 2, 2);
-  m.box(1, 1, 0, 3, 1, 1, t.shade).set(0, 0, 1, t.main).set(0, 0, 0, t.shade);
-  m.box(6, 1, 0, 8, 1, 1, t.shade).set(9, 0, 1, t.main).set(9, 0, 0, t.shade);
-  m.set(3, 0, 1, t.shade).set(6, 0, 1, t.shade);
+  m.box(1, 1, 0, 3, 1, 1, t.main).set(0, 1, 1, t.accent).set(3, 1, 1, t.shade);
+  m.box(6, 1, 0, 8, 1, 1, t.main).set(9, 1, 1, t.accent).set(6, 1, 1, t.shade);
   return m;
 }
 
-/** Eyelids (w10 h2 d1): skin above a dark lash line. */
+/** Eyelids (w10 h2 d1): silver eyeshadow above the black liner (the blink shows the makeup). */
 export function lidsCanvas(): Canvas {
   const m = new Canvas(10, 2, 1);
-  m.box(0, 1, 0, 3, 1, 0, C.skin_shadow).box(6, 1, 0, 9, 1, 0, C.skin_shadow);
-  m.box(0, 0, 0, 3, 0, 0, C.walnut_dk).box(6, 0, 0, 9, 0, 0, C.walnut_dk);
+  m.box(0, 1, 0, 3, 1, 0, C.lid_silver).box(6, 1, 0, 9, 1, 0, C.lid_silver);
+  m.box(0, 0, 0, 3, 0, 0, C.paint_black).box(6, 0, 0, 9, 0, 0, C.paint_black);
   return m;
 }
 

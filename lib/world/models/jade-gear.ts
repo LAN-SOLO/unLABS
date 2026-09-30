@@ -223,12 +223,12 @@ export function headGear(k: Canvas, w: Worn | null): void {
         (x, y) => y <= 14,
       );
       k.free(() => {
-        const cy = topAt(k, 7, 8) + 2.2;
-        k.sphere(7, cy, 8, 2.3, accent);
+        const cy = topAt(k, 7, 8) + 1.6;
+        k.sphere(7, cy, 8, 2, accent);
         k.forEach((x, y, z) => {
           if (
-            y >= cy - 2.5 &&
-            Math.hypot(x - 7, y - cy, z - 8) <= 2.6 &&
+            y >= cy - 2.2 &&
+            Math.hypot(x - 7, y - cy, z - 8) <= 2.3 &&
             hash01(x * 7 + z, y) < 0.25
           )
             k.set(x, y, z, x % 2 ? main : C.paint_white === accent ? C.paint_cream : accent);
@@ -314,6 +314,56 @@ export function headGear(k: Canvas, w: Worn | null): void {
       k.free(() => {
         for (let x = 3; x <= 10; x++) for (let z = 14; z <= 16; z++) k.set(x, 13, z, accent);
         propeller(k, w.t, topAt(k, 7, 7) + 1);
+      });
+      return;
+    }
+    case "sou_wester": {
+      // Oilskin crown with stitched rings, a wide brim that runs longer down the back.
+      helmet(k, [7.2, 9.7, 8.4], 1.2, 13, (x, y) => (y === 15 || y === 17 ? shade : main));
+      k.free(() => {
+        for (let z = -4; z <= 18; z++)
+          for (let x = -2; x <= 15; x++) {
+            const back = z < 4;
+            const e = ((x + 0.5 - 7) / 8.6) ** 2 + ((z + 0.5 - 7.3) / (back ? 11 : 9.6)) ** 2;
+            const hole = ((x + 0.5 - 7) / 7) ** 2 + ((z + 0.5 - 7.5) / 8) ** 2 <= 0.8;
+            if (e > 1 || hole) continue;
+            const y = z < 0 ? 11 : z < 2 ? 12 : 13;
+            k.set(x, y, z, e > 0.82 ? shade : main);
+          }
+        // Chin cord tucked up at the sides.
+        k.set(1, 12, 11, accent).set(12, 12, 11, accent);
+      });
+      return;
+    }
+    case "flower_crown": {
+      // A ring of glowing blossoms round the crown, leaves between them.
+      k.free(() => {
+        wrapRow(k, 15, (x, z) =>
+          (x * 3 + z) % 5 === 0 ? shade : (x + z) % 3 === 0 ? accent : main,
+        );
+        for (const [x, z] of [
+          [2, 12],
+          [7, 14],
+          [11, 12],
+          [1, 6],
+          [12, 6],
+        ] as const) {
+          const y = topAt(k, x, z) >= 15 ? 16 : 15;
+          k.set(x, y, z, accent).set(x + (x < 7 ? -1 : 1), y, z, main);
+        }
+      });
+      return;
+    }
+    case "sweatband": {
+      // Terry band round the forehead with a stripe and a stitched crystal.
+      k.free(() => {
+        wrapRow(k, 13, accent, (x, z) => z < 14 || (x >= 2 && x <= 11));
+        wrapRow(k, 14, (x, z) => (hash01(x, z) < 0.25 ? shade : main));
+        for (let z = 12; z <= 16; z++)
+          if (k.get(7, 14, z) === main || k.get(7, 14, z) === shade) {
+            k.set(7, 14, z, C.crystal_cyan).set(6, 14, z, shade);
+            break;
+          }
       });
       return;
     }
@@ -443,6 +493,22 @@ export function faceGear(k: Canvas, w: Worn | null): void {
         for (let x = 4; x <= 9; x++) k.set(x, 6, 15, main).set(x, 7, 15, main);
         k.box(6, 6, 16, 7, 7, 16, accent);
         k.set(4, 7, 15, shade).set(9, 6, 15, shade).set(5, 6, 15, shade);
+        return;
+      }
+      case "sunglasses": {
+        // Square frames, dark lenses, a bridge and temples; one glint.
+        for (let x = 1; x <= 12; x++) {
+          const z = x <= 1 || x >= 12 ? 13 : 14;
+          k.set(x, 10, z, main);
+        }
+        for (const x0 of [2, 8]) {
+          k.box(x0, 7, 14, x0 + 3, 9, 14, accent);
+          k.set(x0, 7, 14, main).set(x0 + 3, 7, 14, main);
+          k.box(x0, 6, 14, x0 + 3, 6, 14, shade);
+        }
+        k.set(6, 9, 14, main).set(7, 9, 14, main);
+        for (const x of [0, 13]) for (let z = 6; z <= 12; z++) k.set(x, 10, z, main);
+        k.set(3, 9, 15, C.chrome_lt);
         return;
       }
       case "fake_mustache": {

@@ -1166,7 +1166,7 @@ const PERSON_TEXT: Partial<Record<NpcId, string>> = {
     "Master Control Program. Has kept the lab alive for 2,561 days — on 0.3% remaining charge and with too much sarcasm. Knows more than it admits.",
   ),
   damien: tr(
-    "Damien Fridge, born 1965 in Chicago. PhD at MIT on topological anomalies, then the Santa Fe Institute (memetics). The philosopher among the engineers: he gave the bots their personalities and invented Proof of Meme. “Why before how.” Not at his station since February 14, 2019 — only an echo on the recorders.",
+    "Damien Fridge, born 1965 in Chicago. PhD at MIT on topological anomalies, then the Santa Fe Institute (memetics). The philosopher among the engineers: he gave the bots their personalities and invented Proof of Meme. “Why before how.” Not at his station since February 14, 2019 — only an echo on the recorders: a figure in the static, tall and broad, never in focus.",
   ),
   unstables: tr(
     "“We are what persists between your measurements.” A voice in the rift. Not human, not a bot. First appeared on February 7, 2026, zero percent correlation with anything known — and their name sounds like the lab itself.",

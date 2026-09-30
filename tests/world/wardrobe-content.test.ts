@@ -14,7 +14,8 @@ import { describe, expect, it } from "vitest";
 import { DEVICE_BY_ID } from "@/lib/world/content/devices";
 import { ITEM_BY_ID, PROTECTED_ITEMS } from "@/lib/world/content/items";
 import { FLOORS, PICKUPS, PROPS, roomAt } from "@/lib/world/content/map";
-import { BOT_QUESTS } from "@/lib/world/content/story";
+import { BOT_QUESTS, ENDINGS, INSIGHT_BY_ID } from "@/lib/world/content/story";
+import { SIGNATURE_LOOKS } from "@/lib/world/content/looks";
 import {
   REFINE_RECIPES,
   REPLICATOR_PROP,
@@ -26,7 +27,7 @@ import {
 } from "@/lib/world/content/wardrobe";
 import { PROP_VARIANT_DECOR } from "@/lib/world/content/decor-actions";
 import { DECOR_BY_ID } from "@/lib/world/models/decor";
-import { evalWearCond, wardrobeCounters } from "@/lib/world/wardrobe";
+import { evalWearCond, lookUnlocked, wardrobeCounters } from "@/lib/world/wardrobe";
 import type { Condition } from "@/lib/world/types";
 import { explode, fullRun } from "./simCoverage";
 import { step } from "./simPlayer";
@@ -94,12 +95,19 @@ describe("wardrobe catalogue", () => {
       if (w.source.kind === "reward") walk(w.source.when, conds);
     }
     expect(conds.length).toBeGreaterThan(10);
+    for (const l of SIGNATURE_LOOKS) if (l.unlock.kind === "event") walk(l.unlock.when, conds);
     const botFlags = new Set(BOT_QUESTS.map((q) => q.flag));
+    // Endings set `ending_<id>` (game.ts reachEnding).
+    const endingFlags = new Set(ENDINGS.map((e) => `ending_${e.id}`));
     for (const c of conds) {
       if ("device" in c) expect(DEVICE_BY_ID.has(c.device), c.device).toBe(true);
       else if ("counter" in c) expect(DERIVED_COUNTERS.has(c.counter), c.counter).toBe(true);
+      else if ("insight" in c) expect(INSIGHT_BY_ID.has(c.insight), c.insight).toBe(true);
       else if ("flag" in c)
-        expect(botFlags.has(c.flag) || src.includes(`${c.flag}`), c.flag).toBe(true);
+        expect(
+          botFlags.has(c.flag) || endingFlags.has(c.flag) || src.includes(`${c.flag}`),
+          c.flag,
+        ).toBe(true);
       else throw new Error(`unexpected condition ${JSON.stringify(c)}`);
     }
   });
@@ -250,8 +258,17 @@ describe("resources for the replicator", () => {
         (w) => w.id,
       ),
     ).toEqual([]);
+    // Every signature look unlocks (events by playing, the rest by owning its pieces)
+    // and is worn, one per visit.
+    for (let i = 0; i < 120 && SIGNATURE_LOOKS.some((l) => !s.wardrobe.looksWorn[l.id]); i++) {
+      visits += 1;
+      wardrobeRoutine(s, { maxDyes: 8 });
+      step(run);
+    }
+    expect(SIGNATURE_LOOKS.filter((l) => !lookUnlocked(s, l.id)).map((l) => l.id)).toEqual([]);
+    expect(SIGNATURE_LOOKS.filter((l) => !s.wardrobe.looksWorn[l.id]).map((l) => l.id)).toEqual([]);
     console.info(
-      `[wardrobe sim] all ${crafts.length} patterns ${visits} visits (1 play-minute each) after the completionist run, ${s.wardrobe.crafted} crafted, ${Object.keys(s.wardrobe.dyes).length} dyes`,
+      `[wardrobe sim] all ${crafts.length} patterns ${visits} visits (1 play-minute each) after the completionist run, ${s.wardrobe.crafted} crafted, ${Object.keys(s.wardrobe.dyes).length} dyes, ${SIGNATURE_LOOKS.length} looks worn`,
     );
   }, 120_000);
 });

@@ -13,16 +13,18 @@
  *   shin      6×14×10   shoe 0..~5, trousers above, knee plug 12..13
  *   coatTail  20×8×14   the skirt of a coat below the hips (hips x ↔ x + 2, z ↔ z + 2)
  *
- * The default pieces (teal sweater, white lab coat, dark work trousers,
- * brown boots) reproduce the original Jade voxel for voxel; every other
- * piece is drawn from its colourway `Tone` (main / shade / accent).
+ * Every piece is drawn from its colourway `Tone` (main / shade / accent)
+ * in these classic frames; jade-rig.ts then fits the parts to Jade's tall,
+ * slim build (so coordinates here stay the painted ones).
  * Gloves, belts, neck/back/buddy pieces: jade-gear.ts / jade-accessories.ts.
  */
 import { C } from "@/lib/world/content/palette";
 import {
   Canvas,
   SKIN,
+  SKIN_LIGHT,
   SKIN_SHADE,
+  hash01,
   lighter,
   roundEdges,
   tint,
@@ -35,11 +37,35 @@ import { drawPrint } from "@/lib/world/models/jade-prints";
 // ── Classification ──────────────────────────────────────────────
 
 /** Jackets cut like the lab coat: open front, a skirt below the hips. */
-const OPEN_COATS = new Set(["labcoat", "labcoat_patched", "cardigan"]);
+const OPEN_COATS = new Set(["labcoat", "labcoat_patched", "cardigan", "forge_mantle"]);
+/** Closed long coats (slicker, parka, hazmat suit): a skirt below the hips. */
+const CLOSED_COATS = new Set(["raincoat", "parka", "hazmat_suit"]);
 /** Jackets with sleeves (the top's sleeves only show at the wrist). */
-const SLEEVED_OUTER = new Set(["labcoat", "labcoat_patched", "cardigan", "bomber", "raincoat"]);
+const SLEEVED_OUTER = new Set([
+  "labcoat",
+  "labcoat_patched",
+  "cardigan",
+  "bomber",
+  "raincoat",
+  "parka",
+  "track_jacket",
+  "hazmat_suit",
+  "forge_mantle",
+]);
 /** Long-sleeved tops (show at the wrist under a jacket). */
-const LONG_TOPS = new Set(["sweater_teal", "turtleneck", "hoodie", "hoodie_night_shift"]);
+const LONG_TOPS = new Set([
+  "sweater_teal",
+  "turtleneck",
+  "hoodie",
+  "hoodie_night_shift",
+  "shirt_collar_geo",
+  "sweater_nordic",
+  "top_neon",
+]);
+/** Shirts with rolled sleeves (bare forearms without a jacket). */
+const ROLLED = new Set(["flannel", "shirt_damien"]);
+/** Legs in tights under a skirt (thighs and shins). */
+const TIGHTS = new Set(["skirt_plaid", "shorts_tights", "skirt_gown", "leggings_sport"]);
 const TEES = new Set(["tee_unlab", "tee_do_not_lick", "tee_418", "tee_bot_lineup", "tee_residual"]);
 const HOODIES = new Set(["hoodie", "hoodie_night_shift"]);
 
@@ -49,7 +75,7 @@ const NO_TOP: Tone = { main: SKIN, shade: SKIN_SHADE, accent: SKIN_SHADE };
 /** Does the jacket have a skirt part (coatTail)? */
 export function outerHasTail(ctx: LookCtx): boolean {
   const o = ctx.outer?.id;
-  return !!o && (OPEN_COATS.has(o) || o === "raincoat" || o === "welding_apron");
+  return !!o && (OPEN_COATS.has(o) || CLOSED_COATS.has(o) || o === "welding_apron");
 }
 
 // ── Hips ────────────────────────────────────────────────────────
@@ -64,6 +90,19 @@ export function hipsClothes(k: Canvas, ctx: LookCtx): void {
   if (id === "skirt_plaid") {
     k.forEach((x, y, z) => k.set(x, y, z, tartan(lt, x + z, y)));
     k.set(12, 1, 9, C.chrome).set(12, 0, 9, C.steel).set(13, 1, 9, C.steel); // safety pin
+  } else if (id === "skirt_gown") {
+    // Satin with soft vertical folds, a sash round the waist tied at the side.
+    k.forEach((x, y, z) => {
+      if ((x + z) % 4 === 0) k.set(x, y, z, lt.shade);
+      if (y === 3) k.set(x, y, z, lt.accent);
+    });
+    k.free(() => k.box(11, 1, 10, 12, 3, 10, lt.accent).set(12, 0, 10, lt.accent));
+  } else if (id === "leggings_sport") {
+    // Wide waistband, a key pocket at the back.
+    k.forEach((x, y, z) => {
+      if (y === 3) k.set(x, y, z, lt.shade);
+    });
+    k.box(6, 1, 0, 9, 2, 0, lt.shade).set(7, 2, 0, lt.accent);
   } else if (id === "shorts_tights") {
     k.forEach((x, y, z) => {
       if ((z === 9 || z === 0) && x % 2) k.set(x, y, z, lt.shade);
@@ -86,13 +125,16 @@ export function hipsClothes(k: Canvas, ctx: LookCtx): void {
         k.box(x0, 0, 0, x0 + 3, 0, 0, lt.accent).box(x0, 0, 0, x0, 2, 0, lt.accent);
         k.box(x0 + 3, 0, 0, x0 + 3, 2, 0, lt.accent);
       }
-    } else if (id === "joggers") {
+    } else if (id === "joggers" || id === "track_pants") {
       // Waistband rib and the drawstring.
       k.forEach((x, y, z) => {
         if (y === 3 && (x === 0 || x === 15 || z === 0 || z === 9) && (x + z) % 2)
           k.set(x, y, z, lt.shade);
       });
       k.box(6, 0, 9, 6, 1, 9, lt.accent).box(9, 0, 9, 9, 1, 9, lt.accent);
+      if (id === "track_pants")
+        for (let y = 0; y <= 2; y++)
+          for (const z of [3, 5]) k.set(0, y, z, lt.accent).set(15, y, z, lt.accent);
     } else if (id === "workpants_hivis") {
       k.box(0, 1, 0, 15, 1, 9, lt.accent);
       roundEdges(k, 0, 15, 0, 9, 1, 1);
@@ -100,8 +142,35 @@ export function hipsClothes(k: Canvas, ctx: LookCtx): void {
     }
   }
   const o = ctx.outer;
-  if (o && OPEN_COATS.has(o.id)) coatHips(k, o);
-  else if (o?.id === "raincoat") {
+  if (o && OPEN_COATS.has(o.id)) {
+    coatHips(k, o);
+    if (o.id === "forge_mantle") {
+      k.box(3, 0, 9, 3, 3, 9, o.t.accent).box(12, 0, 9, 12, 3, 9, o.t.accent);
+    }
+  } else if (o?.id === "parka" || o?.id === "hazmat_suit") {
+    coatHips(k, o);
+    k.box(4, 0, 9, 11, 3, 9, o.t.main).box(8, 0, 9, 8, 3, 9, o.t.shade);
+    if (o.id === "parka") {
+      // Quilting line, a drawcord toggle at the waist.
+      k.forEach((x, y, z) => {
+        if (y === 2 && (x === 0 || x === 15 || z === 0 || z === 9)) k.set(x, y, z, o.t.shade);
+      });
+      k.set(9, 3, 9, o.t.accent);
+    } else {
+      // Taped seams down the front and round the waist.
+      k.forEach((x, y, z) => {
+        if (y === 3 && (x === 0 || x === 15 || z === 0 || z === 9)) k.set(x, y, z, o.t.accent);
+      });
+      k.box(8, 0, 9, 8, 3, 9, o.t.accent);
+    }
+  } else if (o?.id === "track_jacket") {
+    // Rib hem with the contrast band.
+    k.forEach((x, y, z) => {
+      if (y < 2) return;
+      const surf = x === 0 || x === 15 || z === 0 || z === 9 || x === 1 || x === 14;
+      if (surf) k.set(x, y, z, y === 3 ? o.t.shade : (x + z) % 2 ? o.t.main : o.t.accent);
+    });
+  } else if (o?.id === "raincoat") {
     coatHips(k, o);
     k.box(4, 0, 9, 11, 3, 9, o.t.main).box(8, 0, 9, 8, 3, 9, o.t.shade);
     k.set(9, 1, 9, o.t.accent);
@@ -198,13 +267,86 @@ export function torsoClothes(k: Canvas, ctx: LookCtx, hairMain: number): void {
   const top = ctx.top;
   if (o && OPEN_COATS.has(o.id)) openCoat(k, o, top, hairMain);
   else if (o?.id === "raincoat") raincoat(k, o, top);
+  else if (o?.id === "parka") parka(k, o, top);
+  else if (o?.id === "hazmat_suit") hazmat(k, o, top);
   else if (o?.id === "bomber") bomber(k, o, top);
+  else if (o?.id === "track_jacket") trackJacket(k, o, top);
   else {
     topBody(k, top);
     if (o?.id === "welding_apron") apronBib(k, o);
   }
-  if (top && HOODIES.has(top.id) && o?.id !== "raincoat") hood(k, top.t);
+  const hooded = o !== null && (CLOSED_COATS.has(o.id) || o.id === "forge_mantle");
+  if (top && HOODIES.has(top.id) && !hooded) hood(k, top.t);
   if (top?.id === "turtleneck") turtleCollar(k, top.t);
+  if (top?.id === "shirt_collar_geo" && !hooded) standCollar(k, top.t);
+}
+
+/** Grey-black shard camo (the stand collar's lining); u, v run over the fabric. */
+export function geoShard(t: Tone, u: number, v: number): number {
+  const a = (((u + 2 * v) % 7) + 7) % 7;
+  const b = (((2 * u - v) % 5) + 5) % 5;
+  if (a < 2 && b < 3) return t.accent;
+  if (a < 4 || b === 0) return C.paint_gray_dk;
+  return C.paint_gray_lt;
+}
+
+/**
+ * The stand-up collar of the default shirt: white outside, the geometric
+ * lining showing where it stands open at the throat, on its top rim and on
+ * the lapel facings below it. Stands above a jacket's lapels.
+ */
+function standCollar(k: Canvas, t: Tone): void {
+  k.free(() => {
+    for (let y = 16; y <= 17; y++)
+      for (let x = 5; x <= 10; x++)
+        for (let z = 2; z <= 9; z++) {
+          const inner = x >= 6 && x <= 9 && z >= 3 && z <= 8;
+          if (inner || (z === 9 && x >= 7 && x <= 8)) continue;
+          const lining = z >= 8 || y === 17;
+          k.set(x, y, z, lining ? geoShard(t, x + z, y) : t.main);
+        }
+    // The collar points flare out, lining side forward.
+    k.set(6, 17, 10, geoShard(t, 16, 17)).set(9, 17, 10, geoShard(t, 19, 17));
+    k.set(5, 16, 10, t.main).set(10, 16, 10, t.main);
+  });
+  for (const [x, y] of [
+    [5, 15],
+    [6, 15],
+    [6, 14],
+    [9, 15],
+    [10, 15],
+    [9, 14],
+  ] as const)
+    tint(k, x, y, 9, geoShard(t, x * 2, y));
+}
+
+/** Button placket down the front (where `inside` allows), buttons every third row. */
+function placket(k: Canvas, t: Tone, inside: (x: number, y: number) => boolean): void {
+  for (let y = 0; y <= 13; y++) {
+    if (inside(8, y)) tint(k, 8, y, 9, y % 3 === 2 ? C.paint_gray_lt : t.shade);
+    if (inside(7, y) && y % 3 === 2) tint(k, 7, y, 9, t.main);
+  }
+}
+
+/** The shirt's plain collar points (open, no tie space) on the chest. */
+function shirtPoints(k: Canvas, t: Tone): void {
+  k.free(() => {
+    k.box(5, 14, 10, 7, 15, 10, t.main).box(9, 14, 10, 11, 15, 10, t.main);
+    k.set(5, 14, 10, t.shade).set(11, 14, 10, t.shade);
+    k.box(6, 15, 3, 9, 15, 8, t.shade);
+  });
+  k.box(7, 12, 9, 8, 15, 9, SKIN).set(7, 12, 9, SKIN_SHADE);
+}
+
+/** Nordic star yoke: bands at rows 10 and 14, stars and dots between (u runs round the body). */
+function nordicYoke(t: Tone, u: number, y: number): number | null {
+  if (y === 10 || y === 14) return t.accent;
+  if (y < 11 || y > 13) return null;
+  const m = ((u % 6) + 6) % 6;
+  if (y === 12 && (m === 0 || m === 2)) return t.accent;
+  if ((y === 11 || y === 13) && m === 1) return t.accent;
+  if (y === 12 && m === 1) return t.shade;
+  return null;
 }
 
 /** Lab coat / patched coat / cardigan: open front showing the top. */
@@ -239,6 +381,10 @@ function openCoat(k: Canvas, o: Worn, top: Worn | null, hairMain: number): void 
     }
     return;
   }
+  if (o.id === "forge_mantle") {
+    forgeMantle(k, o);
+    return;
+  }
   // Folded lapels stand proud of the chest.
   for (let y = 10; y <= 15; y++) {
     const w = y >= 13 ? 2 : 1;
@@ -250,7 +396,7 @@ function openCoat(k: Canvas, o: Worn, top: Worn | null, hairMain: number): void 
   k.box(0, 3, 10, 3, 9, 10, C.paper);
   k.box(0, 8, 10, 3, 9, 10, accent);
   k.set(1, 9, 10, C.paper).set(2, 9, 10, C.paper);
-  k.box(0, 5, 10, 1, 7, 10, C.skin);
+  k.box(0, 5, 10, 1, 7, 10, SKIN);
   k.set(0, 7, 10, hairMain).set(1, 7, 10, hairMain);
   k.set(2, 7, 10, C.paint_black).set(3, 6, 10, C.paint_black).set(2, 5, 10, C.paint_black);
   k.box(0, 4, 10, 3, 4, 10, C.paint_black);
@@ -342,6 +488,29 @@ function topFront(k: Canvas, top: Worn | null, inside: (x: number, y: number) =>
       k.box(6, 14, 9, 9, 14, 9, shade);
       k.box(6, 15, 8, 9, 15, 8, shade);
     }
+    return;
+  }
+  if (id === "shirt_collar_geo") {
+    placket(k, top.t, inside);
+    return;
+  }
+  if (id === "shirt_damien") {
+    placket(k, top.t, inside);
+    k.set(6, 12, 9, SKIN).set(9, 12, 9, SKIN);
+    return;
+  }
+  if (id === "sweater_nordic") {
+    for (let y = 0; y <= 15; y++)
+      for (let x = 0; x <= 15; x++) {
+        const c = nordicYoke(top.t, x, y);
+        if (c) paint(x, y, c);
+      }
+    k.box(5, 15, 9, 10, 15, 9, shade);
+    return;
+  }
+  if (id === "top_neon") {
+    for (let y = 0; y <= 15; y++) for (let x = 0; x <= 15; x++) if ((x + y) % 2) paint(x, y, shade);
+    for (let y = 0; y <= 13; y++) paint(y % 2 ? 6 : 9, y, accent);
     return;
   }
   if (id === "flannel") {
@@ -444,6 +613,69 @@ function topBody(k: Canvas, top: Worn | null): void {
     });
     neck();
     if (top?.item.print) drawPrint(k, top.item.print, t, 7.5, 14, 9);
+    return;
+  }
+  if (id === "shirt_collar_geo") {
+    // Crisp shirt: placket with buttons, a breast pocket, side seams, a shaded hem.
+    placket(k, t, () => true);
+    k.box(10, 9, 9, 12, 9, 9, shade).box(10, 6, 9, 10, 9, 9, shade).box(12, 6, 9, 12, 9, 9, shade);
+    for (let y = 1; y <= 13; y++) {
+      tint(k, 0, y, 5, y % 4 ? main : shade);
+      tint(k, 15, y, 5, y % 4 ? main : shade);
+    }
+    k.box(7, 1, 0, 8, 12, 0, shade);
+    hem(() => shade);
+    return;
+  }
+  if (id === "shirt_damien") {
+    // Oversized: pleat folds, a pencil in the pocket, the coffee ring, open collar.
+    placket(k, t, () => true);
+    k.box(2, 8, 9, 5, 8, 9, shade).box(2, 5, 9, 2, 8, 9, shade).box(5, 5, 9, 5, 8, 9, shade);
+    k.free(() => k.box(3, 8, 10, 3, 10, 10, C.paper_yellow).set(3, 10, 10, C.paper_pink));
+    for (const [x, y] of [
+      [11, 3],
+      [12, 3],
+      [13, 4],
+      [10, 4],
+    ] as const)
+      tint(k, x, y, 9, accent);
+    for (const [x, y] of [
+      [3, 2],
+      [4, 3],
+      [12, 11],
+      [13, 10],
+    ] as const)
+      tint(k, x, y, 9, shade);
+    hem((x, z) => ((x + z) % 3 ? main : shade));
+    shirtPoints(k, t);
+    return;
+  }
+  if (id === "sweater_nordic") {
+    k.forEach((x, y, z) => {
+      const surf = x === 0 || x === 15 || z === 0 || z === 9;
+      if (!surf) return;
+      const u = z === 9 || z === 0 ? x : z + 3;
+      const c = nordicYoke(t, u, y);
+      if (c) k.set(x, y, z, c);
+    });
+    hem((x, z) => ((x + z) % 2 ? shade : main));
+    neck();
+    k.box(5, 15, 9, 10, 15, 9, shade);
+    return;
+  }
+  if (id === "top_neon") {
+    // Mesh (a shade grid), glowing seams down the front and back, a glowing neckline.
+    k.forEach((x, y, z) => {
+      const surf = x === 0 || x === 15 || z === 0 || z === 9;
+      if (surf && (x + y + z) % 2) k.set(x, y, z, shade);
+    });
+    for (let y = 0; y <= 13; y++)
+      for (const x of [4, 11]) {
+        tint(k, x, y, 9, accent);
+        tint(k, x, y, 0, accent);
+      }
+    k.box(5, 14, 9, 10, 14, 9, accent);
+    neck();
     return;
   }
   if (id === "flannel") {
@@ -610,6 +842,121 @@ function apronBib(k: Canvas, o: Worn): void {
   });
 }
 
+/** The forge mantle over the body: gold edges, a high collar, the Halo clasp. */
+function forgeMantle(k: Canvas, o: Worn): void {
+  const { main, shade, accent } = o.t;
+  for (let y = 0; y <= 15; y++) {
+    const [a, b] = coatOpening(y);
+    k.set(a - 1, y, 9, accent).set(b + 1, y, 9, accent);
+  }
+  // Brocade: a faint diamond pattern on the back and sides.
+  k.forEach((x, y, z) => {
+    const surf = x === 0 || x === 15 || z === 0;
+    if (surf && (x + y + z) % 4 === 0 && (x - y + z) % 3 === 0) k.set(x, y, z, shade);
+  });
+  for (let z = 1; z <= 8; z++) {
+    tint(k, 1, 13, z, accent);
+    tint(k, 14, 13, z, accent);
+  }
+  k.free(() => {
+    // Standing collar with a gold rim.
+    for (let y = 16; y <= 18; y++)
+      for (let x = 4; x <= 11; x++)
+        for (let z = 1; z <= 9; z++) {
+          const inner = x >= 5 && x <= 10 && z >= 2 && z <= 8;
+          if (inner || (z === 9 && x >= 6 && x <= 9)) continue;
+          k.set(x, y, z, y === 18 ? accent : main);
+        }
+    // The clasp: a Halo shard in gold claws.
+    k.box(7, 13, 10, 8, 14, 10, C.halo_glow);
+    k.set(6, 13, 10, accent).set(9, 13, 10, accent).set(7, 15, 10, accent).set(8, 12, 10, accent);
+  });
+}
+
+/** Closed long coat body (slicker cut) with placket and a hood lying back. */
+function closedCoatBody(k: Canvas, o: Worn, top: Worn | null): void {
+  const { main, shade } = o.t;
+  bodyBlock(k, main);
+  for (let y = 0; y <= 13; y++) k.set(7, y, 9, shade);
+  k.box(7, 14, 9, 8, 15, 9, T(top, NO_TOP).main);
+  k.free(() => {
+    for (let y = 13; y <= 15; y++) {
+      const w = y - 12;
+      k.box(7 - w - 1, y, 10, 6, y, 10, main).box(9, y, 10, 8 + w + 1, y, 10, main);
+    }
+  });
+  k.box(7, 0, 0, 8, 12, 0, shade);
+  hood(k, o.t);
+}
+
+function parka(k: Canvas, o: Worn, top: Worn | null): void {
+  const { main, shade, accent } = o.t;
+  closedCoatBody(k, o, top);
+  // Quilting rows, big bellows pockets, a fur rim on the hood.
+  k.forEach((x, y, z) => {
+    const surf = x === 0 || x === 15 || z === 0 || z === 9;
+    if (surf && y % 4 === 2 && !(z === 9 && x >= 6 && x <= 9)) k.set(x, y, z, shade);
+  });
+  for (const x0 of [1, 11]) {
+    k.box(x0, 1, 9, x0 + 3, 5, 9, shade);
+    k.free(() => k.box(x0, 5, 10, x0 + 3, 5, 10, main));
+  }
+  for (const y of [2, 5, 8, 11]) k.free(() => k.set(8, y, 10, accent));
+  k.free(() => {
+    for (let x = 3; x <= 12; x++)
+      for (let z = -2; z <= 2; z++)
+        if (k.get(x, 16, z)) k.set(x, 17, z, (x + z) % 2 ? accent : C.paint_white);
+    k.box(3, 15, -3, 12, 15, -3, accent);
+  });
+}
+
+function hazmat(k: Canvas, o: Worn, top: Worn | null): void {
+  const { shade, accent } = o.t;
+  closedCoatBody(k, o, top);
+  // Taped seams, the badge window, a hazard trefoil on the back.
+  k.forEach((x, y, z) => {
+    const surf = x === 0 || x === 15 || z === 0 || z === 9;
+    if (surf && (y === 12 || (x === 0 && z === 5) || (x === 15 && z === 5))) k.set(x, y, z, accent);
+  });
+  for (let y = 0; y <= 13; y++) k.set(8, y, 9, accent);
+  k.free(() => {
+    k.box(1, 6, 10, 4, 9, 10, C.glass).box(1, 9, 10, 4, 9, 10, accent);
+    k.set(2, 7, 10, C.badge_blue).set(3, 7, 10, C.paper);
+  });
+  for (const [x, y] of [
+    [7, 7],
+    [8, 7],
+    [6, 5],
+    [9, 5],
+    [7, 4],
+    [8, 4],
+  ] as const)
+    k.set(x, y, 0, x === 7 || x === 8 ? accent : shade);
+  k.set(7, 6, 0, accent).set(8, 6, 0, accent);
+}
+
+function trackJacket(k: Canvas, o: Worn, top: Worn | null): void {
+  const { main, shade, accent } = o.t;
+  bodyBlock(k, main);
+  // Colour blocks: a shade yoke over the shoulders, a white piping, the zip, a stand collar.
+  k.forEach((x, y, z) => {
+    if (y >= 11) k.set(x, y, z, shade);
+    if (y === 10) k.set(x, y, z, accent);
+    if (y <= 1) k.set(x, y, z, (x + z) % 2 ? main : accent);
+  });
+  for (let y = 2; y <= 13; y++) k.set(8, y, 9, y % 2 ? C.chrome : C.steel);
+  k.box(7, 14, 9, 8, 15, 9, T(top, NO_TOP).main);
+  k.free(() => {
+    for (let x = 4; x <= 11; x++)
+      for (let z = 1; z <= 9; z++) {
+        const inner = x >= 5 && x <= 10 && z >= 2 && z <= 8;
+        if (!inner && !(z === 9 && x >= 7 && x <= 8)) k.set(x, 16, z, shade);
+      }
+  });
+  // A small crest on the chest.
+  k.box(11, 7, 9, 12, 8, 9, accent).set(12, 8, 9, C.gold);
+}
+
 // ── Arms ────────────────────────────────────────────────────────
 
 interface Sleeve {
@@ -690,6 +1037,34 @@ export function upperArmClothes(k: Canvas, ctx: LookCtx): void {
         if (c !== top!.t.main) k.set(x, y, z, c);
       }
     });
+  if (id === "track_jacket") {
+    // Two stripes down the outer side, the yoke colour over the shoulder.
+    for (let y = 0; y <= 9; y++) {
+      tint(k, 0, y, 2, o!.t.accent);
+      tint(k, 0, y, 4, o!.t.accent);
+    }
+    k.forEach((x, y, z) => {
+      if (y >= 7 && !(x === 0 && (z === 2 || z === 4))) k.set(x, y, z, o!.t.shade);
+    });
+  }
+  if (id === "parka")
+    k.forEach((x, y, z) => {
+      if (y % 4 === 1 && (x === 0 || x === 5 || z === 0 || z === 5)) k.set(x, y, z, o!.t.shade);
+    });
+  if (id === "hazmat_suit")
+    k.forEach((x, y, z) => {
+      if (y === 9 || (x === 0 && z === 3)) k.set(x, y, z, o!.t.accent);
+    });
+  if (id === "forge_mantle")
+    k.forEach((x, y, z) => {
+      if (y === 9 && (x === 0 || z === 0 || z === 5)) k.set(x, y, z, o!.t.accent);
+    });
+  if (id === "sweater_nordic")
+    k.forEach((x, y, z) => {
+      if ((y === 6 || y === 8) && (x === 0 || x === 5 || z === 0 || z === 5))
+        k.set(x, y, z, top!.t.accent);
+    });
+  if (id === "top_neon") for (let y = 0; y <= 9; y++) tint(k, 0, y, 3, top!.t.accent);
   if (id === "sweater_teal") {
     // A darned elbow in a contrasting yarn.
     k.box(2, 1, 0, 3, 2, 0, top!.t.accent).set(2, 1, 0, top!.t.shade);
@@ -705,7 +1080,7 @@ export function forearmClothes(k: Canvas, ctx: LookCtx): void {
   const { s, outer } = sleeveOf(ctx);
   const top = ctx.top;
   const bare = !s || (!outer && top !== null && (TEES.has(top.id) || top.id === "overall_top"));
-  const rolled = !outer && top?.id === "flannel";
+  const rolled = !outer && !!top && ROLLED.has(top.id);
   const oid = outer ? (ctx.outer?.id ?? "") : "";
   if (bare || rolled) {
     // Bare forearm (short sleeves, tank top, rolled flannel).
@@ -749,7 +1124,7 @@ export function forearmClothes(k: Canvas, ctx: LookCtx): void {
   ] as const)
     tint(k, x, y, z, s.shade);
   // The wrist: the top's sleeve under a jacket, a rib cuff without one, or skin.
-  const long = top && (LONG_TOPS.has(top.id) || top.id === "flannel");
+  const long = top && (LONG_TOPS.has(top.id) || ROLLED.has(top.id));
   const wrist = outer ? (long ? top!.t.main : SKIN) : top!.t.main;
   const wristShade = outer ? (long ? top!.t.shade : SKIN_SHADE) : top!.t.shade;
   k.box(1, 4, 1, 4, 5, 4, wrist);
@@ -765,6 +1140,20 @@ export function forearmClothes(k: Canvas, ctx: LookCtx): void {
     tint(k, 0, 8, 4, lighter(sleeve));
     tint(k, 0, 9, 3, lighter(sleeve));
   }
+  const cuffRing = (c: number) => {
+    for (let x = 0; x <= 5; x++) for (let z = 0; z <= 5; z++) tint(k, x, 6, z, c);
+  };
+  if (oid === "track_jacket") {
+    cuffRing(ctx.outer!.t.accent);
+    for (let y = 7; y <= 9; y++) {
+      tint(k, 0, y, 2, ctx.outer!.t.accent);
+      tint(k, 0, y, 4, ctx.outer!.t.accent);
+    }
+  }
+  if (oid === "hazmat_suit" || oid === "forge_mantle") cuffRing(ctx.outer!.t.accent);
+  if (oid === "parka") cuffRing(ctx.outer!.t.shade);
+  if (!outer && top?.id === "sweater_nordic") cuffRing(top.t.accent);
+  if (!outer && top?.id === "top_neon") cuffRing(top.t.accent);
   if (oid === "labcoat_patched") tint(k, 5, 8, 2, ctx.outer!.t.accent);
 }
 
@@ -775,9 +1164,21 @@ export function thighClothes(k: Canvas, ctx: LookCtx): void {
   const lt = T(ctx.legs, NO_TOP);
   const id = ctx.legs?.id ?? "";
   const { main: pants, shade: fold, accent: gap } = lt;
-  if (id === "skirt_plaid" || id === "shorts_tights") {
-    const tights = id === "skirt_plaid" ? C.paint_black : lt.accent;
+  if (TIGHTS.has(id)) {
+    const tights =
+      id === "skirt_plaid" || id === "skirt_gown"
+        ? C.paint_black
+        : id === "leggings_sport"
+          ? pants
+          : lt.accent;
     k.box(0, 0, 0, 5, 11, 5, tights);
+    if (id === "leggings_sport") {
+      // A reflective stripe down the outer side, a seam at the knee.
+      for (let y = 0; y <= 11; y++) tint(k, 0, y, 3, lt.accent);
+      for (let x = 1; x <= 4; x++) tint(k, x, 1, 5, fold);
+      k.box(2, 12, 2, 3, 13, 3, pants);
+      return;
+    }
     roundEdges(k, 0, 5, 0, 5, 0, 11);
     tint(k, 2, 1, 5, C.paint_black_lt);
     tint(k, 3, 2, 5, C.paint_black_lt);
@@ -838,6 +1239,12 @@ export function thighClothes(k: Canvas, ctx: LookCtx): void {
     for (let y = 0; y <= 11; y++) {
       tint(k, 0, y, 2, lt.accent);
       tint(k, 0, y, 3, lt.accent);
+    }
+  } else if (id === "track_pants") {
+    for (let y = 0; y <= 11; y++) {
+      tint(k, 0, y, 1, lt.accent);
+      tint(k, 0, y, 3, lt.accent);
+      tint(k, 0, y, 2, pants);
     }
   }
 }
@@ -947,6 +1354,43 @@ function shoe(k: Canvas, feet: Worn | null): ShoeFit {
       k.box(0, 3, 4, 5, 3, 4, shade);
       return { top: 4, brk: false };
     }
+    case "court_shoes": {
+      // A thin sole, a block heel at the back, a low pointed vamp — the ankle shows.
+      k.box(1, 0, 1, 4, 0, 2, shade);
+      k.box(1, 0, 5, 4, 0, 9, shade);
+      k.box(1, 1, 1, 4, 1, 9, main);
+      k.box(1, 2, 1, 4, 2, 2, main);
+      k.box(2, 1, 10, 3, 1, 10, main);
+      k.set(1, 1, 9, 0).set(4, 1, 9, 0);
+      k.set(2, 2, 6, accent).set(3, 2, 6, accent);
+      k.box(1, 2, 3, 4, 3, 5, SKIN).box(2, 2, 6, 3, 2, 7, SKIN_LIGHT);
+      return { top: 4, brk: false };
+    }
+    case "winter_boots": {
+      // Lug sole, a padded shaft with quilting, a fur cuff at the top.
+      k.box(0, 0, 1, 5, 1, 9, C.rubber);
+      for (let z = 2; z <= 8; z += 2) k.set(0, 0, z, C.paint_black).set(5, 0, z, C.paint_black);
+      k.box(0, 2, 1, 5, 4, 8, main).box(1, 2, 9, 4, 3, 9, main);
+      roundEdges(k, 0, 5, 1, 9, 2, 4);
+      k.box(0, 5, 1, 5, 8, 7, main);
+      roundEdges(k, 0, 5, 1, 7, 5, 8);
+      k.forEach((x, y, z) => {
+        if ((y === 4 || y === 7) && (x === 0 || x === 5 || z === 1 || z === 7))
+          k.set(x, y, z, shade);
+      });
+      k.box(2, 5, 8, 3, 7, 8, shade).set(2, 6, 8, C.steel);
+      k.free(() => {
+        for (let y = 9; y <= 10; y++)
+          for (let x = -1; x <= 6; x++)
+            for (let z = 0; z <= 8; z++) {
+              const edge = x === -1 || x === 6 || z === 0 || z === 8;
+              const corner = (x === -1 || x === 6) && (z === 0 || z === 8);
+              if (edge && !corner)
+                k.set(x, y, z, hash01(x + y, z) < 0.3 ? lighter(accent) : accent);
+            }
+      });
+      return { top: 11, brk: false };
+    }
     case "roller_boots": {
       for (const zc of [1, 7])
         for (const xc of [0, 4]) {
@@ -992,9 +1436,24 @@ function legsOnShin(k: Canvas, ctx: LookCtx, fit: ShoeFit): void {
   const id = ctx.legs?.id ?? "";
   const { main: pants, shade: fold, accent: gap } = lt;
   const p0 = fit.top;
-  if (id === "skirt_plaid" || id === "shorts_tights") {
-    const tights = id === "skirt_plaid" ? C.paint_black : lt.accent;
+  if (TIGHTS.has(id)) {
+    const tights =
+      id === "skirt_plaid" || id === "skirt_gown"
+        ? C.paint_black
+        : id === "leggings_sport"
+          ? pants
+          : lt.accent;
     if (p0 <= 7) k.box(1, p0, 3, 4, 7, 6, tights);
+    if (id === "leggings_sport") {
+      k.box(0, Math.max(8, p0), 2, 5, 11, 7, tights);
+      roundEdges(k, 0, 5, 2, 7, Math.max(8, p0), 11);
+      for (let y = p0; y <= 11; y++) {
+        tint(k, 0, y, 5, lt.accent);
+        tint(k, 1, y, 6, y < 8 ? lt.accent : tights);
+      }
+      k.box(2, 12, 4, 3, 13, 5, tights);
+      return;
+    }
     k.box(0, Math.max(8, p0), 2, 5, 11, 7, tights);
     roundEdges(k, 0, 5, 2, 7, Math.max(8, p0), 11);
     tint(k, 2, 11, 7, C.paint_black_lt);
@@ -1002,7 +1461,7 @@ function legsOnShin(k: Canvas, ctx: LookCtx, fit: ShoeFit): void {
     k.box(2, 12, 4, 3, 13, 5, tights);
     return;
   }
-  if (id === "joggers" && p0 <= 9) {
+  if ((id === "joggers" || id === "track_pants") && p0 <= 9) {
     // Cuffed ankles: a tighter rib under the loose leg.
     k.box(1, p0, 3, 4, p0 + 1, 6, fold);
     for (let x = 1; x <= 4; x++) if (x % 2) tint(k, x, p0, 6, pants);
@@ -1015,6 +1474,12 @@ function legsOnShin(k: Canvas, ctx: LookCtx, fit: ShoeFit): void {
     }
     tint(k, 2, 9, 7, fold);
     tint(k, 1, 10, 7, fold);
+    if (id === "track_pants")
+      for (let y = p0 + 2; y <= 11; y++) {
+        tint(k, 0, y, 3, lt.accent);
+        tint(k, 0, y, 5, lt.accent);
+        tint(k, 0, y, 4, pants);
+      }
     k.box(2, 12, 4, 3, 13, 5, pants);
     return;
   }
@@ -1065,6 +1530,10 @@ export function coatTailClothes(k: Canvas, ctx: LookCtx): boolean {
     skirt(k, legs.t, outerHasTail(ctx) && o?.id !== "welding_apron");
     any = true;
   }
+  if (legs?.id === "skirt_gown") {
+    gownSkirt(k, legs.t, outerHasTail(ctx) && o?.id !== "welding_apron");
+    any = true;
+  }
   if (!o) return any;
   if (o.id === "labcoat" || o.id === "labcoat_patched") {
     labTail(k, o);
@@ -1076,6 +1545,14 @@ export function coatTailClothes(k: Canvas, ctx: LookCtx): boolean {
   }
   if (o.id === "raincoat") {
     rainTail(k, o);
+    return true;
+  }
+  if (o.id === "parka" || o.id === "hazmat_suit") {
+    longCoatTail(k, o);
+    return true;
+  }
+  if (o.id === "forge_mantle") {
+    mantleTail(k, o);
     return true;
   }
   if (o.id === "welding_apron") {
@@ -1109,8 +1586,8 @@ function labTail(k: Canvas, o: Worn): void {
   k.box(18, 0, 1, 18, 0, 2, 0);
   k.set(12, 2, 2, C.grime).set(11, 3, 2, C.grime);
   // Screwdriver in the right hip pocket, handle sticking out.
-  k.box(1, 6, 7, 1, 7, 7, C.steel).box(0, 6, 7, 0, 7, 7, C.safety_yellow);
-  k.set(0, 7, 7, C.paint_black);
+  k.box(1, 6, 8, 1, 7, 8, C.steel).box(0, 6, 8, 0, 7, 8, C.safety_yellow);
+  k.set(0, 7, 8, C.paint_black);
   // Blue nitrile glove poking out of the left hip pocket.
   k.box(18, 6, 8, 19, 7, 8, C.paint_sky).set(19, 5, 8, C.safety_blue).set(19, 6, 9, C.paint_sky);
   if (o.id === "labcoat_patched") {
@@ -1220,5 +1697,69 @@ function skirt(k: Canvas, t: Tone, underCoat: boolean): void {
       12 + (underCoat ? -1 : 1),
       C.steel,
     );
+  });
+}
+
+/** Parka and hazmat suit: a closed skirt below the knee line, flared hem. */
+function longCoatTail(k: Canvas, o: Worn): void {
+  const { main, shade, accent } = o.t;
+  const bottom = o.id === "parka" ? -2 : -4;
+  longSkirt(k, main, shade, bottom, true);
+  k.free(() => {
+    for (let y = bottom; y <= 7; y++) k.set(9, y, 11 + (y <= bottom + 1 ? 1 : 0), shade);
+    k.forEach((x, y, z) => {
+      if (y === bottom + 1) k.set(x, y, z, o.id === "parka" ? accent : shade);
+      if (o.id === "hazmat_suit" && y === 3) k.set(x, y, z, accent);
+      if (o.id === "parka" && y === 3) k.set(x, y, z, shade);
+    });
+    for (const y of [5, 1]) k.set(10, y, 12, accent);
+  });
+}
+
+/** Forge mantle: open, down to the shins, a gold hem and gold front edges. */
+function mantleTail(k: Canvas, o: Worn): void {
+  const { main, shade, accent } = o.t;
+  const bottom = -9;
+  longSkirt(k, main, shade, bottom, false);
+  k.free(() => {
+    k.forEach((x, y, z) => {
+      if (y === bottom) k.set(x, y, z, accent);
+      else if ((x + y * 2 + z) % 9 === 0) k.set(x, y, z, shade);
+    });
+    for (let y = bottom; y <= 7; y++) {
+      const e = y <= bottom + 1 ? 1 : 0;
+      k.set(4 - e, y, 11 + e, accent).set(15 + e, y, 11 + e, accent);
+    }
+  });
+}
+
+/** Evening skirt: a satin tube to mid-calf, flaring, soft folds and a lighter sheen. */
+function gownSkirt(k: Canvas, t: Tone, underCoat: boolean): void {
+  const sheen = lighter(t.main);
+  k.free(() => {
+    for (let y = -8; y <= 7; y++) {
+      const e = underCoat && y > 0 ? 0 : y <= -5 ? 2 : y <= 1 ? 1 : 0;
+      const x0 = 3 - e;
+      const x1 = 16 + e;
+      const z0 = 3 - e;
+      const z1 = 11 + e;
+      for (let x = x0; x <= x1; x++)
+        for (let z = z0; z <= z1; z++) {
+          const edge = x === x0 || x === x1 || z === z0 || z === z1;
+          if (!edge) continue;
+          const corner = (x === x0 || x === x1) && (z === z0 || z === z1);
+          if (corner && y > -6) continue;
+          const u = x === x0 || x === x1 ? z : x;
+          const c =
+            y === -8
+              ? t.shade
+              : u % 4 === 0
+                ? t.shade
+                : u % 4 === 2 && y % 3 === 0
+                  ? sheen
+                  : t.main;
+          k.set(x, y, z, c);
+        }
+    }
   });
 }

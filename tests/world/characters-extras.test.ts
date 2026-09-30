@@ -62,7 +62,8 @@ describe("extra character visuals", () => {
   it("the legacy body keeps Jade's brows", () => {
     const colours = new Set<number>();
     jadeModel().body.grid.forEach((_x, _y, _z, c) => colours.add(c));
-    expect(colours.has(C.wood_red)).toBe(true);
-    expect(colours.has(C.eye_green)).toBe(true);
+    // Light copper brows, green eyes, the silver lids of her make-up.
+    expect(colours.has(C.hair_copper)).toBe(true);
+    expect(colours.has(C.eye_brown)).toBe(true);
   });
 });

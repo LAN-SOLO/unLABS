@@ -448,7 +448,7 @@ export const MERCH_PRODUCTS: readonly MerchProduct[] = [
     id: "hoodie-damien",
     kind: "hoodie",
     name: tr("Resonance Pattern D.F."),
-    blurb: tr("Damien's hologram echo on the back. Always ask why first."),
+    blurb: tr("Damien's echo on the back — a figure in the static. Always ask why first."),
     collection: "crew",
     print: { front: "logo-wide", back: "damien-echo" },
     inks: D,

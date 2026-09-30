@@ -111,11 +111,17 @@ function legacyParts(def: CharacterRigDef): CharacterParts {
       f(p[1] - (LEGACY_SHOULDER - 10 * U)),
       f(p[2] + 1.5 * U),
     ]);
-  // Lids rest inside the skull (hidden), brows are part of the face.
+  // Lids rest inside the skull (hidden), brows are part of the face. Tall
+  // rigs (Damien, 64 voxels) get a taller body so the crown is not cut off —
+  // up to 20 pose units (5.76 world units, under the 6-unit doors).
+  const top = Math.min(
+    LEGACY_HIP + 20 * U,
+    Math.max(...posedVoxels(def).map((v) => Math.ceil(v.p[1]))),
+  );
   const body = bake(
     def,
     ["hips", "torso", "head", "hairBack", "brows"],
-    [LEGACY_WIDTH, 19 * U, 7 * U],
+    [LEGACY_WIDTH, Math.max(19 * U, top - LEGACY_HIP), 7 * U],
     (p) => [f(p[0] + LEGACY_WIDTH / 2), f(p[1] - LEGACY_HIP), f(p[2] + 2 * U)],
   );
   const side = LEGACY_WIDTH / 2 + 0.5 * U;

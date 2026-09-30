@@ -17,6 +17,7 @@ import {
 } from "@/components/world/ui";
 import { CollectionView, howToGet } from "@/components/world/wardrobe/CollectionView";
 import { JadePreview } from "@/components/world/wardrobe/JadePreview";
+import { LooksView } from "@/components/world/wardrobe/LooksView";
 import { ReplicatorView } from "@/components/world/wardrobe/ReplicatorView";
 import { WearIcon } from "@/components/world/wardrobe/WearIcon";
 import { ITEM_BY_ID } from "@/lib/world/content/items";
@@ -48,10 +49,11 @@ import {
 import { WARDROBE_MENU_FLAG } from "@/lib/world/wardrobe-hints";
 import { REPLICATOR_INTRO_FLAG } from "@/lib/world/content/wardrobe";
 
-export type CharacterTab = "wardrobe" | "outfits" | "collection" | "replicator";
+export type CharacterTab = "wardrobe" | "looks" | "outfits" | "collection" | "replicator";
 
 const TABS: { id: CharacterTab; label: string }[] = [
   { id: "wardrobe", label: tr("menuTab::Wardrobe") },
+  { id: "looks", label: tr("Looks") },
   { id: "outfits", label: tr("Outfits") },
   { id: "collection", label: tr("Collection") },
   { id: "replicator", label: tr("Replicator") },
@@ -406,6 +408,10 @@ export function CharacterMenu({
             )}
           </div>
         </div>
+      )}
+
+      {tab === "looks" && (
+        <LooksView api={api} atWardrobe={atWardrobe} turn={turn} onTurn={setTurn} />
       )}
 
       {tab === "outfits" && (

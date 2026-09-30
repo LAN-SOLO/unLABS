@@ -545,7 +545,7 @@ export function thinkQuietly(ink: Ink): string {
   return s;
 }
 
-/** Hoodie: Jade + her goggles, "Cold start" — night shift at 03:27. */
+/** Hoodie: Jade (copper updo, stand-collar shirt), "Cold start" — night shift at 03:27. */
 export function nightShift(ink: Ink): string {
   let s = "";
   s += drawSprite(JADE, ink, 62, 250, 7.6);

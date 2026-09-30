@@ -85,7 +85,7 @@ export interface RigPart {
 }
 
 export interface CharacterRigDef {
-  id: "jade" | "damien" | "damien_holo";
+  id: "jade" | "damien" | "damien_holo" | "damien_veil";
   /** Parents before children. */
   parts: RigPart[];
   /** World units per model voxel. */
@@ -524,10 +524,12 @@ function hairShell(
 // ── Jade Lawrence ───────────────────────────────────────────────
 
 /**
- * Jade Lawrence wearing `look` (content/wardrobe.ts). The default look —
- * lab coat, teal sweater, amber goggles, auburn ponytail — is the original
- * model voxel for voxel. The art lives in models/jade-*.ts (composition:
- * jade-rig.ts, public API: jade-look.ts).
+ * Jade Lawrence wearing `look` (content/wardrobe.ts). Tall and slim (the
+ * parts are fitted in jade-rig.ts; every joint the poses use is unchanged),
+ * pale skin, silver lids with a black winged liner, the copper updo. The
+ * first-day look — stand-collar shirt under the lab coat, no goggles — is
+ * pinned by tests/world/jade-look.test.ts. The art lives in
+ * models/jade-*.ts (composition: jade-rig.ts, public API: jade-look.ts).
  */
 export function jadeRig(look: JadeLook = DEFAULT_LOOK): CharacterRigDef {
   return buildJadeRig(look);
@@ -598,214 +600,378 @@ function forearm(s: ArmStyle, watch: number | null): Model {
 }
 
 // ── Damien Fridge ───────────────────────────────────────────────
+//
+// Reference: tall and heavy-set, older. Grey-blond hair slicked straight
+// back with short undercut sides, tied into a small knot; a long, full,
+// grey beard that ends in a point well below the chin; pale skin; white /
+// silver eyeshadow with black winged liner; a white collared shirt, charcoal
+// trousers, black shoes. No glasses.
+//
+// Build (rig voxels): the skeleton is the shared one (legs 24, hips pivot
+// at row 24), but the torso is two rows taller (18) and wider (18) with a
+// belly that stands proud of the belt, so he tops out at 64 voxels
+// (5.76 world units — the tallest a rig may be under the 6-unit doors) and
+// reads broad from every side. Large parts are hollowed (`hollow`) so they
+// stay inside the per-part voxel budget.
+//
+// In the game he is never shown like this until he has been found (see
+// lib/world/damien.ts): the echo, scenes and screens use the veiled
+// transform from models/veil.ts.
 
 const DAMIEN_OUTFIT: Outfit = {
-  pants: C.fabric_gray,
-  fold: C.concrete_dark,
-  gap: C.pants_dark,
+  pants: C.fabric_gray_shade,
+  fold: C.pants_dark,
+  gap: C.paint_black,
   boot: C.leather_black,
   bootDark: C.paint_black,
   sole: C.rubber,
-  lace: C.leather,
+  lace: C.paint_black,
 };
 
-/** Hips (w16 h6 d10): grey trousers, a brown leather belt, a notebook in the back pocket. */
-function damienHips(): Model {
-  const m = new Model(16, 6, 10);
-  m.box(0, 0, 0, 15, 3, 9, C.fabric_gray);
-  roundEdges(m, 0, 15, 0, 9, 0, 3);
-  m.box(0, 2, 0, 15, 3, 9, C.leather);
-  roundEdges(m, 0, 15, 0, 9, 2, 3);
-  m.box(6, 2, 9, 9, 3, 9, C.brass).box(7, 2, 9, 8, 3, 9, C.leather_worn);
-  m.set(2, 3, 9, C.walnut).set(13, 3, 9, C.walnut).set(2, 3, 0, C.walnut).set(13, 3, 0, C.walnut);
-  m.box(7, 0, 9, 7, 1, 9, C.concrete_dark);
-  m.box(2, 4, 2, 13, 5, 7, C.white);
-  // Notebook in the back pocket, a pencil clipped to it.
-  m.box(10, 0, 0, 13, 1, 0, C.fabric_gray_shade);
-  m.box(10, 1, 0, 12, 2, 0, C.paper_yellow)
-    .set(13, 2, 0, C.paper_yellow)
-    .set(11, 2, 0, C.paint_black);
+/** Torso width / height (rig voxels). */
+const DAMIEN_TORSO_W = 18;
+const DAMIEN_TORSO_H = 18;
+/** Rows of beard that hang below the head volume (the head model grows downwards). */
+const DAMIEN_BEARD = 9;
+/** The head volume sits one voxel deep in its model (room for the hair knot at the back). */
+const DAMIEN_HEAD_DZ = 1;
+
+/** Remove voxels whose 26 neighbours are all solid (the shell still hides the inside). */
+function hollow(m: Model): Model {
+  const g = m.grid;
+  const inner: [number, number, number][] = [];
+  g.forEach((x, y, z) => {
+    for (let dz = -1; dz <= 1; dz++)
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) if (!g.get(x + dx, y + dy, z + dz)) return;
+    inner.push([x, y, z]);
+  });
+  for (const [x, y, z] of inner) m.set(x, y, z, 0);
   return m;
+}
+
+/** Frontmost solid z of column (x, y), or -1. */
+function frontZ(m: Model, x: number, y: number): number {
+  for (let z = m.d - 1; z >= 0; z--) if (m.grid.get(x, y, z)) return z;
+  return -1;
+}
+
+/** Paint the front surface voxel of column (x, y). */
+function paintFront(m: Model, x: number, y: number, c: number): void {
+  const z = frontZ(m, x, y);
+  if (z >= 0) m.set(x, y, z, c);
+}
+
+/** Fill one rounded-rectangle row of a body (x centred on `cx`, z from `zb` to `zf`). */
+function bodyRow(
+  m: Model,
+  y: number,
+  cx: number,
+  hw: number,
+  zb: number,
+  zf: number,
+  r: number,
+  c: number,
+): void {
+  const cz = (zb + zf) / 2;
+  const hd = (zf - zb) / 2;
+  for (let z = 0; z < m.d; z++)
+    for (let x = 0; x < m.w; x++) {
+      const dx = Math.max(0, Math.abs(x + 0.5 - cx) - (hw - r));
+      const dz = Math.max(0, Math.abs(z + 0.5 - cz) - (hd - r));
+      if (dx * dx + dz * dz <= r * r + 0.01) m.set(x, y, z, c);
+    }
 }
 
 /**
- * Torso (w16 h16 d12): brown waistcoat over a white shirt with an open
- * collar, brass buttons, welt pockets with a pocket-watch chain and a pen,
- * the back strap with its buckle.
+ * Hips (w18 h6 d12): charcoal trousers, a black belt with a steel buckle
+ * half hidden under the belly, back pockets. Rows 4..5 plug into the torso.
+ */
+function damienHips(): Model {
+  const m = new Model(DAMIEN_TORSO_W, 6, 12);
+  const cx = DAMIEN_TORSO_W / 2;
+  for (let y = 0; y <= 5; y++) {
+    const zf = y === 0 ? 9.5 : y === 1 ? 10.5 : 11.2;
+    bodyRow(m, y, cx, y === 0 ? 8.2 : 8.6, y === 0 ? 1 : 0.5, zf, 2.5, C.fabric_gray_shade);
+  }
+  // Belt with loops, the buckle under the overhang.
+  for (let y = 2; y <= 3; y++)
+    m.grid.forEach((x, yy, z) => {
+      if (yy === y) m.set(x, yy, z, C.leather_black);
+    });
+  for (const x of [3, 14]) paintFront(m, x, 2, C.fabric_gray_shade);
+  for (const x of [8, 9]) {
+    paintFront(m, x, 2, C.chrome);
+    paintFront(m, x, 3, C.chrome);
+  }
+  // Fly seam, back pockets, side seams.
+  paintFront(m, 9, 0, C.pants_dark);
+  paintFront(m, 9, 1, C.pants_dark);
+  for (const x of [3, 4, 5, 12, 13, 14]) {
+    tint(m, x, 1, 0, C.pants_dark);
+    tint(m, x, 1, 1, C.pants_dark);
+  }
+  tint(m, 0, 0, 5, C.pants_dark);
+  tint(m, 0, 1, 5, C.pants_dark);
+  tint(m, DAMIEN_TORSO_W - 1, 0, 5, C.pants_dark);
+  tint(m, DAMIEN_TORSO_W - 1, 1, 5, C.pants_dark);
+  return hollow(m);
+}
+
+/**
+ * Torso (w18 h18 d14): a white collared shirt over a broad chest and a
+ * round belly. Open collar with points, a button placket, a chest pocket
+ * with a pen, strain folds over the belly, the yoke seam and a box pleat
+ * at the back.
  */
 function damienTorso(): Model {
-  const m = new Model(16, 16, 12);
-  m.box(0, 0, 0, 15, 15, 9, C.vest_brown);
-  roundEdges(m, 0, 15, 0, 9, 0, 15);
-  m.box(0, 15, 0, 1, 15, 9, 0).box(14, 15, 0, 15, 15, 9, 0);
-  m.box(0, 14, 0, 0, 14, 9, 0).box(15, 14, 0, 15, 14, 9, 0);
-  // White shirt: shoulders and armholes, the open collar V with points.
-  m.box(1, 13, 0, 3, 15, 9, C.white).box(12, 13, 0, 14, 15, 9, C.white);
-  m.box(0, 11, 1, 0, 13, 8, C.white).box(15, 11, 1, 15, 13, 8, C.white);
-  for (let y = 7; y <= 15; y++) {
-    const half = y <= 10 ? 1 : y <= 12 ? 2 : 3;
-    m.box(8 - half, y, 9, 7 + half, y, 9, C.white);
+  const W = DAMIEN_TORSO_W;
+  const m = new Model(W, DAMIEN_TORSO_H, 14);
+  const cx = W / 2;
+  // [half width, back z, front z, corner radius] per row.
+  const row = (y: number): [number, number, number, number] => {
+    if (y <= 1) return [8.6, 0.5, 11.2 + y * 0.6, 2.5];
+    if (y <= 8) {
+      // The belly: deepest at rows 4..6.
+      const bulge = [0, 0, 12.2, 12.8, 13.2, 13.3, 13.2, 12.8, 12.2][y]!;
+      return [9, 0, bulge, 3];
+    }
+    if (y <= 13) return [9, 0, y <= 10 ? 11.8 : 11.6, 2.5];
+    if (y <= 15) return [9, 0.2, 11.2, 2];
+    if (y === 16) return [8.6, 0.6, 10.6, 2.2];
+    return [7.4, 1.2, 9.8, 2.6];
+  };
+  for (let y = 0; y < DAMIEN_TORSO_H; y++) {
+    const [hw, zb, zf, r] = row(y);
+    bodyRow(m, y, cx, hw, zb, zf, r, C.white);
   }
-  m.box(6, 13, 9, 9, 15, 9, C.skin).set(7, 15, 9, C.skin_shadow).set(8, 14, 9, C.skin_shadow);
-  m.box(4, 14, 10, 5, 15, 10, C.white).box(10, 14, 10, 11, 15, 10, C.white);
-  m.set(5, 13, 10, C.coat_shadow).set(10, 13, 10, C.coat_shadow);
-  m.set(6, 12, 9, C.coat_shadow).set(9, 12, 9, C.coat_shadow);
-  // Waistcoat: button line, brass buttons, points at the hem, welt pockets.
-  for (let y = 0; y <= 6; y++) m.set(8, y, 9, C.wood_dark);
-  for (const y of [1, 3, 5]) m.set(7, y, 10, C.brass);
-  m.box(6, 0, 9, 9, 0, 9, 0).set(7, 0, 9, C.vest_brown).set(8, 0, 9, C.vest_brown);
-  m.box(2, 4, 9, 5, 4, 9, C.walnut).box(10, 4, 9, 13, 4, 9, C.walnut);
-  // Pocket-watch chain from the right pocket to a button, a pen clip and pencil in the left.
-  for (let x = 8; x <= 12; x++) m.set(x, x % 2 ? 4 : 3, 10, C.gold);
-  m.set(12, 5, 10, C.gold);
-  m.box(3, 5, 10, 3, 6, 10, C.chrome).box(4, 5, 10, 4, 7, 10, C.paper_yellow);
-  // Back: the strap with a brass buckle, a centre seam.
-  m.box(2, 4, 0, 13, 4, 0, C.wood_dark);
-  m.box(7, 4, 0, 8, 4, 0, C.brass);
-  m.box(7, 5, 0, 8, 12, 0, C.walnut);
-  // Folds.
-  for (const [y, z] of [
-    [9, 3],
-    [7, 5],
-  ] as const) {
-    tint(m, 0, y, z, C.wood_dark);
-    tint(m, 15, y, z, C.wood_dark);
+  // Soft side shading and the underside of the belly.
+  m.grid.forEach((x, y, z) => {
+    if ((x === 0 || x === W - 1) && (y + z) % 3 === 0) m.set(x, y, z, C.coat_shadow);
+  });
+  for (let x = 2; x < W - 2; x++) paintFront(m, x, 1, C.coat_shadow);
+  for (let x = 3; x < W - 3; x += 2) paintFront(m, x, 2, C.tile_white);
+  // Placket down the centre with buttons; strain folds pull from them.
+  for (let y = 1; y <= 14; y++) paintFront(m, 9, y, C.tile_white);
+  for (const y of [2, 5, 8, 11]) paintFront(m, 9, y, C.coat_shadow);
+  for (const [x, y] of [
+    [7, 4],
+    [6, 5],
+    [11, 4],
+    [12, 5],
+    [7, 7],
+    [11, 7],
+    [5, 3],
+    [13, 6],
+  ] as const)
+    paintFront(m, x, y, C.tile_white);
+  // Open collar: skin in the V, points lying on the chest, the stand at the neck.
+  for (let y = 14; y <= 17; y++) {
+    const half = y - 14;
+    for (let x = 9 - half; x <= 8 + half; x++) paintFront(m, x, y, C.skin_light);
   }
-  return m;
+  for (let y = 12; y <= 15; y++) {
+    const off = 15 - y;
+    for (const x of [6 + off, 11 - off]) {
+      const z = frontZ(m, x, y);
+      if (z >= 0) m.set(x, y, z + 1, C.white);
+    }
+  }
+  paintFront(m, 6, 12, C.coat_shadow);
+  paintFront(m, 11, 12, C.coat_shadow);
+  m.box(5, 17, 2, 12, 17, 3, C.white).box(5, 17, 3, 5, 17, 7, C.white);
+  m.box(12, 17, 3, 12, 17, 7, C.white);
+  // Chest pocket on his left (+x) with a pen clipped in it.
+  for (let x = 12; x <= 15; x++) paintFront(m, x, 9, C.coat_shadow);
+  for (const x of [12, 15]) {
+    paintFront(m, x, 10, C.coat_shadow);
+    paintFront(m, x, 11, C.coat_shadow);
+  }
+  paintFront(m, 14, 11, C.paint_black);
+  paintFront(m, 14, 12, C.chrome);
+  // Back: yoke seam, box pleat, a crease where the shirt tucks in.
+  for (let x = 1; x < W - 1; x++) tint(m, x, 14, 0, C.coat_shadow);
+  for (let y = 3; y <= 13; y++) {
+    tint(m, 8, y, 0, C.tile_white);
+    tint(m, 10, y, 0, C.tile_white);
+  }
+  for (let x = 2; x < W - 2; x += 3) tint(m, x, 1, 0, C.coat_shadow);
+  return hollow(m);
 }
 
-/** Face mask for Damien's hair and beard: high forehead, full beard. */
+/** Shell mask: where the head volume stays skin (no hair volume is added). */
 function damienFace(x: number, y: number, z: number): boolean {
   if (y <= 1) return true;
-  if (y >= 15) return false;
-  if (y === 14) return z >= 12 && x >= 4 && x <= 9;
-  if (x <= 1 || x >= 12) return false;
-  return z >= 9;
+  // Slicked-back top: the hairline sits high above the forehead.
+  if (y >= 16) return false;
+  if (y >= 15) return z >= 13 && x >= 4 && x <= 9;
+  if (y >= 12) return z >= 10;
+  // Back of the head above the nape: the hair sweeps down into the knot.
+  if (y >= 9 && z <= 6 && x >= 3 && x <= 10) return false;
+  // Everything else is skin; the undercut sides are painted as stubble.
+  return true;
 }
 
+/** Grey-blond strands combed straight back (lines along z, broken every few voxels). */
+function damienHairColor(x: number, y: number, z: number): number {
+  const n = hash01(x * 13 + (y >= 16 ? 5 : 0), Math.floor(z / 4) + (x % 2) * 7);
+  if (n < 0.24) return C.beige;
+  if (n > 0.86) return C.paint_gray;
+  if (n > 0.62) return C.hair_gray;
+  return C.tile_cream_dk;
+}
+
+/** Mixed grey / white beard strands running downwards. */
+function damienBeardColor(x: number, y: number, z: number): number {
+  const n = hash01(x * 7 + z * 3, Math.floor((y + 40) / 3));
+  if (n < 0.1) return C.paint_white;
+  if (n < 0.24) return C.coat_shadow;
+  if (n < 0.44) return C.paint_gray_lt;
+  if (n > 0.84) return C.paint_gray;
+  return C.hair_gray;
+}
+
+/**
+ * Head (w14 h27 d17): the shared head volume (rows 0..17 → model rows
+ * 9..26, one voxel deep for the knot), slicked-back hair with a small knot,
+ * undercut sides, pale skin, winged liner under white / silver shadow, a
+ * long nose, and the beard — full over the jaw, then hanging nine rows
+ * below the chin to a point, lying on the shirt.
+ */
 function damienHead(): Model {
-  const H = C.hair_gray;
-  const HL = C.white;
-  const HD = C.paint_gray;
-  const m = headVolume(C.skin, C.skin_shadow);
-  hairShell(m, damienFace, (x, y, z) => {
-    const n = hash01(x * 11 + z * 5, Math.floor((y + z) / 2));
-    return n < 0.2 ? HL : n > 0.8 ? HD : H;
+  const base = headVolume(C.skin_light, C.skin);
+  hairShell(base, damienFace, damienHairColor);
+  capHead(base);
+  // Undercut: short stubble on the sides and the nape (no volume).
+  base.grid.forEach((x, y, z, v) => {
+    if (y < 5 || y > 12 || v !== C.skin_light) return;
+    const side = x <= 2 || x >= 11;
+    const nape = z <= 4;
+    if (!side && !nape) return;
+    if (side && z >= 9) return; // temples and cheeks stay skin
+    const n = hash01(x * 5 + z, y);
+    base.set(x, y, z, n < 0.45 ? C.paint_gray_lt : n < 0.8 ? C.hair_gray : C.skin);
   });
-  capHead(m);
-  // Full beard: jaw, chin, cheeks up to the ears, a moustache over the mouth.
-  const beard = (x: number, y: number, z: number): number => {
-    const s = (x * 3 + y * 5 + z) % 5;
-    return s === 0 ? HL : s === 2 ? HD : H;
-  };
-  m.grid.forEach((x, y, z) => {
-    if (y > 6 || y < 2) return;
-    const cheek = y >= 5 && (x <= 3 || x >= 10);
-    const jaw = y <= 4;
-    if ((cheek || jaw) && !(y >= 3 && y <= 4 && x >= 5 && x <= 8 && z >= 12))
-      m.set(x, y, z, beard(x, y, z));
+  // Ears (skin, a shadow in the bowl), set into the undercut.
+  base.box(1, 7, 6, 1, 10, 7, C.skin_light).set(1, 8, 6, C.skin).set(1, 9, 7, C.skin);
+  base.box(12, 7, 6, 12, 10, 7, C.skin_light).set(12, 8, 6, C.skin).set(12, 9, 7, C.skin);
+  // Beard over the jaw and cheeks (rows 2..6), fuller than the chin under it.
+  base.grid.forEach((x, y, z) => {
+    if (y < 2 || y > 6 || z < 6) return;
+    const cheek = y >= 5 ? x <= 3 || x >= 10 : true;
+    if (!cheek) return;
+    if (y >= 3 && y <= 4 && x >= 5 && x <= 8 && z >= 12) return; // mouth area, painted below
+    base.set(x, y, z, damienBeardColor(x, y, z));
   });
-  m.box(4, 1, 11, 9, 1, 13, H).box(5, 0, 11, 8, 0, 12, HD);
-  m.box(4, 2, 14, 9, 2, 14, H).set(6, 1, 14, HL).set(7, 1, 14, H);
-  // Mouth under the moustache.
-  m.box(5, 4, 13, 8, 4, 13, H).set(4, 4, 13, HD).set(9, 4, 13, HD);
-  m.box(6, 3, 13, 7, 3, 13, C.lips);
-  m.set(5, 3, 13, beard(5, 3, 13)).set(8, 3, 13, beard(8, 3, 13));
-  // Nose.
-  m.box(6, 5, 14, 7, 7, 14, C.skin).set(6, 5, 14, C.skin_shadow).set(7, 5, 14, C.skin_shadow);
-  m.set(6, 7, 14, C.skin_light);
-  // Eyes (dark, kind) behind round glasses.
-  const eyes: readonly string[] = ["LLLL..LLLL", "WPPW..WPPW", "sWWs..sWWs"];
+  for (let y = 2; y <= 5; y++)
+    for (let x = 2; x <= 11; x++) {
+      const z = frontZ(base, x, y);
+      if (z >= 10 && z < 15 && !(y >= 3 && y <= 4 && x >= 5 && x <= 8))
+        base.set(x, y, z + 1, damienBeardColor(x, y, z + 1));
+    }
+  // Moustache: full over the mouth, darker at the corners where it runs into the beard.
+  base.box(4, 5, 13, 9, 5, 14, C.hair_gray);
+  base.set(5, 5, 14, C.paint_white).set(8, 5, 14, C.coat_shadow);
+  for (const x of [4, 9]) base.box(x, 3, 14, x, 5, 14, C.paint_gray_dk);
+  base.set(3, 4, 14, C.paint_gray_dk).set(10, 4, 14, C.paint_gray_dk);
+  // Mouth: a thin, level line half hidden by the moustache.
+  base.box(4, 4, 14, 9, 4, 14, C.hair_gray).set(6, 4, 14, C.paint_gray_lt);
+  base.box(5, 4, 13, 8, 4, 13, C.skin_shadow);
+  base.set(6, 3, 13, C.lips).set(7, 3, 13, C.skin_shadow);
+  base.set(5, 3, 13, damienBeardColor(5, 3, 13)).set(8, 3, 13, damienBeardColor(8, 3, 13));
+  // Long, straight nose.
+  base.box(6, 5, 14, 7, 8, 14, C.skin_light);
+  base.set(6, 5, 14, C.skin_shadow).set(7, 5, 14, C.skin_shadow);
+  base.box(6, 6, 15, 7, 6, 15, C.skin_light).set(7, 6, 15, C.skin);
+  base.set(6, 8, 14, C.skin).set(7, 9, 14, C.skin_light);
+  // Eyes: silver-white shadow (row 11), black liner along the lid with a
+  // wing flicking up and out (rows 10..11), the eye (rows 8..9).
+  const eyes: readonly string[] = ["KSSs..sSSK", "SKKK..KKKS", "WPPW..WPPW", "kWWs..sWWk"];
   const pal: Record<string, number> = {
-    L: C.skin_shadow,
+    K: C.hair_black,
+    S: C.paint_white,
     W: C.eye_white,
-    P: C.hair_black,
-    s: C.skin_shadow,
+    P: C.paint_navy,
+    k: C.paint_gray_dk,
+    s: C.skin,
   };
-  eyes.forEach((row, r) => {
-    const y = 10 - r;
-    for (let k = 0; k < row.length; k++) {
-      const c = pal[row[k]!];
+  eyes.forEach((rowS, r) => {
+    const y = 11 - r;
+    for (let k = 0; k < rowS.length; k++) {
+      const c = pal[rowS[k]!];
       if (!c) continue;
       const x = 2 + k;
-      m.set(x, y, m.grid.get(x, y, 13) ? 13 : 12, c);
+      base.set(x, y, base.grid.get(x, y, 13) ? 13 : 12, c);
     }
   });
-  // Round glasses: rims one voxel proud, glass lenses, bridge, arms to the ears.
-  for (const x0 of [1, 7]) {
-    for (const [dx, dy] of [
-      [1, -1],
-      [2, -1],
-      [3, -1],
-      [4, -1],
-      [0, 0],
-      [5, 0],
-      [0, 1],
-      [5, 1],
-      [1, 2],
-      [2, 2],
-      [3, 2],
-      [4, 2],
-    ] as const)
-      m.set(x0 + dx, 8 + dy, 14, C.paint_black);
-    m.box(x0 + 1, 8, 14, x0 + 4, 9, 14, C.glass);
+  // Pupils: a dark core on the inner voxel of each iris.
+  base.set(4, 9, 13, C.hair_black).set(9, 9, 13, C.hair_black);
+  // The wings wrap round onto the side of the face.
+  for (const x of [2, 11]) base.set(x, 11, 11, C.hair_black).set(x, 12, 11, C.hair_black);
+  // Forehead lines and the cheek shadow of a heavy face.
+  base.box(4, 14, 13, 5, 14, 13, C.skin).box(8, 14, 13, 9, 14, 13, C.skin);
+  base.set(3, 7, 13, C.skin).set(10, 7, 13, C.skin);
+  // Hair knot at the back: a small bun behind a black tie.
+  base.box(5, 10, 1, 8, 12, 1, C.leather_black);
+  base.set(5, 10, 1, damienHairColor(5, 10, 1)).set(8, 12, 1, damienHairColor(8, 12, 1));
+
+  // Into the tall model: the volume moves up by DAMIEN_BEARD rows.
+  const B = DAMIEN_BEARD;
+  const dz = DAMIEN_HEAD_DZ;
+  const m = new Model(base.w, base.h + B, base.d + dz);
+  base.grid.forEach((x, y, z, v) => m.set(x, y + B, z + dz, v));
+  // The knot itself, behind the tie.
+  m.box(5, B + 10, 0, 8, B + 12, 1, C.tile_cream_dk);
+  m.set(5, B + 10, 0, 0)
+    .set(8, B + 12, 0, 0)
+    .set(5, B + 12, 0, 0)
+    .set(8, B + 10, 0, 0);
+  m.set(6, B + 11, 0, C.beige)
+    .set(7, B + 10, 0, C.hair_gray)
+    .set(6, B + 12, 1, C.hair_gray);
+  // The hanging beard: rows 1 .. -(B-1) in head-volume rows, narrowing to a point.
+  for (let hy = 1; hy >= 1 - (B - 1); hy--) {
+    const k = 1 - hy; // 0 at the chin
+    const hw = k < 6 ? 5.4 - k * 0.3 : Math.max(0.6, 3.6 - (k - 5) * 0.9);
+    const zb = k <= 1 ? 11 : 12.4; // tucked under the chin, then lying on the shirt
+    const zf = 15.4 - Math.max(0, k - 5) * 0.35;
+    for (let x = 0; x < base.w; x++) {
+      if (Math.abs(x + 0.5 - 7) > hw) continue;
+      for (let z = Math.ceil(zb); z <= Math.floor(zf); z++)
+        m.set(x, hy + B, z + dz, damienBeardColor(x, hy, z));
+    }
   }
-  m.box(6, 9, 14, 7, 9, 14, C.paint_black);
-  for (let z = 6; z <= 13; z++) {
-    m.set(0, 9, z, C.paint_black).set(13, 9, z, C.paint_black);
-  }
-  // Ears.
-  m.box(1, 7, 5, 1, 9, 6, C.skin).set(1, 8, 5, C.skin_shadow);
-  m.box(12, 7, 5, 12, 9, 6, C.skin).set(12, 8, 5, C.skin_shadow);
-  // Forehead lines.
-  m.box(4, 13, 13, 5, 13, 13, C.skin_shadow).box(8, 13, 13, 9, 13, 13, C.skin_shadow);
-  return m;
+  return hollow(m);
 }
 
-/** Bushy grey brows with white tufts that curl over the glasses (w10 h2 d2). */
+/** Pale grey-blond brows, the right one lower, the left one lifted — sceptical (w10 h2 d2). */
 function damienBrows(): Model {
   const m = new Model(10, 2, 2);
-  m.box(0, 0, 0, 3, 1, 0, C.hair_gray).box(6, 0, 0, 9, 1, 0, C.hair_gray);
-  m.set(0, 1, 0, 0).set(9, 1, 0, 0);
-  m.box(0, 0, 1, 2, 0, 1, C.white).box(7, 0, 1, 9, 0, 1, C.white);
-  m.set(3, 1, 1, C.paint_gray).set(6, 1, 1, C.paint_gray);
+  // Right brow (x 0..3): level and low, heavier at the inner end.
+  m.box(0, 0, 0, 3, 0, 0, C.hair_gray).set(3, 1, 0, C.paint_gray).set(0, 0, 1, C.tile_cream_dk);
+  // Left brow (x 6..9): arched up at the outer end.
+  m.box(6, 0, 0, 7, 0, 0, C.hair_gray).box(8, 1, 0, 9, 1, 0, C.hair_gray);
+  m.set(9, 1, 1, C.tile_cream_dk).set(6, 0, 1, C.paint_gray);
   return m;
 }
 
 const DAMIEN_ARMS: ArmStyle = {
   sleeve: C.white,
   shade: C.coat_shadow,
-  cuff: C.coat_shadow,
-  wrist: C.skin,
-  wristShade: C.skin_shadow,
-  skin: C.skin,
-  skinShade: C.skin_shadow,
+  cuff: C.tile_white,
+  wrist: C.skin_light,
+  wristShade: C.skin,
+  skin: C.skin_light,
+  skinShade: C.skin,
 };
 
-/** Rolled shirt sleeves: the forearm below the roll is bare skin with a watch on the left. */
+/** Long white shirt sleeves with buttoned cuffs; the watch (it stopped at 03:40:09) on the left. */
 function damienArms(): [Model, Model, Model] {
   const up = upperArm(DAMIEN_ARMS, false);
-  const fore = (watch: boolean): Model => {
-    const f = forearm(DAMIEN_ARMS, null);
-    // Sleeve rolled up to the elbow: the roll at rows 8..9, skin below.
-    f.box(0, 6, 0, 5, 7, 5, 0);
-    f.box(1, 6, 1, 4, 7, 4, C.skin);
-    f.set(1, 6, 2, C.skin_shadow).set(4, 7, 3, C.skin_shadow);
-    f.box(0, 8, 0, 5, 9, 5, C.white);
-    roundEdges(f, 0, 5, 0, 5, 8, 9);
-    for (let k = 1; k <= 4; k++) {
-      tint(f, 0, 8, k, C.coat_shadow);
-      tint(f, 5, 8, k, C.coat_shadow);
-      tint(f, k, 8, 0, C.coat_shadow);
-      tint(f, k, 8, 5, C.coat_shadow);
-    }
-    if (watch) {
-      f.box(1, 4, 1, 4, 4, 4, C.leather_black);
-      f.box(1, 4, 2, 1, 4, 3, C.gold).set(1, 5, 2, C.gold);
-    }
-    return f;
-  };
-  return [up, fore(false), mirrorX(fore(true))];
+  const right = forearm(DAMIEN_ARMS, null);
+  const left = forearm(DAMIEN_ARMS, C.gold);
+  for (const f of [right, left]) tint(f, 1, 6, 3, C.coat_shadow);
+  return [up, right, mirrorX(left)];
 }
 
 const HOLO_BRIGHT = new Set<number>([
@@ -821,6 +987,12 @@ const HOLO_BRIGHT = new Set<number>([
   C.eye_white,
   C.coat_shadow,
   C.paint_gray,
+  C.paint_white,
+  C.tile_white,
+  C.beige,
+  C.tile_cream_dk,
+  C.paint_gray_lt,
+  C.chrome,
 ]);
 
 /** Glass-class hologram colour for a solid colour index. */
@@ -833,37 +1005,55 @@ export function isScanlineGap(worldRow: number): boolean {
   return ((worldRow % 4) + 4) % 4 === 3;
 }
 
-/** Damien Fridge: gray hair and beard, round glasses, brown vest, rolled sleeves, watch. */
+/**
+ * Damien Fridge, fully authored (see the reference notes above). `hologram`
+ * recolours him into glass classes with scanline gaps — that is his echo
+ * once he has been found. Until then the game only ever shows him veiled
+ * (`veilRig` / `damienFigureRigs` in models/veil.ts).
+ */
 export function damienRig(hologram: boolean): CharacterRigDef {
   const s = CHARACTER_SCALE;
+  const W = DAMIEN_TORSO_W;
   const [up, foreR, foreL] = damienArms();
+  const face = faceParts(damienBrows(), C.paint_white, C.hair_black, s).map(
+    (p): RigPart => ({
+      ...p,
+      // The head volume sits DAMIEN_BEARD rows up and one voxel deep in its model;
+      // his brows ride one row higher (the shadow and the wing sit under them).
+      pivot: [
+        p.pivot[0],
+        p.pivot[1] + DAMIEN_BEARD + (p.name === "brows" ? 1 : 0),
+        p.pivot[2] + DAMIEN_HEAD_DZ,
+      ],
+    }),
+  );
   const parts: RigPart[] = [
     {
       name: "hips",
       model: damienHips(),
       parent: null,
       pivot: [0, HIP_Y, 0],
-      origin: [8, 0, 5],
+      origin: [W / 2, 0, 5],
       scale: s,
     },
     {
       name: "torso",
       model: damienTorso(),
       parent: "hips",
-      pivot: [8, 4, 5],
-      origin: [8, 0, 5],
+      pivot: [W / 2, 4, 5],
+      origin: [W / 2, 0, 5],
       scale: s,
     },
     {
       name: "head",
       model: damienHead(),
       parent: "torso",
-      pivot: [8, 16, 5],
-      origin: [7, 0, 7],
+      pivot: [W / 2, DAMIEN_TORSO_H, 5],
+      origin: [7, DAMIEN_BEARD, 6 + DAMIEN_HEAD_DZ],
       scale: s,
     },
-    ...faceParts(damienBrows(), C.skin_shadow, C.hair_gray, s),
-    ...limbs(up, foreR, DAMIEN_OUTFIT, 16, 16, 15, s, foreL),
+    ...face,
+    ...limbs(up, foreR, DAMIEN_OUTFIT, W, W, DAMIEN_TORSO_H - 1, s, foreL),
   ];
   const def: CharacterRigDef = {
     id: "damien",
@@ -878,9 +1068,9 @@ export function damienRig(hologram: boolean): CharacterRigDef {
   const holoParts = parts.map((p) => {
     const baseY = rest.get(p.name)![1];
     // Face parts are too thin to survive a scanline cut: they stay whole.
-    const face = p.name === "brows" || p.name === "lids";
+    const facePart = p.name === "brows" || p.name === "lids";
     const model = recolor(p.model, (v, _x, y) =>
-      !face && isScanlineGap(Math.floor(baseY + y + 0.5)) ? 0 : holoColor(v),
+      !facePart && isScanlineGap(Math.floor(baseY + y + 0.5)) ? 0 : holoColor(v),
     );
     return { ...p, model };
   });

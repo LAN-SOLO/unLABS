@@ -74,8 +74,10 @@ describe("equipping", () => {
     expect(s.wardrobe.look.top).toEqual({ item: "turtleneck", colorway: "navy" });
     // Gear and accessories change anywhere.
     expect(equip(s, "face", "safety_glasses", undefined, false)).toBe(true);
-    expect(equip(s, "head", null, undefined, false)).toBe(true);
+    // No goggles on the first day — they are an accessory she can put on anywhere.
     expect(s.wardrobe.look.head).toBeNull();
+    expect(equip(s, "head", "goggles_amber", undefined, false)).toBe(true);
+    expect(s.wardrobe.look.head).toEqual({ item: "goggles_amber", colorway: "amber" });
     expect(s.counters.wear_changes).toBe(3);
   });
 
@@ -90,7 +92,7 @@ describe("equipping", () => {
 
   it("does not count putting on what is already worn", () => {
     const s = initialState();
-    expect(equip(s, "top", "sweater_teal", "teal", true)).toBe(false);
+    expect(equip(s, "top", "shirt_collar_geo", "white", true)).toBe(false);
     expect(s.counters.wear_changes ?? 0).toBe(0);
   });
 
@@ -267,7 +269,7 @@ describe("finds and rewards", () => {
     s.counters.slices = 10;
     s.flags.studio_open = true;
     const got = wardrobeTick(s).rewards;
-    expect(got.sort()).toEqual(["hair_undercut", "headphones"]);
+    expect(got.sort()).toEqual(["gig_bag", "hair_undercut", "headphones"]);
     expect(syncWearRewards(s)).toEqual([]);
   });
 });

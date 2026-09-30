@@ -209,8 +209,8 @@ export const DE_DECOR: Record<string, string> = {
   "The bus now pulses in time with the Energy Core. With every pulse the air tastes a little of ozone.":
     "Der Bus pulsiert jetzt im Takt des Energy Core. Bei jedem Puls schmeckt die Luft ein wenig nach Ozon.",
   "Photo from Cottbus": "Foto aus Cottbus",
-  "Cottbus, winter 1989. Two people on a staircase, bundled up, one of them laughing too early. We talked for fourteen hours, until the heating went off at midnight.":
-    "Cottbus, Winter 1989. Zwei Leute auf einer Treppe, dick eingepackt, einer lacht zu früh. Wir haben vierzehn Stunden geredet, bis um Mitternacht die Heizung ausging.",
+  "Cottbus, winter 1989. Two people on a staircase, bundled up, one of them laughing too early. We talked for fourteen hours, until the heating went off at midnight. His half of the print has bleached out, as if the light went straight through him — all that's left is the white of his shirt and that beard he already swore he'd never shave.":
+    "Cottbus, Winter 1989. Zwei Leute auf einer Treppe, dick eingepackt, einer lacht zu früh. Wir haben vierzehn Stunden geredet, bis um Mitternacht die Heizung ausging. Seine Hälfte des Abzugs ist ausgeblichen, als wäre das Licht durch ihn hindurchgegangen — übrig sind nur das Weiß seines Hemds und dieser Bart, von dem er damals schon schwor, ihn nie abzurasieren.",
   "On the back, in his handwriting: “Room 214. Slide seven. You were right.”":
     "Auf der Rückseite, in seiner Schrift: »Raum 214. Folie sieben. Du hattest recht.«",
   "I know now what he was thinking in that moment. He wrote it down. He kept it in a drawer for 15 years.":

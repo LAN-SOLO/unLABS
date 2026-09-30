@@ -170,6 +170,62 @@ export class Canvas {
   }
 }
 
+// ── Body fit (tall and slim) ────────────────────────────────────
+
+/**
+ * How a painted part is reshaped into Jade's tall, slim build: the art is
+ * drawn at the classic part sizes, then whole columns / layers are dropped
+ * (narrower shoulders and hips, slimmer arms) and rows are doubled (a
+ * higher waist). Nearest-neighbour resampling, so every piece keeps its
+ * details; joints move with `fitPoint`.
+ */
+export interface Fit {
+  /** Columns (x) removed. */
+  dropX?: readonly number[];
+  /** Layers (z) removed. */
+  dropZ?: readonly number[];
+  /** Rows (y) shown twice. */
+  dupY?: readonly number[];
+  /** Rows (y) removed. */
+  dropY?: readonly number[];
+}
+
+const below = (list: readonly number[] | undefined, c: number): number =>
+  list ? list.filter((r) => r < c).length : 0;
+
+/** A joint / origin (corner coordinates) of a part after its fit. */
+export function fitPoint(f: Fit, p: V3): V3 {
+  return [
+    p[0] - below(f.dropX, p[0]),
+    p[1] + below(f.dupY, p[1]) - below(f.dropY, p[1]),
+    p[2] - below(f.dropZ, p[2]),
+  ];
+}
+
+/** The canvas reshaped by `f` (nominal size follows; unbounded drawing keeps its offsets). */
+export function fitCanvas(k: Canvas, f: Fit): Canvas {
+  const inW = (list: readonly number[] | undefined, n: number) =>
+    list ? list.filter((r) => r >= 0 && r < n).length : 0;
+  const out = new Canvas(
+    Math.max(1, k.w - inW(f.dropX, k.w)),
+    Math.max(1, k.h + inW(f.dupY, k.h) - inW(f.dropY, k.h)),
+    Math.max(1, k.d - inW(f.dropZ, k.d)),
+  );
+  out.clip = null;
+  const dropX = new Set(f.dropX ?? []);
+  const dropZ = new Set(f.dropZ ?? []);
+  const dropY = new Set(f.dropY ?? []);
+  const dupY = new Set(f.dupY ?? []);
+  k.forEach((x, y, z, v) => {
+    if (dropX.has(x) || dropZ.has(z) || dropY.has(y)) return;
+    const [nx, ny, nz] = fitPoint(f, [x, y, z]);
+    out.set(nx, ny, nz, v);
+    if (dupY.has(y)) out.set(nx, ny + 1, nz, v);
+  });
+  out.clip = [out.w, out.h, out.d];
+  return out;
+}
+
 // ── Small drawing helpers (Canvas twins of rig.ts' helpers) ─────
 
 /** Clear the four vertical edge columns of a box (a rounded limb / body cross-section). */
@@ -261,6 +317,8 @@ const LIGHTER: Partial<Record<ColorName, ColorName>> = {
   cerulean: "paint_sky",
   coat_white: "white",
   neon_pink: "paper_pink",
+  hair_copper: "hair_copper_lt",
+  hair_copper_dk: "hair_copper",
 };
 const LIGHTER_IDX = new Map<number, number>(
   Object.entries(LIGHTER).map(([a, b]) => [C[a as ColorName], C[b]]),
@@ -308,7 +366,7 @@ export function resolveLook(look: JadeLook): LookCtx {
   return out;
 }
 
-/** Skin tones (Jade). */
-export const SKIN = C.skin;
-export const SKIN_SHADE = C.skin_shadow;
-export const SKIN_LIGHT = C.skin_light;
+/** Skin tones (Jade: pale, fair). */
+export const SKIN = C.skin_pale;
+export const SKIN_SHADE = C.skin_pale_shade;
+export const SKIN_LIGHT = C.skin_pale_light;

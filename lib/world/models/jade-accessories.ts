@@ -127,6 +127,33 @@ export function backGear(k: Canvas, w: Worn | null): void {
       shoulderStraps(k, C.leather_black, main);
       return;
     }
+    case "gig_bag": {
+      k.free(() => {
+        // Padded body: two bouts across the lower back.
+        for (const [cy, r] of [
+          [3, 3.9],
+          [8.8, 3.1],
+        ] as const)
+          for (let y = -2; y <= 13; y++)
+            for (let x = 2; x <= 13; x++) {
+              if ((x + 0.5 - 8) ** 2 + (y + 0.5 - cy) ** 2 > r * r) continue;
+              k.box(x, y, -4, x, y, -1, main);
+              k.set(x, y, -5, (x + y) % 5 === 0 ? shade : main);
+            }
+        // The neck runs up to her left over the shoulder, the headstock on top.
+        for (let i = 0; i <= 10; i++) {
+          const x = Math.round(9 + i * 0.45);
+          k.box(x, 12 + i, -3, x + 1, 12 + i, -2, i % 4 === 3 ? shade : main);
+        }
+        k.box(13, 23, -4, 15, 25, -1, main).set(14, 25, -4, accent);
+        // Front pocket with the studio sticker, the zip running round.
+        k.box(5, 0, -6, 11, 4, -6, shade).box(7, 2, -7, 8, 3, -7, C.safety_orange);
+        k.set(7, 3, -7, C.paint_black);
+        for (let x = 4; x <= 12; x++) if (k.get(x, 6, -5)) k.set(x, 6, -6, accent);
+      });
+      shoulderStraps(k, C.leather_black, accent);
+      return;
+    }
     case "cape": {
       k.free(() => {
         for (let y = -8; y <= 15; y++) {
@@ -221,6 +248,40 @@ export function neckGear(k: Canvas, w: Worn | null): void {
           11,
           main,
         );
+      });
+      return;
+    }
+    case "pearl_necklace": {
+      k.free(() => {
+        // One strand: up the sides of the neck, a soft U on the collarbone.
+        const pearl = (x: number, y: number, z: number, i: number) =>
+          k.set(x, y, z, i % 3 === 0 ? accent : i % 2 ? shade : main);
+        let i = 0;
+        for (const [x, y] of [
+          [4, 15],
+          [5, 14],
+          [6, 13],
+          [7, 13],
+          [8, 13],
+          [9, 13],
+          [10, 14],
+          [11, 15],
+        ] as const)
+          pearl(x, y, 10, i++);
+        for (let z = 6; z <= 9; z++) {
+          pearl(4, 16, z, i++);
+          pearl(11, 16, z, i++);
+        }
+      });
+      return;
+    }
+    case "tie_loose": {
+      k.free(() => {
+        // The knot pulled down two fingers, the blade to the belt, the loop up to the collar.
+        k.box(7, 12, 11, 8, 13, 11, shade).set(7, 13, 11, main);
+        for (let y = 3; y <= 11; y++) k.set(7, y, 10, main).set(8, y, 10, y % 4 ? main : accent);
+        k.set(7, 2, 10, main).set(8, 2, 10, shade);
+        for (const x of [6, 9]) k.set(x, 14, 10, main).set(x, 15, 10, shade);
       });
       return;
     }
@@ -399,6 +460,23 @@ export function wristGear(k: Canvas, w: Worn | null, underGlove: boolean): void 
           for (let z = 2; z <= 3; z++) k.set(-3, y, z, y === 6 && z === 3 ? C.scan_dim : accent);
         k.box(-3, 4, 1, -3, 4, 4, shade).set(-3, 8, 1, shade).set(-3, 8, 4, C.led_red);
         k.set(-3, 5, 1, shade).set(-3, 7, 4, shade).set(-2, 9, 1, C.steel);
+      });
+      return;
+    }
+    case "glow_bands": {
+      // Five bangles of glow thread, loose round the wrist.
+      const cols = [main, shade, accent, main, shade];
+      let i = 0;
+      k.free(() => {
+        for (const y of [4, 5]) {
+          for (let x = 0; x <= 5; x++)
+            for (let z = 0; z <= 5; z++) {
+              const edge = x === 0 || x === 5 || z === 0 || z === 5;
+              const corner = (x === 0 || x === 5) && (z === 0 || z === 5);
+              if (edge && !corner) k.set(x, y, z, cols[(i++ + y) % cols.length]!);
+            }
+        }
+        k.set(0, 6, 2, accent).set(0, 6, 3, main);
       });
       return;
     }
