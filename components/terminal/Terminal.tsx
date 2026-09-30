@@ -65,8 +65,8 @@ import { useScrewButtonManagerOptional } from "@/contexts/ScrewButtonManager";
 import { useResourceManagerOptional } from "@/contexts/ResourceManager";
 import { useSystemPowerOptional } from "@/contexts/SystemPowerManager";
 import { useFirmwareManagerOptional } from "@/contexts/FirmwareManager";
-import { useMission } from "@/contexts/MissionProvider";
-import { useResonance } from "@/contexts/ResonanceProvider";
+import { useMissionOptional } from "@/contexts/MissionProvider";
+import { useResonanceOptional } from "@/contexts/ResonanceProvider";
 import { useQuest } from "@/contexts/QuestProvider";
 import { useGameTick } from "@/contexts/GameTickProvider";
 import { useJournalOptional } from "@/contexts/JournalProvider";
@@ -185,18 +185,8 @@ export function Terminal({
   useResonanceEventBridge();
 
   // Mission and resonance systems
-  let missionCtx: ReturnType<typeof useMission> | null = null;
-  let resonanceCtx: ReturnType<typeof useResonance> | null = null;
-  try {
-    missionCtx = useMission();
-  } catch {
-    /* not mounted */
-  }
-  try {
-    resonanceCtx = useResonance();
-  } catch {
-    /* not mounted */
-  }
+  const missionCtx = useMissionOptional();
+  const resonanceCtx = useResonanceOptional();
 
   const missionTerminalActions: MissionTerminalActions | undefined = useMemo(() => {
     if (!missionCtx) return undefined;

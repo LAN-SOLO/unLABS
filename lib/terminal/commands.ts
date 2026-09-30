@@ -16580,9 +16580,11 @@ const clkCommand: Command = {
       if (!state.isPowered || state.deviceState !== "online")
         return { success: false, output: ["[clk] Device must be online to change mode"] };
       const modeName = args[1]?.toLowerCase();
-      const validModes = ["local", "utc", "date", "uptime", "countdown", "stopwatch"];
-      if (modeName && validModes.includes(modeName)) {
-        device.setMode(modeName as any);
+      const validModes = ["local", "utc", "date", "uptime", "countdown", "stopwatch"] as const;
+      const isMode = (v: string): v is (typeof validModes)[number] =>
+        (validModes as readonly string[]).includes(v);
+      if (modeName && isMode(modeName)) {
+        device.setMode(modeName);
         return { success: true, output: [`[clk] Mode set to ${modeName.toUpperCase()}`] };
       }
       device.cycleMode();
@@ -16976,9 +16978,11 @@ const memCommand: Command = {
       if (!state.isPowered || state.deviceState !== "online")
         return { success: false, output: ["[mem] Device must be online to change mode"] };
       const modeName = args[1]?.toLowerCase();
-      const validModes = ["usage", "heap", "cache", "swap", "processes", "allocation"];
-      if (modeName && validModes.includes(modeName)) {
-        device.setMode(modeName as any);
+      const validModes = ["usage", "heap", "cache", "swap", "processes", "allocation"] as const;
+      const isMode = (v: string): v is (typeof validModes)[number] =>
+        (validModes as readonly string[]).includes(v);
+      if (modeName && isMode(modeName)) {
+        device.setMode(modeName);
         return { success: true, output: [`[mem] Mode set to ${modeName.toUpperCase()}`] };
       }
       device.cycleMode();
@@ -17180,9 +17184,18 @@ const andCommand: Command = {
       if (!state.isPowered || state.deviceState !== "online")
         return { success: false, output: ["[and] Device must be online to change mode"] };
       const modeName = args[1]?.toLowerCase();
-      const validModes = ["waveform", "spectrum", "heatmap", "timeline", "frequency", "radar"];
-      if (modeName && validModes.includes(modeName)) {
-        device.setMode(modeName as any);
+      const validModes = [
+        "waveform",
+        "spectrum",
+        "heatmap",
+        "timeline",
+        "frequency",
+        "radar",
+      ] as const;
+      const isMode = (v: string): v is (typeof validModes)[number] =>
+        (validModes as readonly string[]).includes(v);
+      if (modeName && isMode(modeName)) {
+        device.setMode(modeName);
         return { success: true, output: [`[and] Mode set to ${modeName.toUpperCase()}`] };
       }
       device.cycleMode();
@@ -17397,9 +17410,18 @@ const qcpCommand: Command = {
       if (!state.isPowered || state.deviceState !== "online")
         return { success: false, output: ["[qcp] Device must be online to change mode"] };
       const modeName = args[1]?.toLowerCase();
-      const validModes = ["compass", "radar", "heatmap", "trajectory", "triangulate", "history"];
-      if (modeName && validModes.includes(modeName)) {
-        device.setMode(modeName as any);
+      const validModes = [
+        "compass",
+        "radar",
+        "heatmap",
+        "trajectory",
+        "triangulate",
+        "history",
+      ] as const;
+      const isMode = (v: string): v is (typeof validModes)[number] =>
+        (validModes as readonly string[]).includes(v);
+      if (modeName && isMode(modeName)) {
+        device.setMode(modeName);
         return { success: true, output: [`[qcp] Mode set to ${modeName.toUpperCase()}`] };
       }
       device.cycleMode();
