@@ -25,7 +25,19 @@
  * Coordinates are voxels on each floor's own grid (y = 0 is the slab).
  */
 import { tr } from "@/lib/i18n";
+import {
+  CORE,
+  DOOR_PLAN,
+  PLAN_DOORS,
+  PLAN_NOTES,
+  PLAN_ROOMS,
+  PLAN_SIZE,
+  ROOM_PLAN,
+} from "@/lib/world/content/floorplan";
 import { SLICE_ITEM } from "@/lib/world/content/items";
+import { REPLICATOR_POWER, REPLICATOR_PROP, WEAR_ITEM_PREFIX } from "@/lib/world/content/wardrobe";
+import { buildFloorGeom, geomRoomAt, roomShape, type FloorGeom } from "@/lib/world/floor-geom";
+import { shapeBounds, shapeContains } from "@/lib/world/room-shape";
 import { C } from "@/lib/world/content/palette";
 import type {
   DoorDef,
@@ -38,7 +50,7 @@ import type {
   RoomTheme,
 } from "@/lib/world/types";
 
-export const FLOOR_SIZE = { x: 136, y: 20, z: 120 } as const;
+export const FLOOR_SIZE = { x: PLAN_SIZE.x, y: 20, z: PLAN_SIZE.z } as const;
 export const WALL_HEIGHT = 8;
 
 export interface FloorDef {
@@ -844,10 +856,110 @@ const ROOM_THEMES: Record<string, RoomTheme> = {
   bohrung: "geothermal",
 };
 
-export const ROOMS: readonly RoomDef[] = RAW_ROOMS.map((r) => ({
-  ...r,
-  theme: r.theme ?? ROOM_THEMES[r.id] ?? "generic",
-}));
+const RAW_BY_ID: ReadonlyMap<string, RoomDef> = new Map(RAW_ROOMS.map((r) => [r.id, r]));
+
+/**
+ * The design grid: every room's rectangle (and every door) as the content is
+ * authored — the original rectangular plan before floorplan.ts moved and
+ * shaped the rooms. For docs and tests only; the game uses ROOMS / DOORS.
+ */
+export const DESIGN_ROOMS: readonly RoomDef[] = RAW_ROOMS;
+
+/**
+ * How far a room's content moved from its design rectangle to its place on
+ * the floor plan (floorplan.ts). Everything authored inside the room moves
+ * by the same delta.
+ */
+export function roomDelta(id: string): [number, number] {
+  const p = ROOM_PLAN[id];
+  const r = RAW_BY_ID.get(id);
+  if (!p || !r) return [0, 0];
+  return [p.at[0] - r.x, p.at[1] - r.z];
+}
+
+/** Bounding box of a shaped room (x/z/w/d = its wall lines). */
+function withBounds(r: RoomDef): RoomDef {
+  if (!r.shape) return r;
+  const b = shapeBounds(r.shape);
+  return { ...r, x: b.x0, z: b.z0, w: b.x1 - b.x0, d: b.z1 - b.z0 };
+}
+
+function planRoom(r: RoomDef): RoomDef {
+  const p = ROOM_PLAN[r.id];
+  if (!p) return r;
+  const box = { x: p.at[0], z: p.at[1], w: r.w, d: r.d };
+  const shape = p.shape?.(box);
+  return withBounds({ ...r, ...p.patch, x: box.x, z: box.z, ...(shape ? { shape } : {}) });
+}
+
+export const ROOMS: readonly RoomDef[] = [
+  ...RAW_ROOMS.map((r) => planRoom({ ...r, theme: r.theme ?? ROOM_THEMES[r.id] ?? "generic" })),
+  ...PLAN_ROOMS.map(withBounds),
+];
+
+/**
+ * Move a point authored on the legacy grid onto the floor plan: the design
+ * rectangle containing it decides the delta (interior first, then walls).
+ */
+export function relocateAt(
+  floor: FloorId,
+  x: number,
+  z: number,
+): { room?: string; x: number; z: number } {
+  let hit: RoomDef | undefined;
+  for (const r of RAW_ROOMS) {
+    if (r.floor !== floor) continue;
+    const inside = x > r.x && x < r.x + r.w && z > r.z && z < r.z + r.d;
+    const onWall = x >= r.x && x <= r.x + r.w && z >= r.z && z <= r.z + r.d;
+    if (inside) {
+      hit = r;
+      break;
+    }
+    if (onWall && !hit) hit = r;
+  }
+  if (!hit) return { x, z };
+  const [dx, dz] = roomDelta(hit.id);
+  return { room: hit.id, x: x + dx, z: z + dz };
+}
+
+/**
+ * Keep a small thing inside its (possibly round or cut) room: if the cells
+ * within `reach` of (x, z) are not all interior, the nearest spot that is
+ * (spiral search) wins. Large, central things never need it.
+ */
+export function fitInRoom(
+  roomId: string,
+  x: number,
+  z: number,
+  reach = 1,
+): { x: number; z: number } {
+  const r = ROOMS.find((q) => q.id === roomId);
+  if (!r?.shape) return { x, z };
+  const shape = roomShape(r);
+  const ok = (cx: number, cz: number) => {
+    for (let dz = -reach; dz <= reach; dz++)
+      for (let dx = -reach; dx <= reach; dx++)
+        if (!shapeContains(shape, cx + dx, cz + dz)) return false;
+    return true;
+  };
+  const x0 = Math.round(x);
+  const z0 = Math.round(z);
+  if (ok(x0, z0)) return { x, z };
+  for (let rad = 1; rad <= 24; rad++)
+    for (let dz = -rad; dz <= rad; dz++)
+      for (let dx = -rad; dx <= rad; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dz)) !== rad) continue;
+        if (ok(x0 + dx, z0 + dz)) return { x: x + dx, z: z + dz };
+      }
+  return { x, z };
+}
+
+/** Relocate + fit a floor-positioned thing (props, pickups, notes, NPCs). */
+export function planPoint<T extends { floor: FloorId; x: number; z: number }>(t: T, reach = 1): T {
+  const m = relocateAt(t.floor, t.x, t.z);
+  const f = m.room ? fitInRoom(m.room, m.x, m.z, reach) : m;
+  return { ...t, x: f.x, z: f.z };
+}
 
 export const ROOM_BY_ID: ReadonlyMap<string, RoomDef> = new Map(ROOMS.map((r) => [r.id, r]));
 
@@ -862,7 +974,7 @@ function door(
   return { id, floor, x, z, axis, width: 5, ...extra };
 }
 
-export const DOORS: readonly DoorDef[] = [
+const RAW_DOORS: readonly DoorDef[] = [
   // Ebene 0
   door("d_schleuse", 0, 66, 36, "x"),
   door("d_mcp", 0, 84, 52, "z"),
@@ -985,15 +1097,26 @@ export const DOORS: readonly DoorDef[] = [
   door("d_bohrung", 5, 98, 80, "x"),
 ];
 
+/** Doors on the design grid (see DESIGN_ROOMS). */
+export const DESIGN_DOORS: readonly DoorDef[] = RAW_DOORS;
+
+export const DOORS: readonly DoorDef[] = [
+  ...RAW_DOORS.map((d) => ({ ...d, ...DOOR_PLAN[d.id] })),
+  ...PLAN_DOORS,
+];
+
+/** The elevator runs through the middle of every level's core. */
 export const ELEVATORS: readonly ElevatorDef[] = [0, 1, 2, 3, 4, 5].map((f) => ({
   floor: f as FloorId,
-  x: 120,
-  z: 62,
+  x: CORE.x,
+  z: CORE.z,
 }));
+
+const RAW_SPAWN = planPoint({ floor: 0 as FloorId, x: 66, z: 58 }, 2);
 
 export const SPAWN: { floor: FloorId; pos: [number, number, number] } = {
   floor: 0,
-  pos: [66, 1, 58],
+  pos: [RAW_SPAWN.x, 1, RAW_SPAWN.z],
 };
 
 function pk(
@@ -1049,7 +1172,7 @@ function side(
   });
 }
 
-export const PICKUPS: readonly PickupDef[] = [
+const RAW_PICKUPS: readonly PickupDef[] = [
   // Ebene 0
   pk("p_kontroll_regal", 0, 52, 62, "shelf", tr("Shelf"), [
     ["schraubensatz", 2],
@@ -1082,6 +1205,7 @@ export const PICKUPS: readonly PickupDef[] = [
     ["schraubendreher", 1],
     ["luefter", 1],
     ["kupferspule", 2],
+    ["stoffreste", 1],
   ]),
   pk("p_werk_kiste", 0, 80, 74, "crate", tr("Materials Crate"), [
     ["gehaeuseplatte", 2],
@@ -1155,6 +1279,7 @@ export const PICKUPS: readonly PickupDef[] = [
   pk("p_schleuse_boden", 0, 72, 30, "crate", tr("Overturned Crate"), [
     ["filterpatrone", 1],
     ["kabelbaum", 1],
+    ["polymerfaser", 1],
   ]),
   pk("p_mcp_kiste", 0, 90, 64, "crate", tr("Spare Parts Crate"), [
     ["kondensator", 2],
@@ -1162,7 +1287,7 @@ export const PICKUPS: readonly PickupDef[] = [
   ]),
 
   // Ebene −1
-  pk("p_geo_seep", 1, 20, 24, "seep", tr("Abstractum Seep"), [["abstractum", 8]], {
+  pk("p_geo_seep", 1, 20, 24, "seep", tr("Abstractum Seep"), [["abstractum", 12]], {
     hidden: { flag: "seep_open" },
     respawn: 25,
   }),
@@ -1200,6 +1325,7 @@ export const PICKUPS: readonly PickupDef[] = [
     ["kuehlrippe", 2],
     ["luefter", 2],
     ["thermoelement", 1],
+    ["polymerfaser", 1],
   ]),
   pk(
     "p_fert_schrott",
@@ -1480,14 +1606,17 @@ export const PICKUPS: readonly PickupDef[] = [
   ]),
 
   // Ebene +1
-  pk("p_jadeq_spind", 4, 88, 24, "locker", tr("Jade's Locker"), [
+  pk("p_jadeq_spind", 4, 103, 28, "locker", tr("Jade's Locker"), [
     ["linse", 1],
     ["display", 1],
     ["filterpatrone", 1],
+    ["stoffreste", 2],
+    ["farbpigment", 1],
   ]),
   pk("p_damienq_schublade", 4, 80, 46, "locker", tr("Damien's Desk Drawer"), [
     ["notizbuch_blau", 1],
     ["platine", 1],
+    ["stoffreste", 1],
   ]),
   pk("p_kantine_vorrat", 4, 108, 76, "shelf", tr("Pantry"), [
     ["kaffeebohnen", 2],
@@ -1716,6 +1845,134 @@ export const PICKUPS: readonly PickupDef[] = [
   ...SLICES(),
 ];
 
+/** A hidden wardrobe piece (content/wardrobe.ts `find`): one `wear:<id>` item. */
+function wear(
+  id: string,
+  floor: FloorId,
+  x: number,
+  z: number,
+  model: PickupDef["model"],
+  label: string,
+  extra: Partial<PickupDef> = {},
+): PickupDef {
+  return pk(`p_wear_${id}`, floor, x, z, model, label, [[`${WEAR_ITEM_PREFIX}${id}`, 1]], extra);
+}
+
+/**
+ * Pickups authored directly in floor-plan coordinates (not relocated by
+ * `planPoint`): Jade's wardrobe finds, spread over all six levels (hints in
+ * content/wardrobe.ts), and the textile sources for her replicator.
+ */
+const PLANNED_PICKUPS: readonly PickupDef[] = [
+  // ── Wardrobe finds ──
+  // Level 0
+  wear("tee_do_not_lick", 0, 73, 21, "locker", tr("Staff Locker")),
+  wear("skirt_plaid", 0, 155, 145, "bundle", tr("Unpacked Suitcase")),
+  wear("oxygen_tank", 0, 50, 31, "locker", tr("Second Emergency Locker")),
+  // Damien's secret map room: he "borrowed" them.
+  wear("slippers", 0, 148, 43, "bundle", tr("Something Fluffy")),
+  // Shares the lock of the ventilation service hatch (side cache in the West Corridor).
+  wear("roller_boots", 0, 49, 118, "locker", tr("Maintenance Cupboard"), {
+    puzzle: "pz_side_lueftung",
+    hidden: { device: "NXS-01" },
+  }),
+  // Level −1
+  wear("tee_residual", 1, 100, 43, "bundle", tr("Shirt behind the Rack")),
+  wear("raincoat", 1, 151, 50, "bundle", tr("Coat on a Pipe")),
+  wear("hair_braids", 1, 104, 117, "bundle", tr("Hair Tie with a Note")),
+  wear("lanyard_keys", 1, 151, 109, "bundle", tr("Janitor's Hook")),
+  // Level −2
+  wear("hardhat", 2, 74, 146, "crate", tr("Safety Gear Crate")),
+  wear("propeller_cap", 2, 104, 111, "bundle", tr("Behind the Vent Grille"), {
+    hidden: { counter: "drone_runs", min: 1 },
+  }),
+  wear("friendship_band", 2, 130, 108, "bundle", tr("Charging Niche"), {
+    hidden: { flag: "bot_b4c0n_awake" },
+  }),
+  // Level −3
+  wear("hair_pixie", 3, 120, 84, "locker", tr("Wash Cabinet")),
+  wear("insulated_gloves", 3, 46, 90, "locker", tr("Switchgear Cabinet")),
+  wear("fake_mustache", 3, 158, 133, "crate", tr("Costume Box 2018")),
+  // Level +1
+  wear("flannel", 4, 52, 42, "bundle", tr("Shirt over a Chair")),
+  wear("hair_space_buns", 4, 144, 148, "bundle", tr("Two Hair Ties")),
+  wear("round_glasses", 4, 52, 93, "bundle", tr("Reading Glasses")),
+  wear("buddy_plush", 4, 124, 91, "bundle", tr("Plush Toy")),
+  // Level −4
+  wear("hoodie_night_shift", 5, 54, 77, "bundle", tr("Crew Hoodie")),
+  wear("fanny_pack", 5, 146, 86, "crate", tr("Lost-and-Found Box")),
+
+  // ── Textile sources for the wardrobe replicator (refill over time) ──
+  pk("p_tex_jadeq_waesche", 4, 138, 40, "basket", tr("Laundry Basket"), [["stoffreste", 2]], {
+    respawn: 300,
+  }),
+  pk("p_tex_jadeq_naehkasten", 4, 143, 32, "sewing", tr("Jade's Sewing Box"), [
+    ["stoffreste", 3],
+    ["leuchtfaden", 2],
+    ["farbpigment", 2],
+  ]),
+  pk(
+    "p_tex_damienq_waesche",
+    4,
+    35,
+    33,
+    "basket",
+    tr("Damien's Laundry Pile"),
+    [
+      ["stoffreste", 2],
+      ["polymerfaser", 1],
+    ],
+    { respawn: 420 },
+  ),
+  pk("p_tex_wohnflur_fund", 4, 88, 60, "crate", tr("Lost-and-Found Crate"), [["stoffreste", 1]], {
+    respawn: 360,
+    poolCount: 2,
+    pool: ["stoffreste", "stoffreste", "polymerfaser", "farbpigment"],
+  }),
+  pk(
+    "p_tex_kantine_lappen",
+    4,
+    122,
+    76,
+    "basket",
+    tr("Rag Bin"),
+    [
+      ["stoffreste", 1],
+      ["farbpigment", 1],
+    ],
+    { respawn: 300 },
+  ),
+  pk("p_tex_werk_lumpen", 0, 68, 132, "basket", tr("Rag Bin"), [["stoffreste", 2]], {
+    respawn: 240,
+  }),
+  pk("p_tex_fert_verschnitt", 1, 102, 130, "scrap", tr("Offcut Bin"), [["polymerfaser", 1]], {
+    respawn: 300,
+    poolCount: 2,
+    pool: ["polymerfaser", "polymerfaser", "stoffreste", "kabelbaum"],
+  }),
+  pk(
+    "p_tex_lager_vorhang",
+    1,
+    130,
+    128,
+    "basket",
+    tr("Curtain Offcuts"),
+    [
+      ["stoffreste", 2],
+      ["polymerfaser", 1],
+    ],
+    { respawn: 420 },
+  ),
+  pk("p_tex_hangar_planen", 2, 80, 139, "crate", tr("Tarp Offcuts"), [["polymerfaser", 2]], {
+    respawn: 360,
+  }),
+];
+
+export const PICKUPS: readonly PickupDef[] = [
+  ...RAW_PICKUPS.map((t) => planPoint(t, 2)),
+  ...PLANNED_PICKUPS,
+];
+
 function slc(
   n: number,
   floor: FloorId,
@@ -1801,7 +2058,7 @@ function note(
   return { id, floor, x, z, author, title, body, model: "paper", ...extra };
 }
 
-export const NOTES: readonly NoteDef[] = [
+const RAW_NOTES: readonly NoteDef[] = [
   // The four HALO acrostic marginalia — first letters H, A, L, O.
   note(
     "n_jade_h",
@@ -3033,7 +3290,9 @@ export const NOTES: readonly NoteDef[] = [
   ),
 ];
 
-export const PROPS: readonly PropDef[] = [
+export const NOTES: readonly NoteDef[] = [...RAW_NOTES.map((t) => planPoint(t, 1)), ...PLAN_NOTES];
+
+const RAW_PROPS: readonly PropDef[] = [
   // Ebene 0
   {
     id: "hauptkonsole",
@@ -3614,6 +3873,75 @@ export const PROPS: readonly PropDef[] = [
   },
 ];
 
+/**
+ * Props authored directly in floor-plan coordinates (not relocated by
+ * `planPoint`): pieces in parts of a room that only exist on the plan,
+ * e.g. the east bay of Jade's Quarters.
+ */
+const PLANNED_PROPS: readonly PropDef[] = [
+  // Jade's personal computer (lib/world/content/quarters.ts PC_PROP): opens
+  // her computer overlay. Model: decor `jade_workstation` via the variant.
+  {
+    id: "jade_pc",
+    floor: 4,
+    x: 144,
+    z: 27,
+    kind: "station",
+    label: tr("Jade's Computer"),
+    model: "desk",
+    variant: "jade_pc",
+  },
+  // Damien's Sound Studio (content/studio.ts): the key panel in the foam of
+  // the Signal Core (next to the passage into the ring), the mixing desk inside.
+  {
+    id: "studio_panel",
+    floor: 2,
+    x: 102,
+    z: 92,
+    kind: "puzzle",
+    label: tr("Foam Panel with Keys"),
+    model: "pult",
+    puzzle: "pz_studio_door",
+    requires: { insight: "studio_song" },
+    requiresHint: tr(
+      "Eight small keys under the foam, like a tiny piano. It waits for a song — Damien's song. He never wrote it down in one place.",
+    ),
+    rot: 1,
+  },
+  {
+    id: "studio_console",
+    floor: 2,
+    x: 140,
+    z: 70,
+    kind: "station",
+    label: tr("Mixing Desk"),
+    model: "desk",
+    variant: "mixing_console",
+  },
+  // Jade's wardrobe replicator “Needle's Eye” (content/wardrobe.ts
+  // REPLICATOR_PROP) in the east bay of her quarters, beside the wardrobe:
+  // opens the character menu on its replicator page. Model: decor
+  // `wardrobe_replicator` via the variant; fits the `console` footprint.
+  {
+    id: REPLICATOR_PROP,
+    floor: 4,
+    x: 147,
+    z: 32,
+    kind: "station",
+    label: tr("Wardrobe Replicator “Needle's Eye”"),
+    model: "console",
+    variant: "wardrobe_replicator",
+    rot: 3,
+    requires: { power: REPLICATOR_POWER },
+    requiresHint: tr("The wardrobe replicator needs at least 50 W on the grid."),
+  },
+];
+
+export const PROPS: readonly PropDef[] = [
+  ...RAW_PROPS.map((t) => planPoint(t, 2)),
+  ...PLANNED_PROPS,
+];
+
 /** Elevator access per floor. Floor 1 is reachable by the emergency ladder. */
 export const FLOOR_ACCESS: Record<
   FloorId,
@@ -3641,14 +3969,95 @@ export const FLOOR_ACCESS: Record<
   },
 };
 
-export function roomAt(floor: FloorId, x: number, z: number): RoomDef | undefined {
-  // Prefer the smallest room containing the point (handles shared walls).
-  let best: RoomDef | undefined;
-  for (const r of ROOMS) {
-    if (r.floor !== floor) continue;
-    if (x >= r.x && x <= r.x + r.w && z >= r.z && z <= r.z + r.d) {
-      if (!best || r.w * r.d < best.w * best.d) best = r;
-    }
+const GEOM = new Map<FloorId, FloorGeom>();
+
+/** Room geometry of a floor (shapes, door throats, walls) — cached. */
+export function floorGeomOf(floor: FloorId): FloorGeom {
+  let g = GEOM.get(floor);
+  if (!g) {
+    g = buildFloorGeom(
+      ROOMS.filter((r) => r.floor === floor),
+      DOORS.filter((d) => d.floor === floor),
+      FLOOR_SIZE.x,
+      FLOOR_SIZE.z,
+    );
+    GEOM.set(floor, g);
   }
-  return best;
+  return g;
+}
+
+/** Ids of the rooms on the two sides of a door (after its throat). */
+export function doorSides(d: DoorDef): string[] {
+  const g = floorGeomOf(d.floor);
+  const out: string[] = [];
+  for (const s of [-1, 1]) {
+    const x = d.axis === "x" ? d.x : d.x + s;
+    const z = d.axis === "x" ? d.z + s : d.z;
+    if (x < 0 || z < 0 || x >= g.W || z >= g.Z) continue;
+    const o = g.owner[x + z * g.W]!;
+    if (o) out.push(g.rooms[o - 1]!.room.id);
+  }
+  return out;
+}
+
+/** Does the door lead into (or out of) this room? */
+export function doorTouches(d: DoorDef, r: RoomDef): boolean {
+  return d.floor === r.floor && doorSides(d).includes(r.id);
+}
+
+/** Is (x, z) inside this room's shape (walls excluded)? */
+export function inRoomShape(r: RoomDef, x: number, z: number): boolean {
+  const g = floorGeomOf(r.floor);
+  const cx = Math.floor(x);
+  const cz = Math.floor(z);
+  if (cx < 0 || cz < 0 || cx >= g.W || cz >= g.Z) return false;
+  const own = g.byId.get(r.id);
+  return !!own && g.owner[cx + cz * g.W] === own.index + 1;
+}
+
+const ANCHORS = new Map<string, { x: number; z: number }>();
+
+/**
+ * A representative point of a room: its deepest interior cell (furthest
+ * from the walls), nearest the centroid on ties. Unlike the bounding-box
+ * centre it always lies inside — also in bent, L-shaped or crescent rooms.
+ */
+export function roomAnchor(id: string): { floor: FloorId; x: number; z: number } | undefined {
+  const r = ROOM_BY_ID.get(id);
+  if (!r) return undefined;
+  let a = ANCHORS.get(id);
+  if (!a) {
+    const g = floorGeomOf(r.floor);
+    const rg = g.byId.get(id);
+    if (!rg?.cells.length) return { floor: r.floor, x: r.x + r.w / 2, z: r.z + r.d / 2 };
+    let sx = 0;
+    let sz = 0;
+    for (const i of rg.cells) {
+      sx += i % g.W;
+      sz += Math.floor(i / g.W);
+    }
+    const cx = sx / rg.cells.length;
+    const cz = sz / rg.cells.length;
+    let best = rg.cells[0]!;
+    let bestKey = -Infinity;
+    for (const i of rg.cells) {
+      const x = i % g.W;
+      const z = (i - x) / g.W;
+      // Depth first (capped: big rooms prefer their middle), then closeness to the centroid.
+      const key = Math.min(g.edge[i]!, 6) * 1000 - Math.hypot(x - cx, z - cz);
+      if (key > bestKey) {
+        bestKey = key;
+        best = i;
+      }
+    }
+    const x = best % g.W;
+    a = { x: x + 0.5, z: (best - x) / g.W + 0.5 };
+    ANCHORS.set(id, a);
+  }
+  return { floor: r.floor, ...a };
+}
+
+/** The room at a point (its interior, else the room whose wall it is). */
+export function roomAt(floor: FloorId, x: number, z: number): RoomDef | undefined {
+  return geomRoomAt(floorGeomOf(floor), x, z);
 }

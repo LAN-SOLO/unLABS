@@ -35,6 +35,7 @@
 import { intlLocale, tr } from "@/lib/i18n";
 import { ROOMS } from "@/lib/world/content/map";
 import { evalCond, removeItem } from "@/lib/world/game";
+import { PERK_TUNING, hasPerk } from "@/lib/world/perks";
 import { traits } from "@/lib/world/traits";
 import type { BiorhythmMode } from "@/lib/world/settings";
 import type { ItemDef, WorldState } from "@/lib/world/types";
@@ -262,8 +263,25 @@ export function bioTick(s: WorldState, dt: number, mode: BiorhythmMode): BioTick
   if (mode === "off" || !(dt > 0)) return { activated: false };
   const activated = bioActivate(s);
   if (!bioActive(s)) return { activated };
-  for (const n of BIO_NEEDS) setValue(s, n, bioValue(s, n) - (bioRate(n, mode) * dt) / 60);
+  // Perk `steady_rhythm` (course "Biorhythm"): everything drifts a little slower.
+  const f = hasPerk(s, "steady_rhythm") ? PERK_TUNING.bioDecay : 1;
+  for (const n of BIO_NEEDS) setValue(s, n, bioValue(s, n) - (bioRate(n, mode) * f * dt) / 60);
   return { activated };
+}
+
+/** Rest spent per minute of study at the computer ("normal"; halved when relaxed). */
+export const STUDY_REST_PER_MIN = 0.5;
+
+/**
+ * Studying at the computer tires Jade a little (rest only, never below
+ * `BIO_LOW`, nothing while the rhythm is off or has not started).
+ */
+export function bioStudyFatigue(s: WorldState, seconds: number, mode: BiorhythmMode): void {
+  if (!bioEnabled(s, mode) || !(seconds > 0)) return;
+  const v = bioValue(s, "rest");
+  if (v <= BIO_LOW) return;
+  const cost = (STUDY_REST_PER_MIN * (mode === "relaxed" ? BIO_RELAXED_FACTOR : 1) * seconds) / 60;
+  setValue(s, "rest", Math.max(BIO_LOW, v - cost));
 }
 
 // ── Effects ──────────────────────────────────────────────────────
@@ -555,7 +573,9 @@ export function train(s: WorldState, now: number = s.playTime): BioReport {
   const cd = trainCooldown(s, now);
   if (cd > 0) return fail(tr("Catch your breath first."), cd);
   const protein = (s.counters.bio_protein ?? 0) > 0;
-  const gains = applyRestore(s, { fit: TRAIN_GAIN }, protein ? PROTEIN_BONUS : 1);
+  // Perk `good_form` (course "Training"): cleaner form, more from every workout.
+  const form = hasPerk(s, "good_form") ? PERK_TUNING.trainGain : 1;
+  const gains = applyRestore(s, { fit: TRAIN_GAIN }, (protein ? PROTEIN_BONUS : 1) * form);
   for (const [n, c] of Object.entries(TRAIN_COST) as [BioNeed, number][]) {
     const before = bioValue(s, n);
     setValue(s, n, before - c);

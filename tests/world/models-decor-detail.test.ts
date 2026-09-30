@@ -1,6 +1,7 @@
+import { PLAN_ROOMS } from "@/lib/world/content/floorplan";
 import { describe, expect, it } from "vitest";
 import { C } from "@/lib/world/content/palette";
-import { FLOORS } from "@/lib/world/content/map";
+import { FLOORS, ROOMS } from "@/lib/world/content/map";
 import { interiorFor } from "@/lib/world/content/interior";
 import type { Model } from "@/lib/world/models/core";
 import { DECOR, DECOR_BY_ID, decorModel, decorScale } from "@/lib/world/models/decor";
@@ -100,11 +101,20 @@ describe("performance budget", () => {
 
   it("library and placed decor voxels stay within +40 %", () => {
     const lib = DECOR.reduce((a, d) => a + voxels(d.id), 0);
-    const placed = FLOORS.reduce(
-      (a, f) => a + interiorFor(f.id).reduce((b, p) => b + voxels(p.decor), 0),
-      0,
-    );
+    // The floor-plan cores and passages (floorplan.ts) are new rooms with their own cap.
+    const fresh = new Set([
+      ...PLAN_ROOMS.map((r) => r.id),
+      ...ROOMS.filter((r) => r.theme === "hub").map((r) => r.id),
+    ]);
+    let placed = 0;
+    let added = 0;
+    for (const f of FLOORS)
+      for (const p of interiorFor(f.id)) {
+        if (fresh.has(p.room)) added += voxels(p.decor);
+        else placed += voxels(p.decor);
+      }
     expect(lib).toBeLessThanOrEqual(LIB_BEFORE * 1.4);
     expect(placed).toBeLessThanOrEqual(PLACED_BEFORE * 1.4);
+    expect(added).toBeLessThanOrEqual(50_000);
   });
 });

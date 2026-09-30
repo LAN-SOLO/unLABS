@@ -174,6 +174,7 @@ export const DE_MAP_UI: Record<string, string> = {
   "verb::Listen": "Hören",
   "verb::Look": "Ansehen",
   "verb::Sit down": "Hinsetzen",
+  "verb::Lie down": "Hinlegen",
   "verb::Drink": "Trinken",
   "terminal role::Maintenance": "Wartung",
   "terminal role::Archive": "Archiv",

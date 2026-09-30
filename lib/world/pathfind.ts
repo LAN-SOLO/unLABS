@@ -19,15 +19,22 @@
  * line-of-sight test so she walks straight lines between corners.
  * If the goal cannot be reached, the path ends at the explored node closest
  * to it and `reached` is false.
+ *
+ * Cells: the blocked layer may be finer than a voxel (`scale` cells per
+ * world unit, e.g. 2 → half-voxel collision cells). Every function takes
+ * and returns WORLD coordinates; `sx`/`sz`, `vox`, `dyn` and the `blocked`
+ * callbacks are in cell units.
  */
 
 export type XZ = [number, number];
 
 export interface NavGrid {
-  /** Voxel dimensions. */
+  /** Cell dimensions (cells, see `scale`). */
   readonly sx: number;
   readonly sz: number;
-  /** Nodes per voxel along each axis. */
+  /** Cells per world unit (1 = voxel columns, 2 = half-voxel cells). */
+  readonly scale: number;
+  /** Nodes per cell along each axis. */
   readonly res: number;
   readonly nx: number;
   readonly nz: number;
@@ -58,10 +65,12 @@ interface Scratch {
 }
 
 export interface NavOptions {
-  /** Nodes per voxel (default 2 → half-voxel resolution). */
+  /** Nodes per cell (default 2 → half-voxel resolution on voxel cells). */
   res?: number;
   /** Walker half-width in world units (default 1.1 = WALKER.width / 2). */
   half?: number;
+  /** Cells per world unit (default 1). */
+  scale?: number;
 }
 
 /** Head clearance above the slab the walker needs (walker height 5.1 → y 1..6). */
@@ -94,6 +103,7 @@ export function createNavGrid(
   const g: NavGrid = {
     sx,
     sz,
+    scale: opts.scale ?? 1,
     res,
     nx,
     nz,
@@ -130,7 +140,7 @@ export function updateNavGrid(g: NavGrid, blocked: (x: number, z: number) => boo
   return changed;
 }
 
-/** Replace the dynamic layer (locked door cells) with `cells`; patches the affected nodes. */
+/** Replace the dynamic layer (locked door cells, in cell units) with `cells`; patches the affected nodes. */
 export function setDynamicBlocked(g: NavGrid, cells: Iterable<XZ>): void {
   const next = new Set<number>();
   for (const [x, z] of cells) if (x >= 0 && z >= 0 && x < g.sx && z < g.sz) next.add(x + z * g.sx);
@@ -150,10 +160,11 @@ export function setDynamicBlocked(g: NavGrid, cells: Iterable<XZ>): void {
 
 /** Node index range whose walker box overlaps voxel column range [vx0, vx1]. */
 function nodeRange(g: NavGrid, v0: number, v1: number, n: number): [number, number] {
-  // Node i centre c = (i + 0.5) / res; box [c − half, c + half] overlaps voxel v
-  // when c − half < v + 1 and c + half > v.
-  const lo = Math.max(0, Math.floor((v0 - g.half) * g.res - 0.5) - 1);
-  const hi = Math.min(n - 1, Math.ceil((v1 + 1 + g.half) * g.res - 0.5) + 1);
+  // Node i centre c = (i + 0.5) / res; box [c − half, c + half] overlaps cell v
+  // when c − half < v + 1 and c + half > v (all in cell units).
+  const half = g.half * g.scale;
+  const lo = Math.max(0, Math.floor((v0 - half) * g.res - 0.5) - 1);
+  const hi = Math.min(n - 1, Math.ceil((v1 + 1 + half) * g.res - 0.5) + 1);
   return [lo, hi];
 }
 
@@ -175,10 +186,11 @@ function evalNode(g: NavGrid, i: number, k: number): [0 | 1, 0 | 1] {
   const cx = (i + 0.5) / g.res;
   const cz = (k + 0.5) / g.res;
   const eps = 1e-6;
-  const x0 = Math.floor(cx - g.half + eps);
-  const x1 = Math.ceil(cx + g.half - eps) - 1;
-  const z0 = Math.floor(cz - g.half + eps);
-  const z1 = Math.ceil(cz + g.half - eps) - 1;
+  const half = g.half * g.scale;
+  const x0 = Math.floor(cx - half + eps);
+  const x1 = Math.ceil(cx + half - eps) - 1;
+  const z0 = Math.floor(cz - half + eps);
+  const z1 = Math.ceil(cz + half - eps) - 1;
   if (x0 < 0 || z0 < 0 || x1 >= g.sx || z1 >= g.sz) return [0, 0];
   let dyn = false;
   for (let z = z0; z <= z1; z++)
@@ -192,19 +204,29 @@ function evalNode(g: NavGrid, i: number, k: number): [0 | 1, 0 | 1] {
 
 // ── Coordinates ──────────────────────────────────────────────────
 
+/** Node of world point (x, z). */
 export function nodeOf(g: NavGrid, x: number, z: number): XZ {
+  const k = g.res * g.scale;
   return [
-    Math.min(g.nx - 1, Math.max(0, Math.floor(x * g.res))),
-    Math.min(g.nz - 1, Math.max(0, Math.floor(z * g.res))),
+    Math.min(g.nx - 1, Math.max(0, Math.floor(x * k))),
+    Math.min(g.nz - 1, Math.max(0, Math.floor(z * k))),
   ];
 }
 
+/** World centre of node (i, k). */
 export function nodeCentre(g: NavGrid, i: number, k: number): XZ {
-  return [(i + 0.5) / g.res, (k + 0.5) / g.res];
+  const n = g.res * g.scale;
+  return [(i + 0.5) / n, (k + 0.5) / n];
+}
+
+/** Grid extent in world units. */
+function worldSize(g: NavGrid): XZ {
+  return [g.sx / g.scale, g.sz / g.scale];
 }
 
 export function isFreeAt(g: NavGrid, x: number, z: number, ignoreDynamic = false): boolean {
-  if (x < 0 || z < 0 || x >= g.sx || z >= g.sz) return false;
+  const [wx, wz] = worldSize(g);
+  if (x < 0 || z < 0 || x >= wx || z >= wz) return false;
   const [i, k] = nodeOf(g, x, z);
   return !!(ignoreDynamic ? g.nodeStatic : g.node)[i + k * g.nx];
 }
@@ -219,7 +241,8 @@ export function nearestFree(
 ): XZ | null {
   const nodes = ignoreDynamic ? g.nodeStatic : g.node;
   const [ci, ck] = nodeOf(g, x, z);
-  const maxR = Math.ceil(radius * g.res);
+  const perUnit = g.res * g.scale;
+  const maxR = Math.ceil(radius * perUnit);
   let best: XZ | null = null;
   let bestD = Infinity;
   for (let r = 0; r <= maxR; r++) {
@@ -235,9 +258,36 @@ export function nearestFree(
         }
       }
     // A ring at Chebyshev distance r is at least r / res away: stop once no closer hit can follow.
-    if (best && bestD <= r / g.res) break;
+    if (best && bestD <= r / perUnit) break;
   }
-  return best && bestD <= radius + 1 / g.res ? best : null;
+  return best && bestD <= radius + 1 / perUnit ? best : null;
+}
+
+/**
+ * Exact test: the walker's square box (± `half` world units, default the
+ * grid's) centred on world point (x, z) touches only free cells.
+ */
+export function boxFree(
+  g: NavGrid,
+  x: number,
+  z: number,
+  half: number = g.half,
+  ignoreDynamic = false,
+): boolean {
+  const s = g.scale;
+  const h = half * s;
+  const eps = 1e-6;
+  const x0 = Math.floor(x * s - h + eps);
+  const x1 = Math.ceil(x * s + h - eps) - 1;
+  const z0 = Math.floor(z * s - h + eps);
+  const z1 = Math.ceil(z * s + h - eps) - 1;
+  if (x0 < 0 || z0 < 0 || x1 >= g.sx || z1 >= g.sz) return false;
+  for (let vz = z0; vz <= z1; vz++)
+    for (let vx = x0; vx <= x1; vx++) {
+      const v = vx + vz * g.sx;
+      if (g.vox[v] || (!ignoreDynamic && g.dyn[v])) return false;
+    }
+  return true;
 }
 
 // ── Line of sight ────────────────────────────────────────────────
@@ -245,19 +295,26 @@ export function nearestFree(
 /**
  * Exact swept-box test: true when the walker's square box (± `half`) can
  * slide in a straight line from world point a to b touching only free
- * voxel columns. Column by column along x, the part of the segment whose
- * box overlaps that column is clipped and its z range (± half) checked —
- * no sampling gaps, corners included.
+ * cells. Column by column along x, the part of the segment whose box
+ * overlaps that column is clipped and its z range (± half) checked — no
+ * sampling gaps, corners included. `half` overrides the grid's walker
+ * half-width (world units), e.g. the exact collision box on a last leg.
  */
 export function lineClear(
   g: NavGrid,
-  ax: number,
-  az: number,
-  bx: number,
-  bz: number,
+  wax: number,
+  waz: number,
+  wbx: number,
+  wbz: number,
   ignoreDynamic = false,
+  half: number = g.half,
 ): boolean {
-  const h = g.half;
+  const s = g.scale;
+  const ax = wax * s;
+  const az = waz * s;
+  const bx = wbx * s;
+  const bz = wbz * s;
+  const h = half * s;
   const EPS = 1e-6;
   const dx = bx - ax;
   const dz = bz - az;
@@ -375,6 +432,7 @@ export function findPath(g: NavGrid, from: XZ, to: XZ, opts: PathOptions = {}): 
   const nodes = ignoreDynamic ? g.nodeStatic : g.node;
   const maxExp = opts.maxExpansions ?? 40_000;
   const nx = g.nx;
+  const perUnit = g.res * g.scale;
   let start = nodeOf(g, from[0], from[1]);
   if (!nodes[start[0] + start[1] * nx]) {
     const near = nearestFree(g, from[0], from[1], 3, ignoreDynamic);
@@ -388,7 +446,7 @@ export function findPath(g: NavGrid, from: XZ, to: XZ, opts: PathOptions = {}): 
   const h = (i: number, k: number): number => {
     const dx = Math.abs(i - gi);
     const dz = Math.abs(k - gk);
-    return (Math.max(dx, dz) + (SQRT2 - 1) * Math.min(dx, dz)) / g.res;
+    return (Math.max(dx, dz) + (SQRT2 - 1) * Math.min(dx, dz)) / perUnit;
   };
   const s = scratchFor(g);
   const gen = s.gen;
@@ -476,7 +534,7 @@ export function findPath(g: NavGrid, from: XZ, to: XZ, opts: PathOptions = {}): 
       if (!nodes[n] || s.closed[n] === gen) continue;
       // No corner cutting: both orthogonal neighbours must be free for a diagonal.
       if (di && dk && (!nodes[ni + ck * nx] || !nodes[ci + nk * nx])) continue;
-      const ng = gc + cost / g.res;
+      const ng = gc + cost / perUnit;
       if (s.stamp[n] === gen && s.g[n]! <= ng) continue;
       s.stamp[n] = gen;
       s.g[n] = ng;
@@ -497,9 +555,9 @@ export function findPath(g: NavGrid, from: XZ, to: XZ, opts: PathOptions = {}): 
 }
 
 /**
- * Point ray over the static voxel layer from a to b, ignoring the last
- * `stopShort` units (the target's own footprint): "can she see / reach it
- * from here", i.e. no wall in between.
+ * Point ray over the static cell layer from a to b (world units), ignoring
+ * the last `stopShort` units (the target's own footprint): "can she see /
+ * reach it from here", i.e. no wall in between.
  */
 export function rayClear(
   g: NavGrid,
@@ -515,8 +573,8 @@ export function rayClear(
   const n = Math.ceil(end / 0.25);
   for (let s = 0; s <= n; s++) {
     const t = Math.min(end, s * 0.25) / len;
-    const x = Math.floor(ax + (bx - ax) * t);
-    const z = Math.floor(az + (bz - az) * t);
+    const x = Math.floor((ax + (bx - ax) * t) * g.scale);
+    const z = Math.floor((az + (bz - az) * t) * g.scale);
     if (x < 0 || z < 0 || x >= g.sx || z >= g.sz || g.vox[x + z * g.sx]) return false;
   }
   return true;

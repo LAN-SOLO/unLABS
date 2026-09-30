@@ -106,7 +106,10 @@ function DevicePanelImpl({
   onEnding,
   onPower,
   onProto,
+  onInterface,
 }: {
+  /** Back to the device's interface (built devices). */
+  onInterface?: () => void;
   id: string;
   api: WorldApi;
   onClose: () => void;
@@ -456,6 +459,11 @@ function DevicePanelImpl({
                 <CrtButton tone="amber" onClick={onPower}>
                   {tr("Power")}
                 </CrtButton>
+                {onInterface && (
+                  <CrtButton tone="cyan" onClick={onInterface}>
+                    {tr("device::Interface")}
+                  </CrtButton>
+                )}
                 {id === "MCP-000" && (
                   <CrtButton tone="cyan" onClick={() => onTalk("mcp")}>
                     {tr("Talk")}

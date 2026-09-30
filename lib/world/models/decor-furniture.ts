@@ -87,23 +87,23 @@ export const FURNITURE: DecorDef[] = [
     return { model: m, screens: [scr] };
   }),
   fine("swivel_chair", { solid: true }, () => {
-    const m = new Model(12, 20, 12);
+    // Seat at knee height (5 × 0.25 = 1.25): star base, short gas column.
+    const m = new Model(12, 14, 12);
     starBase(m, 5.5, 5.5, 5);
-    m.box(5, 2, 5, 6, 6, 6, C.chrome);
-    m.box(1, 7, 1, 10, 7, 10, C.metal_dark);
-    m.box(0, 8, 0, 11, 9, 11, C.fabric_blue);
-    m.box(1, 10, 2, 10, 10, 10, C.fabric_blue);
-    for (let x = 2; x <= 9; x += 3) m.box(x, 10, 3, x, 10, 9, C.paint_navy); // seams
-    m.box(1, 10, 0, 10, 19, 2, C.fabric_blue);
-    m.box(2, 19, 0, 9, 19, 2, C.leather_black);
-    m.box(2, 12, 2, 9, 17, 2, C.paint_navy); // lumbar pad
+    m.box(5, 2, 5, 6, 2, 6, C.chrome);
+    m.box(0, 3, 0, 11, 3, 11, C.fabric_blue);
+    m.box(1, 4, 2, 10, 4, 10, C.fabric_blue);
+    for (let x = 2; x <= 9; x += 3) m.box(x, 4, 3, x, 4, 9, C.paint_navy); // seams
+    m.box(1, 4, 0, 10, 13, 2, C.fabric_blue);
+    m.box(2, 13, 0, 9, 13, 2, C.leather_black);
+    m.box(2, 6, 2, 9, 11, 2, C.paint_navy); // lumbar pad
     // Back: moulded shell, tag, height lever under the seat.
-    m.box(2, 11, 0, 9, 18, 0, C.metal_dark);
-    m.box(3, 12, 0, 8, 12, 0, C.steel_dark).set(5, 15, 0, C.paper);
-    m.box(11, 7, 7, 11, 7, 9, C.metal_dark);
+    m.box(2, 5, 0, 9, 12, 0, C.metal_dark);
+    m.box(3, 6, 0, 8, 6, 0, C.steel_dark).set(5, 9, 0, C.paper);
+    m.box(11, 2, 7, 11, 2, 9, C.metal_dark);
     for (const x of [0, 11]) {
-      m.box(x, 10, 5, x, 12, 5, C.metal_dark);
-      m.box(x, 13, 3, x, 13, 9, C.leather_black);
+      m.box(x, 4, 5, x, 6, 5, C.metal_dark);
+      m.box(x, 7, 3, x, 7, 9, C.leather_black);
     }
     return m;
   }),
@@ -122,58 +122,60 @@ export const FURNITURE: DecorDef[] = [
     m.box(6, 2, 0, 7, 3, 0, C.paper);
     return m;
   }),
-  fine("sofa", { solid: true, top: 8 }, () => {
-    const m = new Model(28, 14, 14);
+  fine("sofa", { solid: true, top: 4 }, () => {
+    // Cushions at knee height (4 × 0.25 = 1.0).
+    const m = new Model(28, 10, 14);
     for (const [x, z] of [
       [1, 1],
       [26, 1],
       [1, 12],
       [26, 12],
     ] as const)
-      m.box(x, 0, z, x, 1, z, C.walnut);
-    m.box(0, 2, 0, 27, 3, 13, C.fabric_red);
+      m.set(x, 0, z, C.walnut);
+    m.box(0, 1, 0, 27, 1, 13, C.fabric_red);
     for (let i = 0; i < 3; i++) {
       const x0 = 3 + i * 7;
-      m.box(x0, 4, 4, x0 + 6, 7, 13, C.carpet_red);
-      m.box(x0, 7, 4, x0, 7, 13, C.fabric_red); // seam
+      m.box(x0, 2, 4, x0 + 6, 3, 13, C.carpet_red);
+      m.box(x0, 3, 4, x0, 3, 13, C.fabric_red); // seam
     }
-    m.box(0, 4, 0, 27, 13, 3, C.fabric_red);
-    m.box(3, 12, 2, 24, 13, 3, C.carpet_red);
-    for (const x0 of [0, 25]) m.box(x0, 4, 0, x0 + 2, 9, 13, C.fabric_red);
-    m.box(0, 10, 4, 2, 10, 13, C.walnut).box(25, 10, 4, 27, 10, 13, C.walnut);
-    m.box(19, 8, 4, 23, 11, 6, C.fabric_mustard); // pillow
-    m.set(21, 11, 6, C.fabric_mustard_shade).set(20, 9, 6, C.fabric_mustard_shade);
+    m.box(0, 2, 0, 27, 9, 3, C.fabric_red);
+    m.box(3, 8, 2, 24, 9, 3, C.carpet_red);
+    for (const x0 of [0, 25]) m.box(x0, 2, 0, x0 + 2, 5, 13, C.fabric_red);
+    m.box(0, 6, 4, 2, 6, 13, C.walnut).box(25, 6, 4, 27, 6, 13, C.walnut);
+    m.box(19, 4, 4, 23, 7, 6, C.fabric_mustard); // pillow
+    m.set(21, 7, 6, C.fabric_mustard_shade).set(20, 5, 6, C.fabric_mustard_shade);
     // Tufted backrest: buttons in a diamond grid, piping along the arm tops.
-    for (let y = 6; y <= 11; y += 3)
-      for (let x = 4 + ((y / 3) % 2) * 2; x <= 23; x += 4) m.set(x, y, 3, C.fabric_red_shade);
-    m.box(0, 9, 13, 2, 9, 13, C.fabric_red_shade).box(25, 9, 13, 27, 9, 13, C.fabric_red_shade);
-    m.box(9, 7, 11, 11, 7, 12, C.fabric_red_shade); // a sat-in dent
+    for (const y of [5, 7])
+      for (let x = 4 + (y === 7 ? 2 : 0); x <= 23; x += 4) m.set(x, y, 3, C.fabric_red_shade);
+    m.box(0, 5, 13, 2, 5, 13, C.fabric_red_shade).box(25, 5, 13, 27, 5, 13, C.fabric_red_shade);
+    m.box(9, 3, 11, 11, 3, 12, C.fabric_red_shade); // a sat-in dent
     // Back: upholstery seams, a blanket thrown over the backrest.
-    for (const x of [7, 14, 21]) m.box(x, 4, 0, x, 12, 0, C.carpet_red);
-    m.box(4, 8, 0, 11, 13, 0, C.fabric_mustard).box(4, 13, 1, 11, 13, 3, C.fabric_mustard);
-    for (let x = 4; x <= 11; x += 2) m.set(x, 8, 0, C.fabric_red);
+    for (const x of [7, 14, 21]) m.box(x, 2, 0, x, 8, 0, C.carpet_red);
+    m.box(4, 4, 0, 11, 9, 0, C.fabric_mustard).box(4, 9, 1, 11, 9, 3, C.fabric_mustard);
+    for (let x = 4; x <= 11; x += 2) m.set(x, 4, 0, C.fabric_red);
     return m;
   }),
   fine("armchair", { solid: true }, () => {
-    const m = new Model(14, 16, 14);
+    // Cushion at knee height (4 × 0.25 = 1.0).
+    const m = new Model(14, 12, 14);
     for (const [x, z] of [
       [1, 1],
       [12, 1],
       [1, 12],
       [12, 12],
     ] as const)
-      m.box(x, 0, z, x, 1, z, C.walnut);
-    m.box(0, 2, 0, 13, 5, 13, C.leather);
-    m.box(3, 6, 3, 10, 7, 13, C.fabric_green);
-    m.box(3, 7, 13, 10, 7, 13, C.fabric_green_shade); // cushion piping
-    m.box(5, 7, 6, 8, 7, 9, C.fabric_green_shade); // sat-in dent
-    m.set(1, 10, 13, C.leather_worn).set(12, 10, 13, C.leather_worn); // rubbed arm ends
-    m.box(0, 6, 0, 13, 15, 2, C.leather);
-    m.box(1, 15, 0, 12, 15, 1, C.wood_dark);
-    for (const x0 of [0, 11]) m.box(x0, 6, 0, x0 + 2, 10, 13, C.leather);
-    for (let y = 8; y <= 14; y += 3) for (let x = 3; x <= 10; x += 3) m.set(x, y, 3, C.brass);
-    m.box(1, 6, 0, 12, 6, 0, C.wood_dark); // back rail
-    for (const x of [4, 9]) m.box(x, 7, 0, x, 14, 0, C.leather_black); // back seams
+      m.set(x, 0, z, C.walnut);
+    m.box(0, 1, 0, 13, 2, 13, C.leather);
+    m.box(3, 3, 3, 10, 3, 13, C.fabric_green);
+    m.box(3, 3, 13, 10, 3, 13, C.fabric_green_shade); // cushion piping
+    m.box(5, 3, 6, 8, 3, 9, C.fabric_green_shade); // sat-in dent
+    m.box(0, 3, 0, 13, 11, 2, C.leather);
+    m.box(1, 11, 0, 12, 11, 1, C.wood_dark);
+    for (const x0 of [0, 11]) m.box(x0, 3, 0, x0 + 2, 6, 13, C.leather);
+    m.set(1, 6, 13, C.leather_worn).set(12, 6, 13, C.leather_worn); // rubbed arm ends
+    for (let y = 5; y <= 10; y += 3) for (let x = 3; x <= 10; x += 3) m.set(x, y, 3, C.brass);
+    m.box(1, 3, 0, 12, 3, 0, C.wood_dark); // back rail
+    for (const x of [4, 9]) m.box(x, 4, 0, x, 10, 0, C.leather_black); // back seams
     return m;
   }),
   fine("cot", { solid: true }, () => {
@@ -321,11 +323,12 @@ export const FURNITURE: DecorDef[] = [
     return m;
   }),
   fine("stool", { solid: true }, () => {
-    const m = new Model(8, 12, 8);
-    legs(m, 0, 0, 7, 7, 9, C.steel_dark);
-    m.box(0, 4, 0, 7, 4, 0, C.steel).box(0, 4, 7, 7, 4, 7, C.steel);
-    m.cyl(3.5, 3.5, 3.8, 10, 11, C.leather_black);
-    m.ring(3.5, 3.5, 3.8, 10, C.metal_dark);
+    // Low lab stool: seat at knee height (5 × 0.25 = 1.25), a foot ring.
+    const m = new Model(8, 5, 8);
+    legs(m, 0, 0, 7, 7, 2, C.steel_dark);
+    m.box(0, 1, 0, 7, 1, 0, C.steel).box(0, 1, 7, 7, 1, 7, C.steel);
+    m.cyl(3.5, 3.5, 3.8, 3, 4, C.leather_black);
+    m.ring(3.5, 3.5, 3.8, 3, C.metal_dark);
     return m;
   }),
   fine("microscope", { solid: true }, () => {

@@ -281,9 +281,12 @@ describe("scene scripts", () => {
     // halo: white-gold bloom
     expect(count("halo", "power_wave", ENDING_SIGNATURE.halo.color)).toBeGreaterThanOrEqual(1);
     expect(count("halo", "pickup_glint", ENDING_SIGNATURE.halo.color)).toBeGreaterThanOrEqual(8);
-    // kristall: thirty slice glints (twice: laid out, then whole)
-    expect(count("kristall", "pickup_glint", 0x9d5cff)).toBe(30);
-    expect(count("kristall", "pickup_glint", 0xe8f4ff)).toBe(30);
+    // kristall: thirty orange slice glints (#0089 = unETH ID 89, orange),
+    // twice: laid out, then whole (white-hot core)
+    expect(ENDING_SIGNATURE.kristall.color).toBe(0xff6b00);
+    expect(count("kristall", "pickup_glint", ENDING_SIGNATURE.kristall.color)).toBe(30);
+    expect(count("kristall", "pickup_glint", 0xfff4c8)).toBe(30);
+    expect(count("kristall", "power_wave", ENDING_SIGNATURE.kristall.color)).toBe(1);
     // the signature colours are distinct
     const colors = ENDING_IDS.map((id) => ENDING_SIGNATURE[id].color);
     expect(new Set(colors).size).toBe(colors.length);

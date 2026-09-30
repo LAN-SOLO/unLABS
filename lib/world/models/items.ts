@@ -1084,15 +1084,17 @@ const AUTHORED: Record<string, Builder> = {
       o.set(x, y, z, C.gamma);
     return o;
   },
+  // Crystal #0089 is orange: unETH archive ID 89 (P02/L02 pure, T2, 64 bit,
+  // CW, state O) — neon #FF6B00 = C.orange_neon.
   kristall_0089: () => {
     const o = new IconModel(12, 16, 12);
     o.box(1, 0, 1, 10, 1, 10, C.chrome);
     o.box(2, 2, 2, 9, 2, 9, C.steel);
     for (let y = 3; y <= 12; y++) {
-      const c = y === 7 ? C.orange_neon : y % 2 ? C.crystal_cyan : C.safety_blue;
-      layer(o, 5.5, 5.5, 3.3, y, c, y === 7 ? C.plasma : C.holo_cyan);
+      const c = y === 7 ? C.halo_glow : y % 2 ? C.glass_amber : C.safety_orange;
+      layer(o, 5.5, 5.5, 3.3, y, c, y === 7 ? C.plasma : C.orange_neon);
     }
-    spire(o, 5.5, 5.5, 13, 3.3, 3, C.crystal_cyan, C.holo_cyan, C.lamp_cold);
+    spire(o, 5.5, 5.5, 13, 3.3, 3, C.glass_amber, C.orange_neon, C.halo_glow);
     return o;
   },
   anomaler_kern: () => {
@@ -1162,12 +1164,13 @@ const AUTHORED: Record<string, Builder> = {
         const v = Math.abs(y - 7.5);
         if (u <= 5.4 && v <= 5.6 && u * 0.5 + v * 0.87 <= 5.5) {
           const edge = u * 0.5 + v * 0.87 > 4.3 || u > 4.6;
-          o.set(x, y, 3, edge ? C.safety_blue : C.crystal_cyan);
-          o.set(x, y, 2, C.blue_paint);
+          // Orange like its crystal (unETH ID 89): neon rim, amber glass face.
+          o.set(x, y, 3, edge ? C.orange_neon : C.glass_amber);
+          o.set(x, y, 2, C.orange_paint_dk);
         }
       }
-    for (let x = 3; x <= 8; x++) o.set(x, 7 + ((x * 3) % 3) - 1, 3, C.holo_cyan);
-    o.set(6, 8, 3, C.plasma).set(5, 8, 3, C.orange_neon);
+    for (let x = 3; x <= 8; x++) o.set(x, 7 + ((x * 3) % 3) - 1, 3, C.plasma);
+    o.set(6, 8, 3, C.halo_glow).set(5, 8, 3, C.safety_orange);
     return o;
   },
   sternkarte: () => {
@@ -1239,6 +1242,53 @@ const AUTHORED: Record<string, Builder> = {
   },
 
   // ── Schlacke ──
+  // ── Textiles (wardrobe replicator) ──
+  stoffreste: () => {
+    // Three folded patches, stacked a little crooked, a loose thread on top.
+    const o = new IconModel(13, 6, 12);
+    o.box(1, 0, 1, 10, 1, 9, C.fabric_red).box(1, 1, 9, 10, 1, 9, C.fabric_red_shade);
+    o.box(2, 2, 2, 11, 3, 10, C.fabric_mustard).box(2, 3, 10, 11, 3, 10, C.fabric_mustard_shade);
+    o.box(1, 4, 3, 9, 4, 10, C.fabric_blue).box(1, 4, 10, 9, 4, 10, C.fabric_blue_shade);
+    for (let x = 2; x <= 8; x += 2) o.set(x, 4, 6, C.paint_white); // stitches
+    o.set(10, 5, 6, C.paint_white).set(11, 5, 7, C.paint_white).set(12, 4, 8, C.paint_white);
+    o.box(0, 0, 4, 0, 1, 6, C.fabric_green);
+    return o;
+  },
+  polymerfaser: () => {
+    // A white spool of fibre on a dark core, the loose end trailing off.
+    const o = new IconModel(12, 12, 12);
+    o.cyl(5.5, 5.5, 4.8, 0, 0, C.paint_black);
+    o.cyl(5.5, 5.5, 4.2, 1, 9, C.paint_white);
+    for (let y = 2; y <= 8; y += 2) layer(o, 5.5, 5.5, 4.3, y, C.paint_white, C.paint_white_dk);
+    o.cyl(5.5, 5.5, 4.8, 10, 10, C.paint_black);
+    o.cyl(5.5, 5.5, 1.2, 10, 11, C.steel_dark);
+    for (let x = 9; x <= 11; x++) o.set(x, 5 - (x - 9), 10, C.paint_white);
+    return o;
+  },
+  farbpigment: () => {
+    // Glass jar of ground pigment with a cork, colour smudged on the rim.
+    const o = new IconModel(11, 13, 11);
+    o.cyl(5, 5, 4, 0, 8, C.glass);
+    for (let y = 0; y <= 6; y++)
+      layer(o, 5, 5, 3.4, y, y < 3 ? C.safety_red : y < 5 ? C.neon_magenta : C.paint_pink);
+    o.cyl(5, 5, 2.6, 9, 10, C.wood_light);
+    o.set(8, 8, 8, C.safety_red).set(2, 7, 8, C.neon_magenta);
+    o.box(3, 11, 5, 7, 11, 5, C.paper).set(5, 12, 5, C.safety_red);
+    return o;
+  },
+  leuchtfaden: () => {
+    // A bobbin of glowing green thread, a looped end catching the light.
+    const o = new IconModel(12, 13, 12);
+    o.cyl(5.5, 5.5, 3.6, 0, 1, C.wood);
+    o.cyl(5.5, 5.5, 2.8, 2, 9, C.led_green);
+    for (let y = 3; y <= 8; y += 2) layer(o, 5.5, 5.5, 2.9, y, C.screen_green, C.lime);
+    o.cyl(5.5, 5.5, 3.6, 10, 11, C.wood);
+    o.cyl(5.5, 5.5, 0.9, 12, 12, C.wood_dark);
+    for (let a = 0; a < 8; a++)
+      o.set(9 + Math.round(Math.cos(a) * 1.5), 6 + Math.round(Math.sin(a) * 2), 9, C.led_green);
+    return o;
+  },
+
   schlacke: () => {
     const o = new IconModel(13, 9, 13);
     lump(

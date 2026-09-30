@@ -99,7 +99,8 @@ function expectFinite(p: CharacterPose, label: string): void {
     }
     for (const q of p[n].pos ?? [0, 0, 0]) {
       expect(Number.isFinite(q), `${label} ${n}`).toBe(true);
-      expect(Math.abs(q), `${label} ${n}`).toBeLessThanOrEqual(8 * U);
+      // The hips travel down to a seat / mattress (at most the leg length).
+      expect(Math.abs(q), `${label} ${n}`).toBeLessThanOrEqual(n === "hips" ? 12 * U : 8 * U);
     }
   }
 }
@@ -190,6 +191,8 @@ describe("pose kinds", () => {
   it.each(RIGS)("%s: every pose clears the 6-unit door and stays on the floor", (_n, def) => {
     for (const kind of POSE_KINDS)
       for (let t = 0; t < 40; t += 0.53) {
+        // "lie" is placed on a bed by the engine: see rig-seat.test.ts.
+        if (kind === "lie") continue;
         const speed = kind === "run" ? RUN_FULL_SPEED : kind === "walk" ? WALK_FULL_SPEED : 0;
         const [min, max] = rigBounds(def, characterPose(kind, t, speed));
         expect(max[1], `${kind} @ ${t}`).toBeLessThan(6);
@@ -229,7 +232,8 @@ describe("pose kinds", () => {
     let lowest = Infinity;
     for (let i = 0; i < 24; i++) {
       const low = lowestFoot(def, characterPose("run", i / 24 / RUN_HZ));
-      expect(low, `phase ${i}/24`).toBeGreaterThan(-0.6 * U);
+      // No ankle: the toe cap may dip a little as the foot rolls off (see soleDrop).
+      expect(low, `phase ${i}/24`).toBeGreaterThan(-1.0 * U);
       lowest = Math.min(lowest, low);
     }
     expect(lowest).toBeLessThan(0.3 * U);

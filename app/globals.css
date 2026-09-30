@@ -792,3 +792,28 @@ body {
 .and-sens-slider:disabled {
   cursor: not-allowed;
 }
+
+/* Lab World: now-playing chip (fade in, hold, fade out over 6 s) */
+@keyframes unlab-now-playing {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  8%,
+  82% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, 0);
+  }
+}
+.unlab-now-playing {
+  animation: unlab-now-playing 6s ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .unlab-now-playing {
+    animation: none;
+  }
+}

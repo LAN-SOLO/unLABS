@@ -10,6 +10,7 @@ export const DE_WORLD: Record<string, string> = {
   "decor verb::heard": "gehört",
   "decor verb::viewed": "angesehen",
   "decor verb::break": "Pause",
+  "decor verb::rest": "Ruhe",
   "decor verb::drunk": "getrunken",
   "Insight: {title}": "Erkenntnis: {title}",
   "OK [E]": "OK [E]",

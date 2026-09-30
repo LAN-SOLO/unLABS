@@ -65,10 +65,13 @@ function InventoryPanelImpl({
   api,
   onClose,
   onProto,
+  onWardrobe,
 }: {
   api: WorldApi;
   onClose: () => void;
   onProto?: ProtoUseHandler;
+  /** Opens Jade's character menu (button next to the provisions). */
+  onWardrobe?: () => void;
 }) {
   const s = api.get();
   const version = api.version;
@@ -124,6 +127,17 @@ function InventoryPanelImpl({
       onClose={onClose}
       wide
     >
+      {onWardrobe && (
+        <div className="mb-2 flex justify-end">
+          <CrtButton
+            tone="cyan"
+            onClick={onWardrobe}
+            title={tr("Jade's wardrobe and replicator (O)")}
+          >
+            {tr("Wardrobe [O]")}
+          </CrtButton>
+        </div>
+      )}
       {/* Biorhythm provisions (kept outside the item grid — never workbench material). */}
       <ProvisionList api={api} />
       <div className="grid gap-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">

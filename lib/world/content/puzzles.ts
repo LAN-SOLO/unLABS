@@ -661,6 +661,24 @@ export const PUZZLES: readonly PuzzleDef[] = [
     ),
   },
   {
+    id: "pz_studio_door",
+    kind: "tones",
+    title: tr("The Studio Door"),
+    intro: tr(
+      "Eight small keys under the foam. You know Damien's song now — three scraps put together. The panel hums it back once; play it without a mistake.",
+    ),
+    params: {
+      tones: [2, 4, 7, 5, 6, 4],
+      scale: [261.63, 293.66, 329.63, 349.23, 392.0, 440.0, 493.88, 523.25],
+      // The panel sings Damien's song on an ocarina (lib/world/audio/songs/instruments.ts).
+      voice: "ocarina",
+    },
+    reward: { insights: ["damiens_studio"], flags: ["studio_open"] },
+    mcpSolved: tr(
+      "A room I did not know I had. Forty kilos of acoustic foam, one very good chair. Dr. Fridge built a studio in my listening ring and never told me. I would like to be offended. I would rather listen.",
+    ),
+  },
+  {
     id: "pz_side_spieluhr",
     kind: "tones",
     title: tr("The Music Box in the Library"),

@@ -4,6 +4,7 @@
  * (`checkStage`, `missingParts`, `recipeChain`, `deviceHasUse`, …) and the
  * inventory panel's "uses" derivation; nothing here mutates the state.
  */
+import { isWearPickupItem, wearItemName } from "@/lib/world/wardrobe";
 import { tr } from "@/lib/i18n";
 import { recipeUses, stageUses } from "@/components/world/panels/derive";
 import { DEVICES, DEVICE_BY_ID } from "@/lib/world/content/devices";
@@ -132,6 +133,7 @@ export const VERB_LABEL: Record<DecorVerb, string> = {
   hören: tr("verb::Listen"),
   ansehen: tr("verb::Look"),
   sitzen: tr("verb::Sit down"),
+  liegen: tr("verb::Lie down"),
   trinken: tr("verb::Drink"),
 };
 
@@ -154,7 +156,7 @@ const AUTHOR_LABEL: Record<NoteDef["author"], string> = {
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-const itemName = (id: string): string => ITEM_BY_ID.get(id)?.name ?? id;
+const itemName = (id: string): string => ITEM_BY_ID.get(id)?.name ?? wearItemName(id) ?? id;
 
 function snippet(text: string, max = 220): string {
   const flat = text.replace(/\s+/g, " ").trim();
@@ -273,7 +275,14 @@ function pickupDossier(s: WorldState, model: MapModel, e: MapEntity): Dossier {
   const sections: DossierSection[] = [];
   const contents = p.pool?.length
     ? [tr("{n} random parts per opening (recycling pool)", { n: p.poolCount ?? 3 })]
-    : p.items.map((it) => `${it.count}× ${itemName(it.item)}`);
+    : p.items.map((it) => {
+        // Wardrobe finds stay a surprise until picked up.
+        if (!isWearPickupItem(it.item)) return `${it.count}× ${itemName(it.item)}`;
+        const name = wearItemName(it.item);
+        return s.taken[p.id] !== undefined && name
+          ? tr("{name} (in Jade's wardrobe)", { name })
+          : tr("Something for Jade's wardrobe");
+      });
   sections.push({ title: tr("dossier::Contents"), items: contents });
   const how: string[] = [];
   if (p.puzzle) {

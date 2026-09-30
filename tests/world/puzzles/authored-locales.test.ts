@@ -179,7 +179,9 @@ function checkPuzzle(a: All, p: PuzzleDef, text: string): void {
     case "tones": {
       const scale = nums(pr, "scale", []);
       const tones = nums(pr, "tones", []);
-      expect(tones).toHaveLength(4);
+      // Four-tone sequences, and Damien's six-note studio song (pz_studio_door).
+      expect(tones.length).toBeGreaterThanOrEqual(4);
+      expect(tones.length).toBeLessThanOrEqual(8);
       for (const t of tones) expect(t >= 0 && t < scale.length && Number.isInteger(t)).toBe(true);
       break;
     }

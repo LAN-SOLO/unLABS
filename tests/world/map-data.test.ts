@@ -42,7 +42,7 @@ describe("map model — rooms, fog and doors", () => {
     const m = buildMapModel(initialState());
     expect(m.order).toEqual([4, 0, 1, 2, 3, 5]);
     expect(m.shaft.map((x) => x.floor)).toEqual(m.order);
-    const secret = ["kartenraum", "kaeltearchiv", "c8versteck"];
+    const secret = ["kartenraum", "kaeltearchiv", "c8versteck", "studio"];
     for (const r of ROOMS) {
       const listed = m.floors[r.floor].rooms.some((x) => x.id === r.id);
       expect(listed, r.id).toBe(!secret.includes(r.id));

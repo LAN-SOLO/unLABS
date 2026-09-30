@@ -298,6 +298,13 @@ describe("pathfind — lab floors", () => {
           expect(touchesDoor(r.points, doors, g.half), `${ra.id} → ${rb.id} via door`).toBe(true);
         }
       // With every door open (all locks ignored), the floor is one connected lab.
+      if (reached !== pairs && process.env.PF_DEBUG) {
+        const miss: string[] = [];
+        for (const [ra, a] of spots)
+          for (const [rb, b] of spots)
+            if (ra.id < rb.id && !findPath(g, a!, b!).reached) miss.push(`${ra.id}-${rb.id}`);
+        console.log("MISS", floor, miss.join(" "));
+      }
       expect(reached, `${reached}/${pairs} pairs reachable`).toBe(pairs);
     });
   }

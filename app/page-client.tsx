@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { BootSequence } from "@/components/BootSequence";
+import { VERSION_LABEL } from "@/lib/version";
 
 export function LandingPageClient() {
   const [showBoot, setShowBoot] = useState(true);
@@ -101,7 +102,7 @@ export function LandingPageClient() {
 
       {/* Footer */}
       <footer className="p-4 text-center text-xs text-green-500/30">
-        <p>v{process.env.NEXT_PUBLIC_APP_VERSION} | SOLANA DEVNET</p>
+        <p>{VERSION_LABEL} | SOLANA DEVNET</p>
       </footer>
     </div>
   );

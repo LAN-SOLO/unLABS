@@ -202,3 +202,36 @@ describe("atmosphere", () => {
     expect(brownoutInterval(0.5, true)).toBeCloseTo(brownoutInterval(0.5, false) * 3, 6);
   });
 });
+
+describe("npc brain: motion quality", () => {
+  const cfg: NpcBrainConfig = {
+    homeX: 10,
+    homeZ: 10,
+    wander: 6,
+    stations: [],
+    radius: 0.8,
+    speed: 3,
+  };
+
+  it("never stops dead or lurches: speed changes smoothly, turns stay gentle when standing", () => {
+    const b = createBrain("smooth-bot", 10, 10);
+    const dt = 1 / 60;
+    let prevSpeed = 0;
+    let prevYaw = b.yaw;
+    let walked = false;
+    for (let i = 0; i < 60 * 60; i++) {
+      // The player wanders past now and then (watch → resume).
+      const near = i % 900 > 600;
+      stepBrain(b, cfg, world(near ? b.x + 3 : 100, near ? b.z : 100), dt);
+      if (b.mode === "walk") walked = true;
+      // No more than ~0.25 units/s of speed change per frame (no dead stops from full speed).
+      expect(Math.abs(b.speed - prevSpeed), `frame ${i} ${b.mode}`).toBeLessThan(0.25);
+      const turn = Math.abs(angleDelta(prevYaw, b.yaw)) / dt;
+      if (b.mode === "idle" && b.speed === 0)
+        expect(turn, `frame ${i}`).toBeLessThanOrEqual(1.4 + 1e-6);
+      prevSpeed = b.speed;
+      prevYaw = b.yaw;
+    }
+    expect(walked).toBe(true);
+  });
+});

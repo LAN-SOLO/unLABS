@@ -80,6 +80,9 @@ describe("character rigs", () => {
   it.each(RIGS)("%s: every pose stays under the door frame", (_n, def) => {
     for (const kind of POSE_KINDS)
       for (let t = 0; t < 4; t += 0.37) {
+        // "lie" is placed on a bed by the engine (legs hang over the edge while
+        // lying down): see rig-seat.test.ts.
+        if (kind === "lie") continue;
         const [min, max] = rigBounds(def, characterPose(kind, t, 13));
         expect(max[1], `${kind} @ ${t}`).toBeLessThan(DOOR_HEIGHT);
         expect(min[1], `${kind} @ ${t}`).toBeGreaterThan(-0.6);
@@ -116,7 +119,8 @@ describe("character poses", () => {
             }
             for (const q of p[n].pos ?? [0, 0, 0]) {
               expect(Number.isFinite(q)).toBe(true);
-              expect(Math.abs(q)).toBeLessThanOrEqual(8 * U);
+              // The hips travel down to a seat / mattress (at most the leg length).
+              expect(Math.abs(q)).toBeLessThanOrEqual(n === "hips" ? 12 * U : 8 * U);
             }
           }
         }
@@ -134,7 +138,8 @@ describe("character poses", () => {
     // Contra-lateral: right leg forward while right arm swings back, then the reverse.
     expect(a.thighR.rot[0]).toBeLessThan(-0.3);
     expect(a.upperArmR.rot[0]).toBeGreaterThan(0.2);
-    expect(b.thighR.rot[0]).toBeGreaterThan(0.3);
+    // Toe-off: the right thigh is back (the knee already bends forward to swing through).
+    expect(b.thighR.rot[0]).toBeGreaterThan(0.15);
     expect(b.thighL.rot[0]).toBeLessThan(-0.3);
     // Standing still means no stride.
     expect(Math.abs(characterPose("walk", 0.3, 0).thighR.rot[0])).toBeLessThan(1e-9);

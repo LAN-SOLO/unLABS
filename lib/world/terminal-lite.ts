@@ -37,6 +37,7 @@ import {
   PROPS,
   ROOMS,
   roomAt,
+  inRoomShape,
 } from "@/lib/world/content/map";
 import { PUZZLES, PUZZLE_BY_ID } from "@/lib/world/content/puzzles";
 import { ENDINGS, INSIGHTS, NPC_SPEAKERS, BOT_QUESTS } from "@/lib/world/content/story";
@@ -171,7 +172,7 @@ function hereRoom(s: WorldState, ctx: TerminalContext): { floor: FloorId; room?:
 }
 
 function inRoom(r: RoomDef, floor: FloorId, x: number, z: number): boolean {
-  return floor === r.floor && x > r.x && x < r.x + r.w && z > r.z && z < r.z + r.d;
+  return floor === r.floor && inRoomShape(r, x, z);
 }
 
 function deviceFloor(id: string): FloorId | undefined {

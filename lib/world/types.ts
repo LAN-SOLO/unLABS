@@ -9,6 +9,9 @@
  * (no DOM, no three) so it runs in Vitest.
  */
 
+import type { RoomShape } from "@/lib/world/room-shape";
+import type { JadeLook } from "@/lib/world/content/wardrobe";
+
 /** The eight trait axes every item carries (0..∞, usually 0..12). */
 export const TRAIT_AXES = [
   "energie",
@@ -89,9 +92,15 @@ export interface RoomDef {
   litBy?: string;
   /** Interior theme used by the decor generator (see content/interior.ts). */
   theme?: RoomTheme;
+  /**
+   * Floor shape (union of primitives, absolute voxels; see lib/world/room-shape.ts).
+   * Absent = the wall rectangle. With a shape, x/z/w/d are its wall-line bounding box.
+   */
+  shape?: RoomShape;
 }
 
 export type RoomTheme =
+  | "hub"
   | "control"
   | "server"
   | "office"
@@ -151,7 +160,13 @@ export type Condition =
   | { puzzle: string }
   | { power: number }
   /** Numeric counter in `WorldState.counters` reaches `min` (e.g. slices found). */
-  | { counter: string; min: number };
+  | { counter: string; min: number }
+  /** Hub `link` has device `to` connected (lib/world/links.ts). */
+  | { link: string; to: string }
+  /** Device `firmware` runs at least version `min` (lib/world/firmware.ts). */
+  | { firmware: string; min: string }
+  /** Archive entry found (lib/world/archive.ts). */
+  | { archive: string };
 
 export interface Requirement {
   label: string;
@@ -241,7 +256,20 @@ export interface PickupDef {
   label: string;
   /** Regrows after this many seconds (resource sources). */
   respawn?: number;
-  model: "crate" | "scrap" | "shelf" | "seep" | "locker" | "canister" | "crystal";
+  model:
+    | "crate"
+    | "scrap"
+    | "shelf"
+    | "seep"
+    | "locker"
+    | "canister"
+    | "crystal"
+    /** Folded clothes with a tag — hidden wardrobe finds (`wear:<id>` items). */
+    | "bundle"
+    /** Laundry basket / rag bin — refilling textile source. */
+    | "basket"
+    /** Jade's sewing box. */
+    | "sewing";
   /** Puzzle that must be solved before the pickup can be opened. */
   puzzle?: string;
   /** Full salvage needs this device; otherwise only the first item is recovered. */
@@ -459,4 +487,89 @@ export interface WorldState {
   combos: number;
   /** Misc numeric counters (drone runs, timers). */
   counters: Record<string, number>;
+  /** Installed firmware per device when it differs from the factory image (id → semver). */
+  firmware: Record<string, string>;
+  /** Hub device id → devices connected to it (lib/world/links.ts). */
+  links: Record<string, string[]>;
+  /** Archive entries found (id → play time when found; lib/world/archive.ts). */
+  archive: Record<string, number>;
+  /** Device interface settings, keyed `<device>.<control>` (knobs, modes, sliders). */
+  tuning: Record<string, number>;
+  /** Jade's knowledge base: what she wrote down, filed or pinned (lib/world/memos.ts). */
+  memos: Memo[];
+  /** Study progress per course (seconds studied; lib/world/courses.ts). */
+  courses: Record<string, number>;
+  /** Last readout per device (kept for the knowledge panel). */
+  readouts: Record<string, { t: number; lines: string[] }>;
+  /** Recent workbench experiments, newest last (capped). */
+  experiments: Experiment[];
+  /** Jade's wardrobe: owned pieces, dyes, the current look, presets, replicator job (lib/world/wardrobe.ts). */
+  wardrobe: WardrobeState;
 }
+
+export interface WardrobeState {
+  /** Owned wardrobe pieces (content/wardrobe.ts ids). */
+  owned: Record<string, true>;
+  /** Paid dye colourways, keyed `<item>.<colourway>`. */
+  dyes: Record<string, true>;
+  look: JadeLook;
+  /** Saved outfits (OUTFIT_PRESETS slots, null = empty). */
+  presets: ({ name: string; look: JadeLook } | null)[];
+  /** Hidden pieces found (id → play time when found). */
+  found: Record<string, number>;
+  /** Pieces made at the replicator (count). */
+  crafted: number;
+  /** Pieces the player has looked at / worn (the menu marks the rest “new”). */
+  seen: Record<string, true>;
+  /** The replicator's running job (play-time seconds). */
+  job: { kind: "craft" | "refine" | "dye"; id: string; start: number; done: number } | null;
+}
+
+/** Where a memo lives: in Jade's head (knowledge panel), on her computer, or pinned to a board (decor placement id). */
+export type MemoPlace = "mind" | "pc" | `decor:${string}`;
+
+export type MemoSourceKind =
+  | "archive"
+  | "insight"
+  | "readout"
+  | "recipe"
+  | "note"
+  | "log"
+  | "puzzle"
+  | "device"
+  | "course"
+  | "experiment"
+  | "message"
+  | "custom";
+
+export interface Memo {
+  id: string;
+  title: string;
+  text: string;
+  /** Play time when written. */
+  t: number;
+  place: MemoPlace;
+  source?: { kind: MemoSourceKind; id?: string };
+  tags?: string[];
+}
+
+export interface Experiment {
+  t: number;
+  /** Input item ids with counts. */
+  inputs: Record<string, number>;
+  outcome: "recipe" | "prototype" | "explosion" | "fail";
+  output?: string;
+}
+
+/** Knowledge areas of the knowledge panel (lib/world/knowledge.ts). */
+export type KnowledgeArea =
+  | "power"
+  | "building"
+  | "combining"
+  | "signals"
+  | "anomalies"
+  | "quantum"
+  | "systems"
+  | "people"
+  | "exploration"
+  | "body";

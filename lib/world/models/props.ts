@@ -188,15 +188,15 @@ function forgeRig(): PropRig {
   }
 
   // ── Animated parts ──
-  // Crystal #0089: slow turn inside the glass, halo-glow core.
+  // Crystal #0089 (orange, archive T2): slow turn inside the glass, halo-glow core.
   const crystal = new Model(4, 8, 4);
-  crystal.box(1, 0, 1, 2, 0, 2, C.crystal_violet);
+  crystal.box(1, 0, 1, 2, 0, 2, C.orange_neon);
   for (let y = 1; y <= 5; y++) {
-    crystal.box(1, y, 0, 2, y, 3, C.crystal_cyan).box(0, y, 1, 3, y, 2, C.crystal_cyan);
-    crystal.box(1, y, 1, 2, y, 2, y === 3 ? C.cerulean : C.crystal_violet);
+    crystal.box(1, y, 0, 2, y, 3, C.glass_amber).box(0, y, 1, 3, y, 2, C.glass_amber);
+    crystal.box(1, y, 1, 2, y, 2, y === 3 ? C.halo_glow : C.plasma);
   }
-  crystal.set(0, 3, 1, C.crystal_violet).set(3, 2, 2, C.crystal_violet);
-  crystal.box(1, 6, 1, 2, 6, 2, C.crystal_violet).set(1, 7, 2, C.crystal_cyan);
+  crystal.set(0, 3, 1, C.orange_neon).set(3, 2, 2, C.orange_neon);
+  crystal.box(1, 6, 1, 2, 6, 2, C.orange_neon).set(1, 7, 2, C.glass_amber);
 
   // Halo ring: dashed band turning in the gate plane.
   const halo = partModel(m, [18, 18, 2], [5, 9, 13], (x, y) => {
@@ -561,14 +561,15 @@ const PROP_MODELS: Record<string, () => Model> = {
     return m;
   },
   chair: () => {
-    const m = new Model(6, 10, 6);
+    // Seat at knee height (2 × 0.5 = 1.0): star base, seat, backrest.
+    const m = new Model(6, 8, 6);
     m.box(1, 0, 2, 4, 0, 3, C.metal).box(2, 0, 1, 3, 0, 4, C.metal);
     m.set(0, 0, 2, C.rubber).set(5, 0, 3, C.rubber).set(2, 0, 0, C.rubber).set(3, 0, 5, C.rubber);
-    m.box(2, 1, 2, 3, 2, 3, C.chrome);
-    m.box(0, 3, 0, 5, 3, 5, C.black).box(1, 4, 1, 4, 4, 4, C.leather_black);
-    m.box(0, 4, 0, 5, 9, 0, C.black).box(1, 5, 0, 4, 8, 0, C.leather_black);
-    m.box(0, 5, 2, 0, 5, 4, C.metal).box(5, 5, 2, 5, 5, 4, C.metal);
-    m.box(1, 4, 4, 4, 4, 4, C.leather).set(2, 6, 0, C.leather).set(3, 7, 0, C.leather); // worn
+    m.box(2, 0, 2, 3, 0, 3, C.chrome);
+    m.box(0, 1, 0, 5, 1, 5, C.black).box(1, 1, 1, 4, 1, 4, C.leather_black);
+    m.box(0, 2, 0, 5, 7, 0, C.black).box(1, 3, 0, 4, 6, 0, C.leather_black);
+    m.box(0, 2, 2, 0, 2, 4, C.metal).box(5, 2, 2, 5, 2, 4, C.metal);
+    m.box(1, 1, 4, 4, 1, 4, C.leather).set(2, 4, 0, C.leather).set(3, 5, 0, C.leather); // worn
     return m;
   },
   plant: () => {
@@ -789,6 +790,44 @@ const PICKUP_MODELS: Record<string, () => Model> = {
     m.box(2, 6, 2, 2, 7, 2, C.crystal_violet)
       .set(3, 7, 3, C.crystal_cyan)
       .set(1, 6, 3, C.crystal_cyan);
+    return m;
+  },
+  bundle: () => {
+    // Folded clothes, tied with string, a paper tag hanging off the knot.
+    const m = new Model(6, 4, 5);
+    m.box(0, 0, 0, 5, 0, 4, C.fabric_gray_shade);
+    m.box(0, 1, 0, 5, 1, 4, C.fabric_blue).box(0, 1, 4, 5, 1, 4, C.fabric_blue_shade);
+    m.box(1, 2, 0, 5, 2, 4, C.fabric_red).box(1, 2, 4, 5, 2, 4, C.fabric_red_shade);
+    m.box(1, 3, 1, 4, 3, 3, C.fabric_mustard);
+    m.box(3, 0, 0, 3, 3, 4, C.cardboard).box(0, 3, 2, 5, 3, 2, C.cardboard); // string
+    m.set(3, 3, 2, C.wood_dark).set(4, 2, 4, C.paper).set(4, 1, 4, C.paper_yellow); // knot, tag
+    return m;
+  },
+  basket: () => {
+    // Wicker laundry basket, overflowing with scraps.
+    const m = new Model(6, 5, 6);
+    for (let y = 0; y <= 3; y++)
+      for (let z = 0; z <= 5; z++)
+        for (let x = 0; x <= 5; x++)
+          if (x === 0 || z === 0 || x === 5 || z === 5 || y === 0)
+            m.set(x, y, z, (x + y + z) % 2 ? C.wood_light : C.beige_dk);
+    // A heap of scraps, spilling over the rim.
+    const heap = [C.fabric_blue, C.fabric_red, C.fabric_mustard, C.paint_white, C.fabric_green];
+    for (let z = 1; z <= 4; z++)
+      for (let x = 1; x <= 4; x++) m.set(x, 3, z, heap[(x * 3 + z * 2) % heap.length]!);
+    m.set(2, 4, 2, C.fabric_red).set(3, 4, 3, C.paint_white).set(2, 4, 3, C.fabric_mustard);
+    m.set(5, 4, 2, C.fabric_green).set(0, 3, 4, C.fabric_blue).set(1, 4, 4, C.fabric_blue);
+    m.box(2, 3, 0, 3, 3, 0, C.wood_dark); // handle
+    return m;
+  },
+  sewing: () => {
+    // Jade's sewing box: lid open, thread spools, pins in a red cushion.
+    const m = new Model(6, 4, 4);
+    m.box(0, 0, 0, 5, 1, 3, C.walnut);
+    m.box(0, 2, 0, 5, 3, 0, C.walnut).box(1, 3, 0, 4, 3, 0, C.wood); // open lid
+    m.set(1, 2, 2, C.fabric_red).set(2, 2, 2, C.safety_blue).set(3, 2, 2, C.lime);
+    m.set(4, 2, 2, C.scarf_red).set(4, 3, 2, C.chrome); // pin cushion, pin
+    m.set(1, 1, 3, C.brass).set(4, 1, 3, C.brass);
     return m;
   },
   paper: () =>

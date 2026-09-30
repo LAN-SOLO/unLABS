@@ -34,6 +34,7 @@ import { addItem, bump, evalCond, grant } from "@/lib/world/game";
 import { buffKey, type ActiveBuff } from "@/lib/world/buffs";
 import { roomAt } from "@/lib/world/content/map";
 import { DECOR_BY_ID, decorSize } from "@/lib/world/models/decor";
+import { SEATS } from "@/lib/world/stand-spots";
 import type { DialogueLine, PropDef, WorldState } from "@/lib/world/types";
 
 // Buff helpers live in `buffs.ts` (so `game.ts` can use them); re-exported
@@ -80,11 +81,18 @@ export interface DecorActionResult {
   resting: boolean;
   /** Seconds until the action's cooldown outcomes are available again (0 = ready). */
   cooldownLeft: number;
-  /** Sitting pose hint for the renderer (verb "sitzen"). */
-  pose: "sit" | null;
+  /** Body pose hint for the renderer (verb "sitzen" → "sit", "liegen" → "lie"). */
+  pose: "sit" | "lie" | null;
 }
 
 const IDLE_FALLBACK = tr("Nothing is happening here right now. Maybe later.");
+
+/** Pose of a decor action: sitting down, or lying down on a bed / cot. */
+function poseOf(verb: DecorVerb, decorId: string): "sit" | "lie" | null {
+  if (verb === "liegen") return "lie";
+  if (verb !== "sitzen") return null;
+  return SEATS[decorId]?.kind === "lie" ? "lie" : "sit";
+}
 
 // ── Lookup ───────────────────────────────────────────────────────
 
@@ -250,7 +258,7 @@ export function runDecorAction(
     actionId: action.id,
     label: action.label,
     verb: action.verb,
-    pose: action.verb === "sitzen" ? ("sit" as const) : null,
+    pose: poseOf(action.verb, decorId),
   };
   if (!evalCond(state, action.requires)) {
     return {

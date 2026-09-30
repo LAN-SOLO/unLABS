@@ -47,8 +47,25 @@ import {
 import { fmtNum } from "@/components/world/format";
 import { IntroSequence, SceneTitleCard } from "@/components/world/IntroSequence";
 import { poseForDecorVerb } from "@/lib/world/models/rig";
+import { DeviceInterface } from "@/components/world/device-ui/DeviceInterface";
+import { KnowledgePanel } from "@/components/world/knowledge/KnowledgePanel";
+import { PersonalComputer } from "@/components/world/pc/PersonalComputer";
+import { PC_PROP } from "@/lib/world/content/quarters";
+import { STUDIO_PROP } from "@/lib/world/content/studio";
+import { StudioPanel } from "@/components/world/studio/StudioPanel";
+import { CharacterMenu, type CharacterTab } from "@/components/world/wardrobe/CharacterMenu";
+import { WearIcon } from "@/components/world/wardrobe/WearIcon";
+import { REPLICATOR_PROP } from "@/lib/world/content/wardrobe";
+import { isWearPickupItem, lookSignature, visibleLook, wearIdFromItem } from "@/lib/world/wardrobe";
+import { nextWardrobeHint } from "@/lib/world/wardrobe-hints";
+import { TitleMusic } from "@/components/world/TitleMusic";
+import { SpotEntries, SpotPanel } from "@/components/world/ArchiveSpot";
+import { SEARCHABLE_DECOR, isArchiveDecor, spotName, visitSpot } from "@/lib/world/archive";
+import type { ArchiveSpot } from "@/lib/world/content/archive";
+import { usesInterface } from "@/lib/world/device-ops";
 import {
   decorActionAt,
+  hasDecorAction,
   propDecorAction,
   runDecorAction,
   runPropDecorAction,
@@ -60,6 +77,8 @@ import { enterPostgame } from "@/lib/world/postgame";
 import { ItemIcon } from "@/components/world/ItemIcon";
 import { Codex } from "@/components/world/Codex";
 import { HintBubble } from "@/components/world/HintBubble";
+import { GENRE_LABEL } from "@/lib/world/audio/songs/labels";
+import type { Genre } from "@/lib/world/audio/songs/types";
 import type { CodexTab } from "@/lib/world/content/codex";
 import {
   LEGEND_REVEAL_SECONDS,
@@ -146,9 +165,24 @@ import type { FloorId, WorldState } from "@/lib/world/types";
 
 type Overlay =
   | { kind: "device"; id: string }
+  /** The device's own interface (every built device is used through it). */
+  | { kind: "deviceui"; id: string }
+  /** An archive spot without an action of its own (board, locker, vent …). */
+  | { kind: "spot"; placementId: string; decor: string }
   | { kind: "workbench" }
   | { kind: "inventory" }
   | { kind: "journal" }
+  /** Jade's knowledge panel (N). */
+  | { kind: "knowledge" }
+  /** Jade's personal computer (prop `jade_pc`, Jade's Quarters). */
+  | { kind: "pc" }
+  /** Damien's Sound Studio: the mixing desk (prop `studio_console`, Level −2). */
+  | { kind: "studio" }
+  /**
+   * Jade's character menu (O, pause menu, inventory; the wardrobe and the
+   * replicator “Needle's Eye” in her quarters open it with `atWardrobe`).
+   */
+  | { kind: "character"; atWardrobe?: boolean; atReplicator?: boolean; tab?: CharacterTab }
   | { kind: "power" }
   | { kind: "dialogue"; npc: string }
   | { kind: "note"; id: string }
@@ -178,11 +212,13 @@ const PANEL_KINDS: ReadonlySet<string> = new Set([
   "inventory",
   "workbench",
   "journal",
+  "knowledge",
   "power",
   "map",
   "codex",
   "achievements",
   "bio",
+  "character",
 ]);
 
 /** World effect per prototype effect family. */
@@ -291,6 +327,11 @@ function targetLabel(
     case "decor": {
       const pl = decorOf(t.id);
       const v = pl ? decorActionAt(pl, s) : null;
+      if (pl && !v)
+        return {
+          title: spotName(pl.decor),
+          sub: SEARCHABLE_DECOR.has(pl.decor) ? tr("search") : tr("look"),
+        };
       return {
         title: v?.label ?? "…",
         sub: v?.available ? VERB_LABEL[v.verb] : (v?.hint ?? tr("blocked")),
@@ -319,6 +360,9 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
   const puzzleReturn = useRef<Overlay>(null);
 
   const director = useLabDirector(world, engineRef, floor, room);
+  /** Dev handle (`window.__lab.audio`) reads the audio system through this ref. */
+  const getAudioRef = useRef(director.getAudio);
+  getAudioRef.current = director.getAudio;
   const cinematicRef = useRef(false);
   const skipSceneRef = useRef<() => void>(() => undefined);
   useEffect(() => {
@@ -427,6 +471,7 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
           hören: "radio_tune",
           lesen: "page_turn",
           sitzen: "sit",
+          liegen: "sit",
         };
         soundRef.current?.(verbSound[r.verb] ?? "ui_click");
         if (r.buff) soundRef.current?.("buff_on");
@@ -444,9 +489,18 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
         announce(a, { insights: r.insights });
         open(prop ? { kind: "decor", result: r, prop } : { kind: "decor", result: r });
       };
+      /** Read entries at a note / prop / terminal land in the journal archive. */
+      const archiveVisit = (spot: ArchiveSpot) => {
+        const v = a.act((st) => visitSpot(st, spot, "read"));
+        for (const e of v.fresh) a.toast(tr("Archive — {title}", { title: e.title }), "insight");
+      };
       switch (t.kind) {
         case "device":
-          open({ kind: "device", id: t.id });
+          // Built devices are always used through their interface; the
+          // build / service view is one click away inside it.
+          open(
+            usesInterface(s, t.id) ? { kind: "deviceui", id: t.id } : { kind: "device", id: t.id },
+          );
           return;
         case "npc":
           a.act((st) => {
@@ -457,11 +511,27 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
         case "decor": {
           const pl = engineRef.current?.decorPlacement(t.id);
           if (!pl) return;
+          if (!hasDecorAction(pl.decor, pl.room)) {
+            soundRef.current?.("ui_open");
+            open({ kind: "spot", placementId: t.id, decor: pl.decor });
+            return;
+          }
+          // Jade's wardrobe: its flavour line, then the character menu in wardrobe mode.
+          if (pl.decor === "wardrobe" && pl.room === "jadeq") {
+            const r = a.act((st) => runDecorAction(st, t.id, pl.decor, pl.room, st.playTime));
+            if (r.ok && !r.resting) {
+              a.toast(r.who === "mcp" ? `MCP: ${r.text}` : r.text, "info");
+              if (r.buff) soundRef.current?.("buff_on");
+            }
+            open({ kind: "character", atWardrobe: true });
+            return;
+          }
           showDecor(a.act((st) => runDecorAction(st, t.id, pl.decor, pl.room, st.playTime)));
           return;
         }
         case "terminal":
           soundRef.current?.("ui_open");
+          archiveVisit({ terminal: t.id });
           open({ kind: "terminal", id: t.id });
           return;
         case "note": {
@@ -470,6 +540,7 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
           if (note && !s.read[note.id]) barkRef.current?.("note_read", { author: note.author });
           const fresh = a.act((st) => readNote(st, t.id));
           announce(a, { insights: fresh });
+          archiveVisit({ note: t.id });
           open({ kind: "note", id: t.id });
           return;
         }
@@ -530,6 +601,21 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
             return;
           }
           if (p.grants?.length) announce(a, { insights: a.act((st) => grant(st, p.grants)) });
+          archiveVisit({ prop: p.id });
+          if (p.id === PC_PROP) {
+            soundRef.current?.("ui_open");
+            open({ kind: "pc" });
+            return;
+          }
+          if (p.id === STUDIO_PROP) {
+            open({ kind: "studio" });
+            return;
+          }
+          // Jade's wardrobe replicator “Needle's Eye” (stands at the wardrobe, mirror included).
+          if (p.id === REPLICATOR_PROP) {
+            open({ kind: "character", atWardrobe: true, atReplicator: true, tab: "replicator" });
+            return;
+          }
           // Biorhythm stations: Food Replicator, Neutro-Fridge, Jade's bed, ergometer.
           const station = BIO_STATION_BY_PROP.get(p.id);
           if (station) {
@@ -640,7 +726,15 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
         engineRef.current = engine;
         // Dev-only handle for debugging and browser automation.
         if (process.env.NODE_ENV !== "production")
-          Object.assign(window, { __lab: { engine, world } });
+          Object.assign(window, {
+            __lab: {
+              engine,
+              world,
+              get audio() {
+                return getAudioRef.current();
+              },
+            },
+          });
         setLoading(false);
         if (!world.get().flags.intro_seen) open({ kind: "intro" });
       })
@@ -719,8 +813,10 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
       else if (action === "workbench") open({ kind: "workbench" });
       // Fixed keys (not rebindable) — only when no rebindable action uses them.
       else if (action === null && e.code === "KeyM") open({ kind: "map" });
+      else if (action === null && e.code === "KeyN") open({ kind: "knowledge" });
       else if (action === null && e.code === "KeyK") open({ kind: "achievements" });
       else if (action === null && e.code === "KeyC") open({ kind: "codex" });
+      else if (action === null && e.code === "KeyO") open({ kind: "character" });
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -746,19 +842,17 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
       if (hintRef.current) return;
       const st = world.get();
       const c = hintCtx.current;
-      const h = nextHint(
-        st,
-        {
-          focus: c.focus,
-          room: c.room,
-          floor: c.floor,
-          overlay: overlayRef.current?.kind ?? null,
-          powerGeneration: power(st).generation,
-          hintsEnabled: getSettings().gameplay.hints,
-          cinematic: c.cinematic,
-        },
-        st.playTime,
-      );
+      const hctx = {
+        focus: c.focus,
+        room: c.room,
+        floor: c.floor,
+        overlay: overlayRef.current?.kind ?? null,
+        powerGeneration: power(st).generation,
+        hintsEnabled: getSettings().gameplay.hints,
+        cinematic: c.cinematic,
+      };
+      // The tutorial first; the wardrobe's own first-time hints when it is quiet.
+      const h = nextHint(st, hctx, st.playTime) ?? nextWardrobeHint(st, hctx, st.playTime);
       if (h) {
         world.act((x) => markHintSeen(x, h.id));
         soundRef.current?.("hint_pop");
@@ -811,6 +905,30 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
       off();
     };
   }, [world]);
+
+  // Jade's look on the 3D model: whenever the wardrobe look changes (and once
+  // the engine is up, e.g. after loading a save). Compared by signature in a
+  // ref — never `act` here (useWorld re-renders on every act).
+  const lookSigRef = useRef<string | null>(null);
+  const getLookState = world.get;
+  useEffect(() => {
+    const eng = engineRef.current;
+    if (!eng || loading) return;
+    const look = visibleLook(getLookState().wardrobe.look);
+    const sig = lookSignature(look);
+    if (sig === lookSigRef.current) return;
+    lookSigRef.current = sig;
+    eng.setPlayerLook(look);
+  }, [world.version, loading, getLookState]);
+
+  // Needle's Eye: a ping when a replicator job finishes (useWorld's tick clears the job).
+  const replicatorJobRef = useRef<string | null>(null);
+  useEffect(() => {
+    const job = getLookState().wardrobe.job;
+    const id = job ? `${job.kind}:${job.id}:${job.start}` : null;
+    if (replicatorJobRef.current && !id) soundRef.current?.("replicator_ping");
+    replicatorJobRef.current = id;
+  }, [world.version, getLookState]);
 
   const [settings] = useSettings();
   /** Current key for a rebindable action ("I", "Esc", …). */
@@ -912,6 +1030,20 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
       onSelect: () => open({ kind: "journal" }),
     },
     {
+      id: "character",
+      tone: "cyan",
+      label: tr("Character [O]"),
+      title: tr("Jade's wardrobe and replicator (O)"),
+      onSelect: () => open({ kind: "character" }),
+    },
+    {
+      id: "knowledge",
+      tone: "cyan",
+      label: tr("Knowledge [N]"),
+      title: tr("What Jade knows, has done and has written down (N)"),
+      onSelect: () => open({ kind: "knowledge" }),
+    },
+    {
       id: "codex",
       tone: "cyan",
       label: tr("Handbook [C]"),
@@ -947,17 +1079,29 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
   ];
 
   const [fading, setFading] = useState(false);
-  /** Sleep in Jade's bed: a short fade to black, then rest → 100 while a few minutes pass. */
+  /**
+   * Sleep in Jade's bed: she walks to it and lies down, then a short fade to
+   * black while rest → 100 and a few minutes pass. She stays lying until the
+   * player moves.
+   */
   const sleepNow = () => {
     close();
-    setFading(true);
-    window.setTimeout(() => {
-      announceBio(
-        apiRef.current,
-        world.act((st) => bioSleep(st)),
-      );
-      window.setTimeout(() => setFading(false), 500);
-    }, 700);
+    const eta = engineRef.current?.restIn({ kind: "prop", id: "jades_bett" }) ?? null;
+    // Fade once she lies (capped, so a long walk never delays the rest).
+    const wait = eta === null ? 700 : Math.min(5000, Math.max(700, eta * 1000));
+    window.setTimeout(
+      () => {
+        setFading(true);
+        window.setTimeout(() => {
+          announceBio(
+            apiRef.current,
+            world.act((st) => bioSleep(st)),
+          );
+          window.setTimeout(() => setFading(false), 500);
+        }, 700);
+      },
+      wait - 700 > 0 ? wait - 700 : 0,
+    );
   };
   // Endings: trigger → the director plays the ending scene → epilogue sequence.
   const [pendingEnding, setPendingEnding] = useState<string | null>(null);
@@ -1030,7 +1174,12 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
           : k === "terminal"
             ? "typing"
             : k === "decor" && overlay?.kind === "decor"
-              ? poseForDecorVerb(overlay.result.verb, overlay.result.placementId)
+              ? (overlay.result.pose ??
+                poseForDecorVerb(
+                  overlay.result.verb,
+                  engineRef.current?.decorPlacement(overlay.result.placementId)?.decor ??
+                    overlay.result.placementId,
+                ))
               : k === "puzzle" || k === "workbench"
                 ? "think"
                 : "idle",
@@ -1242,6 +1391,23 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
             </p>
           </div>
         )}
+        {/* Now playing: title and genre of a song that just started */}
+        {director.nowPlaying && !director.cinematic && (
+          <div
+            key={director.nowPlaying.key}
+            role="status"
+            aria-live="polite"
+            data-now-playing
+            className="unlab-now-playing pointer-events-none absolute bottom-[11vh] left-1/2 z-30 -translate-x-1/2 border border-[#00FFFF]/25 bg-black/55 px-3 py-1 text-center font-mono text-[11px] text-[#9FF7FF]"
+          >
+            <span className="text-[#FFB800]">♪</span> {director.nowPlaying.title}
+            <span className="text-white/45">
+              {" · "}
+              {GENRE_LABEL[director.nowPlaying.genre as Genre] ?? director.nowPlaying.genre}
+              {director.nowPlaying.jukebox ? ` · ${tr("Studio")}` : ""}
+            </span>
+          </div>
+        )}
         {director.titleCard && (
           <SceneTitleCard
             key={director.titleCard.key}
@@ -1302,6 +1468,9 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
               {t.item && itemDef(s, t.item) && (
                 <ItemIcon item={itemDef(s, t.item)!} size={26} frame={false} />
               )}
+              {t.item && isWearPickupItem(t.item) && wearIdFromItem(t.item) && (
+                <WearIcon item={wearIdFromItem(t.item)!} size={26} />
+              )}
               <span>{t.text}</span>
             </div>
           ))}
@@ -1330,8 +1499,52 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
         </div>
 
         {/* Overlays */}
+        {overlay?.kind === "knowledge" && (
+          <KnowledgePanel
+            api={api}
+            onClose={close}
+            onAchievements={() => open({ kind: "achievements" })}
+          />
+        )}
+        {overlay?.kind === "pc" && (
+          <PersonalComputer
+            api={api}
+            onClose={close}
+            onTerminal={() => open({ kind: "terminal", id: "term_jadeq" })}
+          />
+        )}
+        {overlay?.kind === "studio" && <StudioPanel getAudio={director.getAudio} onClose={close} />}
+        {overlay?.kind === "deviceui" && (
+          <DeviceInterface
+            key={overlay.id}
+            id={overlay.id}
+            api={api}
+            onClose={close}
+            onService={() => open({ kind: "device", id: overlay.id })}
+            onTalk={(npc) => open({ kind: "dialogue", npc })}
+            onWorkbench={() => open({ kind: "workbench" })}
+            onInventory={() => open({ kind: "inventory" })}
+            onPower={() => open({ kind: "power" })}
+          />
+        )}
+        {overlay?.kind === "spot" && (
+          <SpotPanel
+            key={overlay.placementId}
+            api={api}
+            spot={{ decor: overlay.placementId }}
+            title={spotName(overlay.decor)}
+            searchable={SEARCHABLE_DECOR.has(overlay.decor)}
+            spotId={overlay.placementId}
+            onClose={close}
+          />
+        )}
         {overlay?.kind === "device" && (
           <DevicePanel
+            onInterface={
+              usesInterface(api.get(), overlay.id)
+                ? () => open({ kind: "deviceui", id: overlay.id })
+                : undefined
+            }
             id={overlay.id}
             api={api}
             onClose={close}
@@ -1346,7 +1559,22 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
         )}
         {overlay?.kind === "workbench" && <WorkbenchPanel api={api} onClose={close} />}
         {overlay?.kind === "inventory" && (
-          <InventoryPanel api={api} onClose={close} onProto={protoUse} />
+          <InventoryPanel
+            api={api}
+            onClose={close}
+            onProto={protoUse}
+            onWardrobe={() => open({ kind: "character" })}
+          />
+        )}
+        {overlay?.kind === "character" && (
+          <CharacterMenu
+            key={`${overlay.atWardrobe ? "w" : "-"}${overlay.atReplicator ? "r" : "-"}${overlay.tab ?? ""}`}
+            api={api}
+            atWardrobe={!!overlay.atWardrobe}
+            atReplicator={!!overlay.atReplicator}
+            initialTab={overlay.tab ?? "wardrobe"}
+            onClose={close}
+          />
         )}
         {overlay?.kind === "journal" && <JournalPanel api={api} onClose={close} />}
         {overlay?.kind === "power" && <PowerPanel api={api} onClose={close} />}
@@ -1477,7 +1705,8 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
                 <b className="text-[#FFB800]">{key("power")}</b> {tr("Power")} ·{" "}
                 <b className="text-[#FFB800]">C</b> {tr("Handbook")} ·{" "}
                 <b className="text-[#FFB800]">M</b> {tr("Map")} ·{" "}
-                <b className="text-[#FFB800]">K</b> {tr("Achievements")}
+                <b className="text-[#FFB800]">K</b> {tr("Achievements")} ·{" "}
+                <b className="text-[#FFB800]">O</b> {tr("Character")}
               </li>
               <li>
                 <b className="text-[#FFB800]">{key("quicksave")}</b> {tr("Quicksave")} ·{" "}
@@ -1494,7 +1723,7 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
             </p>
             <p className="mt-2 text-xs text-white/40">
               {tr(
-                "Almost every key can be rebound under Menu → Settings → Controls; V, M, K and C are fixed.",
+                "Almost every key can be rebound under Menu → Settings → Controls; V, M, K, C and O are fixed.",
               )}
             </p>
             <div className="mt-4 flex gap-2">
@@ -1514,6 +1743,7 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
             onLoad={onReload}
             onMainMenu={onMainMenu}
             onTerminal={() => openConsole("pause")}
+            onCharacter={() => open({ kind: "character" })}
             onHelp={() => {
               helpReturn.current = { kind: "pause" };
               open({ kind: "help" });
@@ -1541,7 +1771,19 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
             extra={
               overlay.prop ? (
                 <PrototypeUse api={api} target={overlay.prop} onUse={protoUse} />
-              ) : undefined
+              ) : (
+                (() => {
+                  const pl = engineRef.current?.decorPlacement(overlay.result.placementId);
+                  return pl && isArchiveDecor(pl.id, pl.decor) ? (
+                    <SpotEntries
+                      api={api}
+                      spot={{ decor: pl.id }}
+                      searchable={SEARCHABLE_DECOR.has(pl.decor)}
+                      spotId={pl.id}
+                    />
+                  ) : undefined;
+                })()
+              )
             }
           />
         )}
@@ -1639,6 +1881,7 @@ export function LabWorld() {
 
   return (
     <>
+      {phase === "title" && <TitleMusic />}
       {phase === "title" && (
         <UiScale>
           <TitleScreen

@@ -30,6 +30,7 @@ const BRANCH_COLOR: Record<AchievementBranch, string> = {
   ki: "#9AD0FF",
   transzendenz: "#E8F4FF",
   labor: "#33FF33",
+  garderobe: "#E91E8C",
 };
 
 type Status = "alle" | "offen" | "erreicht";

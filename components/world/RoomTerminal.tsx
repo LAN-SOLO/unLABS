@@ -14,7 +14,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { CrtButton } from "@/components/world/puzzles/ui";
 import { tr } from "@/lib/i18n";
-import { ROOM_TERMINAL_BY_ID } from "@/lib/world/content/terminals";
+import { ROOM_TERMINAL_BY_ID, type RoomTerminalDef } from "@/lib/world/content/terminals";
+import { NOTES } from "@/lib/world/content/map";
+import { memoFrom, remember } from "@/lib/world/memos";
 import { textCharsPerSecond, useSettings } from "@/lib/world/settings";
 import {
   applyTerminalEffects,
@@ -24,7 +26,40 @@ import {
   terminalBanner,
   terminalUsable,
 } from "@/lib/world/terminal-lite";
-import type { WorldState } from "@/lib/world/types";
+import type { MemoSourceKind, WorldState } from "@/lib/world/types";
+
+/** A mail, file or note the last command put on screen (for "Remember"). */
+interface ShownDoc {
+  kind: MemoSourceKind;
+  id: string;
+  title: string;
+  text: string;
+}
+
+/** Which document (if any) a command's output shows. */
+function docIn(def: RoomTerminalDef | undefined, lines: readonly string[]): ShownDoc | null {
+  if (!def) return null;
+  const has = (l: string) => lines.includes(l);
+  for (const m of def.mail ?? [])
+    if (m.body.length && m.body.every(has) && lines.some((l) => l.includes(m.subject)))
+      return {
+        kind: "message",
+        id: `mail:${def.id}:${m.id}`,
+        title: m.subject,
+        text: [`${m.from} → ${m.to} · ${m.date}`, ...m.body].join("\n"),
+      };
+  for (const f of def.files ?? [])
+    if (has(`== ${f.title} ==`) && f.body.every(has))
+      return {
+        kind: "message",
+        id: `file:${def.id}:${f.id}`,
+        title: f.title,
+        text: f.body.join("\n"),
+      };
+  for (const n of NOTES)
+    if (has(`== ${n.title} ==`)) return { kind: "note", id: n.id, title: n.title, text: n.body };
+  return null;
+}
 
 type LineKind = "out" | "in" | "sys";
 
@@ -121,6 +156,9 @@ export function RoomTerminal({
   /** Every input of this session, oldest first (for `verlauf` / `!n`). */
   const session = useRef<string[]>([]);
   const [histIdx, setHistIdx] = useState(-1);
+  /** Last mail / file / note on screen, and whether it has been written down. */
+  const [doc, setDoc] = useState<ShownDoc | null>(null);
+  const [noted, setNoted] = useState(false);
   const [cursorOn, setCursorOn] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -225,10 +263,15 @@ export function RoomTerminal({
         echo,
         [...res.lines, ...extra].map((t) => mk(t, "out")),
       );
+      const shown = docIn(def, res.lines);
+      if (shown) {
+        setDoc(shown);
+        setNoted(!!memoFrom(getState(), shown.kind, shown.id));
+      }
       if (fx?.openBigTerminal) later(onOpenBigTerminal, instant ? 0 : 700);
       if (fx?.close) later(onClose, instant ? 0 : 350);
     },
-    [act, append, getState, instant, later, onClose, onOpenBigTerminal, prompt, terminalId],
+    [act, append, def, getState, instant, later, onClose, onOpenBigTerminal, prompt, terminalId],
   );
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -328,6 +371,21 @@ export function RoomTerminal({
         <div className="mb-2 flex items-center justify-between gap-3 px-1 font-mono text-[10px] tracking-[0.25em] text-[#9a9a90] uppercase">
           <span className="truncate">{def?.label ?? "Terminal"}</span>
           <span className="flex items-center gap-2">
+            {doc && (
+              <CrtButton
+                tone="cyan"
+                disabled={noted}
+                onClick={() => {
+                  const r = act((st) => remember(st, doc));
+                  if (r.ok) setNoted(true);
+                  inputRef.current?.focus();
+                }}
+                title={doc.title}
+                aria-label={tr("Remember: {title}", { title: doc.title })}
+              >
+                {noted ? tr("✓ noted") : tr("+ Remember")}
+              </CrtButton>
+            )}
             <span
               aria-hidden
               className="h-1.5 w-1.5 rounded-full"

@@ -72,8 +72,11 @@ import { compassTarget, objectives, topObjective } from "@/lib/world/quests";
 import { SCENE_IDS, sceneFor } from "@/lib/world/scenes";
 import { dailyPriceModifier } from "@/lib/game/volatility";
 import type { Condition, FloorId, WorldState } from "@/lib/world/types";
-import { defaultDone, inReach, play } from "./simPlayer";
-import { fullRun } from "./simCoverage";
+import { WORLD_FIRMWARE } from "@/lib/world/content/firmware";
+import { HUBS } from "@/lib/world/content/links";
+import { FIRMWARE } from "@/lib/world/firmware";
+import { defaultDone, inReach, knownChecksum, play } from "./simPlayer";
+import { fullRun, linkedHubs } from "./simCoverage";
 
 // ── Helpers ───────────────────────────────────────────────────────
 
@@ -125,6 +128,32 @@ describe("coverage: everything is reachable by play", () => {
     expect(SCENE_IDS.filter((id) => !fired.has(id))).toEqual([]);
   });
 
+  it("every lab firmware update is flashed by play (manual checksums found in the lab)", () => {
+    expect(report.firmware).toEqual([]);
+    for (const [id, w] of Object.entries(WORLD_FIRMWARE))
+      if (w.source === "manual")
+        expect(knownChecksum(run.s, id), `${id}: checksum learned from a found entry`).toBe(
+          FIRMWARE.get(id)!.update!.checksum,
+        );
+  });
+
+  it("every hub links devices in play, and every link a build stage asks for is made", () => {
+    expect(HUBS.filter((h) => !linkedHubs(run.s).has(h.id)).map((h) => h.id)).toEqual([]);
+    const asked: string[] = [];
+    const walk = (c: Condition | undefined): void => {
+      if (!c) return;
+      if ("all" in c) c.all.forEach(walk);
+      else if ("any" in c) c.any.forEach(walk);
+      else if ("link" in c) asked.push(`${c.link}>${c.to}`);
+    };
+    for (const d of DEVICES) for (const st of d.stages) walk(st.when);
+    expect(asked.length).toBeGreaterThan(0);
+    for (const l of asked) {
+      const [hub, to] = l.split(">") as [string, string];
+      expect(run.s.links[hub] ?? [], l).toContain(to);
+    }
+  });
+
   it("every ending is triggered at a device (or prop) that exists and is reachable", () => {
     for (const e of ENDINGS) {
       const dev = DEVICE_BY_ID.get(e.device);
@@ -158,7 +187,7 @@ function interactables(): Map<FloorId, Set<string>> {
 }
 
 describe("hints, objectives and the compass stay truthful along the playthrough", () => {
-  const run = play({ sampleEvery: 3 });
+  const run = play({ sampleEvery: 1 });
   const spots = interactables();
   const samples = [initialState(), ...run.samples, run.s];
 

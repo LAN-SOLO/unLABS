@@ -100,33 +100,20 @@ function Rooms({
         const f = roomFill(r);
         return (
           <g key={r.id}>
-            <rect x={r.x} y={r.z} width={r.w} height={r.d} fill={f.fill} opacity={f.opacity} />
+            <path d={r.outline} fill={f.fill} opacity={f.opacity} />
             {r.fog === "visited" && (
-              <rect
-                x={r.x}
-                y={r.z}
-                width={r.w}
-                height={r.d}
-                fill={mini ? "none" : `url(#${uid}-grid)`}
-              />
+              <path d={r.outline} fill={mini ? "none" : `url(#${uid}-grid)`} />
             )}
-            {r.fog === "unknown" && (
-              <rect x={r.x} y={r.z} width={r.w} height={r.d} fill={`url(#${uid}-hatch)`} />
-            )}
-            {r.fog === "visited" && !r.lit && (
-              <rect x={r.x} y={r.z} width={r.w} height={r.d} fill={`url(#${uid}-dark)`} />
-            )}
+            {r.fog === "unknown" && <path d={r.outline} fill={`url(#${uid}-hatch)`} />}
+            {r.fog === "visited" && !r.lit && <path d={r.outline} fill={`url(#${uid}-dark)`} />}
           </g>
         );
       })}
       {/* Walls on top of every floor tint (shared walls overlap). */}
       {rooms.map((r) => (
-        <rect
+        <path
           key={`w-${r.id}`}
-          x={r.x}
-          y={r.z}
-          width={r.w}
-          height={r.d}
+          d={r.outline}
           fill="none"
           stroke={r.fog === "visited" ? MAP_COLORS.wallVisited : MAP_COLORS.wall}
           strokeOpacity={r.fog === "visited" ? 0.9 : r.fog === "known" ? 0.55 : 0.25}
@@ -138,12 +125,10 @@ function Rooms({
         rooms
           .filter((r) => r.fog === "known")
           .map((r) => (
-            <rect
+            <path
               key={`k-${r.id}`}
-              x={r.x + 1.6}
-              y={r.z + 1.6}
-              width={Math.max(0, r.w - 3.2)}
-              height={Math.max(0, r.d - 3.2)}
+              d={r.outline}
+              transform={`translate(${r.x + r.w / 2} ${r.z + r.d / 2}) scale(${Math.max(0.5, 1 - 3.2 / Math.max(8, r.w))} ${Math.max(0.5, 1 - 3.2 / Math.max(8, r.d))}) translate(${-(r.x + r.w / 2)} ${-(r.z + r.d / 2)})`}
               fill="none"
               stroke={MAP_COLORS.amber}
               strokeOpacity={0.45}
@@ -234,8 +219,8 @@ function RoomLabels({
           return (
             <text
               key={r.id}
-              x={r.x + r.w / 2}
-              y={r.z + r.d / 2}
+              x={r.ax}
+              y={r.az}
               fontSize={Math.max(3.2 / Math.sqrt(k), font * 1.6)}
               fill="#ffffff"
               fillOpacity={0.28}

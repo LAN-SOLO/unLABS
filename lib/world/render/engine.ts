@@ -29,9 +29,34 @@ import {
   type MeshModel,
 } from "@/lib/world/render/doors";
 import { PROP_VARIANT_DECOR } from "@/lib/world/content/decor-actions";
+import {
+  boxFootprint,
+  candidateSpots,
+  headingOf,
+  pickSpot,
+  settleSpot,
+  STAND_GAP,
+  type ClickHit,
+  type SeatAnchor,
+  type StandSpot,
+  type StandTarget,
+} from "@/lib/world/stand-spots";
+import {
+  decorStand,
+  deviceStand,
+  doorStand,
+  fillCollision,
+  floorOccupants,
+  looseStand,
+  propGrid,
+  propStand,
+  terminalStand,
+  type Occupant,
+} from "@/lib/world/occupancy";
 import { bioWalkMultiplier } from "@/lib/world/biorhythm";
 import {
   buffMultiplier,
+  decorActionFor,
   decorInteractPoint,
   hasDecorAction,
   propDecorAction,
@@ -39,7 +64,6 @@ import {
 import {
   type DecorPlacement,
   animatedDecor,
-  decorFootprints,
   decorLights,
   decorElevation,
   interiorFor,
@@ -54,6 +78,7 @@ import {
 } from "@/lib/world/models/refine";
 import {
   animTransform,
+  gaitTransform,
   lightIntensity,
   lightPosInBase,
   partPivotInBase,
@@ -82,6 +107,15 @@ import {
   damienRig,
   jadeRig,
   jointRestPosition,
+  LIE_BACK_HEIGHT,
+  LIE_ENTER_DURATION,
+  LIE_EXIT_DURATION,
+  SIT_ENTER_DURATION,
+  SIT_EXIT_DURATION,
+  SIT_SEAT_OFFSET,
+  seatRootProgress,
+  sitFit,
+  type SeatSpec,
   type CageMotion,
   type CharacterPose,
   type CharacterPoseKind,
@@ -91,7 +125,13 @@ import {
   type RigPartName,
 } from "@/lib/world/models/rig";
 import { FxSystem, type AmbientKind, type FxKind } from "@/lib/world/render/fx";
-import { smoothDamp, smoothstep01, turnToward, type DampState } from "@/lib/world/render/motion";
+import {
+  angleDelta,
+  smoothDamp,
+  smoothstep01,
+  turnToward,
+  type DampState,
+} from "@/lib/world/render/motion";
 import {
   ASSEMBLY_TIME,
   NOTE_FOLD_TIME,
@@ -114,6 +154,8 @@ import {
   type NpcWorld,
   type Station,
 } from "@/lib/world/render/npc-brain";
+import { clipMove } from "@/lib/world/crowd";
+import { isArchiveDecor } from "@/lib/world/archive";
 import {
   brownoutInterval,
   floorMood,
@@ -144,7 +186,7 @@ import {
   subscribeSettings,
   type Settings,
 } from "@/lib/world/settings";
-import { FloorCollision, Walker, WALKER } from "@/lib/world/actor";
+import { FINE, FloorCollision, Walker, WALKER } from "@/lib/world/actor";
 import { DEVICES } from "@/lib/world/content/devices";
 import {
   DOORS,
@@ -174,7 +216,8 @@ import {
 } from "@/lib/world/game";
 import { buildFloor, doorCells, setLamps, type FloorLayout } from "@/lib/world/layout";
 import {
-  columnBlocked,
+  NAV_HEADROOM,
+  boxFree,
   createNavGrid,
   findPath,
   isFreeAt,
@@ -185,16 +228,12 @@ import {
   type NavGrid,
   type XZ,
 } from "@/lib/world/pathfind";
-import {
-  MODEL_SCALE,
-  pickupModel,
-  propModel,
-  propVisual,
-  stagedGrid,
-  type Model,
-} from "@/lib/world/models";
+import { MODEL_SCALE, pickupModel, propVisual, stagedGrid, type Model } from "@/lib/world/models";
 import { createVoxelMaterials, toGeometry, toMesh } from "@/lib/world/render/voxel-mesh";
 import { WorldRenderer } from "@/lib/world/render/world-renderer";
+import { DEFAULT_LOOK, type JadeLook } from "@/lib/world/content/wardrobe";
+import { jadeLookKey, jadeLookRig } from "@/lib/world/models/jade-look";
+import { visibleLook } from "@/lib/world/wardrobe";
 import {
   AutoInstancer,
   HIDDEN_LAYER,
@@ -278,6 +317,51 @@ interface Interactable {
   active: boolean;
   /** Closed secret door: only targetable while a prototype can open it. */
   secretDoor?: DoorDef;
+  /** Where Jade stands to use it (active sides, seat); NPCs compute theirs live. */
+  stand?: StandTarget;
+}
+
+/** Click-to-move goal kept for one replan when she gets stuck. */
+interface RouteGoal {
+  to: XZ;
+  accept?: (x: number, z: number) => boolean;
+  /** A stand spot: plan with `spotPath` and end exactly on it. */
+  exact?: boolean;
+}
+
+/** What happens when a walk to a stand spot ends. */
+interface Arrival {
+  target: Target;
+  facing: number;
+  /** Face this world point on arrival instead (NPCs move). */
+  lookAt?: () => [number, number] | null;
+  /** Seat anchor at this spot (offered to `setPlayerMode("sit" | "lie")`). */
+  seat: SeatAnchor | null;
+  /** Outward heading of the spot (she stands up facing this way). */
+  out: number;
+  /** "interact" → gesture + onInteract; "lie" → lie down without an interaction. */
+  then: "interact" | "lie";
+  /** Seconds spent turning after the walk ended (-1 = still walking). */
+  t: number;
+}
+
+/** Seated / lying state: the walker stays on the approach spot, the rig moves onto the seat. */
+interface SeatState {
+  anchor: SeatAnchor;
+  kind: "sit" | "lie";
+  /** Approach spot (walker position) and the heading she stands up with. */
+  from: XZ;
+  fromYaw: number;
+  out: number;
+  phase: "enter" | "hold" | "exit";
+  /** Seconds in the current phase. */
+  t: number;
+  /** Root pose where the exit started (she may stand up half-way down). */
+  exitFrom: { pos: Vec3; yaw: number } | null;
+  /** Last rendered root pose. */
+  last: { pos: Vec3; yaw: number } | null;
+  /** Runs once she stands again (e.g. the click that made her get up). */
+  after: (() => void) | null;
 }
 
 interface PartView {
@@ -312,6 +396,11 @@ interface VisualRig {
    * spin up / wind down instead of snapping (see transitions.ts).
    */
   ramp?: RigRamp;
+  /**
+   * Walking bots: distance travelled (world units) and 0..1 locomotion
+   * weight — parts with `gait` roll / stride with it instead of the clock.
+   */
+  gait?: { travel: number; moving: number };
 }
 
 /** What a device's meshes were built for. */
@@ -403,6 +492,24 @@ interface CharacterRig {
 
 export type PlayerMode = CharacterPoseKind;
 const HAND_PROPS: readonly HandPropKind[] = ["mug", "book", "crate", "wrench"];
+/** Cached wardrobe part meshes (player + X-ray twin share a geometry). */
+const LOOK_MESH_CACHE = 96;
+
+/** Content key of a rig part: size, origin and every voxel (FNV-1a). */
+function partContentKey(part: { model: Model; origin: readonly number[] }): string {
+  let h = 0x811c9dc5;
+  const mix = (n: number) => {
+    h ^= n & 0xffff;
+    h = Math.imul(h, 0x01000193);
+  };
+  for (const n of [part.model.w, part.model.h, part.model.d, ...part.origin.map((o) => o * 10)])
+    mix(n);
+  part.model.grid.forEach((x, y, z, v) => {
+    mix(x | (y << 6));
+    mix(z | (v << 6));
+  });
+  return `${part.model.grid.count()}:${(h >>> 0).toString(36)}`;
+}
 
 interface FloorView {
   floor: FloorId;
@@ -410,6 +517,10 @@ interface FloorView {
   renderer: WorldRenderer;
   group: THREE.Group;
   collision: FloorCollision;
+  /** Walker collider in fine cells (terrain, objects, doors, elevator). */
+  fineCollider: VoxelSource;
+  /** Static occupants (props, decor, terminals) and per-device ones, built once. */
+  occupants: Occupant[] | null;
   devices: Map<string, DeviceView>;
   pickups: Map<string, THREE.Group>;
   notes: Map<string, THREE.Group>;
@@ -446,7 +557,6 @@ interface FloorView {
   stations: Station[];
   mcpAvatar?: AvatarView;
   /** Room index + 1 per cell (lazy, see roomIdAt). */
-  roomGrid?: Int16Array;
   /** Never-moving meshes + decor, merged per map tile. */
   batch: StaticBatcher;
   /** Moving meshes with shared geometry (doors, pickups, rig parts) as InstancedMeshes. */
@@ -537,6 +647,12 @@ export class LabEngine {
   private walkW = 0;
   private gaitPhase = 0;
   private speedS = 0;
+  /** Smoothed forward acceleration (units/s²) and turn rate (rad/s) for the body lean / bank. */
+  private accelS = 0;
+  private turnS = 0;
+  private prevYawS = 0;
+  /** Frames until the next "wedged in something" check. */
+  private unstickCheck = 0;
   /** Seconds standing still (fidgets, chill), counted with `advanceIdle`. */
   private idleFor = 0;
   /** Running elevator / ladder ride: pose, where Lawrence stands on the deck, which way she faces. */
@@ -574,8 +690,19 @@ export class LabEngine {
   private walkStuck = 0;
   /** Click-to-move: waypoints after `walkTo`, and the goal for one replan when stuck. */
   private route: XZ[] = [];
-  private routeGoal: { to: XZ; accept?: (x: number, z: number) => boolean } | null = null;
+  private routeGoal: RouteGoal | null = null;
   private replanned = false;
+  /** Pending use of an object at the end of the current walk (stand spot + facing). */
+  private arrival: Arrival | null = null;
+  /** Heading to turn to while standing (keyboard interact, arrival); cleared by movement. */
+  private faceGoal: number | null = null;
+  /** Rendered heading (eases toward `walker.facing`, never snaps). */
+  private yawS = 0;
+  private seat: SeatState | null = null;
+  /** Seat she just walked up to; `setPlayerMode("sit" | "lie")` sits her down on it. */
+  private seatOffer: { anchor: SeatAnchor; from: XZ; out: number; until: number } | null = null;
+  private readonly proxyGeo = new Map<string, THREE.BufferGeometry>();
+  private readonly proxyMat = new THREE.MeshBasicMaterial({ visible: false });
   /** Waypoint dots + target disc (one instanced draw call). */
   private readonly pathDots: THREE.InstancedMesh;
   private pathDotsAlpha = 0;
@@ -626,8 +753,19 @@ export class LabEngine {
   private poolReselect = 0;
   private readonly lightCands: { v: VirtualLight; d: number }[] = [];
   private readonly npcOthers: number[] = [];
+  private readonly npcRadii: number[] = [];
+  private readonly npcSlots = new Map<NpcView, number>();
+  /** Bot bodies (x, z, r) Jade collides with — refreshed every frame. */
+  private readonly crowd: number[] = [];
   private readonly framing: [number, number] = [0, 0];
   private readonly xrayPairs: [THREE.Object3D, THREE.Object3D][] = [];
+  /** Wardrobe: materials of the player's meshes, the X-ray material, current look + part keys. */
+  private playerMats!: Record<MaterialClass, THREE.Material>;
+  private xrayMat!: THREE.Material;
+  private playerLook = jadeLookKey(DEFAULT_LOOK);
+  private readonly playerPartKeys = new Map<RigPartName, string>();
+  /** Part meshes by `part|content hash` (player + X-ray twin), so switching back is instant. */
+  private readonly lookMeshes = new Map<string, { mesh: THREE.Mesh; xray: THREE.Mesh }>();
   private smokeTick = 0;
   private readonly roomById = new Map(ROOMS.map((r) => [r.id, r]));
   private readonly stats: EngineStats = {
@@ -763,7 +901,9 @@ export class LabEngine {
         return [k, c];
       }),
     ) as Record<MaterialClass, THREE.Material>;
-    this.player = this.buildCharacter(jadeRig(), stencilMats);
+    const jadeDef = jadeRig();
+    this.playerMats = stencilMats;
+    this.player = this.buildCharacter(jadeDef, stencilMats);
     this.scene.add(this.player.root);
     this.xray = this.player.root.clone(true);
     const xmat = new THREE.MeshBasicMaterial({
@@ -793,6 +933,8 @@ export class LabEngine {
         o.renderOrder = 10;
       }
     });
+    this.xrayMat = xmat;
+    this.registerLookMeshes(jadeDef);
     this.attachHandProps(this.player, stencilMats);
     this.scene.add(this.xray);
     this.lantern = new THREE.PointLight("#ffd9a0", 60, 22, 1.6);
@@ -862,7 +1004,7 @@ export class LabEngine {
     this.scene.add(this.blobs);
 
     const s = getState();
-    this.walker = new Walker([...s.pos]);
+    this.walker = new Walker([...s.pos], WALKER.radius);
     this.setFloor(s.floor, s.pos);
     this.bindInput();
     this.resize();
@@ -986,9 +1128,11 @@ export class LabEngine {
       pos && this.ride
         ? [e.x + 0.5 + this.ride.spot[0], pos[1], e.z + 0.5 + this.ride.spot[1]]
         : (pos ?? [e.x - 6, 1, e.z]);
+    this.clearSeat();
     this.walker.teleport(p);
     this.focus = null;
     this.stopWalk();
+    this.faceGoal = null;
     // Camera: cut to the new floor (no pan across the map), then let the
     // zoom settle in; the floor mood cross-fades in updateLighting.
     this.target.set(p[0], p[1] + 2, p[2]);
@@ -1203,6 +1347,8 @@ export class LabEngine {
     this.scene.traverse((o) => {
       if (o instanceof THREE.Mesh || o instanceof THREE.Points) o.geometry.dispose();
     });
+    for (const e of this.lookMeshes.values()) e.mesh.geometry.dispose();
+    this.lookMeshes.clear();
     for (const f of this.floors.values()) {
       for (const dv of f.devices.values()) {
         dv.rampMat?.dispose();
@@ -1243,8 +1389,10 @@ export class LabEngine {
     const ride = ladder
       ? { mode: "climb" as const, spot: [1.4, 0] as [number, number], facing: Math.PI / 2 }
       : { mode: "ride" as const, spot: [0.6, -0.8] as [number, number], facing: -Math.PI / 2 };
+    this.clearSeat();
     this.walker.teleport([e.x + 0.5 + ride.spot[0], 1, e.z + 0.5 + ride.spot[1]]);
     this.stopWalk();
+    this.faceGoal = null;
     const ok = this.elevators.ride(from, to, hooks.onMidpoint, {
       onEvent: (ev) => {
         this.rideEvent(ev);
@@ -1691,6 +1839,7 @@ export class LabEngine {
       );
       mesh.position.set(-part.origin[0], -part.origin[1], -part.origin[2]);
       mesh.castShadow = !def.hologram;
+      mesh.userData.rigPart = part.name;
       j.add(mesh);
       (part.parent ? (joints.get(part.parent) ?? inner) : inner).add(j);
       joints.set(part.name, j);
@@ -1785,15 +1934,108 @@ export class LabEngine {
     }
   }
 
+  /** Seed the look-mesh cache with the default meshes built in the constructor. */
+  private registerLookMeshes(def: CharacterRigDef): void {
+    const twin = new Map(this.xrayPairs);
+    for (const part of def.parts) {
+      const joint = this.player.joints.get(part.name);
+      const xj = joint ? twin.get(joint) : undefined;
+      const mesh = joint?.children.find((c) => c.userData.rigPart === part.name);
+      const xray = xj?.children.find((c) => c.userData.rigPart === part.name);
+      if (!(mesh instanceof THREE.Mesh) || !(xray instanceof THREE.Mesh)) continue;
+      const key = `${part.name}|${partContentKey(part)}`;
+      this.lookMeshes.set(key, { mesh, xray });
+      this.playerPartKeys.set(part.name, key);
+    }
+  }
+
+  /**
+   * Dress Lawrence (wardrobe). Only parts whose voxels changed get new
+   * meshes, swapped inside the existing joint groups of the player and her
+   * X-ray twin (joints, poses, hand props and the X-ray pairing stay as they
+   * are — a look never moves a joint). Meshes are cached per part + content,
+   * so switching back is instant; evicted ones free their geometry.
+   */
+  setPlayerLook(look: JadeLook): void {
+    const shown = visibleLook(look);
+    const key = jadeLookKey(shown);
+    if (key === this.playerLook) return;
+    this.playerLook = key;
+    const def = jadeLookRig(shown);
+    const twin = new Map(this.xrayPairs);
+    const family = familyFor(def, "character");
+    for (const part of def.parts) {
+      const pk = `${part.name}|${partContentKey(part)}`;
+      if (this.playerPartKeys.get(part.name) === pk) continue;
+      const joint = this.player.joints.get(part.name);
+      const xj = joint ? twin.get(joint) : undefined;
+      if (!joint || !xj) continue;
+      let entry = this.lookMeshes.get(pk);
+      if (!entry) {
+        const mesh = this.meshModel(part.model.grid, 1, false, family, undefined, this.playerMats);
+        mesh.position.set(-part.origin[0], -part.origin[1], -part.origin[2]);
+        mesh.castShadow = true;
+        mesh.userData.rigPart = part.name;
+        const xray = new THREE.Mesh(mesh.geometry, this.xrayMat);
+        xray.position.copy(mesh.position);
+        xray.castShadow = false;
+        xray.renderOrder = 10;
+        xray.userData.rigPart = part.name;
+        entry = { mesh, xray };
+        this.lookMeshes.set(pk, entry);
+      } else {
+        // Refresh LRU order.
+        this.lookMeshes.delete(pk);
+        this.lookMeshes.set(pk, entry);
+      }
+      for (const [g, m] of [
+        [joint, entry.mesh],
+        [xj, entry.xray],
+      ] as const) {
+        const old = g.children.find((c) => c.userData.rigPart === part.name);
+        if (old) g.remove(old);
+        g.add(m);
+      }
+      this.playerPartKeys.set(part.name, pk);
+    }
+    // Keep the cache bounded; never evict a mesh that is worn.
+    const worn = new Set(this.playerPartKeys.values());
+    for (const [k, e] of this.lookMeshes) {
+      if (this.lookMeshes.size <= LOOK_MESH_CACHE) break;
+      if (worn.has(k)) continue;
+      e.mesh.geometry.dispose();
+      this.lookMeshes.delete(k);
+    }
+  }
+
   /** What Lawrence's body language shows (set by the UI: dialogue → talk, …). */
   setPlayerMode(mode: PlayerMode): void {
     // The ride / climb owns the body until the gate opens (overlays close as it starts).
     if (this.ride) return;
+    if (mode === "sit" || mode === "lie") {
+      if (this.seat) return;
+      const offer = this.seatOffer && this.seatOffer.until > this.time ? this.seatOffer : null;
+      const [px, , pz] = this.walker.position;
+      if (offer && Math.hypot(offer.from[0] - px, offer.from[1] - pz) < 2.5) {
+        // Onto the seat / bed she just walked up to (a bed always means lying down).
+        this.startSeat(offer.anchor, offer.anchor.kind, [px, pz], offer.out);
+        return;
+      }
+      // No seat here: she would sit in the air or lie on the floor — stay standing.
+      return;
+    }
+    if (this.seat) {
+      // Closing the popover keeps her seated until she moves; anything else gets her up.
+      if (mode === "idle") return;
+      this.leaveSeat(() => this.setPlayerMode(mode));
+      return;
+    }
     if (mode !== this.track.kind) this.track = switchPose(this.track, mode, this.time);
   }
 
   /** One-shot gesture (interact, crouch) that returns to idle when done. */
   playGesture(kind: "interact" | "crouch"): void {
+    if (this.seat) return;
     this.track = restartPose(this.track, kind, this.time);
   }
 
@@ -1901,12 +2143,17 @@ export class LabEngine {
         collision.get(x, y, z) ||
         (doors.solidAt(x, y, z) || this.elevators.solidAt(floor, x, y, z) ? 1 : 0),
     };
+    const fineCollider = collision.fineSource({
+      get: (x, y, z) => (doors.solidAt(x, y, z) || this.elevators.solidAt(floor, x, y, z) ? 1 : 0),
+    });
     const view: FloorView = {
       floor,
       layout,
       renderer,
       group,
       collision,
+      fineCollider,
+      occupants: null,
       doors,
       collider,
       devices: new Map(),
@@ -1988,6 +2235,7 @@ export class LabEngine {
         radius: Math.max(hw, hd),
         object: g,
         active: true,
+        stand: deviceStand(d),
       });
     }
     for (const p of PROPS) {
@@ -2014,6 +2262,25 @@ export class LabEngine {
         });
       }
       place(g, p.x, p.z, p.rot ?? 0);
+      // Screens of a variant's decor model (Jade's PC, the food replicator):
+      // lit with the room like decor screens.
+      const variantScreens = variantDecor ? DECOR_BY_ID.get(variantDecor)?.screens : undefined;
+      if (variantDecor && variantScreens?.length) {
+        const room = roomAt(floor, p.x, p.z)?.id ?? "";
+        for (const sp of variantScreens) {
+          const ref = this.screens.attach(
+            g,
+            sp,
+            { w: m.w, d: m.d },
+            MODEL_SCALE,
+            { roomId: room },
+            {
+              powered: false,
+            },
+          );
+          if (ref >= 0) view.decorScreens.push({ room, ref });
+        }
+      }
       if (p.kind !== "decor" || propDecorAction(p)) {
         view.interactables.push({
           target: { kind: "prop", id: p.id },
@@ -2022,6 +2289,7 @@ export class LabEngine {
           radius: (Math.max(m.w, m.d) * MODEL_SCALE) / 2,
           object: g,
           active: true,
+          stand: propStand(p),
         });
       }
     }
@@ -2048,6 +2316,8 @@ export class LabEngine {
         radius: 1.5,
         object: g,
         active: true,
+        // Crouch reach: stand just beside it, from whichever side she comes.
+        stand: looseStand(p.x, p.z, 1.35),
       });
     }
     for (const n of NOTES) {
@@ -2075,12 +2345,16 @@ export class LabEngine {
         radius: 0.8,
         object: g,
         active: true,
+        stand: looseStand(n.x, n.z, 1.3),
       });
     }
     for (const d of DOORS) {
       if (d.floor !== floor || (!d.lock && !d.keypad && !d.secret)) continue;
       const marker = new THREE.Object3D();
       place(marker, d.x, d.z);
+      // Click proxy over the opening (the leaves belong to the door system).
+      const alongX = d.axis === "x";
+      marker.add(this.pickProxy(alongX ? d.width : 1, 6, alongX ? 1 : d.width));
       view.interactables.push({
         target: { kind: "door", id: d.id },
         x: d.x,
@@ -2089,6 +2363,8 @@ export class LabEngine {
         object: marker,
         active: !d.secret,
         ...(d.secret ? { secretDoor: d } : {}),
+        // Both faces of the wall; she uses the one on her side.
+        stand: doorStand(d),
       });
     }
     for (const npc of NPCS) {
@@ -2331,10 +2607,13 @@ export class LabEngine {
     const sc = rig.scale;
     const r = rig.ramp;
     for (const pv of rig.parts) {
+      const g = rig.gait;
       const st =
-        r && pv.part.requiresPower
-          ? rampedTransform(pv.part, r.clock, r.speed, r.glow)
-          : animTransform(pv.part, t, rig.powered);
+        g && pv.part.gait
+          ? gaitTransform(pv.part, t, rig.powered, g.travel, g.moving, sc)
+          : r && pv.part.requiresPower
+            ? rampedTransform(pv.part, r.clock, r.speed, r.glow)
+            : animTransform(pv.part, t, rig.powered);
       pv.pivot.rotation.set(st.rot[0], st.rot[1], st.rot[2]);
       pv.pivot.position.set(
         pv.rest.x + st.pos[0] * sc,
@@ -2465,7 +2744,8 @@ export class LabEngine {
           sp,
           { w: m.w, d: m.d },
           ds,
-          { roomId: p.room },
+          // Live pinboards key their canvas by placement (their pinned memos).
+          sp.content === "notes" ? { roomId: p.room, placementId: p.id } : { roomId: p.room },
           {
             powered: false,
             anchor: {
@@ -2481,10 +2761,24 @@ export class LabEngine {
     }
     // Furniture with actions (coffee machine, radio, whiteboards, …).
     for (const p of interiorFor(view.floor)) {
-      if (!hasDecorAction(p.decor, p.room)) continue;
+      if (!hasDecorAction(p.decor, p.room) && !isArchiveDecor(p.id, p.decor)) continue;
       const { x, z, radius } = decorInteractPoint(p);
       const marker = new THREE.Object3D();
       marker.position.set(x + 0.5, 1 + decorElevation(p), z + 0.5);
+      // Invisible click target with the piece's own shape (the piece itself
+      // is merged into the static batch); a box if it has no mesh.
+      const dm = decorModel(p.decor);
+      const ds = decorScale(p.decor);
+      const shape = geoByDecor.get(p.decor);
+      let proxy: THREE.Mesh;
+      if (shape) {
+        proxy = new THREE.Mesh(shape, this.proxyMat);
+        proxy.scale.setScalar(ds);
+        proxy.userData.sharedGeo = true;
+        proxy.layers.set(HIDDEN_LAYER);
+      } else proxy = this.pickProxy(dm.w * ds, Math.max(0.4, dm.h * ds), dm.d * ds);
+      proxy.rotation.y = (p.rot * Math.PI) / 2;
+      marker.add(proxy);
       view.group.add(marker);
       this.decorById.set(p.id, p);
       view.interactables.push({
@@ -2494,6 +2788,7 @@ export class LabEngine {
         radius,
         object: marker,
         active: true,
+        stand: decorStand(p),
       });
     }
     for (const p of animatedDecor(view.floor)) {
@@ -2542,6 +2837,7 @@ export class LabEngine {
         radius: 1.5,
         object: g,
         active: true,
+        stand: terminalStand(t),
       });
     }
     for (const l of decorLights(view.floor)) {
@@ -2594,98 +2890,375 @@ export class LabEngine {
     return pts;
   }
 
+  // ── Occupancy, stand spots, pick proxies ──────────────────────
+
+  /** Invisible, raycastable box (bottom at y = 0) for objects without their own clickable mesh. */
+  private pickProxy(w: number, h: number, d: number): THREE.Mesh {
+    const key = `${w.toFixed(2)}|${h.toFixed(2)}|${d.toFixed(2)}`;
+    let geo = this.proxyGeo.get(key);
+    if (!geo) {
+      geo = new THREE.BoxGeometry(w, h, d).translate(0, h / 2, 0);
+      this.proxyGeo.set(key, geo);
+    }
+    const m = new THREE.Mesh(geo, this.proxyMat);
+    m.userData.sharedGeo = true;
+    m.layers.set(HIDDEN_LAYER);
+    m.castShadow = false;
+    m.receiveShadow = false;
+    return m;
+  }
+
+  private rebuildCollision(v: FloorView): void {
+    const s = this.getState();
+    if (!v.occupants) v.occupants = floorOccupants(v.floor);
+    fillCollision(v.collision, v.occupants, (id) => stagesDone(s, id) > 0);
+  }
+
   // ── Click-to-move ─────────────────────────────────────────────
 
-  /** Nav grid of a floor: built on first use, patched after collision changes; locked doors as the dynamic layer. */
+  /** Fine nav cell test: no floor / terrain or elevator up to head height (per voxel column), or an object cell. */
+  private navBlocked(v: FloorView): (fx: number, fz: number) => boolean {
+    const sx = FLOOR_SIZE.x;
+    const sz = FLOOR_SIZE.z;
+    const coarse = new Uint8Array(sx * sz);
+    const w = v.layout.world;
+    for (let z = 0; z < sz; z++)
+      for (let x = 0; x < sx; x++) {
+        let b = !w.get(x, 0, z);
+        for (let y = 1; !b && y <= NAV_HEADROOM; y++)
+          if (w.get(x, y, z) || this.elevators.solidAt(v.floor, x, y, z)) b = true;
+        if (b) coarse[x + z * sx] = 1;
+      }
+    return (fx, fz) =>
+      coarse[Math.floor(fx / FINE) + Math.floor(fz / FINE) * sx] === 1 ||
+      v.collision.fineHeight(fx, fz) > 0;
+  }
+
+  /** Nav grid of a floor (fine cells): built on first use, patched after collision changes; locked doors as the dynamic layer. */
   private navFor(v: FloorView): NavGrid {
-    const blocked = columnBlocked(
-      (x, y, z) => !!v.collision.get(x, y, z) || this.elevators.solidAt(v.floor, x, y, z),
-    );
     if (!v.nav)
-      v.nav = createNavGrid(FLOOR_SIZE.x, FLOOR_SIZE.z, blocked, { half: WALKER.width / 2 });
-    else if (v.navDirty) updateNavGrid(v.nav, blocked);
+      v.nav = createNavGrid(FLOOR_SIZE.x * FINE, FLOOR_SIZE.z * FINE, this.navBlocked(v), {
+        half: WALKER.navRadius,
+        scale: FINE,
+        res: 1,
+      });
+    else if (v.navDirty) updateNavGrid(v.nav, this.navBlocked(v));
     v.navDirty = false;
     // Closed-for-good doors: locked, keypad not solved, secret not revealed.
     // Unlocked doors stay free — they slide open as Lawrence walks up.
     const cells: XZ[] = [];
     for (const d of DOORS)
       if (d.floor === v.floor && v.doors.lockedAt(d.x, d.z))
-        for (const c of doorCells(d)) cells.push([c.x, c.z]);
+        for (const c of doorCells(d))
+          for (let k = 0; k < FINE; k++)
+            for (let i = 0; i < FINE; i++) cells.push([c.x * FINE + i, c.z * FINE + k]);
     setDynamicBlocked(v.nav, cells);
     return v.nav;
   }
 
-  /** Clear click-to-move (target, waypoints, replan state, dots). */
+  /** Cancel click-to-move (target, waypoints, replan state, pending use). */
   private stopWalk(): void {
+    this.finishWalk();
+    this.arrival = null;
+  }
+
+  /** End the current walk; a pending arrival starts turning. */
+  private finishWalk(): void {
     this.walkTo = null;
     this.walkStuck = 0;
     this.route = [];
     this.routeGoal = null;
     this.replanned = false;
+    if (this.arrival && this.arrival.t < 0) this.arrival.t = 0;
   }
 
-  /**
-   * Plan a path to world point `to` (A* on the nav grid, doors respected)
-   * and start following it. `accept` ends the path early (e.g. in reach of
-   * an interactable). Unreachable → walk to the closest point and report.
-   */
-  private planWalk(to: XZ, accept?: (x: number, z: number) => boolean, replan = false): void {
-    const v = this.active;
-    const nav = this.navFor(v);
+  /** Start following world waypoints (the first may be skipped when she can head for the next directly). */
+  private followPath(points: XZ[], goal: RouteGoal, nav: NavGrid): void {
+    const pts = points.slice();
     const [px, , pz] = this.walker.position;
-    const from: XZ = [px, pz];
-    const res = findPath(nav, from, to, { accept });
+    if (pts.length > 1 && lineClear(nav, px, pz, pts[1]![0], pts[1]![1], false, WALKER.radius))
+      pts.shift();
+    const first = pts.shift();
     this.walkStuck = 0;
-    if (!replan) this.replanned = false;
-    this.routeGoal = { to, accept };
-    if (res.noStart || !res.points.length) {
-      // Wedged somewhere the grid does not know: fall back to a straight line.
-      this.route = [];
-      this.walkTo = new THREE.Vector3(to[0], 1, to[1]);
+    this.routeGoal = goal;
+    this.faceGoal = null;
+    if (!first) {
+      this.finishWalk();
       return;
     }
-    const pts = res.points.slice();
-    // Skip the snapped start node if she can head for the next point directly.
-    if (pts.length > 1 && lineClear(nav, px, pz, pts[1]![0], pts[1]![1])) pts.shift();
-    if (res.reached && !accept) {
-      // End exactly on the clicked spot when it is walkable from the last node.
-      const last = pts[pts.length - 1]!;
-      if (isFreeAt(nav, to[0], to[1]) && lineClear(nav, last[0], last[1], to[0], to[1]))
-        pts[pts.length - 1] = [to[0], to[1]];
-    }
-    if (!res.reached && !replan) {
-      const goalWalkable = !!accept || isFreeAt(nav, to[0], to[1], true);
-      if (goalWalkable) {
-        const viaLock = findPath(nav, from, to, { accept, ignoreDynamic: true }).reached;
-        this.cb.onPathBlocked?.(viaLock ? "locked" : "unreachable");
-      }
-    }
-    const first = pts.shift()!;
     this.route = pts;
     this.walkTo = new THREE.Vector3(first[0], 1, first[1]);
     this.pathDotsAlpha = Math.max(this.pathDotsAlpha, 0.01);
     this.placePathDots();
   }
 
-  /** Click-to-move from outside the 3D view (e.g. the map's "Go there"). */
-  goTo(x: number, z: number): void {
-    if (!this.inputEnabled) return;
-    this.planWalk([x + 0.5, z + 0.5]);
+  /**
+   * Plan a path to world point `to` (A* on the nav grid, doors respected)
+   * and start following it. `accept` ends the path early (e.g. in reach of
+   * an interactable). Unreachable → walk to the closest point and report
+   * (a pending use is dropped).
+   */
+  private planWalk(to: XZ, accept?: (x: number, z: number) => boolean, replan = false): void {
+    const v = this.active;
+    const nav = this.navFor(v);
+    const [px, , pz] = this.walker.position;
+    const from: XZ = [px, pz];
+    const res = findPath(nav, from, to, accept ? { accept } : {});
+    if (!replan) this.replanned = false;
+    const goal: RouteGoal = accept ? { to, accept } : { to };
+    if (res.noStart || !res.points.length) {
+      // Wedged somewhere the grid does not know: fall back to a straight line.
+      this.route = [];
+      this.routeGoal = goal;
+      this.walkStuck = 0;
+      this.walkTo = new THREE.Vector3(to[0], 1, to[1]);
+      return;
+    }
+    const pts = res.points.slice();
+    if (res.reached && !accept) {
+      // End exactly on the clicked spot when it is walkable from the last node.
+      const last = pts[pts.length - 1]!;
+      if (
+        boxFree(nav, to[0], to[1], WALKER.radius) &&
+        lineClear(nav, last[0], last[1], to[0], to[1], false, WALKER.radius)
+      )
+        pts[pts.length - 1] = [to[0], to[1]];
+    }
+    if (!res.reached) {
+      this.arrival = null;
+      if (!replan) {
+        const goalWalkable = !!accept || isFreeAt(nav, to[0], to[1], true);
+        if (goalWalkable) {
+          const viaLock = findPath(nav, from, to, {
+            ...(accept ? { accept } : {}),
+            ignoreDynamic: true,
+          }).reached;
+          this.cb.onPathBlocked?.(viaLock ? "locked" : "unreachable");
+        }
+      }
+    }
+    this.followPath(pts, goal, nav);
   }
 
-  /** Walk up to an interactable that is out of reach: stop in reach, on its side of the walls. */
-  private walkToInteractable(it: Interactable): void {
+  /**
+   * Path to an exact stand spot: A* to a node from which the slim collision
+   * box slides straight onto the spot, then the spot itself. Null when the
+   * spot is blocked or unreachable.
+   */
+  private spotPath(nav: NavGrid, from: XZ, spot: XZ): { points: XZ[]; length: number } | null {
+    const [sx, sz] = spot;
+    if (!boxFree(nav, sx, sz, WALKER.radius)) return null;
+    const d0 = Math.hypot(sx - from[0], sz - from[1]);
+    if (d0 < 0.05) return { points: [], length: 0 };
+    if (d0 < 8 && lineClear(nav, from[0], from[1], sx, sz, false, WALKER.radius))
+      return { points: [[sx, sz]], length: d0 };
+    const res = findPath(nav, from, spot, {
+      accept: (x, z) =>
+        Math.hypot(x - sx, z - sz) <= 1.5 && lineClear(nav, x, z, sx, sz, false, WALKER.radius),
+    });
+    if (!res.reached || !res.points.length) return null;
+    const pts = res.points.slice();
+    const last = pts[pts.length - 1]!;
+    if (Math.hypot(last[0] - sx, last[1] - sz) > 1e-3) pts.push([sx, sz]);
+    let length = 0;
+    let ax = from[0];
+    let az = from[1];
+    for (const [bx, bz] of pts) {
+      length += Math.hypot(bx - ax, bz - az);
+      ax = bx;
+      az = bz;
+    }
+    return { points: pts, length };
+  }
+
+  /**
+   * Wedged inside something (a device was just built where she stood, a
+   * teleport onto furniture): step out to the nearest free spot instead of
+   * staying stuck. Checked a few times per second.
+   */
+  /** Solid bot bodies on this floor as (x, z, r) triples (dormant bots included). */
+  private botBodies(v: FloorView): number[] | null {
+    const out = this.crowd;
+    out.length = 0;
+    for (const o of v.npcs.values())
+      if (o.brain && o.cfg && o.group.visible) out.push(o.brain.x, o.brain.z, o.cfg.radius);
+    return out.length ? out : null;
+  }
+
+  /** Jade never walks into or through a bot: clip the step, slide round them. */
+  private keepOffBots(crowd: readonly number[], x0: number, z0: number): void {
+    const [x1, , z1] = this.walker.position;
+    const [x, z] = clipMove(x0, z0, x1, z1, WALKER.radius, crowd);
+    if (x === x1 && z === z1) return;
+    // Slide round the bot; where the slide would clip a wall, stay put instead.
+    if (this.walker.blockedAt(this.active.fineCollider, x, z, FINE)) this.walker.placeAt(x0, z0);
+    else this.walker.placeAt(x, z);
+  }
+
+  private unstick(): void {
+    this.unstickCheck -= 1;
+    if (this.unstickCheck > 0) return;
+    this.unstickCheck = 6;
+    const [px, py, pz] = this.walker.position;
+    const v = this.active;
+    if (!this.walker.blockedAt(v.fineCollider, px, pz, FINE)) return;
+    const nav = this.navFor(v);
+    for (let r = 0.25; r <= 4; r += 0.25)
+      for (let k = 0; k < 16; k++) {
+        const a = (k / 16) * Math.PI * 2;
+        const x = px + Math.sin(a) * r;
+        const z = pz + Math.cos(a) * r;
+        if (!boxFree(nav, x, z, WALKER.radius, true)) continue;
+        if (this.walker.blockedAt(v.fineCollider, x, z, FINE)) continue;
+        this.walker.teleport([x, py, z]);
+        return;
+      }
+  }
+
+  /** Terrain-only line test (walls between a stand spot and its object). */
+  private terrainClear(v: FloorView, ax: number, az: number, bx: number, bz: number): boolean {
+    const len = Math.hypot(bx - ax, bz - az);
+    const n = Math.max(1, Math.ceil(len / 0.25));
+    for (let i = 0; i <= n; i++) {
+      const x = Math.floor(ax + ((bx - ax) * i) / n);
+      const z = Math.floor(az + ((bz - az) * i) / n);
+      if (v.layout.world.get(x, 2, z)) return false;
+    }
+    return true;
+  }
+
+  /** Stand target of an interactable (NPCs: around where they are right now). */
+  private standOf(it: Interactable): StandTarget | null {
+    if (it.target.kind === "npc") {
+      const p = it.object.position;
+      return { fp: boxFootprint(1, 1, 1, p.x, p.z, 0), sides: [], radial: 2.9 };
+    }
+    return it.stand ?? null;
+  }
+
+  /**
+   * Walk up to an object and use it: the clicked side's stand spot (or the
+   * nearest reachable active side), turn to face it, then interact (or lie
+   * down for `then = "lie"`). No side reachable → today's fallback: walk into
+   * reach as close as possible. Returns the path length (0 = already there),
+   * or null when she can only get as close as possible.
+   */
+  private approach(
+    it: Interactable,
+    hit?: ClickHit,
+    then: "interact" | "lie" = "interact",
+  ): number | null {
+    const v = this.active;
+    const t = this.standOf(it);
+    const [px, , pz] = this.walker.position;
+    if (!t) {
+      this.walkToInteractable(it, then);
+      return null;
+    }
+    const nav = this.navFor(v);
+    const cands = candidateSpots(t, [px, pz], hit);
+    const settled = new Map<StandSpot, { spot: StandSpot; points: XZ[] }>();
+    // A* is the expensive part: cap the searches per click (unreachable spots cost the most).
+    let searches = 0;
+    const pick = pickSpot(
+      cands,
+      (c) => {
+        const s = settleSpot(c, (x, z) => boxFree(nav, x, z, WALKER.radius));
+        if (!s) return null;
+        // Never through a wall: the object's face must be in plain sight of the spot.
+        const g = (c.side ? (t.gap ?? STAND_GAP) : (t.radial ?? 1.4)) - 0.15;
+        if (!this.terrainClear(v, s.x, s.z, c.x - c.nx * g, c.z - c.nz * g)) return null;
+        if (++searches > 16) return null;
+        const r = this.spotPath(nav, [px, pz], [s.x, s.z]);
+        if (!r) return null;
+        settled.set(c, { spot: s, points: r.points });
+        return r.length;
+      },
+      (c) => Math.hypot(c.x - px, c.z - pz),
+    );
+    if (!pick) {
+      this.walkToInteractable(it, then);
+      return null;
+    }
+    const { spot, points } = settled.get(pick.spot)!;
+    const npc = it.target.kind === "npc" ? it.object : null;
+    this.stopWalk();
+    this.arrival = {
+      target: it.target,
+      facing: spot.facing,
+      seat: spot.seat ?? null,
+      out: headingOf(spot.nx, spot.nz),
+      then,
+      t: -1,
+      ...(npc ? { lookAt: (): [number, number] | null => [npc.position.x, npc.position.z] } : {}),
+    };
+    if (Math.hypot(spot.x - px, spot.z - pz) <= 0.4 || !points.length) {
+      // Close enough: just turn and use it.
+      this.finishWalk();
+      return 0;
+    }
+    this.replanned = false;
+    this.followPath(points, { to: [spot.x, spot.z], exact: true }, nav);
+    return pick.length;
+  }
+
+  /** Fallback: walk into reach of an interactable (on its side of the walls), then face and use it. */
+  private walkToInteractable(it: Interactable, then: "interact" | "lie"): void {
     const v = this.active;
     const gx = it.x + 0.5;
     const gz = it.z + 0.5;
     const reach = Math.max(1.5, REACH + it.radius - 1.2);
     const room = this.roomIdAt(v, gx, gz);
     const nav = this.navFor(v);
+    this.stopWalk();
+    if (then === "interact")
+      this.arrival = {
+        target: it.target,
+        facing: 0,
+        lookAt: () => [it.object.position.x, it.object.position.z],
+        seat: null,
+        out: 0,
+        then,
+        t: -1,
+      };
     this.planWalk([gx, gz], (x, z) => {
       if (Math.hypot(x - gx, z - gz) > reach) return false;
       if (room !== undefined && this.roomIdAt(v, x, z) === room) return true;
       return rayClear(nav, x, z, gx, gz, it.radius + 0.5);
     });
+  }
+
+  /** Arrived at a stand spot: turn to face the object, then use it. */
+  private stepArrival(dt: number): void {
+    const a = this.arrival;
+    if (!a || a.t < 0 || this.seat) return;
+    const [px, , pz] = this.walker.position;
+    const look = a.lookAt?.();
+    if (look && Math.hypot(look[0] - px, look[1] - pz) > 0.2)
+      a.facing = headingOf(look[0] - px, look[1] - pz);
+    this.faceGoal = a.facing;
+    a.t += dt;
+    if (Math.abs(angleDelta(this.yawS, a.facing)) > 0.45 && a.t < 0.4) return;
+    this.arrival = null;
+    if (a.then === "lie") {
+      if (a.seat) this.startSeat(a.seat, "lie", [px, pz], a.out);
+      return;
+    }
+    if (a.seat)
+      this.seatOffer = { anchor: a.seat, from: [px, pz], out: a.out, until: this.time + 4 };
+    else this.playGesture("interact");
+    this.cb.onInteract(a.target);
+  }
+
+  /** Click-to-move from outside the 3D view (e.g. the map's "Go there"). */
+  goTo(x: number, z: number): void {
+    if (!this.inputEnabled) return;
+    if (this.seat) {
+      this.leaveSeat(() => this.goTo(x, z));
+      return;
+    }
+    this.stopWalk();
+    this.planWalk([x + 0.5, z + 0.5]);
   }
 
   /** A door near Lawrence is unlocked but still sliding open (she waits instead of giving up). */
@@ -2744,46 +3317,207 @@ export class LabEngine {
     (this.pathDots.material as THREE.MeshBasicMaterial).opacity = this.pathDotsAlpha;
     this.pathDots.visible = this.pathDotsAlpha > 0 && this.pathDots.count > 0;
   }
+  // ── Seats & beds ──────────────────────────────────────────────
 
-  private rebuildCollision(v: FloorView): void {
-    const s = this.getState();
-    v.collision.clearFootprints();
-    for (const dv of v.devices.values()) {
-      if (stagesDone(s, dv.id) === 0) continue;
-      const [x0, z0, x1, z1, h] = dv.footprint;
-      v.collision.addFootprint(x0 + 0.3, z0 + 0.3, x1 - 0.3, z1 - 0.3, h);
+  /** Root position of the rig on a seat / bed (the walker stays on the approach spot). */
+  private seatRoot(a: SeatAnchor, kind: "sit" | "lie", floorY: number): Vec3 {
+    if (kind === "sit")
+      return [
+        a.x - Math.sin(a.yaw) * SIT_SEAT_OFFSET,
+        floorY + sitFit(this.seatSpec(a)).lift,
+        a.z - Math.cos(a.yaw) * SIT_SEAT_OFFSET,
+      ];
+    return [a.x, floorY + a.y - LIE_BACK_HEIGHT, a.z];
+  }
+
+  /** The rig's view of a seat (legs reach for the floor / footrest). */
+  private seatSpec(a: SeatAnchor): SeatSpec {
+    return { height: a.y, footrest: a.footrest, sink: a.sink };
+  }
+
+  /** Sit / lie down from where she stands onto `anchor`. */
+  private startSeat(anchor: SeatAnchor, kind: "sit" | "lie", from: XZ, out: number): void {
+    this.stopWalk();
+    this.faceGoal = null;
+    this.seatOffer = null;
+    this.seat = {
+      anchor,
+      kind,
+      from,
+      fromYaw: this.yawS,
+      out,
+      phase: "enter",
+      t: 0,
+      exitFrom: null,
+      last: null,
+      after: null,
+    };
+    // The pose's own clock plays the sit-down / lie-down from standing.
+    this.track = switchPose(this.track, kind, this.time);
+  }
+
+  /** Stand up (animated) and run `after` once she is on her feet. */
+  private leaveSeat(after: (() => void) | null): void {
+    const st = this.seat;
+    if (!st) {
+      after?.();
+      return;
     }
-    for (const p of PROPS) {
-      if (p.floor !== v.floor || p.model === "elevator") continue;
-      const m = propGrid(p);
-      const rot = (p.rot ?? 0) % 2 === 1;
-      const hw = ((rot ? m.d : m.w) * MODEL_SCALE) / 2;
-      const hd = ((rot ? m.w : m.d) * MODEL_SCALE) / 2;
-      v.collision.addFootprint(
-        p.x + 0.8 - hw,
-        p.z + 0.8 - hd,
-        p.x + 0.2 + hw,
-        p.z + 0.2 + hd,
-        m.h * MODEL_SCALE,
-      );
+    st.after = after;
+    if (st.phase === "exit") return;
+    // Leaving mid-way down: the exit starts from wherever the rig is now.
+    st.exitFrom = st.last ?? {
+      pos: this.seatRoot(st.anchor, st.kind, this.walker.position[1]),
+      yaw: st.anchor.yaw,
+    };
+    st.phase = "exit";
+    st.t = 0;
+    // Leaving "sit" / "lie" plays the stand-up / get-up choreography.
+    this.track = switchPose(this.track, "idle", this.time);
+  }
+
+  /** Drop the seat at once (floor change, elevator, teleport). */
+  private clearSeat(): void {
+    if (!this.seat) return;
+    const out = this.seat.out;
+    this.seat = null;
+    this.walker.facing = out;
+    this.yawS = out;
+    if (this.track.kind === "sit" || this.track.kind === "lie")
+      this.track = switchPose(this.track, "idle", this.time, 0.2);
+  }
+
+  /** Advance the seat motion; returns the rig root pose while seated, else null. */
+  private stepSeat(dt: number, floorY: number): { pos: Vec3; yaw: number } | null {
+    const st = this.seat;
+    if (!st) return null;
+    st.t += dt;
+    const seatPos = this.seatRoot(st.anchor, st.kind, floorY);
+    const stand: Vec3 = [st.from[0], floorY, st.from[1]];
+    const lerp = (a: Vec3, b: Vec3, u: number): Vec3 => [
+      a[0] + (b[0] - a[0]) * u,
+      a[1] + (b[1] - a[1]) * u,
+      a[2] + (b[2] - a[2]) * u,
+    ];
+    let out: { pos: Vec3; yaw: number };
+    if (st.phase === "enter") {
+      // Root travel eased like the body (glance back, lower; lie: sit on the edge, then recline).
+      const p = seatRootProgress(st.kind, "enter", st.t);
+      out = {
+        pos: lerp(stand, seatPos, p.pos),
+        yaw: st.fromYaw + angleDelta(st.fromYaw, st.anchor.yaw) * p.yaw,
+      };
+      if (st.t >= (st.kind === "lie" ? LIE_ENTER_DURATION : SIT_ENTER_DURATION)) st.phase = "hold";
+    } else if (st.phase === "hold") {
+      out = { pos: seatPos, yaw: st.anchor.yaw };
+    } else {
+      const from = st.exitFrom ?? { pos: seatPos, yaw: st.anchor.yaw };
+      const dur = st.kind === "lie" ? LIE_EXIT_DURATION : SIT_EXIT_DURATION;
+      if (st.t >= dur) {
+        // On her feet again.
+        const after = st.after;
+        this.seat = null;
+        this.walker.facing = st.out;
+        // Continue from the rendered heading (eases on if the exit did not turn her).
+        this.yawS = st.last?.yaw ?? st.out;
+        after?.();
+        return null;
+      }
+      const p = seatRootProgress(st.kind, "exit", st.t);
+      out = {
+        pos: lerp(from.pos, stand, p.pos),
+        yaw: from.yaw + angleDelta(from.yaw, st.out) * p.yaw,
+      };
     }
-    for (const f of decorFootprints(v.floor)) v.collision.addFootprint(f.x0, f.z0, f.x1, f.z1, f.h);
-    for (const t of ROOM_TERMINALS) {
-      if (t.floor !== v.floor) continue;
-      const odd = (t.rot ?? 0) % 2 === 1;
-      const hw = ((odd ? ROOM_TERMINAL_SIZE.d : ROOM_TERMINAL_SIZE.w) * ROOM_TERMINAL_SCALE) / 2;
-      const hd = ((odd ? ROOM_TERMINAL_SIZE.w : ROOM_TERMINAL_SIZE.d) * ROOM_TERMINAL_SCALE) / 2;
-      v.collision.addFootprint(
-        t.x + 0.8 - hw,
-        t.z + 0.8 - hd,
-        t.x + 0.2 + hw,
-        t.z + 0.2 + hd,
-        ROOM_TERMINAL_SIZE.h * ROOM_TERMINAL_SCALE,
-      );
-    }
+    st.last = out;
+    return out;
+  }
+
+  /** Walk to a bed and lie down (sleep). Returns seconds until she lies, or null without a bed. */
+  restIn(target: Target): number | null {
+    const it = this.active.interactables.find(
+      (i) => i.target.kind === target.kind && i.target.id === target.id,
+    );
+    if (!it?.stand?.seat || it.stand.seat.def.kind !== "lie") return null;
+    if (this.seat?.kind === "lie" && this.seat.phase !== "exit") return 0;
+    this.clearSeat();
+    const len = this.approach(it, undefined, "lie");
+    if (len === null) return null;
+    return len / WALKER.speed + 0.4 + LIE_ENTER_DURATION;
+  }
+
+  /** Jade is sitting or lying (or getting there / up). */
+  get seated(): "sit" | "lie" | null {
+    return this.seat?.kind ?? null;
   }
 
   // ── Input ─────────────────────────────────────────────────────
+
+  /**
+   * A click on small things lying on a seat (the blanket and books on the
+   * sofa, a mug on the canteen table) means the seat — unless the thing has
+   * an action that does something (a clue, an item), then it stays itself.
+   * E on the focused thing still uses it.
+   */
+  private seatHostOf(it: Interactable): Interactable {
+    if (it.target.kind !== "decor") return it;
+    const p = this.decorById.get(it.target.id);
+    if (!p?.host) return it;
+    const host = this.active.interactables.find(
+      (i) => i.active && i.target.kind === "decor" && i.target.id === p.host,
+    );
+    if (!host?.stand?.seat) return it;
+    const own = decorActionFor(p.decor, p.room);
+    if (own?.outcomes.some((o) => o.effects)) return it;
+    return host;
+  }
+
+  /** A terrain voxel (wall, pillar) lies between the camera and world point `p` (ray direction `dir`). */
+  private terrainOccludes(p: THREE.Vector3, dir: THREE.Vector3): boolean {
+    const w = this.active.layout.world;
+    for (let d = 0.35; d < 40; d += 0.25) {
+      const x = p.x - dir.x * d;
+      const y = p.y - dir.y * d;
+      const z = p.z - dir.z * d;
+      if (y > WALL_HEIGHT + 2) return false;
+      if (y >= 1 && w.get(Math.floor(x), Math.floor(y), Math.floor(z))) return true;
+    }
+    return false;
+  }
+
+  /** Raycast a click at normalized device coords: use an object, or walk to the floor point. */
+  private clickAt(nx: number, ny: number): void {
+    this.pointer.set(nx, ny);
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    const objects = this.active.interactables.filter((i) => i.active).map((i) => i.object);
+    const hits = this.raycaster.intersectObjects(objects, true);
+    // First hit that is not hidden behind a wall (e.g. a poster on the far side of the near wall).
+    const dir = this.raycaster.ray.direction;
+    const h = hits.find((x) => !this.terrainOccludes(x.point, dir));
+    if (h) {
+      const hitIt = this.active.interactables.find(
+        (i) => i.active && isAncestor(i.object, h.object),
+      );
+      const it = hitIt ? this.seatHostOf(hitIt) : undefined;
+      if (it) {
+        const hit: ClickHit = { x: h.point.x, z: h.point.z };
+        if (h.face) {
+          const n = this.tmpDir.copy(h.face.normal).transformDirection(h.object.matrixWorld);
+          hit.nx = n.x;
+          hit.ny = n.y;
+          hit.nz = n.z;
+        }
+        this.approach(it, hit);
+        return;
+      }
+    }
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1);
+    const p = new THREE.Vector3();
+    if (this.raycaster.ray.intersectPlane(plane, p)) {
+      this.stopWalk();
+      this.planWalk([p.x, p.z]);
+    }
+  }
 
   private bindInput(): void {
     const down = (e: KeyboardEvent) => {
@@ -2792,9 +3526,22 @@ export class LabEngine {
       this.keys.add(e.code);
       const action = actionForCode(e.code, this.settings.controls);
       if (action === "interact") {
-        if (this.focus) {
-          this.playGesture("interact");
-          this.cb.onInteract(this.focus.target);
+        if (this.seat) this.leaveSeat(null);
+        else if (this.focus) {
+          const it = this.focus;
+          if (this.standOf(it)?.seat) {
+            // A seat needs her in front of it: a short walk, then sit down.
+            this.approach(it);
+          } else {
+            // Turn toward it where she stands and use it.
+            const [px, , pz] = this.walker.position;
+            const cx = it.object.position.x;
+            const cz = it.object.position.z;
+            if (Math.hypot(cx - px, cz - pz) > 0.3) this.faceGoal = headingOf(cx - px, cz - pz);
+            this.stopWalk();
+            this.playGesture("interact");
+            this.cb.onInteract(it.target);
+          }
         }
         e.preventDefault();
       }
@@ -2815,30 +3562,16 @@ export class LabEngine {
     const click = (e: PointerEvent) => {
       if (!this.inputEnabled || e.button !== 0) return;
       const rect = this.renderer.domElement.getBoundingClientRect();
-      this.pointer.set(
-        ((e.clientX - rect.left) / rect.width) * 2 - 1,
-        -((e.clientY - rect.top) / rect.height) * 2 + 1,
-      );
-      this.raycaster.setFromCamera(this.pointer, this.camera);
-      // Clicked an interactable in reach? Interact. Otherwise walk there.
-      const objects = this.active.interactables.filter((i) => i.active).map((i) => i.object);
-      const hits = this.raycaster.intersectObjects(objects, true);
-      if (hits[0]) {
-        const it = this.active.interactables.find((i) => isAncestor(i.object, hits[0]!.object));
-        if (it) {
-          const [px, , pz] = this.walker.position;
-          if (Math.hypot(it.x + 0.5 - px, it.z + 0.5 - pz) <= REACH + it.radius) {
-            this.playGesture("interact");
-            this.cb.onInteract(it.target);
-            return;
-          }
-          this.walkToInteractable(it);
-          return;
-        }
+      const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      // Seated: stand up first, then do what the click asked for.
+      if (this.seat) {
+        this.leaveSeat(() => {
+          if (this.inputEnabled) this.clickAt(nx, ny);
+        });
+        return;
       }
-      const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1);
-      const p = new THREE.Vector3();
-      if (this.raycaster.ray.intersectPlane(plane, p)) this.planWalk([p.x, p.z]);
+      this.clickAt(nx, ny);
     };
     const resize = () => this.resize();
     window.addEventListener("keydown", down);
@@ -2896,16 +3629,39 @@ export class LabEngine {
     const fz = -Math.cos(this.yaw);
     let mx = fx * f - fz * r;
     let mz = fz * f + fx * r;
-    // Any movement key cancels click-to-move at once.
-    if (f || r) {
-      if (this.walkTo) this.stopWalk();
+    const gs = this.getState();
+    // Buffs (coffee …) × the gentle biorhythm factor (0.92 low · 1.06 balanced · else 1).
+    const walkBoost =
+      buffMultiplier(gs, gs.playTime, "walk_speed") *
+      bioWalkMultiplier(gs, this.settings.gameplay.biorhythm);
+    const STEP = 1 / 60;
+    // Simulated time this frame (the walker runs in fixed steps).
+    const simT = Math.floor(this.acc / STEP) * STEP;
+    let finalLeg = false;
+    if (this.seat) {
+      // Seated: a movement key makes her stand up; no walking until she is up.
+      if ((f || r) && this.seat.phase !== "exit") this.leaveSeat(null);
+      mx = 0;
+      mz = 0;
+    } else if (f || r) {
+      // Any movement key cancels click-to-move and a pending turn at once.
+      if (this.walkTo || this.arrival) this.stopWalk();
+      this.faceGoal = null;
     } else if (this.walkTo) {
       const [px, , pz] = this.walker.position;
       let dx = this.walkTo.x - px;
       let dz = this.walkTo.z - pz;
       let dist = Math.hypot(dx, dz);
-      // Next waypoint once this one is (nearly) reached.
-      while (this.route.length && dist < 0.5) {
+      // Next waypoint once this one is (nearly) reached — or already in
+      // straight view, so corners are rounded instead of touched.
+      const nav = this.active.nav;
+      while (
+        this.route.length &&
+        (dist < 0.5 ||
+          (dist < 1.6 &&
+            !!nav &&
+            lineClear(nav, px, pz, this.route[0]![0], this.route[0]![1], false, WALKER.radius)))
+      ) {
         const [nx, nz] = this.route.shift()!;
         this.walkTo.set(nx, 1, nz);
         dx = nx - px;
@@ -2913,10 +3669,21 @@ export class LabEngine {
         dist = Math.hypot(dx, dz);
         this.placePathDots();
       }
-      if (dist < 0.6 && !this.route.length) this.stopWalk();
-      else {
+      finalLeg = !this.route.length;
+      if (finalLeg && dist < 0.05) {
+        this.finishWalk();
+      } else {
         mx = dx / dist;
         mz = dz / dist;
+        if (finalLeg) {
+          // Ease into the spot and never overshoot it this frame.
+          const k = Math.min(
+            Math.max(0.3, Math.min(1, dist / 1.3)),
+            simT > 0 ? dist / (WALKER.speed * walkBoost * simT) : 1,
+          );
+          mx *= k;
+          mz *= k;
+        }
       }
     }
     const len = Math.hypot(mx, mz);
@@ -2924,17 +3691,26 @@ export class LabEngine {
       mx /= len;
       mz /= len;
     }
-    const gs = this.getState();
-    // Buffs (coffee …) × the gentle biorhythm factor (0.92 low · 1.06 balanced · else 1).
-    const walkBoost =
-      buffMultiplier(gs, gs.playTime, "walk_speed") *
-      bioWalkMultiplier(gs, this.settings.gameplay.biorhythm);
-    this.active.doors.update(dt, this.walker.position);
+    // Slow down while turning round (no moonwalking on a 180° turn).
+    if (len > 0.01 && !this.ride) {
+      const d = Math.abs(angleDelta(this.yawS, Math.atan2(mx, mz)));
+      const k = 1 - 0.6 * smoothstep01((d - 0.6) / 1.8);
+      mx *= k;
+      mz *= k;
+    }
+    // Door magnetism: heading into a doorway steers onto its centre line.
+    if (!this.seat && !this.ride)
+      [mx, mz] = this.active.doors.assist(this.walker.position, [mx, mz]);
+    const vel = WALKER.speed * walkBoost;
+    this.active.doors.update(dt, this.walker.position, [mx * vel, mz * vel]);
     this.elevators.update(dt);
-    const STEP = 1 / 60;
+    if (!this.seat && !this.ride) this.unstick();
     const before = this.walker.position;
+    const crowd = this.ride ? null : this.botBodies(this.active);
     while (this.acc >= STEP) {
-      this.walker.update(this.active.collider, [mx * walkBoost, mz * walkBoost], STEP);
+      const [x0, , z0] = this.walker.position;
+      this.walker.update(this.active.fineCollider, [mx * walkBoost, mz * walkBoost], STEP, FINE);
+      if (crowd) this.keepOffBots(crowd, x0, z0);
       this.acc -= STEP;
     }
     const after = this.walker.position;
@@ -2943,15 +3719,26 @@ export class LabEngine {
       // Pressing against a door that is still sliding open is not "stuck".
       const waiting = moved < 0.01 && this.waitingForDoor(this.active, after[0], after[2]);
       this.walkStuck = moved < 0.01 && !waiting ? this.walkStuck + dt : 0;
-      if (this.walkStuck > 0.5) {
-        const goal = this.routeGoal;
+      const goal = this.routeGoal;
+      const toEnd = finalLeg ? Math.hypot(this.walkTo.x - after[0], this.walkTo.z - after[2]) : 99;
+      if (this.walkStuck > 0.3 && toEnd < 0.8) {
+        // Nudged against something right at the spot: close enough.
+        this.finishWalk();
+      } else if (this.walkStuck > 0.5) {
         if (goal && !this.replanned) {
           // Something moved into the way (bot, door): plan once more, then give up.
-          this.planWalk(goal.to, goal.accept, true);
           this.replanned = true;
+          if (goal.exact) {
+            const nav = this.navFor(this.active);
+            const r = this.spotPath(nav, [after[0], after[2]], goal.to);
+            if (r) this.followPath(r.points, goal, nav);
+            else this.stopWalk();
+          } else this.planWalk(goal.to, goal.accept, true);
         } else this.stopWalk();
       }
-    }
+    } else if (this.faceGoal !== null && !this.walker.moving && !this.seat && !this.ride)
+      this.walker.facing = this.faceGoal;
+    this.stepArrival(dt);
     this.fadePathDots(dt);
     if (after[1] < -10) this.walker.teleport([ELEVATORS[0]!.x - 6, 2, ELEVATORS[0]!.z]);
 
@@ -2959,11 +3746,32 @@ export class LabEngine {
     const [px, py, pz] = after;
     const lift = this.elevators.riding ? this.elevators.offset : 0;
     this.stepRide(dt, lift);
-    this.player.root.position.set(px, py + lift, pz);
-    this.player.root.rotation.y = this.walker.facing;
+    // Rendered heading eases toward the walker's (turns never snap).
+    this.yawS = this.settings.accessibility.reduceMotion
+      ? this.walker.facing
+      : turnToward(this.yawS, this.walker.facing, dt, 12, 12);
+    const seated = this.stepSeat(dt, py);
+    if (seated) {
+      this.player.root.position.set(seated.pos[0], seated.pos[1] + lift, seated.pos[2]);
+      this.player.root.rotation.y = seated.yaw;
+    } else {
+      this.player.root.position.set(px, py + lift, pz);
+      this.player.root.rotation.y = this.yawS;
+    }
     // Pose: idle ↔ walk blend, interact gesture, talk/think/celebrate modes.
     const rawSpeed = dt > 0 ? Math.hypot(after[0] - before[0], after[2] - before[2]) / dt : 0;
+    const prevSpeed = this.speedS;
     this.speedS = approach(this.speedS, this.walker.moving ? rawSpeed : 0, dt, 6);
+    // Lean into starts / stops and bank into turns (the rendered heading, not the input snap).
+    const still = !!this.seat || !!this.ride;
+    const accel = dt > 0 && !still ? (this.speedS - prevSpeed) / dt : 0;
+    const turn =
+      dt > 0 && !still
+        ? THREE.MathUtils.clamp(angleDelta(this.prevYawS, this.yawS) / dt, -12, 12)
+        : 0;
+    this.prevYawS = this.yawS;
+    this.accelS = approach(this.accelS, accel, dt, 8);
+    this.turnS = approach(this.turnS, turn, dt, 8);
     this.walkW = approach(this.walkW, this.walker.moving ? 1 : 0, dt, 8);
     this.idleFor = advanceIdle(this.idleFor, dt, this.walker.moving, this.walkW);
     if (this.walker.moving) {
@@ -2994,12 +3802,16 @@ export class LabEngine {
         chill: this.chill,
         load: this.rideLoad,
         rattle: this.rideRattle,
+        accel: this.accelS,
+        turnRate: this.turnS,
+        ...(this.seat?.kind === "sit" ? { seat: this.seatSpec(this.seat.anchor) } : {}),
       }),
     );
     const prop = activeProp(this.track, this.time);
     for (const [k, m] of this.handProps) m.visible = k === prop;
     this.syncXray();
-    this.lantern.position.set(px, py + 5, pz);
+    const root = this.player.root.position;
+    this.lantern.position.set(root.x, py + 5, root.z);
 
     this.animateWorld(dt);
     this.fx.update(dt);
@@ -3095,7 +3907,11 @@ export class LabEngine {
     this.updateBrownout();
     this.updateBlobs(lift);
     const st = this.getState();
-    this.screens.update(this.time, (src) => screenInfo(st, src.deviceId, src.roomId), this.camera);
+    this.screens.update(
+      this.time,
+      (src) => screenInfo(st, src.deviceId, src.roomId, undefined, src.placementId),
+      this.camera,
+    );
     this.crt.uniforms.uTime.value = this.time;
     this.crt.uniforms.uAspect.value = aspect;
     // One world-matrix update per frame (auto-update is off), then refresh
@@ -3356,15 +4172,25 @@ export class LabEngine {
     playerX: 0,
     playerZ: 0,
     others: this.npcOthers,
+    otherRadii: this.npcRadii,
+    playerRadius: WALKER.radius,
   };
 
   /** Bots think, walk, work and watch; Damien's echo talks; the MCP eye follows Lawrence. */
   private animateNpcs(v: FloorView, dt: number, t: number): void {
     const [px, , pz] = this.walker.position;
     const others = this.npcOthers;
+    const radii = this.npcRadii;
     others.length = 0;
+    radii.length = 0;
+    const slots = this.npcSlots;
+    slots.clear();
     for (const o of v.npcs.values())
-      if (o.brain && o.group.visible) others.push(o.brain.x, o.brain.z);
+      if (o.brain && o.cfg && o.group.visible) {
+        slots.set(o, others.length);
+        others.push(o.brain.x, o.brain.z);
+        radii.push(o.cfg.radius);
+      }
     const world = this.npcWorld;
     world.playerX = px;
     world.playerZ = pz;
@@ -3426,8 +4252,20 @@ export class LabEngine {
         continue;
       }
       stepBrain(b, cfg, world, dt);
+      // Later bots see where this one went this frame (no mutual overlap).
+      const slot = slots.get(npc);
+      if (slot !== undefined) {
+        others[slot] = b.x;
+        others[slot + 1] = b.z;
+      }
       const k = Math.min(1, b.speed / cfg.speed);
       npc.phase += b.speed * dt * 2.2;
+      // Wheels / legs follow the distance walked (phase = 2.2 × travel).
+      if (npc.visual) {
+        const gait = (npc.visual.gait ??= { travel: 0, moving: 0 });
+        gait.travel = npc.phase / 2.2;
+        gait.moving = k;
+      }
       const s = npc.seed;
       const hop = Math.abs(Math.sin(npc.phase)) * 0.14 * k;
       const breathe = Math.sin(t * 1.7 + s) * 0.025 * (1 - k);
@@ -3465,23 +4303,9 @@ export class LabEngine {
     return !c.get(cx, 0, cz) || !!c.get(cx, 1, cz) || !!c.get(cx, 2, cz);
   }
 
-  /** Room index + 1 per floor cell (0 = corridor/none), built lazily. */
+  /** Room id at a floor cell (room shapes, see floor-geom.ts). */
   private roomIdAt(v: FloorView, x: number, z: number): string | undefined {
-    if (!v.roomGrid) {
-      const grid = new Int16Array(FLOOR_SIZE.x * FLOOR_SIZE.z);
-      ROOMS.forEach((r, i) => {
-        if (r.floor !== v.floor) return;
-        for (let zz = Math.max(0, r.z); zz < Math.min(FLOOR_SIZE.z, r.z + r.d); zz++)
-          for (let xx = Math.max(0, r.x); xx < Math.min(FLOOR_SIZE.x, r.x + r.w); xx++)
-            grid[xx + zz * FLOOR_SIZE.x] = i + 1;
-      });
-      v.roomGrid = grid;
-    }
-    const cx = Math.floor(x);
-    const cz = Math.floor(z);
-    if (cx < 0 || cz < 0 || cx >= FLOOR_SIZE.x || cz >= FLOOR_SIZE.z) return undefined;
-    const i = v.roomGrid[cx + cz * FLOOR_SIZE.x]!;
-    return i ? ROOMS[i - 1]!.id : undefined;
+    return roomAt(v.floor, x, z)?.id;
   }
 
   /**
@@ -3622,8 +4446,11 @@ export class LabEngine {
   /** Contact shadows under Lawrence and every visible character. */
   private updateBlobs(lift: number): void {
     let n = 0;
-    const [px, py, pz] = this.walker.position;
-    n = this.putBlob(n, px, py + lift, pz, 2.7, 0.5);
+    // Under the rig (on a seat / bed the shadow follows her, flatter and wider).
+    const root = this.player.root.position;
+    const [, py] = this.walker.position;
+    const lying = this.seat?.kind === "lie" && this.seat.phase === "hold";
+    n = this.putBlob(n, root.x, py + lift, root.z, lying ? 3.4 : 2.7, lying ? 0.3 : 0.5);
     for (const npc of this.active.npcs.values()) {
       if (!npc.group.visible || npc.blob <= 0) continue;
       const g = npc.group;
@@ -3694,8 +4521,3 @@ function isAncestor(parent: THREE.Object3D, child: THREE.Object3D): boolean {
 }
 
 export { WALKER };
-
-function propGrid(p: { model: string; variant?: string }): Model {
-  const decor = p.variant ? PROP_VARIANT_DECOR[p.variant] : undefined;
-  return decor && DECOR_BY_ID.has(decor) ? decorModel(decor) : propModel(p.model);
-}

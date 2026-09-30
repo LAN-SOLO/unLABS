@@ -26,7 +26,8 @@ import type { ScreenContent, ScreenSpec } from "@/lib/world/models/anim";
 import { topObjective } from "@/lib/world/quests";
 import { unreadMail } from "@/lib/world/terminal-lite";
 import { SPECTRUM_HEX } from "@/lib/world/traits";
-import { SPECTRUM, type FloorId, type WorldState } from "@/lib/world/types";
+import { BOARD_CAPACITY } from "@/lib/world/memos";
+import { SPECTRUM, type FloorId, type MemoSourceKind, type WorldState } from "@/lib/world/types";
 
 /** The subset of a 2D context the screens use (real canvases and test stubs both fit). */
 export type ScreenCtx = Pick<CanvasRenderingContext2D, "fillRect" | "fillStyle" | "globalAlpha">;
@@ -127,6 +128,16 @@ export interface ScreenInfo {
   endings: number;
   /** Room terminal in this room: unread mails. */
   unreadMail: number;
+  /** Live pinboards: memos pinned to the screen's decor placement, oldest first. */
+  pinned?: readonly PinnedCard[];
+}
+
+/** One memo card on a live pinboard (content "notes"). */
+export interface PinnedCard {
+  /** One or two words of the memo title. */
+  title: string;
+  /** Card colour index into NOTE_CARD_COLORS. */
+  tone: number;
 }
 
 // ── Info snapshot ────────────────────────────────────────────────
@@ -334,6 +345,7 @@ export function screenInfo(
   deviceId?: string,
   roomId?: string,
   now: Date = new Date(),
+  placementId?: string,
 ): ScreenInfo {
   const b = baseInfo(s);
   const dev = deviceId ? DEVICE_BY_ID.get(deviceId) : undefined;
@@ -394,7 +406,53 @@ export function screenInfo(
   };
   if (deviceId) info.deviceId = deviceId;
   if (room) info.roomId = room.id;
+  if (placementId) info.pinned = pinnedCards(s, placementId);
   return info;
+}
+
+/** Card colours of a live pinboard (paper, yellow, pink, blue, green, orange). */
+export const NOTE_CARD_COLORS = [
+  "rgb(236,228,206)",
+  "rgb(242,221,110)",
+  "rgb(240,168,190)",
+  "rgb(156,200,240)",
+  "rgb(168,226,160)",
+  "rgb(244,178,110)",
+] as const;
+
+const NOTE_TONE: Record<MemoSourceKind, number> = {
+  custom: 0,
+  note: 0,
+  message: 0,
+  archive: 1,
+  log: 1,
+  insight: 3,
+  course: 3,
+  readout: 4,
+  device: 4,
+  recipe: 2,
+  puzzle: 2,
+  experiment: 5,
+};
+
+/** First one or two words of a memo title (the pixel font is small). */
+export function shortNoteTitle(title: string): string {
+  const words = title.trim().split(/\s+/).filter(Boolean);
+  const two = words.slice(0, 2).join(" ");
+  return two.length > 16 ? (words[0] ?? "").slice(0, 16) : two;
+}
+
+/**
+ * Memos pinned to a decor placement, oldest first. Memos store the board
+ * as `place` = the placement id (e.g. "decor:jadeq:a16"); the explicit
+ * "decor:" + placement id form is accepted as well.
+ */
+export function pinnedCards(s: WorldState, placementId: string): PinnedCard[] {
+  const alt = `decor:${placementId}`;
+  return (s.memos ?? [])
+    .filter((m) => m.place === placementId || m.place === alt)
+    .sort((a, b) => a.t - b.t)
+    .map((m) => ({ title: shortNoteTitle(m.title), tone: NOTE_TONE[m.source?.kind ?? "custom"] }));
 }
 
 // ── Colour helpers ───────────────────────────────────────────────
@@ -475,6 +533,7 @@ export const SCREEN_COLOR: Record<ScreenContent, string> = {
   damien: "#00FFFF",
   boot: "#33FF33",
   noise: "#CFD8DC",
+  notes: "#F4E9C8",
 };
 
 // ── Noise ────────────────────────────────────────────────────────
@@ -1526,6 +1585,80 @@ function drawNoise(f: Frame): void {
   }
 }
 
+/**
+ * Live pinboard: cork, up to 3 × 2 (small: 2 × 1) memo cards with one or two
+ * words each, a pin on every card, and the count in the corner.
+ */
+function drawNotes(f: Frame): void {
+  const { w, h, info } = f;
+  const CORK = "rgb(150,104,62)";
+  const CORK_DARK = "rgb(118,80,46)";
+  const INK = "rgb(44,34,26)";
+  rect(f, 0, 0, w, h, CORK);
+  for (let y = 0; y < h; y += 2)
+    for (let x = (y >> 1) % 2; x < w; x += 3) if (hash3(x, y, 91) > 0.72) px(f, x, y, CORK_DARK);
+  const cards = info.pinned ?? [];
+  const head = h >= 32 ? 8 : 0;
+  if (head) {
+    drawText(f.ctx, clip(tr("screen::PINBOARD"), f.cols - 6), 2, 2, NOTE_CARD_COLORS[0]);
+    const count = `${cards.length}/${BOARD_CAPACITY}`;
+    drawText(f.ctx, count, w - 1 - count.length * GLYPH_W, 2, NOTE_CARD_COLORS[1]);
+  }
+  if (!cards.length) {
+    const msg = tr("screen::NOTHING PINNED");
+    const lines = wrapText(msg, Math.max(1, f.cols - 1));
+    const y0 = Math.round(head + (h - head - lines.length * GLYPH_H) / 2);
+    lines.forEach((l, i) =>
+      drawText(f.ctx, l, Math.round((w - l.length * GLYPH_W) / 2), y0 + i * GLYPH_H, CORK_DARK),
+    );
+    rect(f, Math.round(w / 2) - 1, Math.max(head, y0 - 5), 2, 2, RED);
+    return;
+  }
+  const cols = Math.max(1, Math.min(4, Math.floor((w - 2) / 28)));
+  const rows = Math.max(1, Math.min(2, Math.floor((h - head - 2) / 20)));
+  const slots = cols * rows;
+  const more = cards.length > slots ? cards.length - (slots - 1) : 0;
+  const shown = more ? cards.slice(0, slots - 1) : cards.slice(0, slots);
+  const gap = 2;
+  const cw = Math.floor((w - 2 - gap * (cols - 1)) / cols);
+  const ch = Math.floor((h - head - 2 - gap * (rows - 1)) / rows);
+  const lineCols = Math.max(1, Math.floor((cw - 2) / GLYPH_W));
+  const lineRows = Math.max(1, Math.floor((ch - 3) / GLYPH_H));
+  const at = (i: number) => {
+    const c = i % cols;
+    const r = Math.floor(i / cols);
+    // A slight hand-pinned jitter per card.
+    const jx = Math.round((hash3(i, 7) - 0.5) * 2);
+    const jy = Math.round((hash3(i, 11) - 0.5) * 2);
+    return {
+      x: Math.max(0, Math.min(w - cw, 1 + c * (cw + gap) + jx)),
+      y: Math.max(head, Math.min(h - ch, head + 1 + r * (ch + gap) + jy)),
+    };
+  };
+  shown.forEach((card, i) => {
+    const { x, y } = at(i);
+    const color = NOTE_CARD_COLORS[card.tone % NOTE_CARD_COLORS.length] ?? NOTE_CARD_COLORS[0];
+    rect(f, x + 1, y + 1, cw, ch, CORK_DARK); // shadow
+    rect(f, x, y, cw, ch, color);
+    wrapText(card.title, lineCols)
+      .slice(0, lineRows)
+      .forEach((l, k) => drawText(f.ctx, l, x + 2, y + 3 + k * GLYPH_H, INK));
+    rect(f, x + Math.floor(cw / 2) - 1, y, 2, 2, RED);
+  });
+  if (more) {
+    const { x, y } = at(slots - 1);
+    rect(f, x, y, cw, ch, CORK_DARK);
+    const label = `+${more}`;
+    drawText(
+      f.ctx,
+      label,
+      x + Math.max(1, Math.round((cw - label.length * GLYPH_W) / 2)),
+      y + Math.round(ch / 2) - 2,
+      NOTE_CARD_COLORS[0],
+    );
+  }
+}
+
 const RENDERERS: Record<ScreenContent, (f: Frame) => void> = {
   power: drawPower,
   wave: drawWave,
@@ -1545,10 +1678,11 @@ const RENDERERS: Record<ScreenContent, (f: Frame) => void> = {
   damien: drawDamien,
   boot: drawBoot,
   noise: drawNoise,
+  notes: drawNotes,
 };
 
 /** Content kinds that already show the terminal feed themselves. */
-const OWN_CAPTION = new Set<ScreenContent>(["text", "code", "log"]);
+const OWN_CAPTION = new Set<ScreenContent>(["text", "code", "log", "notes"]);
 
 /** Room-terminal caption band at the bottom (cycles the feed; long lines scroll). */
 function drawCaption(f: Frame): void {
@@ -1722,14 +1856,16 @@ export function drawScreen(
     RENDERERS[spec.content](f);
     drawCaption(f);
   }
-  // Scanlines + a slow rolling brightness band.
-  ctx.globalAlpha = 0.28;
-  ctx.fillStyle = "rgb(0,0,0)";
-  for (let y = 1; y < h; y += 2) ctx.fillRect(0, y, w, 1);
-  ctx.globalAlpha = 0.06;
-  ctx.fillStyle = pal.hot;
-  const roll = Math.floor((t * 9) % (h + 10)) - 5;
-  ctx.fillRect(0, roll, w, 4);
+  // Scanlines + a slow rolling brightness band (not on paper: live pinboards).
+  if (spec.content !== "notes") {
+    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = "rgb(0,0,0)";
+    for (let y = 1; y < h; y += 2) ctx.fillRect(0, y, w, 1);
+    ctx.globalAlpha = 0.06;
+    ctx.fillStyle = pal.hot;
+    const roll = Math.floor((t * 9) % (h + 10)) - 5;
+    ctx.fillRect(0, roll, w, 4);
+  }
   // Edge vignette.
   ctx.globalAlpha = 0.35;
   ctx.fillStyle = "rgb(0,0,0)";

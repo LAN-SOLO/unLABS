@@ -1,5 +1,6 @@
 import type { Command, CommandContext, CommandResult } from "./types";
 import { tr } from "@/lib/i18n";
+import { APP_VERSION } from "@/lib/version";
 import { parseTimeArg, formatCountdown } from "@/lib/power/timeParser";
 import { REROLL_COST, STREAK_INSURANCE_COST, utcDayKey } from "@/lib/game/daily/engine";
 import { applyVolatility, volatilityPercent } from "@/lib/game/volatility";
@@ -1203,7 +1204,7 @@ const aboutCommand: Command = {
       "|    _unITM - Crystal NFTs                                      |",
       "|    _unSLC - Crystal Slices (30 per crystal)                   |",
       "|                                                               |",
-      "|  VERSION: 0.1.0-alpha                                         |",
+      `|  VERSION: ${APP_VERSION.padEnd(52)}|`,
       "+---------------------------------------------------------------+",
       "",
     ];

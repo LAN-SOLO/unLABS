@@ -401,6 +401,13 @@ const ROOM_FIRST_BARKS: BarkDef[] = group("room.first", "enter_room", { once: tr
   ],
   [
     "jade",
+    tr(
+      "A studio. Of course he built a studio. The chair is still warm — no, that is the amplifier.",
+    ),
+    { on: { room: "studio", ...first } },
+  ],
+  [
+    "jade",
     tr("Damien's map room. Every pin a place where he searched. Or was found."),
     { on: { room: "kartenraum", ...first } },
   ],
@@ -654,7 +661,7 @@ const ROOM_AGAIN_BARKS: BarkDef[] = group(
     [
       "pa",
       tr("Elevator: maximum load eight persons. Or one Jade with a toolbox."),
-      { on: { theme: "elevator" } },
+      { on: { theme: "hub" } },
     ],
     ["jade", tr("The office. Mug rings on the desk like tree rings."), { on: { theme: "office" } }],
     // Bots greeting in their own rooms.
@@ -1216,6 +1223,16 @@ const IDLE_BARKS: BarkDef[] = group("idle", "idle", { cooldown: 480 }, [
   ],
   ["jade", tr("The noise. If I listen long enough, I hear my name."), { on: { theme: "audio" } }],
   [
+    "jade",
+    tr(
+      "Three, five, eight, six, seven, five. The foam in here hums along — one panel hums louder.",
+    ),
+    {
+      on: { room: "aufzug2" },
+      when: { all: [{ insight: "studio_song" }, { not: { puzzle: "pz_studio_door" } }] },
+    },
+  ],
+  [
     "damien",
     tr("[SIGNAL WEAK] …Jade? Are you still there? I'm counting the seconds in your silence."),
     { on: { theme: "anomaly" } },
@@ -1578,6 +1595,100 @@ const BIO_BARKS: BarkDef[] = group("bio", "bio_low", { cooldown: 600 }, [
   ["pa", tr("Staff are reminded that fainting in the corridors is not a break.")],
 ]);
 
+// ── Wardrobe (what Jade wears; `worn_<item>` flags, lib/world/wardrobe.ts) ──
+
+const worn = (item: string) => ({ flag: `worn_${item}` });
+const WEAR_W = 4;
+
+const WEAR_BARKS: BarkDef[] = [
+  ...group("wear.amb", "ambient", { cooldown: 1200, weight: WEAR_W }, [
+    [
+      "mcp",
+      tr("Dr. Lawrence, your hat is rotating. I have filed it under ventilation."),
+      { when: worn("propeller_cap") },
+    ],
+    [
+      "mcp",
+      tr(
+        "Unknown person in the lab. Moustache: yes. Resemblance to Dr. Lawrence: 98 %. Access granted, with reservations.",
+      ),
+      { when: worn("fake_mustache") },
+    ],
+    [
+      "mcp",
+      tr("Please remove the unauthorised likeness from your shoulder. It is staring at my camera."),
+      { when: worn("buddy_plush") },
+    ],
+    [
+      "mcp",
+      tr("Status 418. Your footwear is not lab-safe. I have decided not to see it."),
+      { when: worn("slippers") },
+    ],
+    [
+      "pa",
+      tr("Attention: a dress-code violation is in progress on this level. Please continue."),
+      { when: { all: [worn("propeller_cap"), worn("slippers"), worn("fake_mustache")] } },
+    ],
+    [
+      "b4c0n",
+      tr("Antennae detected! Frequency confirmed. Welcome to the family, Dr. Lawrence."),
+      { when: worn("antenna_band") },
+    ],
+    [
+      "d3c4d3",
+      tr("I am in the middle of your shirt. Correct. Acknowledged. Filed under dignity."),
+      { when: worn("tee_bot_lineup") },
+    ],
+    [
+      "f1ndr",
+      tr("There is a smaller me on your shoulder. It keeps finding my things before I do."),
+      { when: worn("buddy_f1ndr") },
+    ],
+    [
+      "damien",
+      tr("[SIGNAL WEAK] …is that my shirt? …Keep it. It never fit me in the shoulders."),
+      { when: worn("flannel") },
+    ],
+    [
+      "damien",
+      tr("[SIGNAL WEAK] …closed-back, the left ear crackles. Turn it up anyway."),
+      { when: worn("headphones") },
+    ],
+    [
+      "jade",
+      tr("The pendant hums along with the crystal. Or the crystal hums along with me."),
+      { when: worn("crystal_pendant") },
+    ],
+  ]),
+  ...group("wear.room", "enter_room", { cooldown: 900, weight: WEAR_W }, [
+    [
+      "jade",
+      tr("Corridors were made for this. Nobody tell the MCP."),
+      { when: worn("roller_boots"), on: { theme: "corridor" } },
+    ],
+    [
+      "jade",
+      tr("Every drip on this level now lands on something yellow. Progress."),
+      { when: worn("raincoat"), on: { floor: 1 } },
+    ],
+    [
+      "jade",
+      tr("Clack. Clack. The grating and I have come to an understanding."),
+      { when: worn("mag_boots") },
+    ],
+    [
+      "mcp",
+      tr("The hard hat suits you, Dr. Lawrence. It would suit you even better on Level −4."),
+      { when: worn("hardhat") },
+    ],
+    [
+      "c8br41n",
+      tr("The circlet hums at 847 hertz. So do I. We should talk, the three of us."),
+      { when: worn("crystal_tiara"), on: { floor: 5 } },
+    ],
+  ]),
+];
+
 export const BARKS: readonly BarkDef[] = [
   ...FLOOR_BARKS,
   ...ROOM_FIRST_BARKS,
@@ -1589,6 +1700,7 @@ export const BARKS: readonly BarkDef[] = [
   ...STORY_BARKS,
   ...AMBIENT_BARKS,
   ...BIO_BARKS,
+  ...WEAR_BARKS,
 ];
 
 export const BARK_BY_ID: ReadonlyMap<string, BarkDef> = new Map(BARKS.map((b) => [b.id, b]));

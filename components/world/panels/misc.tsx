@@ -11,6 +11,7 @@ import {
   type WorldApi,
 } from "@/components/world/panels/shared";
 import { PrototypeUse, type ProtoUseHandler } from "@/components/world/panels/prototype";
+import { RememberButton } from "@/components/world/knowledge/Remember";
 import { FLOORS_TOP_DOWN, FLOOR_ACCESS, NOTES } from "@/lib/world/content/map";
 import { NPCS } from "@/lib/world/content/story";
 import {
@@ -203,7 +204,16 @@ function DialoguePanelImpl({
 
 // ── Note ─────────────────────────────────────────────────────────
 
-function NotePanelImpl({ noteId, onClose }: { noteId: string; onClose: () => void }) {
+function NotePanelImpl({
+  noteId,
+  onClose,
+  api,
+}: {
+  noteId: string;
+  onClose: () => void;
+  /** With the world api the note offers "Remember". */
+  api?: WorldApi;
+}) {
   const n = NOTES.find((x) => x.id === noteId)!;
   const color =
     n.author === "jade"
@@ -237,6 +247,20 @@ function NotePanelImpl({ noteId, onClose }: { noteId: string; onClose: () => voi
           n.body
         )}
       </p>
+      {api && (
+        <div className="mt-2 flex justify-end">
+          <RememberButton
+            api={api}
+            src={{
+              kind: "note",
+              id: n.id,
+              title: n.title,
+              text: n.body,
+              tags: n.author === "unbekannt" ? [] : [n.author],
+            }}
+          />
+        </div>
+      )}
     </Panel>
   );
 }

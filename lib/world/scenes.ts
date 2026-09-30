@@ -21,7 +21,14 @@ import { tr } from "@/lib/i18n";
 import type { SfxName } from "@/lib/world/audio/sfx";
 import type { MusicScene } from "@/lib/world/audio/music";
 import { DEVICE_BY_ID } from "@/lib/world/content/devices";
-import { ELEVATORS, FLOOR_BY_ID, PROPS, ROOM_BY_ID, SPAWN } from "@/lib/world/content/map";
+import {
+  ELEVATORS,
+  FLOOR_BY_ID,
+  PROPS,
+  ROOM_BY_ID,
+  SPAWN,
+  roomAnchor,
+} from "@/lib/world/content/map";
 import { SLICE_TOTAL as SLICE_COUNT } from "@/lib/world/content/items";
 import { BOT_QUESTS, ENDING_BY_ID, NPCS } from "@/lib/world/content/story";
 import type { CharacterPoseKind } from "@/lib/world/models/rig";
@@ -159,9 +166,9 @@ function npcPos(id: string, y = 2): Vec3Tuple {
 }
 
 function roomCenter(id: string, y = 1): Vec3Tuple {
-  const r = ROOM_BY_ID.get(id);
-  if (!r) throw new Error(`scenes: unknown room ${id}`);
-  return [r.x + r.w / 2, y, r.z + r.d / 2];
+  const a = roomAnchor(id);
+  if (!a) throw new Error(`scenes: unknown room ${id}`);
+  return [a.x, y, a.z];
 }
 
 function elevatorPos(floor: FloorId, y = 2): Vec3Tuple {
@@ -810,7 +817,8 @@ export const ENDING_SIGNATURE: Readonly<Record<EndingId, EndingSignature>> = {
   substrat: { color: 0x33ff33, css: "#33FF33", accent: "#0A2A0A", motif: "Data rain" },
   rueckkehr: { color: 0xfff4e0, css: "#FFF4E0", accent: "#3A2A10", motif: "Teleport beam" },
   halo: { color: 0xffe7a0, css: "#FFE7A0", accent: "#FFFFFF", motif: "White gold" },
-  kristall: { color: 0x9d5cff, css: "#9D5CFF", accent: "#1A0A33", motif: "Thirty facets" },
+  // #0089 is orange (unETH archive ID 89) — neon #FF6B00.
+  kristall: { color: 0xff6b00, css: "#FF6B00", accent: "#331400", motif: "Thirty facets" },
 };
 
 const WHITE_GOLD = 0xffe7a0;
@@ -1139,7 +1147,16 @@ function endingHalo(): SceneScript {
   };
 }
 
-/** Secret ending: the 30 slices of Crystal #0089 laid side by side at the CDC. */
+/** Crystal #0089 is orange: unETH archive ID 89, neon #FF6B00 (palette `orange_neon`). */
+const SLICE_ORANGE = ENDING_SIGNATURE.kristall.color;
+/** Hot core of an orange neon tube (palette `halo_glow`). */
+const SLICE_CORE = 0xfff4c8;
+
+/**
+ * Secret ending: the 30 slices of Crystal #0089 laid side by side at the CDC.
+ * The 30 slices are one 180° turn of the 2-fold symmetric crystal (6° per
+ * slice), so slice 30 flows seamlessly back into slice 1.
+ */
 function endingKristall(): SceneScript {
   const { pos, floor } = endingAnchor("kristall");
   const room = roomCenter("archiv", 0);
@@ -1154,9 +1171,9 @@ function endingKristall(): SceneScript {
       music("ending_halo", 0.1),
       endingTitle("kristall"),
       cam([{ target: up(pos, 1), zoom: 18, yaw: Q * 3, duration: 3, ease: "inOut" }], true),
-      // Thirty slices, one glint each; every fifth a rising tone.
+      // Thirty slices, one orange glint each; every fifth a rising tone.
       ...ring.flatMap((p, i) => [
-        fx("pickup_glint", p, { color: 0x9d5cff }),
+        fx("pickup_glint", p, { color: SLICE_ORANGE }),
         ...(i % 5 === 0 ? [tone(pos, (i / 5) * 2)] : []),
         wait(0.14),
       ]),
@@ -1178,10 +1195,10 @@ function endingKristall(): SceneScript {
         return [fx("insight_ring", pos, { color: 0x9d5cff, scale: 1 + i * 0.2 })];
       }),
       wait(1),
-      // All thirty at once, white-blue: the crystal is whole.
-      ...ring.map((p) => fx("pickup_glint", p, { color: 0xe8f4ff, scale: 0.8 })),
+      // All thirty at once, white-hot orange: the crystal is whole.
+      ...ring.map((p) => fx("pickup_glint", p, { color: SLICE_CORE, scale: 0.8 })),
       tone(pos, 12),
-      fx("power_wave", pos, { color: 0x9d5cff, scale: 1.2 }),
+      fx("power_wave", pos, { color: SLICE_ORANGE, scale: 1.2 }),
       wait(1.2),
       cam([{ target: up(room, 8), zoom: 110, duration: 6, ease: "inOut", fade: 1 }], true),
       wait(0.8),

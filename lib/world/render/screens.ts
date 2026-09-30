@@ -45,6 +45,8 @@ const DARK_RECHECK = 1;
 export interface ScreenSource {
   deviceId?: string;
   roomId?: string;
+  /** Decor placement id — live pinboards (content "notes") show its pinned memos. */
+  placementId?: string;
 }
 
 /** Placement of an anchor (e.g. one decor instance): world voxel position + quarter-turn yaw. */
@@ -407,6 +409,7 @@ export class ScreenSystem {
       spec.text ?? "",
       source.deviceId ?? "",
       source.roomId ?? "",
+      source.placementId ?? "",
       `${res.w}x${res.h}`,
       live ? 1 : 0,
     ].join("|");

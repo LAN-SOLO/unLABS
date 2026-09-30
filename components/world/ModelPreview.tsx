@@ -6,7 +6,7 @@ import { LAB_PALETTE } from "@/lib/world/content/palette";
 import type { VoxelGrid } from "@/lib/voxel/grid";
 import { bakeIsoSprite } from "@/lib/voxel/iso-baker";
 
-type Rotation = 0 | 1 | 2 | 3;
+export type Rotation = 0 | 1 | 2 | 3;
 
 const cache = new Map<string, ImageData>();
 const CACHE_MAX = 160;
@@ -48,6 +48,7 @@ export function ModelPreview({
   rotate = false,
   rotateMs = 1600,
   label,
+  rotation: fixed,
 }: {
   grid: VoxelGrid;
   cacheKey: string;
@@ -56,16 +57,19 @@ export function ModelPreview({
   rotate?: boolean;
   rotateMs?: number;
   label?: string;
+  /** Controlled view direction (quarter turns); overrides `rotate`. */
+  rotation?: Rotation;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const [rotation, setRotation] = useState<Rotation>(0);
+  const [spun, setRotation] = useState<Rotation>(0);
+  const rotation: Rotation = fixed ?? spun;
   const [paused, setPaused] = useState(false);
 
   useEffect(() => {
-    if (!rotate || paused || prefersReducedMotion()) return;
+    if (!rotate || fixed !== undefined || paused || prefersReducedMotion()) return;
     const id = window.setInterval(() => setRotation((r) => ((r + 1) % 4) as Rotation), rotateMs);
     return () => window.clearInterval(id);
-  }, [rotate, paused, rotateMs]);
+  }, [rotate, fixed, paused, rotateMs]);
 
   useEffect(() => {
     const canvas = ref.current;

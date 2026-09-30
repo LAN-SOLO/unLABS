@@ -18,6 +18,7 @@ import { C } from "@/lib/world/content/palette";
 import type { ScreenContent, ScreenSpec } from "@/lib/world/models/anim";
 import { MODEL_SCALE, Model } from "@/lib/world/models/core";
 import type { Condition, FloorId } from "@/lib/world/types";
+import { fitInRoom, roomDelta } from "@/lib/world/content/map";
 
 /** What a terminal is for; decides its extra commands and its screen feed. */
 export type TerminalRole = "wartung" | "archiv" | "privat" | "leitstand" | "forschung" | "kantine";
@@ -89,7 +90,7 @@ const LOW_POWER_HINT = tr(
   "The screen stays black. The terminal runs off the main grid — at least 50 W.",
 );
 
-export const ROOM_TERMINALS: readonly RoomTerminalDef[] = [
+const RAW_ROOM_TERMINALS: readonly RoomTerminalDef[] = [
   // Level 0
   {
     id: "term_mcp",
@@ -799,6 +800,12 @@ export const ROOM_TERMINALS: readonly RoomTerminalDef[] = [
     ],
   },
 ];
+
+/** Placed on the floor plan (content moves with its room, see floorplan.ts). */
+export const ROOM_TERMINALS: readonly RoomTerminalDef[] = RAW_ROOM_TERMINALS.map((t) => {
+  const [dx, dz] = roomDelta(t.room);
+  return { ...t, ...fitInRoom(t.room, t.x + dx, t.z + dz, 1) };
+});
 
 export const ROOM_TERMINAL_BY_ID: ReadonlyMap<string, RoomTerminalDef> = new Map(
   ROOM_TERMINALS.map((t) => [t.id, t]),

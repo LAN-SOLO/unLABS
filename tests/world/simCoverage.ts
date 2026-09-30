@@ -3,12 +3,16 @@
  * German-locale checks (`locale-de.test.ts`): the greedy player first
  * reaches the main goals, then keeps going until every note, pickup,
  * puzzle, dialogue option, insight, recipe, research topic, achievement,
- * ending, bot, door, floor and room is done. `coverage()` lists what is
+ * ending, bot, door, floor and room is done — and every lab firmware update
+ * is flashed and every hub has linked something. `coverage()` lists what is
  * still missing (empty lists = everything reachable by play).
  */
 import { ACHIEVEMENTS, isUnlocked } from "@/lib/world/achievements";
 import { combine, VOLATILITY_LIMIT } from "@/lib/world/combine";
 import { DEVICES } from "@/lib/world/content/devices";
+import { WORLD_FIRMWARE } from "@/lib/world/content/firmware";
+import { HUBS } from "@/lib/world/content/links";
+import { isUpdated } from "@/lib/world/firmware";
 import { ITEM_BY_ID, RECIPES, comboKey, type Recipe } from "@/lib/world/content/items";
 import { DOORS, FLOORS, NOTES, PICKUPS } from "@/lib/world/content/map";
 import { PUZZLES } from "@/lib/world/content/puzzles";
@@ -40,6 +44,7 @@ import {
   train,
 } from "@/lib/world/biorhythm";
 import { VISITABLE_ROOMS, play, step, tryCraft, type SimRun } from "./simPlayer";
+import { wardrobeRoutine } from "./simWardrobe";
 
 /** Craft one specific recipe (not just its output) if its inputs can be gathered. */
 export function craftRecipe(s: WorldState, r: Recipe): boolean {
@@ -110,6 +115,15 @@ export interface Coverage {
   floors: string[];
   rooms: string[];
   devicesNeverOnline: string[];
+  /** Lab firmware updates never flashed. */
+  firmware: string[];
+  /** Hubs with nothing linked at the end of the run (see `linkedHubs`). */
+  hubs: string[];
+}
+
+/** Hubs that hold (or held) at least one link in this run. */
+export function linkedHubs(s: WorldState): Set<string> {
+  return new Set(HUBS.filter((h) => (s.links[h.id] ?? []).length > 0).map((h) => h.id));
 }
 
 export function coverage(s: WorldState, everOnline: Set<string>): Coverage {
@@ -130,6 +144,8 @@ export function coverage(s: WorldState, everOnline: Set<string>): Coverage {
     floors: FLOORS.filter((f) => !floorAccessible(s, f.id)).map((f) => f.name),
     rooms: VISITABLE_ROOMS.filter((id) => !s.flags[`visited_${id}`]),
     devicesNeverOnline: DEVICES.filter((d) => !everOnline.has(d.id)).map((d) => d.id),
+    firmware: Object.keys(WORLD_FIRMWARE).filter((id) => !isUpdated(s, id)),
+    hubs: HUBS.filter((h) => !linkedHubs(s).has(h.id)).map((h) => h.id),
   };
 }
 
@@ -168,6 +184,7 @@ export function fullRun(): { run: SimRun; everOnline: Set<string>; report: Cover
     if (!s.flags.explosion_seen || (!recipeDone(s, slag) && count(s, "schlacke") < 3)) explode(s);
     for (const r of RECIPES) if (!recipeDone(s, r)) craftRecipe(s, r);
     bioRoutine(s);
+    wardrobeRoutine(s, { textileOnly: true });
     step(run);
     run.steps += 1;
     for (const t of run.triggers) if (t.kind === "device_online") everOnline.add(t.id);

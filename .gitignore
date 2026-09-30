@@ -57,3 +57,7 @@ supabase/dumps/
 /dist-electron/
 /.INSTALL/
 /INSTALL/
+
+# merch render scratch
+/scripts/merch/.render.html
+/scripts/merch/.review.png

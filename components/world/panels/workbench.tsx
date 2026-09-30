@@ -23,6 +23,8 @@ import {
 } from "@/components/world/ui";
 import { ItemIcon } from "@/components/world/ItemIcon";
 import { announce, memoPanel, type WorldApi } from "@/components/world/panels/shared";
+import { RememberButton } from "@/components/world/knowledge/Remember";
+import { comboKey } from "@/lib/world/content/items";
 import {
   fillSlots,
   inventoryItems,
@@ -87,6 +89,9 @@ interface ResultView {
   /** Explosion: side event and what it left behind. */
   event?: ExplosionEventDef;
   extras: { item: string; count: number }[];
+  /** Combination key and the parts as text (for "Remember"). */
+  key: string;
+  inputsText: string;
 }
 
 const usesText = (uses: readonly ProtoEffectId[]): string =>
@@ -213,7 +218,12 @@ function WorkbenchPanelImpl({ api, onClose }: { api: WorldApi; onClose: () => vo
     if (!r.ok || !r.output) return api.toast(r.message, "warn");
     if (r.kind === "recipe" || r.kind === "prototype" || r.kind === "explosion")
       api.workbenchFx?.(r.kind);
+    const inputsText = Object.entries(preview.inputs)
+      .map(([k, n]) => `${n}× ${itemDef(s, k)?.name ?? k}`)
+      .join(" + ");
     setResult({
+      key: comboKey(preview.inputs),
+      inputsText,
       item: r.output,
       count: r.count,
       synergies: r.synergies,
@@ -563,9 +573,35 @@ function WorkbenchPanelImpl({ api, onClose }: { api: WorldApi; onClose: () => vo
                 <div className="flex items-center gap-3 p-2">
                   <ItemIcon item={result.item} size={64} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm text-[#00FFFF]">
-                      {result.count}× {result.item.name}{" "}
-                      {result.isNew && <span className="text-[#FFB800]">{tr("· NEW")}</span>}
+                    <p className="flex items-start gap-2 text-sm text-[#00FFFF]">
+                      <span className="min-w-0 flex-1">
+                        {result.count}× {result.item.name}{" "}
+                        {result.isNew && <span className="text-[#FFB800]">{tr("· NEW")}</span>}
+                      </span>
+                      <RememberButton
+                        api={api}
+                        src={{
+                          kind: result.kind === "recipe" ? "recipe" : "experiment",
+                          id: result.key,
+                          title:
+                            result.kind === "explosion"
+                              ? tr("Explosion: {name}", { name: result.item.name })
+                              : result.item.name,
+                          text: [
+                            `${result.inputsText} → ${result.count}× ${result.item.name}`,
+                            result.archetype
+                              ? `${result.archetype.name}: ${result.archetype.property}`
+                              : "",
+                            result.uses.length
+                              ? tr("Good for: {uses}", { uses: usesText(result.uses) })
+                              : "",
+                            result.event ? `${result.event.name}: ${result.event.text}` : "",
+                          ]
+                            .filter(Boolean)
+                            .join("\n"),
+                          tags: [result.kind],
+                        }}
+                      />
                     </p>
                     <p className="text-[11px] text-white/50">
                       {KIND_LABEL[result.item.kind]} ·{" "}
@@ -673,6 +709,20 @@ function WorkbenchPanelImpl({ api, onClose }: { api: WorldApi; onClose: () => vo
                           <span className="ml-1 text-[#E91E8C]">{tr("· your own")}</span>
                         )}
                       </span>
+                      {c.output && (
+                        <RememberButton
+                          api={api}
+                          src={{
+                            kind: "recipe",
+                            id: c.key,
+                            title: c.output.name,
+                            text: `${Object.entries(c.inputs)
+                              .map(([k, n]) => `${n}× ${itemDef(s, k)?.name ?? k}`)
+                              .join(" + ")} → ${c.output.name}${c.note ? ` (${c.note})` : ""}`,
+                            tags: ["recipe"],
+                          }}
+                        />
+                      )}
                       <button
                         type="button"
                         onClick={() => fill(c.inputs)}

@@ -36,6 +36,8 @@ import {
   ROOMS,
   ROOM_BY_ID,
   roomAt,
+  floorGeomOf,
+  roomAnchor,
 } from "@/lib/world/content/map";
 import { PUZZLE_BY_ID } from "@/lib/world/content/puzzles";
 import {
@@ -425,9 +427,10 @@ export function labBots(): string[] {
 
 // ── Map ──────────────────────────────────────────────────────────
 
-const MAP_SX = 2;
+/** Voxels per terminal map column / row (the map fits 80 columns). */
+const MAP_SX = FLOOR_SIZE.x / 78;
 const MAP_SZ = 4;
-const MAP_W = Math.ceil(FLOOR_SIZE.x / MAP_SX) + 1;
+const MAP_W = Math.ceil(FLOOR_SIZE.x / MAP_SX);
 const MAP_H = Math.ceil(FLOOR_SIZE.z / MAP_SZ) + 1;
 
 /** ASCII legend of the map markers. */
@@ -448,52 +451,47 @@ export function labMap(floor?: FloorId): string[] {
     }
     const grid: string[][] = Array.from({ length: MAP_H }, () => Array<string>(MAP_W).fill(" "));
     const put = (x: number, z: number, ch: string): void => {
-      const cx = Math.round(x / MAP_SX);
-      const cz = Math.round(z / MAP_SZ);
+      const cx = Math.floor(x / MAP_SX);
+      const cz = Math.floor(z / MAP_SZ);
       if (cz >= 0 && cz < MAP_H && cx >= 0 && cx < MAP_W) grid[cz]![cx] = ch;
     };
     const rooms = ROOMS.filter((r) => r.floor === f).sort((a, b) => a.z - b.z || a.x - b.x);
+    // Walls of the real room shapes (floor-geom.ts), sampled per map cell.
+    const g = floorGeomOf(f);
+    for (let cz = 0; cz < MAP_H; cz++)
+      for (let cx = 0; cx < MAP_W; cx++) {
+        let wallOf = 0;
+        for (let z = Math.floor(cz * MAP_SZ); z < Math.floor((cz + 1) * MAP_SZ) && !wallOf; z++)
+          for (let x = Math.floor(cx * MAP_SX); x < Math.floor((cx + 1) * MAP_SX); x++) {
+            if (x < 0 || z < 0 || x >= g.W || z >= g.Z) continue;
+            const o = g.wallOwner[x + z * g.W]!;
+            if (o) {
+              wallOf = o;
+              break;
+            }
+          }
+        if (!wallOf) continue;
+        const r = g.rooms[wallOf - 1]!.room;
+        const visited = !!s.flags[`visited_${r.id}`];
+        const cur = grid[cz]![cx];
+        if (cur === " " || cur === ":") grid[cz]![cx] = visited ? "#" : ":";
+      }
     const legend: string[] = [];
     let letter = 0;
     let unknown = 0;
     for (const r of rooms) {
       const visited = !!s.flags[`visited_${r.id}`];
-      const x0 = Math.round(r.x / MAP_SX);
-      const x1 = Math.round((r.x + r.w) / MAP_SX);
-      const z0 = Math.round(r.z / MAP_SZ);
-      const z1 = Math.round((r.z + r.d) / MAP_SZ);
-      const h = visited ? "-" : ".";
-      const v = visited ? "|" : ":";
-      for (let x = x0; x <= x1; x++) {
-        for (const z of [z0, z1]) {
-          const cur = grid[z]?.[x];
-          if (cur !== undefined && (cur === " " || cur === "." || cur === ":")) grid[z]![x] = h;
-        }
-      }
-      for (let z = z0; z <= z1; z++) {
-        for (const x of [x0, x1]) {
-          const cur = grid[z]?.[x];
-          if (cur !== undefined && (cur === " " || cur === "." || cur === ":")) grid[z]![x] = v;
-        }
-      }
-      for (const [x, z] of [
-        [x0, z0],
-        [x1, z0],
-        [x0, z1],
-        [x1, z1],
-      ] as const) {
-        if (grid[z]?.[x] !== undefined) grid[z]![x] = "+";
-      }
-      const labelX = x0 + 1;
-      const labelZ = z0 + 1;
+      const a = roomAnchor(r.id);
+      const lx = Math.floor((a?.x ?? r.x + r.w / 2) / MAP_SX);
+      const lz = Math.floor((a?.z ?? r.z + r.d / 2) / MAP_SZ);
       if (visited) {
         const key = String.fromCharCode(65 + (letter % 26));
         letter++;
-        if (labelZ < z1 && labelX < x1) grid[labelZ]![labelX] = key;
+        if (grid[lz]?.[lx] !== undefined) grid[lz]![lx] = key;
         legend.push(`${key} ${r.name}`);
       } else {
         unknown++;
-        if (labelZ < z1 && labelX < x1) grid[labelZ]![labelX] = "?";
+        if (grid[lz]?.[lx] !== undefined) grid[lz]![lx] = "?";
       }
     }
     for (const d of DOORS) {

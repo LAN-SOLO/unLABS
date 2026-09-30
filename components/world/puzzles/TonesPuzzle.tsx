@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { nums } from "@/components/world/puzzles/logic";
+import { playNote } from "@/lib/world/audio/songs/instruments";
+import { INSTRUMENTS, type InstrumentId } from "@/lib/world/audio/songs/types";
+import { WebAudioTarget, createNoiseBuffer } from "@/lib/world/audio/webaudio";
 import { tr } from "@/lib/i18n";
 import {
   CrtButton,
@@ -127,11 +130,37 @@ export function TonesPuzzle({ params, onSolve, solved, sound }: PuzzleProps) {
     return ctxRef.current;
   }, []);
 
+  // Optional instrument voice (e.g. the studio door sings on an ocarina).
+  const voiceParam = params.voice;
+  const voice =
+    typeof voiceParam === "string" && (INSTRUMENTS as readonly string[]).includes(voiceParam)
+      ? (voiceParam as InstrumentId)
+      : null;
+  const noiseRef = useRef<AudioBuffer | null>(null);
+
   const beep = useCallback(
     (freq: number, startIn: number, durMs: number, type: OscillatorType, peak: number) => {
       const ctx = audio();
       if (!ctx) return;
       if (ctx.state === "suspended") void ctx.resume().catch(() => undefined);
+      if (voice && type === "sine") {
+        noiseRef.current ??= createNoiseBuffer(ctx, 1);
+        const t = new WebAudioTarget(
+          ctx,
+          ctx.destination,
+          noiseRef.current,
+          ctx.currentTime + startIn,
+          1,
+          2.2,
+        );
+        playNote(t, voice, {
+          midi: 69 + 12 * Math.log2(freq / 440) + 12,
+          at: 0,
+          dur: durMs / 1000,
+          vel: 1,
+        });
+        return;
+      }
       const t0 = ctx.currentTime + startIn;
       const dur = durMs / 1000;
       const osc = ctx.createOscillator();
@@ -146,7 +175,7 @@ export function TonesPuzzle({ params, onSolve, solved, sound }: PuzzleProps) {
       osc.start(t0);
       osc.stop(t0 + dur + 0.02);
     },
-    [audio],
+    [audio, voice],
   );
 
   const playSequence = () => {

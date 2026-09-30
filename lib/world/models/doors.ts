@@ -22,7 +22,7 @@
  * frame cells (proud by 0.25 on both wall faces) so nothing is coplanar.
  */
 import { C } from "@/lib/world/content/palette";
-import { ROOMS, WALL_HEIGHT } from "@/lib/world/content/map";
+import { WALL_HEIGHT, floorGeomOf } from "@/lib/world/content/map";
 import { Model } from "@/lib/world/models/core";
 import {
   bezelScreen,
@@ -401,26 +401,24 @@ function isShaftRoom(r: RoomDef): boolean {
   return r.floor === 5 && (r.theme === "storage" || r.theme === "corridor");
 }
 
-function onWall(r: RoomDef, x: number, z: number): boolean {
-  if (x < r.x || x > r.x + r.w || z < r.z || z > r.z + r.d) return false;
-  return x === r.x || x === r.x + r.w || z === r.z || z === r.z + r.d;
-}
-
 /**
- * The exact skin layout.ts paints on this door's wall: for every cell the
- * LAST room (ROOMS order) whose perimeter contains it wins, like the
- * voxelizer's overwrite order — panelling phase and shaft rock included.
+ * The exact skin layout.ts paints on this door's wall: every wall cell
+ * belongs to one room (floor-geom.ts) and carries its position along the
+ * wall — panelling phase and shaft rock included.
  */
 export function secretSkinFor(d: DoorDef): WallSkin {
-  const rooms = ROOMS.filter((r) => r.floor === d.floor);
+  const g = floorGeomOf(d.floor);
   return (o, y) => {
     const x = d.axis === "x" ? d.x + o : d.x;
     const z = d.axis === "x" ? d.z : d.z + o;
-    let owner: RoomDef | undefined;
-    for (const r of rooms) if (onWall(r, x, z)) owner = r;
-    if (!owner) return C.wall;
-    const p = z === owner.z || z === owner.z + owner.d ? x - owner.x : z - owner.z;
-    return isShaftRoom(owner) ? rockColor(x, y, z, p) : panelColor(owner.wallColor, p, y);
+    const i = x + z * g.W;
+    const o1 = g.wallOwner[i];
+    const cell = g.wallAt.get(i);
+    // Door at the end of a passage through the poché: beside the frame is solid mass.
+    if (g.mass[i]) return d.floor === 3 || d.floor === 5 ? C.rock_dark : C.concrete_dark;
+    if (!o1 || !cell) return C.wall;
+    const owner = g.rooms[o1 - 1]!.room;
+    return isShaftRoom(owner) ? rockColor(x, y, z, cell.p) : panelColor(owner.wallColor, cell.p, y);
   };
 }
 

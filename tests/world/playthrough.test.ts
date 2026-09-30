@@ -8,7 +8,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { DEVICES } from "@/lib/world/content/devices";
 import { SLICE_TOTAL } from "@/lib/world/content/items";
-import { SLICE_PICKUPS } from "@/lib/world/content/map";
+import { ROOMS, SLICE_PICKUPS } from "@/lib/world/content/map";
 import { BOT_QUESTS, ENDINGS } from "@/lib/world/content/story";
 import { checkStage, floorAccessible, isBuilt, reachableRooms } from "@/lib/world/game";
 import { dailyPriceModifier } from "@/lib/game/volatility";
@@ -66,8 +66,9 @@ describe("simulated playthrough", () => {
   it("visits the new floors", () => {
     expect(floorAccessible(s, 4)).toBe(true);
     expect(floorAccessible(s, 5)).toBe(true);
-    expect(reachableRooms(s, 4).size).toBe(9);
-    expect(reachableRooms(s, 5).size).toBe(8);
+    // Every room of both floors, core and passages included.
+    expect(reachableRooms(s, 4).size).toBe(ROOMS.filter((r) => r.floor === 4).length);
+    expect(reachableRooms(s, 5).size).toBe(ROOMS.filter((r) => r.floor === 5).length);
   });
 
   it("finishes in a sensible number of steps", () => {

@@ -20,7 +20,9 @@ import {
   PROPS,
   ROOMS,
   WALL_HEIGHT,
+  floorGeomOf,
 } from "@/lib/world/content/map";
+import type { FloorGeom, RoomGeom, WallCell } from "@/lib/world/floor-geom";
 import { NPCS } from "@/lib/world/content/story";
 import {
   ROOM_TERMINALS,
@@ -33,11 +35,17 @@ import { pickupModel, propModel } from "@/lib/world/models/props";
 import { fnv1a } from "@/lib/world/traits";
 import type { DoorDef, FloorId, RoomDef, RoomTheme } from "@/lib/world/types";
 import { VoxelWorld } from "@/lib/voxel/world";
+import { CORE } from "@/lib/world/content/floorplan";
 
 export const DOOR_HEIGHT = 6;
 
 /** Elevator keep-out (world units, inclusive voxel range). */
-export const ELEVATOR_AREA = { x0: 112, z0: 52, x1: 128, z1: 72 } as const;
+export const ELEVATOR_AREA = {
+  x0: CORE.x - 8,
+  z0: CORE.z - 10,
+  x1: CORE.x + 8,
+  z1: CORE.z + 10,
+} as const;
 
 export interface Lamp {
   room: string;
@@ -277,13 +285,19 @@ const WINDOW_THEMES: ReadonlySet<RoomTheme> = new Set<RoomTheme>([
   "anomaly",
 ]);
 
-/** Random-walk crack cells for concrete floors (deterministic per room). */
-function crackSet(r: RoomDef, count: number, len: number): Set<number> {
+/** Random-walk crack cells for concrete floors (deterministic per room, inside its shape). */
+function crackSet(
+  r: RoomDef,
+  own: (x: number, z: number) => boolean,
+  count: number,
+  len: number,
+): Set<number> {
   const out = new Set<number>();
   const seed = fnv1a(`crack:${r.id}`);
   for (let c = 0; c < count; c++) {
     let x = r.x + 2 + (ih(c, 1, seed) % Math.max(1, r.w - 4));
     let z = r.z + 2 + (ih(c, 2, seed) % Math.max(1, r.d - 4));
+    if (!own(x, z)) continue;
     let dir = ih(c, 3, seed) % 4;
     for (let i = 0; i < len; i++) {
       out.add(x + z * FLOOR_SIZE.x);
@@ -292,21 +306,23 @@ function crackSet(r: RoomDef, count: number, len: number): Set<number> {
       else if (turn === 1) dir = (dir + 3) % 4;
       x += [1, 0, -1, 0][dir]!;
       z += [0, 1, 0, -1][dir]!;
-      if (x <= r.x || x >= r.x + r.w || z <= r.z || z >= r.z + r.d) break;
+      if (!own(x, z)) break;
     }
   }
   return out;
 }
 
-/** Floor colour of an interior cell (lx, lz relative to the room corner). */
-function floorColorAt(r: RoomDef, x: number, z: number, cracks: Set<number>): number {
+/**
+ * Floor colour of a cell (lx, lz relative to the room's bounding box);
+ * `edge` = distance to the room's own wall (0 = the wall line itself).
+ */
+function floorColorAt(r: RoomDef, x: number, z: number, cracks: Set<number>, edge: number): number {
   const theme = r.theme ?? "generic";
   const lx = x - r.x;
   const lz = z - r.z;
   const base = r.floorColor;
   const seed = fnv1a(r.id);
   const h = ih(x, z, seed);
-  const edge = Math.min(lx, lz, r.w - lx, r.d - lz); // 0 = wall line
   const cx = r.x + r.w / 2;
   const cz = r.z + r.d / 2;
   const dist = Math.hypot(x + 0.5 - cx, z + 0.5 - cz);
@@ -428,6 +444,14 @@ function floorColorAt(r: RoomDef, x: number, z: number, cracks: Set<number>): nu
       return grid4 ? C.metal_dark : base;
     }
     case "corridor": {
+      if (r.shape?.some((p) => p.kind !== "rect")) {
+        // Bent / curved passage: guide lines follow the walls (distance field), studs every 5.
+        const carpet = base === C.carpet_red || base === C.carpet_blue || base === C.carpet_green;
+        if (edge === 2)
+          return carpet ? C.fabric_mustard : (x + z) % 5 === 0 ? C.led_green : C.safety_yellow;
+        if (edge === 1) return carpet ? C.walnut : C.floor_tile;
+        return carpet ? base : grid4 ? C.floor_dark : base;
+      }
       const long = r.w >= r.d;
       const across = long ? lz - Math.floor(r.d / 2) : lx - Math.floor(r.w / 2);
       const along = long ? lx : lz;
@@ -542,15 +566,6 @@ function shaftWall(world: VoxelWorld, x: number, z: number, p: number): void {
     }
     world.set(x, y, z, c);
   }
-}
-
-function isWall(r: RoomDef, x: number, z: number): boolean {
-  return x === r.x || x === r.x + r.w || z === r.z || z === r.z + r.d;
-}
-
-/** Position along the room perimeter wall (distance from the wall's start corner). */
-function alongWall(r: RoomDef, x: number, z: number): number {
-  return z === r.z || z === r.z + r.d ? x - r.x : z - r.z;
 }
 
 // ── Architecture detail ──────────────────────────────────────────
@@ -709,21 +724,22 @@ function wallDetail(r: RoomDef, p: number, y: number, pillar: boolean, c: number
   return c;
 }
 
-/** Wall cells of each room side, in order (side 0 N, 1 S, 2 W, 3 E). */
-function roomSides(r: RoomDef): { x: number; z: number }[][] {
-  const n: { x: number; z: number }[] = [];
-  const s: { x: number; z: number }[] = [];
-  const w: { x: number; z: number }[] = [];
-  const e: { x: number; z: number }[] = [];
-  for (let x = r.x; x <= r.x + r.w; x++) {
-    n.push({ x, z: r.z });
-    s.push({ x, z: r.z + r.d });
+/**
+ * Wall cells of a room grouped by the side they face (0 N, 1 S, 2 W, 3 E),
+ * each group ordered along the wall. Curved walls land in the side their
+ * normal leans to.
+ */
+function roomSides(rg: RoomGeom): { x: number; z: number }[][] {
+  const out: WallCell[][] = [[], [], [], []];
+  for (const w of rg.walls) {
+    const side = Math.abs(w.nz) >= Math.abs(w.nx) ? (w.nz > 0 ? 0 : 1) : w.nx > 0 ? 2 : 3;
+    out[side]!.push(w);
   }
-  for (let z = r.z; z <= r.z + r.d; z++) {
-    w.push({ x: r.x, z });
-    e.push({ x: r.x + r.w, z });
-  }
-  return [n, s, w, e];
+  out[0]!.sort((a, b) => a.x - b.x);
+  out[1]!.sort((a, b) => a.x - b.x);
+  out[2]!.sort((a, b) => a.z - b.z);
+  out[3]!.sort((a, b) => a.z - b.z);
+  return out;
 }
 
 /** Door cells, frames and keypads plus a margin: architecture detail stays clear. */
@@ -742,10 +758,16 @@ function doorKeepOut(doors: readonly DoorDef[], x: number, z: number): boolean {
  * Deep floors: rock intrusions (Ebene −4) / exposed brick behind fallen
  * plaster (Ebene −3), glowing crystal veins and roots hanging from above.
  */
-function deepWalls(world: VoxelWorld, r: RoomDef, doors: readonly DoorDef[], shaft: boolean): void {
+function deepWalls(
+  world: VoxelWorld,
+  rg: RoomGeom,
+  doors: readonly DoorDef[],
+  shaft: boolean,
+): void {
+  const r = rg.room;
   const seed = fnv1a(`deep:${r.id}`);
-  const sides = roomSides(r);
-  const perim = 2 * (r.w + r.d);
+  const sides = roomSides(rg);
+  const perim = rg.walls.length;
   const paint = (side: number, i: number, y: number, c: number): boolean => {
     const cells = sides[side]!;
     if (i < 1 || i >= cells.length - 1 || y < 1 || y > WALL_HEIGHT) return false;
@@ -842,17 +864,17 @@ function doorPlates(world: VoxelWorld, doors: readonly DoorDef[]): void {
 
 /** Direction (+1 / −1) along a corridor's long axis toward the floor's elevator. */
 function towardElevator(r: RoomDef): number {
-  const e = ELEVATORS.find((q) => q.floor === r.floor) ?? { x: 120, z: 62 };
+  const e = ELEVATORS.find((q) => q.floor === r.floor) ?? { x: CORE.x, z: CORE.z };
   const long = r.w >= r.d;
   const d = long ? e.x - (r.x + r.w / 2) : e.z - (r.z + r.d / 2);
   return d < 0 ? -1 : 1;
 }
 
-/** Interior cell of a room (not the wall line). */
-function inside(r: RoomDef, x: number, z: number, margin = 1): boolean {
-  return (
-    x >= r.x + margin && x <= r.x + r.w - margin && z >= r.z + margin && z <= r.z + r.d - margin
-  );
+/** Interior cell of a room (its own shape, not the wall line). */
+function inside(g: FloorGeom, rg: RoomGeom, x: number, z: number, margin = 1): boolean {
+  if (x < 0 || z < 0 || x >= g.W || z >= g.Z) return false;
+  const i = x + z * g.W;
+  return g.owner[i] === rg.index + 1 && g.edge[i]! >= margin;
 }
 
 function inElevatorArea(x: number, z: number): boolean {
@@ -870,17 +892,19 @@ function inElevatorArea(x: number, z: number): boolean {
  */
 function floorDetail(
   world: VoxelWorld,
-  r: RoomDef,
+  g: FloorGeom,
+  rg: RoomGeom,
   doors: readonly DoorDef[],
   zones: readonly Zone[],
 ): void {
+  const r = rg.room;
   const theme = r.theme ?? "generic";
-  if (theme === "elevator" || isShaft(r)) return;
+  if (theme === "elevator" || theme === "hub" || isShaft(r)) return;
   const seed = fnv1a(`slab:${r.id}`);
-  const inRoom = (q: Zone) => q.x >= r.x && q.x <= r.x + r.w && q.z >= r.z && q.z <= r.z + r.d;
+  const inRoom = (q: Zone) => inside(g, rg, Math.floor(q.x), Math.floor(q.z), 1);
   const own = zones.filter(inRoom);
   const setSlab = (x: number, z: number, c: number) => {
-    if (inside(r, x, z) && !inElevatorArea(x, z)) world.set(x, 0, z, c);
+    if (inside(g, rg, x, z) && !inElevatorArea(x, z)) world.set(x, 0, z, c);
   };
 
   // Hazard rings (diagonal stripes) one voxel around every machine footprint.
@@ -924,7 +948,7 @@ function floorDetail(
         }
     }
   };
-  const area = r.w * r.d;
+  const area = rg.area;
 
   // Drain grates: 3 × 3, dark slots in a steel frame.
   if (DRAINS.has(theme)) {
@@ -976,7 +1000,7 @@ function floorDetail(
         for (const into of [-1, 1] as const) {
           const x = d.axis === "x" ? d.x + o : d.x + into;
           const z = d.axis === "x" ? d.z + into : d.z + o;
-          if (inside(r, x, z)) setSlab(x, z, C.led_green);
+          if (inside(g, rg, x, z)) setSlab(x, z, C.led_green);
         }
       }
     }
@@ -986,34 +1010,34 @@ function floorDetail(
  * Relief on top of the walls (y = WALL_HEIGHT + 1): pipe runs with flanges
  * over industrial rooms, cable bundles over server rooms, pillar caps elsewhere.
  */
-function wallTops(world: VoxelWorld, r: RoomDef, doors: readonly DoorDef[]): void {
+function wallTops(world: VoxelWorld, rg: RoomGeom, doors: readonly DoorDef[]): void {
+  const r = rg.room;
   const theme = r.theme ?? "generic";
   if (theme === "elevator" || theme === "greenhouse" || isShaft(r) || RESIDENTIAL.has(theme))
     return;
   const y = WALL_HEIGHT + 1;
   const pipe = PIPES[theme];
-  for (let z = r.z; z <= r.z + r.d; z++)
-    for (let x = r.x; x <= r.x + r.w; x++) {
-      if (!isWall(r, x, z) || doorKeepOut(doors, x, z) || inElevatorArea(x, z)) continue;
-      if (!world.get(x, WALL_HEIGHT, z) || world.get(x, y, z)) continue;
-      const p = alongWall(r, x, z);
-      if (pipe !== undefined) world.set(x, y, z, p % 12 === 6 ? C.metal_dark : pipe);
-      else if (theme === "server" && p % 8 !== 0)
-        world.set(x, y, z, p % 5 === 0 ? C.cable_red : C.cable_black);
-      else if (p % 8 === 0) world.set(x, y, z, C.metal_light);
-    }
+  for (const { x, z, p } of rg.walls) {
+    if (doorKeepOut(doors, x, z) || inElevatorArea(x, z)) continue;
+    if (!world.get(x, WALL_HEIGHT, z) || world.get(x, y, z)) continue;
+    if (pipe !== undefined) world.set(x, y, z, p % 12 === 6 ? C.metal_dark : pipe);
+    else if (theme === "server" && p % 8 !== 0)
+      world.set(x, y, z, p % 5 === 0 ? C.cable_red : C.cable_black);
+    else if (p % 8 === 0) world.set(x, y, z, C.metal_light);
+  }
 }
 
 /**
- * Head-height pipe runs (y = WALL_HEIGHT − 1) along the north and west walls
- * of industrial rooms (the south/east walls carry the cable trays).
+ * Head-height pipe runs (y = WALL_HEIGHT − 1) along the north- and
+ * west-facing walls of industrial rooms (the others carry the cable trays).
  */
 function headPipes(
   world: VoxelWorld,
-  r: RoomDef,
+  rg: RoomGeom,
   ok: (x: number, z: number) => boolean,
   lampCells: ReadonlySet<string>,
 ): void {
+  const r = rg.room;
   const pipe = PIPES[r.theme ?? "generic"];
   if (pipe === undefined || isShaft(r)) return;
   const y = WALL_HEIGHT - 1;
@@ -1023,148 +1047,146 @@ function headPipes(
     lampCells.has(`${x + 1},${z}`) ||
     lampCells.has(`${x},${z - 1}`) ||
     lampCells.has(`${x},${z + 1}`);
-  const put = (x: number, z: number, p: number) => {
-    if (!ok(x, z) || lampNear(x, z) || world.get(x, y, z)) return;
-    world.set(x, y, z, p % 24 === 15 ? C.safety_red : p % 6 === 3 ? C.metal_dark : pipe);
-  };
-  for (let x = r.x + 2; x <= r.x + r.w - 2; x++) put(x, r.z + 1, x - r.x);
-  for (let z = r.z + 2; z <= r.z + r.d - 2; z++) put(r.x + 1, z, z - r.z);
+  for (const w of rg.walls) {
+    if (!((w.nz === 1 && w.nx === 0) || (w.nx === 1 && w.nz === 0))) continue;
+    const x = w.x + w.nx;
+    const z = w.z + w.nz;
+    if (!ok(x, z) || lampNear(x, z) || world.get(x, y, z)) continue;
+    world.set(x, y, z, w.p % 24 === 15 ? C.safety_red : w.p % 6 === 3 ? C.metal_dark : pipe);
+  }
 }
 
 // ── Build ────────────────────────────────────────────────────────
 
 export function buildFloor(floor: FloorId): FloorLayout {
   const world = new VoxelWorld(FLOOR_SIZE.x, FLOOR_SIZE.y, FLOOR_SIZE.z);
-  const rooms = ROOMS.filter((r) => r.floor === floor);
+  const g = floorGeomOf(floor);
   const doors = DOORS.filter((d) => d.floor === floor);
   const zones = interactableZones(floor).filter((q) => q.kind !== "door" && q.kind !== "elevator");
   const tall = zones.filter((q) => q.h > WALL_HEIGHT - 2);
   const secret = doors.filter((d) => d.secret);
   const lamps: Lamp[] = [];
+  const W = g.W;
 
-  // Floors first (interiors), then walls on every room perimeter.
-  for (const r of rooms) {
+  // Floors first (interiors and their wall lines), each room in its own pattern.
+  for (const rg of g.rooms) {
+    const r = rg.room;
     const theme = r.theme ?? "generic";
+    const own = (x: number, z: number) => inside(g, rg, x, z, 1);
     const cracks =
       theme === "geothermal" || theme === "reactor" || theme === "hangar" || isShaft(r)
-        ? crackSet(r, Math.ceil((r.w * r.d) / 220), 26)
+        ? crackSet(r, own, Math.ceil(rg.area / 220), 26)
         : theme === "anomaly"
-          ? crackSet(r, Math.ceil((r.w * r.d) / 160), 30)
+          ? crackSet(r, own, Math.ceil(rg.area / 160), 30)
           : new Set<number>();
-    for (let z = r.z; z <= r.z + r.d; z++)
-      for (let x = r.x; x <= r.x + r.w; x++) world.set(x, 0, z, floorColorAt(r, x, z, cracks));
+    for (const i of rg.cells) {
+      const x = i % W;
+      const z = (i - x) / W;
+      world.set(x, 0, z, floorColorAt(r, x, z, cracks, g.edge[i]!));
+    }
+    for (const w of rg.walls) world.set(w.x, 0, w.z, floorColorAt(r, w.x, w.z, cracks, 0));
   }
 
   // Walls with panelling: baseboard, seams, pillars every 8, amber top trim
   // (the shaft gets rough rock with timber supports instead).
-  const shaftRooms = new Set(rooms.filter(isShaft).map((r) => r.id));
-  for (const r of rooms) {
+  const shaftRooms = new Set(g.rooms.filter((rg) => isShaft(rg.room)).map((rg) => rg.room.id));
+  for (const rg of g.rooms) {
+    const r = rg.room;
     const mats = WALL_MATS[r.wallColor] ?? {
       seam: C.wall_dark,
       pillar: C.metal,
       base: C.metal_dark,
     };
-    for (let z = r.z; z <= r.z + r.d; z++)
-      for (let x = r.x; x <= r.x + r.w; x++) {
-        if (!isWall(r, x, z)) continue;
-        const p = alongWall(r, x, z);
-        if (shaftRooms.has(r.id)) {
-          shaftWall(world, x, z, p);
-          continue;
-        }
-        const pillar = p % 8 === 0;
-        const glassy = r.theme === "greenhouse" && !pillar && !nearDoor(doors, x, z, 4, 1);
-        // Plain panelling beside secret doors: their wall cover mirrors it.
-        const plain = nearDoor(secret, x, z, 6, 1);
-        for (let y = 1; y <= WALL_HEIGHT; y++) {
-          let c = r.wallColor;
-          if (y === WALL_HEIGHT) c = C.wall_trim;
-          else if (pillar) c = y === WALL_HEIGHT - 1 ? C.metal_light : mats.pillar;
-          else if (y === 1) c = mats.base;
-          else if (glassy && y >= 3 && y <= 6) c = y === 3 || p % 4 === 0 ? C.steel : C.glass_green;
-          else if (p % 8 === 4 || y === 5) c = mats.seam;
-          if (!plain && !glassy) c = wallDetail(r, p, y, pillar, c);
-          world.set(x, y, z, c);
-        }
+    for (const { x, z, p } of rg.walls) {
+      if (shaftRooms.has(r.id)) {
+        shaftWall(world, x, z, p);
+        continue;
       }
+      const pillar = p % 8 === 0;
+      const glassy = r.theme === "greenhouse" && !pillar && !nearDoor(doors, x, z, 4, 1);
+      // Plain panelling beside secret doors: their wall cover mirrors it.
+      const plain = nearDoor(secret, x, z, 6, 1);
+      for (let y = 1; y <= WALL_HEIGHT; y++) {
+        let c = r.wallColor;
+        if (y === WALL_HEIGHT) c = C.wall_trim;
+        else if (pillar) c = y === WALL_HEIGHT - 1 ? C.metal_light : mats.pillar;
+        else if (y === 1) c = mats.base;
+        else if (glassy && y >= 3 && y <= 6) c = y === 3 || p % 4 === 0 ? C.steel : C.glass_green;
+        else if (p % 8 === 4 || y === 5) c = mats.seam;
+        if (!plain && !glassy) c = wallDetail(r, p, y, pillar, c);
+        world.set(x, y, z, c);
+      }
+    }
   }
+
+  // Poché: the solid body of the lab between the rooms (rock on the deep floors).
+  pocheMass(world, g, floor);
 
   // Deep floors: rock / brick intrusions, crystal veins, roots.
-  if (isDeepFloor(floor)) for (const r of rooms) deepWalls(world, r, doors, shaftRooms.has(r.id));
+  if (isDeepFloor(floor))
+    for (const rg of g.rooms) deepWalls(world, rg, doors, shaftRooms.has(rg.room.id));
 
   // Windows in walls shared by two "clean" rooms (y 3–5, glass class).
-  for (let i = 0; i < rooms.length; i++)
-    for (let j = i + 1; j < rooms.length; j++) {
-      const a = rooms[i]!;
-      const b = rooms[j]!;
-      if (!WINDOW_THEMES.has(a.theme ?? "generic") || !WINDOW_THEMES.has(b.theme ?? "generic"))
-        continue;
-      if (isShaft(a) || isShaft(b)) continue; // rock, not glass
-      const pane =
-        a.theme === "containment" || b.theme === "containment"
-          ? C.glass_purple
-          : a.theme === "cryo" || b.theme === "cryo"
-            ? C.ice
-            : C.glass;
-      carveWindows(world, a, b, doors, pane);
-    }
+  carveWindows(world, g, doors);
 
-  // Wall lamps every ~10 voxels on the north and west walls (inside), with a hood.
-  for (const r of rooms) {
-    for (let x = r.x + 5; x < r.x + r.w - 3; x += 10)
-      lamps.push({ room: r.id, x, y: WALL_HEIGHT - 1, z: r.z + 1 });
-    for (let z = r.z + 5; z < r.z + r.d - 3; z += 10)
-      lamps.push({ room: r.id, x: r.x + 1, y: WALL_HEIGHT - 1, z });
-  }
+  // Wall lamps every ~10 voxels on north- and west-facing walls (inside), with a hood.
+  for (const rg of g.rooms)
+    for (const w of rg.walls) {
+      const north = w.nz === 1 && w.nx === 0;
+      const west = w.nx === 1 && w.nz === 0;
+      if ((!north && !west) || w.p % 10 !== 5) continue;
+      const x = w.x + w.nx;
+      const z = w.z + w.nz;
+      if (!inside(g, rg, x, z, 1)) continue;
+      lamps.push({ room: rg.room.id, x, y: WALL_HEIGHT - 1, z });
+    }
   for (const l of lamps) {
     world.set(l.x, l.y, l.z, C.led_red);
     world.set(l.x, l.y + 1, l.z, C.metal_dark);
   }
   const lampCells = new Set(lamps.map((l) => `${l.x},${l.z}`));
 
-  // Above-head details beside the walls: pillar corbels + cable trays (S/E walls).
+  // Above-head details beside the walls: pillar corbels + cable trays (south/east walls).
   const headOk = (x: number, z: number) =>
     !lampCells.has(`${x},${z}`) && !nearDoor(doors, x, z, 4, 2) && !nearZone(tall, x, z, 1);
-  for (const r of rooms) {
+  const trayColor = (i: number) =>
+    i % 7 === 0
+      ? C.steel
+      : i % 3 === 0
+        ? C.cable_red
+        : i % 5 === 0
+          ? C.cable_yellow
+          : C.cable_black;
+  for (const rg of g.rooms) {
+    const r = rg.room;
     const theme = r.theme ?? "generic";
     if (theme === "elevator") continue;
     const y = WALL_HEIGHT - 1;
     const shaft = shaftRooms.has(r.id);
     const step = shaft ? SHAFT_PILLAR : 8;
     const corbel = shaft ? C.wood : C.metal_light;
-    for (let x = r.x + step; x < r.x + r.w; x += step) {
-      if (headOk(x, r.z + 1)) world.set(x, y, r.z + 1, corbel);
-      if (headOk(x, r.z + r.d - 1)) world.set(x, y, r.z + r.d - 1, corbel);
+    const trays = TRAY_THEMES.has(theme) && !shaft;
+    for (const w of rg.walls) {
+      if (Math.abs(w.nx) + Math.abs(w.nz) !== 1) continue;
+      const x = w.x + w.nx;
+      const z = w.z + w.nz;
+      if (!inside(g, rg, x, z, 1) || !headOk(x, z)) continue;
+      if (w.p % step === 0) world.set(x, y, z, corbel);
+      else if (trays && (w.nz === -1 || w.nx === -1)) world.set(x, y, z, trayColor(w.p));
     }
-    for (let z = r.z + step; z < r.z + r.d; z += step) {
-      if (headOk(r.x + 1, z)) world.set(r.x + 1, y, z, corbel);
-      if (headOk(r.x + r.w - 1, z)) world.set(r.x + r.w - 1, y, z, corbel);
-    }
-    if (!TRAY_THEMES.has(theme) || shaft) continue;
-    const trayColor = (i: number) =>
-      i % 7 === 0
-        ? C.steel
-        : i % 3 === 0
-          ? C.cable_red
-          : i % 5 === 0
-            ? C.cable_yellow
-            : C.cable_black;
-    for (let x = r.x + 2; x <= r.x + r.w - 2; x++)
-      if (headOk(x, r.z + r.d - 1)) world.set(x, y, r.z + r.d - 1, trayColor(x));
-    for (let z = r.z + 2; z <= r.z + r.d - 2; z++)
-      if (headOk(r.x + r.w - 1, z)) world.set(r.x + r.w - 1, y, z, trayColor(z));
   }
-  for (const r of rooms) headPipes(world, r, headOk, lampCells);
+  for (const rg of g.rooms) headPipes(world, rg, headOk, lampCells);
 
   // Door openings with hazard-striped frames (+ keypads).
   for (const d of doors) carveDoor(world, d);
   doorPlates(world, doors);
 
   // Slab details and wall-top relief.
-  for (const r of rooms) {
-    floorDetail(world, r, doors, zones);
-    wallTops(world, r, doors);
+  for (const rg of g.rooms) {
+    floorDetail(world, g, rg, doors, zones);
+    wallTops(world, rg, doors);
   }
+  hubDetail(world, g, doors);
 
   // Elevator shaft: platform ring + pillars + overhead frame.
   for (const e of ELEVATORS) {
@@ -1205,31 +1227,31 @@ export function buildFloor(floor: FloorId): FloorLayout {
   return { floor, world, lamps };
 }
 
-function carveWindows(
-  world: VoxelWorld,
-  a: RoomDef,
-  b: RoomDef,
-  doors: readonly DoorDef[],
-  pane: number,
-): void {
-  // Vertical shared wall (constant x).
-  for (const [xa, xb] of [
-    [a.x + a.w, b.x],
-    [a.x, b.x + b.w],
-  ] as const) {
-    if (xa !== xb) continue;
-    const z0 = Math.max(a.z, b.z) + 2;
-    const z1 = Math.min(a.z + a.d, b.z + b.d) - 2;
-    for (let z = z0; z <= z1; z++) paneAt(world, xa, z, z - z0, doors, pane);
-  }
-  for (const [za, zb] of [
-    [a.z + a.d, b.z],
-    [a.z, b.z + b.d],
-  ] as const) {
-    if (za !== zb) continue;
-    const x0 = Math.max(a.x, b.x) + 2;
-    const x1 = Math.min(a.x + a.w, b.x + b.w) - 2;
-    for (let x = x0; x <= x1; x++) paneAt(world, x, za, x - x0, doors, pane);
+/**
+ * Windows in walls between two "clean" rooms: a straight wall cell whose
+ * inner side belongs to one room and whose outer side to another.
+ */
+function carveWindows(world: VoxelWorld, g: FloorGeom, doors: readonly DoorDef[]): void {
+  for (const rg of g.rooms) {
+    const a = rg.room;
+    if (!WINDOW_THEMES.has(a.theme ?? "generic") || isShaft(a)) continue;
+    for (const w of rg.walls) {
+      if (Math.abs(w.nx) + Math.abs(w.nz) !== 1) continue;
+      const bx = w.x - w.nx;
+      const bz = w.z - w.nz;
+      if (bx < 0 || bz < 0 || bx >= g.W || bz >= g.Z) continue;
+      const o = g.owner[bx + bz * g.W]!;
+      if (!o || o === rg.index + 1) continue;
+      const b = g.rooms[o - 1]!.room;
+      if (!WINDOW_THEMES.has(b.theme ?? "generic") || isShaft(b)) continue;
+      const pane =
+        a.theme === "containment" || b.theme === "containment"
+          ? C.glass_purple
+          : a.theme === "cryo" || b.theme === "cryo"
+            ? C.ice
+            : C.glass;
+      paneAt(world, w.x, w.z, w.p, doors, pane);
+    }
   }
 }
 
@@ -1242,11 +1264,107 @@ function paneAt(
   pane: number,
 ): void {
   if (nearDoor(doors, x, z, 5, 0.5)) return;
-  const slot = p % 8;
+  const slot = ((p % 8) + 8) % 8;
   if (slot < 2 || slot > 6) return;
   world.set(x, 2, z, C.metal_light);
   for (let y = 3; y <= 5; y++) world.set(x, y, z, pane);
   world.set(x, 6, z, C.metal);
+}
+
+/**
+ * The poché — the lab's solid body between the rooms, thick as a bunker:
+ * dark concrete with service hatches, vents and cable ducts on top; raw rock
+ * with crystal flecks on the deep floors.
+ */
+function pocheMass(world: VoxelWorld, g: FloorGeom, floor: FloorId): void {
+  // Few, large runs of one colour so the greedy mesher merges them into big quads:
+  // flat sides, a flat top with a service duct grid (every 16) and rare hatches.
+  const deep = isDeepFloor(floor);
+  const side = deep ? C.rock_dark : C.concrete_dark;
+  const flat = deep ? C.rock_dark : C.asphalt;
+  const seed = 9001 + floor;
+  for (let z = 0; z < g.Z; z++)
+    for (let x = 0; x < g.W; x++) {
+      if (!g.mass[x + z * g.W]) continue;
+      for (let y = 1; y < WALL_HEIGHT; y++) world.set(x, y, z, side);
+      let top = flat;
+      if (deep) {
+        const h = ih(x >> 1, z >> 1, seed);
+        if (h % 23 === 0) top = floor === 5 ? C.abstractum : C.vein_cyan;
+        else if (h % 5 === 0) top = C.rock;
+      } else if (x % 16 === 8 || z % 16 === 8) top = C.steel_dark;
+      else if (ih(x >> 1, z >> 1, seed) % 41 === 0) top = C.metal_dark;
+      world.set(x, WALL_HEIGHT, z, top);
+    }
+}
+
+/**
+ * The core rotunda floor: a compass rose around the shaft, concentric
+ * guide rings and floor lights pointing at the doors.
+ */
+function hubDetail(world: VoxelWorld, g: FloorGeom, doors: readonly DoorDef[]): void {
+  for (const rg of g.rooms) {
+    const r = rg.room;
+    if (r.theme !== "hub") continue;
+    const e = ELEVATORS.find((q) => q.floor === r.floor);
+    if (!e) continue;
+    const deep = r.floor === 5;
+    const own = rg.index + 1;
+    // Guide lights: a strip in the floor from the shaft platform to every door of the core.
+    const guide = new Set<number>();
+    for (const d of doors) {
+      const touches = [-1, 1].some((sd) => {
+        const x = d.axis === "x" ? d.x : d.x + sd;
+        const z = d.axis === "x" ? d.z + sd : d.z;
+        return g.owner[x + z * g.W] === own;
+      });
+      if (!touches) continue;
+      const len = Math.hypot(d.x - e.x, d.z - e.z);
+      for (let t = 0; t <= len; t += 0.5) {
+        const x = Math.floor(e.x + ((d.x - e.x) * t) / len);
+        const z = Math.floor(e.z + ((d.z - e.z) * t) / len);
+        if (g.owner[x + z * g.W] === own && !inElevatorArea(x, z)) guide.add(x + z * g.W);
+      }
+    }
+    for (const i of rg.cells) {
+      const x = i % g.W;
+      const z = (i - x) / g.W;
+      if (inElevatorArea(x, z)) continue;
+      const dx = x + 0.5 - e.x;
+      const dz = z + 0.5 - e.z;
+      const dist = Math.hypot(dx, dz);
+      const a = Math.atan2(dz, dx);
+      const edge = g.edge[i]!;
+      if (guide.has(i)) {
+        world.set(
+          x,
+          0,
+          z,
+          deep
+            ? Math.round(dist) % 3 === 0
+              ? C.lamp_warm
+              : C.wood_dark
+            : Math.round(dist) % 2 === 0
+              ? C.led_green
+              : C.metal_dark,
+        );
+        continue;
+      }
+      if (deep) {
+        // Pit bottom: mine rails in a ring, gravel between.
+        if (Math.abs(dist - 16) < 0.6 || Math.abs(dist - 18) < 0.6) world.set(x, 0, z, C.steel);
+        else if (Math.abs(dist - 17) < 1.2 && Math.round(a * 16) % 3 === 0)
+          world.set(x, 0, z, C.wood_dark);
+        continue;
+      }
+      const ring = Math.abs(dist - 15.5) < 0.55 || Math.abs(dist - 18.5) < 0.45;
+      const spoke = Math.abs(a - Math.round(a / (Math.PI / 4)) * (Math.PI / 4)) * dist < 0.55;
+      if (ring) world.set(x, 0, z, (Math.round(a * 20) & 1) === 0 ? C.brass : C.metal_light);
+      else if (spoke && dist > 12 && edge > 2)
+        world.set(x, 0, z, dist % 3 < 1 ? C.led_amber : C.metal_dark);
+      else if (edge === 2) world.set(x, 0, z, C.wall_trim);
+    }
+  }
 }
 
 export function doorCells(d: DoorDef): { x: number; z: number }[] {

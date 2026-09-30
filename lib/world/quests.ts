@@ -24,6 +24,7 @@ import {
   ROOM_BY_ID,
   SLICE_PICKUPS,
   roomAt,
+  doorTouches,
 } from "@/lib/world/content/map";
 import { BOT_QUESTS, ENDINGS, NPCS } from "@/lib/world/content/story";
 import {
@@ -43,7 +44,8 @@ import {
   power,
   reachableRooms,
 } from "@/lib/world/game";
-import type { Condition, DoorDef, FloorId, RoomDef, WorldState } from "@/lib/world/types";
+import type { Condition, FloorId, RoomDef, WorldState } from "@/lib/world/types";
+import { CORE } from "@/lib/world/content/floorplan";
 
 export type ObjectiveGroup =
   | "strom"
@@ -145,12 +147,6 @@ function missingParts(s: WorldState, c: Condition): string[] {
   return parts.filter((p) => !evalCond(s, p)).map(describeCond);
 }
 
-function touches(d: DoorDef, r: RoomDef): boolean {
-  return d.axis === "x"
-    ? (d.z === r.z || d.z === r.z + r.d) && d.x > r.x && d.x < r.x + r.w
-    : (d.x === r.x || d.x === r.x + r.w) && d.z > r.z && d.z < r.z + r.d;
-}
-
 /** Lock hint of a closed door that touches the room (why the player cannot get in yet). */
 function lockedDoorInto(
   s: WorldState,
@@ -161,7 +157,7 @@ function lockedDoorInto(
   const d = DOORS.find(
     (x) =>
       x.floor === floor &&
-      touches(x, room) &&
+      doorTouches(x, room) &&
       !doorIsOpen(s, x) &&
       (!x.secret || !!s.insights.geheimtueren),
   );
@@ -234,7 +230,7 @@ function floorObjectives(s: WorldState): Objective[] {
       text: tr("Reach {floor}", { floor: f.name }),
       detail: acc.hint,
       priority: 20 + f.order,
-      target: at(s.floor, 120, 62, tr("Elevator")),
+      target: at(s.floor, CORE.x, CORE.z, tr("Elevator")),
     });
   }
   return out;
@@ -369,7 +365,7 @@ function doorObjectives(s: WorldState): Objective[] {
     for (const d of DOORS) {
       if (d.floor !== f.id || doorIsOpen(s, d)) continue;
       if (d.secret && !s.insights.geheimtueren) continue;
-      const beside = ROOMS.some((r) => r.floor === f.id && reach.has(r.id) && touches(d, r));
+      const beside = ROOMS.some((r) => r.floor === f.id && reach.has(r.id) && doorTouches(d, r));
       if (!beside) continue;
       out.push({
         id: `tuer_${d.id}`,

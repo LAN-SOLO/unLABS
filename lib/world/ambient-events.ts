@@ -84,6 +84,7 @@ export const THEME_WEIGHTS: Record<RoomTheme, Weights> = {
   archive: { lamp_flicker: 1, monitor_glitch: 1, drip: 0.5 },
   airlock: { steam_burst: 1.5, pa_crackle: 1 },
   elevator: { distant_rumble: 1, drip: 1, pa_crackle: 1 },
+  hub: { pa_crackle: 2, distant_rumble: 1, lamp_flicker: 1 },
   geothermal: { distant_rumble: 3, steam_burst: 3, drip: 1 },
   power: { spark: 2, hum_surge: 2 },
   cooling: { steam_burst: 2, drip: 2, hum_surge: 1 },

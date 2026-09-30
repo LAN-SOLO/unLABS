@@ -19,7 +19,15 @@ import {
   SLICE_TOTAL,
   comboKey,
 } from "@/lib/world/content/items";
+import { WORLD_FIRMWARE, type FirmwareSource } from "@/lib/world/content/firmware";
+import {
+  REFINE_RECIPES,
+  REPLICATOR_POWER as WARDROBE_REPLICATOR_POWER,
+  WEAR_ITEMS,
+} from "@/lib/world/content/wardrobe";
+import { BUS_LABEL, HUBS } from "@/lib/world/content/links";
 import { FLOORS, FLOOR_ACCESS, ROOMS } from "@/lib/world/content/map";
+import { manifestOf } from "@/lib/world/firmware";
 import { NPCS, NPC_SPEAKERS } from "@/lib/world/content/story";
 import {
   PWD_BONUS,
@@ -160,6 +168,128 @@ export function codexUnlocked(s: WorldState, u: CodexUnlock | undefined): boolea
   }
   return false;
 }
+
+// ── Lab systems: interfaces, links, firmware, archive ────────────
+
+const SOURCE_LABEL: Record<FirmwareSource, string> = {
+  net: tr("source::Network mirror (NET-001)"),
+  mcp: tr("source::MCP registry"),
+  manual: tr("source::Service image — type the checksum"),
+};
+
+const SYSTEMS: CodexEntry[] = [
+  {
+    id: "s_interface",
+    tab: "geraete",
+    title: tr("Device interfaces"),
+    sub: tr("Every built device has its own"),
+    unlock: ALWAYS,
+    blocks: [
+      p(
+        tr(
+          "A finished device is used through its own interface: its faceplate pages show live values and its controls (knobs, modes, switches). Every interface also has an Info page — “Read out” for the device's live readout, plus any records stored on the device — and a Firmware page. Hubs have a Links page.",
+        ),
+      ),
+      list([
+        tr("Switch on / off: top right. Offline devices show no pages, only “no power”."),
+        tr("Service: the old build view — stages, slots, hosted puzzles and endings."),
+        tr("Records on an Info page appear only while the device is online."),
+      ]),
+    ],
+  },
+  {
+    id: "s_links",
+    tab: "geraete",
+    title: tr("Links & hubs"),
+    sub: tr("Devices that manage other devices"),
+    unlock: ALWAYS,
+    blocks: [
+      p(
+        tr(
+          "Six devices are hubs: on their Links page you connect other finished devices to them. A device can hang on several hubs, but on each kind of hub only once. The hub must be online; unlinking is free and instant. Some build stages need a link — the stage tells you which.",
+        ),
+      ),
+      {
+        kind: "table",
+        head: [tr("Hub"), tr("Kind"), tr("Ports"), tr("What linking does")],
+        rows: HUBS.map((h) => ({
+          cells: [deviceName(h.id), BUS_LABEL[h.bus], String(h.capacity), h.text],
+          unlock: { discovered: h.id },
+        })),
+      },
+    ],
+  },
+  {
+    id: "s_firmware",
+    tab: "geraete",
+    title: tr("Firmware updates"),
+    sub: tr("Check → download → verify → flash → reboot"),
+    unlock: ALWAYS,
+    blocks: [
+      p(
+        tr(
+          "Many devices have one lab update. It is flashed on the device's Firmware page while the device is online, and each update adds a feature. Where the image comes from decides what you need first:",
+        ),
+      ),
+      list([
+        tr(
+          "Network mirror: NET-001 needs its own update first (the firmware mirror), then link the device to NET-001.",
+        ),
+        tr("MCP registry: add the device to the MCP's device registry (MCP → Links)."),
+        tr(
+          "Service image: already on board, but you must type its eight-character checksum. The labels are somewhere in the lab — search.",
+        ),
+      ]),
+      p(
+        tr(
+          "A rollback restores the factory image at any time; the update stays available. Some build stages need a device to run a certain version.",
+        ),
+      ),
+      {
+        kind: "table",
+        head: [tr("Device"), tr("Update"), tr("Source"), tr("New feature")],
+        rows: Object.entries(WORLD_FIRMWARE).map(([id, w]) => ({
+          cells: [
+            deviceName(id),
+            manifestOf(id)?.update?.version ?? "",
+            SOURCE_LABEL[w.source],
+            `${w.unlock.label} — ${w.unlock.text}`,
+          ],
+          unlock: { discovered: id },
+        })),
+      },
+    ],
+  },
+  {
+    id: "g_archiv",
+    tab: "grundlagen",
+    title: tr("The archive"),
+    sub: tr("Everything is written down somewhere"),
+    unlock: ALWAYS,
+    blocks: [
+      p(
+        tr(
+          "Whatever you might look up in a guide, somebody in this lab wrote down: on boards and posters, in lockers and vents, on device screens. Every record you find lands in the journal under Archive.",
+        ),
+      ),
+      list([
+        tr("Read: boards, posters, screens and notes show their records when used."),
+        tr(
+          "Search: lockers, cabinets, vents, shelves, boxes and paper piles offer “Search” — empty ones too, so looking is never a giveaway.",
+        ),
+        tr("Devices: records on a device's Info page, while it is online."),
+        tr(
+          "Combine: some knowledge exists only between several records. Once you have them all, the console in Journal → Archive asks a question — the answer follows from what you found.",
+        ),
+      ]),
+      p(
+        tr(
+          "The harder a record is to find (open → tucked away → hidden → well hidden → buried), the further it reaches. The best ones need a device online, a tool in hand or a certain firmware.",
+        ),
+      ),
+    ],
+  },
+];
 
 // ── Grundlagen ───────────────────────────────────────────────────
 
@@ -370,6 +500,98 @@ const BASICS: CodexEntry[] = [
           },
         ],
       },
+    ],
+  },
+  {
+    id: "g_garderobe",
+    tab: "grundlagen",
+    title: tr("Wardrobe & character menu"),
+    sub: "O",
+    unlock: ALWAYS,
+    blocks: [
+      p(
+        tr(
+          "Jade can dress however she likes. The character menu (O, the pause menu or the inventory) shows her from all sides and lists every piece by slot: clothes (top, jacket, trousers, shoes, hairstyle), gadgets (headgear, face, gloves) and accessories (back, neck, belt, wrist, shoulder buddy).",
+        ),
+      ),
+      p(
+        tr(
+          "Gadgets and accessories change anywhere. Clothes, shoes and hair only change at the wardrobe in Jade's quarters — use it and the menu opens there. Four outfit slots save a whole look; “Surprise me” rolls one from what she owns. Many pieces come in several colours; some colours have to be dyed first.",
+        ),
+      ),
+      {
+        kind: "table",
+        head: [tr("Where pieces come from"), tr("How")],
+        rows: [
+          {
+            cells: [
+              tr("Hidden in the lab"),
+              tr(
+                "{n} pieces lie hidden on every level — some behind a lock, in a secret room or only after a certain event. The collection tab gives a hint for each.",
+                { n: WEAR_ITEMS.filter((w) => w.source.kind === "find").length },
+              ),
+            ],
+          },
+          {
+            cells: [
+              tr("Wardrobe replicator"),
+              tr("{n} patterns, made from collected resources (see “Needle's Eye”).", {
+                n: WEAR_ITEMS.filter((w) => w.source.kind === "craft").length,
+              }),
+            ],
+          },
+          {
+            cells: [
+              tr("Rewards"),
+              tr(
+                "{n} pieces arrive on their own: for slices of Crystal #0089, awake bots, explosions, Damien's studio.",
+                { n: WEAR_ITEMS.filter((w) => w.source.kind === "reward").length },
+              ),
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "g_nadeloehr",
+    tab: "grundlagen",
+    title: tr("Needle's Eye (wardrobe replicator)"),
+    sub: tr("Jade's Quarters"),
+    unlock: { visited: "jadeq" },
+    blocks: [
+      p(
+        tr(
+          "Jade built NDL-0 “Needle's Eye” in 2018: a cast-iron industrial sewing head on the spare gantry of the first 3D fabricator, a spool rack, a slot for pattern disks, a dye carousel from the canteen's broken slush machine, a mirror on the upright and a recycling maw at the side. It stands next to her wardrobe and needs {w} W on the grid to start a job.",
+          { w: WARDROBE_REPLICATOR_POWER },
+        ),
+      ),
+      list([
+        tr(
+          "Fabricate: a new piece from resources. Some patterns only appear after something happened in the lab (a device built, bots awake, an explosion survived).",
+        ),
+        tr("Refine: turns salvage into textiles (table below)."),
+        tr("Dye: pays for a new colourway of a piece once; afterwards it is free."),
+        tr("Recycle: an unworn replicated piece goes back into the maw for half its fabric."),
+        tr("One job at a time; it keeps working while Jade walks the lab."),
+      ]),
+      {
+        kind: "table",
+        head: [tr("Refine"), tr("Gives")],
+        rows: REFINE_RECIPES.map((r) => ({
+          cells: [
+            Object.entries(r.inputs)
+              .map(([id, n]) => `${n}× ${itemName(id)}`)
+              .join(" + "),
+            `${r.count}× ${itemName(r.output)}`,
+          ],
+        })),
+      },
+      p(
+        tr(
+          "Fabric scraps come from laundry baskets, rag bins and lost-and-found crates (they refill), polymer fibre from offcut bins and tarps, pigment from the greenhouse (refined algae), glow thread from fibre optics.",
+        ),
+      ),
     ],
   },
 ];
@@ -1479,6 +1701,7 @@ export const CODEX_ENTRIES: readonly CodexEntry[] = [
   ...BASICS,
   ...ENERGY,
   ...BUILD,
+  ...SYSTEMS,
   ...COMBINE,
   ...TRAITS,
   ...RECIPE_ENTRIES,

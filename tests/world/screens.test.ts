@@ -54,8 +54,8 @@ function info(): ScreenInfo {
 }
 
 describe("screen content", () => {
-  it("covers all 18 content kinds", () => {
-    expect(CONTENTS).toHaveLength(18);
+  it("covers all 19 content kinds", () => {
+    expect(CONTENTS).toHaveLength(19);
   });
 
   it.each(CONTENTS)("draws %s at several sizes and times without throwing", (content) => {

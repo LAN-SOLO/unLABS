@@ -54,6 +54,8 @@ import { weatherModel } from "@/lib/world/models/decor-weather";
 import { CLUTTER_DECOR } from "@/lib/world/models/decor-clutter";
 import { DECOR_UPGRADES } from "@/lib/world/models/decor-upgrades";
 import { BIO_DECOR } from "@/lib/world/models/decor-bio";
+import { QUARTERS_DECOR } from "@/lib/world/models/decor-quarters";
+import { STUDIO_DECOR } from "@/lib/world/models/decor-studio";
 
 export type { DecorDef, DecorLight } from "@/lib/world/models/decor-kit";
 
@@ -1503,9 +1505,10 @@ const LIST: DecorDef[] = [
     id: "bench_long",
     solid: true,
     model: () => {
-      const m = new Model(14, 4, 4);
-      legs(m, 0, 0, 13, 3, 2, C.steel_dark);
-      m.box(0, 3, 0, 13, 3, 3, C.wood_light);
+      // Plank at knee height (2 × 0.5 = 1.0).
+      const m = new Model(14, 2, 4);
+      legs(m, 0, 0, 13, 3, 0, C.steel_dark);
+      m.box(0, 1, 0, 13, 1, 3, C.wood_light);
       return m;
     },
   },
@@ -1529,6 +1532,8 @@ const ALL: DecorDef[] = [
   ...LORE_DECOR,
   ...CLUTTER_DECOR,
   ...BIO_DECOR,
+  ...QUARTERS_DECOR,
+  ...STUDIO_DECOR,
 ];
 
 export const DECOR: readonly DecorDef[] = ALL;

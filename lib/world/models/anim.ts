@@ -75,6 +75,17 @@ export interface AnimPart {
   requiresPower: boolean;
   /** Name of an earlier part this one rides on (offset is then in the parent's voxel frame). */
   parent?: string;
+  /**
+   * Locomotion part of a character (see `gaitTransform`): "roll" = a wheel /
+   * track sprocket that turns by the distance travelled (`rollRadius`),
+   * "stride" = legs / body bounce that cycle once per `stride` world units
+   * and settle while standing. Without a gait source it animates on the clock.
+   */
+  gait?: "roll" | "stride";
+  /** "roll": wheel radius in the part's voxels. */
+  rollRadius?: number;
+  /** "stride": world units travelled per animation cycle. */
+  stride?: number;
 }
 
 export interface VisualLight {
@@ -107,7 +118,9 @@ export type ScreenContent =
   | "reactor"
   | "damien"
   | "boot"
-  | "noise";
+  | "noise"
+  /** A live pinboard: the memos pinned to that decor placement (ScreenInfo.pinned). */
+  | "notes";
 
 /**
  * A flat live screen on a model. `center` is in the model's voxel coords
@@ -296,6 +309,43 @@ export function animTransform(part: AnimPart, t: number, powered: boolean): Anim
   return { rot, pos, visible, intensity };
 }
 
+/**
+ * Pose of a part on a moving character. Locomotion parts (`gait`) follow the
+ * distance travelled instead of the clock, so wheels roll without slipping
+ * and legs never paddle while the character stands still:
+ *  - "roll": angle = phase + travel / radius (forward roll about the part's axis);
+ *  - "stride": the clip advances one cycle per `stride` units and its
+ *    swing fades out with `moving` (0 standing … 1 full speed).
+ * `travel` is the distance walked (world units, any origin), `scale` the
+ * rig's world units per voxel. Every other part: `animTransform`.
+ */
+export function gaitTransform(
+  part: AnimPart,
+  t: number,
+  powered: boolean,
+  travel: number,
+  moving: number,
+  scale: number,
+): AnimState {
+  if (!part.gait) return animTransform(part, t, powered);
+  if (part.gait === "roll") {
+    const st = animTransform(part, 0, false);
+    const r = Math.max(1e-3, (part.rollRadius ?? 3) * scale);
+    st.rot[AXIS_INDEX[partAxis(part)]] = (part.phase ?? 0) + travel / r;
+    st.intensity = powered || !part.requiresPower ? 1 : 0;
+    return st;
+  }
+  const cycles = travel / Math.max(1e-3, part.stride ?? 1);
+  const st = animTransform(part, cycles / Math.max(1e-6, part.speed), true);
+  const w = Math.max(0, Math.min(1, moving));
+  for (let i = 0; i < 3; i++) {
+    st.rot[i] = st.rot[i]! * w;
+    st.pos[i] = st.pos[i]! * w;
+  }
+  if (part.requiresPower && !powered) st.intensity = 0;
+  return st;
+}
+
 /** Light strength at time `t` (0 when it needs power and has none). */
 export function lightIntensity(light: VisualLight, t: number, powered: boolean): number {
   if (light.requiresPower && !powered) return 0;
@@ -333,6 +383,10 @@ export interface MountOpts {
   /** Pivot in the part's voxel coords; defaults to the part's centre. */
   pivot?: Vec3;
   parent?: string;
+  /** Locomotion part (see `AnimPart.gait`). */
+  gait?: "roll" | "stride";
+  rollRadius?: number;
+  stride?: number;
 }
 
 /** Part whose pivot sits at `at` (continuous base coords, or the parent's frame). */
@@ -357,6 +411,9 @@ export function mount(
   if (o.amplitude !== undefined) part.amplitude = o.amplitude;
   if (o.phase !== undefined) part.phase = o.phase;
   if (o.parent) part.parent = o.parent;
+  if (o.gait) part.gait = o.gait;
+  if (o.rollRadius !== undefined) part.rollRadius = o.rollRadius;
+  if (o.stride !== undefined) part.stride = o.stride;
   return part;
 }
 

@@ -1,3 +1,4 @@
+import { WEAR_ITEM_PREFIX } from "@/lib/world/content/wardrobe";
 import { describe, expect, it } from "vitest";
 import { DEVICES, DEVICE_BY_ID, DEVICE_PUZZLES } from "@/lib/world/content/devices";
 import { ITEM_BY_ID, RECIPES, SLICE_ITEM, SLICE_TOTAL } from "@/lib/world/content/items";
@@ -15,8 +16,13 @@ import {
   ROOMS,
   ROOM_BY_ID,
   SLICE_PICKUPS,
+  doorSides,
+  doorTouches,
+  floorGeomOf,
   roomAt,
 } from "@/lib/world/content/map";
+import { roomShape } from "@/lib/world/floor-geom";
+import { shapeContains } from "@/lib/world/room-shape";
 import { PUZZLE_BY_ID } from "@/lib/world/content/puzzles";
 import {
   BOT_QUESTS,
@@ -123,7 +129,9 @@ describe("lab world content", () => {
   it("references only existing ids", () => {
     const refs = collectAll();
     for (const id of refs.devices) expect(DEVICE_BY_ID.has(id), `device ${id}`).toBe(true);
-    for (const id of refs.items) expect(ITEM_BY_ID.has(id), `item ${id}`).toBe(true);
+    // `wear:<id>` pickups hand over wardrobe pieces (checked in wardrobe-content.test.ts).
+    for (const id of refs.items)
+      if (!id.startsWith(WEAR_ITEM_PREFIX)) expect(ITEM_BY_ID.has(id), `item ${id}`).toBe(true);
     for (const id of refs.puzzles) expect(PUZZLE_BY_ID.has(id), `puzzle ${id}`).toBe(true);
     for (const id of refs.insights) expect(INSIGHT_BY_ID.has(id), `insight ${id}`).toBe(true);
   });
@@ -142,14 +150,12 @@ describe("lab world content", () => {
   });
 
   it("puts doors on a wall shared by two rooms", () => {
+    // Rooms may be round or cut: a door leads from one room's interior to another's
+    // (a short straight passage through the wall mass where needed, see floor-geom.ts).
     for (const d of DOORS) {
-      const rooms = ROOMS.filter((r) => r.floor === d.floor);
-      const onWall = rooms.filter((r) =>
-        d.axis === "x"
-          ? (d.z === r.z || d.z === r.z + r.d) && d.x > r.x && d.x < r.x + r.w
-          : (d.x === r.x || d.x === r.x + r.w) && d.z > r.z && d.z < r.z + r.d,
-      );
-      expect(onWall.length, `door ${d.id}`).toBeGreaterThanOrEqual(2);
+      const sides = doorSides(d);
+      expect(sides, `door ${d.id}`).toHaveLength(2);
+      expect(sides[0], `door ${d.id}`).not.toBe(sides[1]);
     }
   });
 
@@ -184,25 +190,45 @@ describe("lab world content", () => {
     }
   });
 
-  it("gives each new floor 6–9 rooms and an elevator shaft like the others", () => {
-    for (const floor of [4, 5] as const) {
+  it("gives every floor 6–11 rooms around a core with the elevator in its middle", () => {
+    for (const floor of [0, 1, 2, 3, 4, 5] as const) {
       const rooms = ROOMS.filter((r) => r.floor === floor);
       expect(rooms.length).toBeGreaterThanOrEqual(6);
-      expect(rooms.length).toBeLessThanOrEqual(9);
-      const shaft = rooms.find((r) => r.id === `aufzug${floor}`)!;
-      expect([shaft.x, shaft.z, shaft.w, shaft.d]).toEqual([112, 52, 16, 20]);
-      for (const r of rooms) expect(r.blurb.length, r.id).toBeGreaterThan(40);
+      expect(rooms.length).toBeLessThanOrEqual(11);
+      const e = ELEVATORS.find((q) => q.floor === floor)!;
+      expect(roomAt(floor, e.x, e.z)?.id).toBe(`aufzug${floor}`);
+      expect(roomAt(floor, e.x, e.z)?.theme).toBe("hub");
+      if (floor >= 4) for (const r of rooms) expect(r.blurb.length, r.id).toBeGreaterThan(40);
     }
   });
 
   it("never lets two rooms on a floor overlap (walls may be shared)", () => {
+    // Room shapes (not their bounding boxes) must not share interior cells.
     for (const a of ROOMS)
       for (const b of ROOMS) {
-        if (a === b || a.floor !== b.floor) continue;
-        const ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
-        const oz = Math.min(a.z + a.d, b.z + b.d) - Math.max(a.z, b.z);
-        expect(ox > 0 && oz > 0, `${a.id} × ${b.id}`).toBe(false);
+        if (a.id >= b.id || a.floor !== b.floor) continue;
+        const sa = roomShape(a);
+        const sb = roomShape(b);
+        let shared = 0;
+        for (let z = Math.max(a.z, b.z); z <= Math.min(a.z + a.d, b.z + b.d); z++)
+          for (let x = Math.max(a.x, b.x); x <= Math.min(a.x + a.w, b.x + b.w); x++)
+            if (shapeContains(sa, x, z) && shapeContains(sb, x, z)) shared++;
+        expect(shared, `${a.id} × ${b.id}`).toBe(0);
       }
+    // …and no two interiors touch without a wall between them (that would be a
+    // doorless shortcut past a lock).
+    for (const f of FLOORS) {
+      const g = floorGeomOf(f.id);
+      for (let z = 0; z < g.Z - 1; z++)
+        for (let x = 0; x < g.W - 1; x++) {
+          const a = g.owner[x + z * g.W]!;
+          for (const b of [g.owner[x + 1 + z * g.W]!, g.owner[x + (z + 1) * g.W]!])
+            if (a && b && a !== b)
+              expect.fail(
+                `${g.rooms[a - 1]!.room.id} touches ${g.rooms[b - 1]!.room.id} at ${x},${z}`,
+              );
+        }
+    }
     for (const r of ROOMS) {
       expect(r.x >= 0 && r.z >= 0, r.id).toBe(true);
       expect(r.x + r.w < FLOOR_SIZE.x && r.z + r.d < FLOOR_SIZE.z, r.id).toBe(true);
@@ -215,7 +241,7 @@ describe("lab world content", () => {
     );
     expect(newRooms.length).toBeGreaterThan(15);
     for (const r of newRooms) {
-      if (r.theme === "elevator") continue;
+      if (r.theme === "elevator" || r.theme === "hub") continue;
       const inside = (o: { floor: number; x: number; z: number }) =>
         o.floor === r.floor && roomAt(r.floor, o.x, o.z)?.id === r.id;
       const things =
@@ -309,7 +335,5 @@ describe("lab world content", () => {
 });
 
 function touches(d: (typeof DOORS)[number], r: (typeof ROOMS)[number]): boolean {
-  return d.axis === "x"
-    ? (d.z === r.z || d.z === r.z + r.d) && d.x > r.x && d.x < r.x + r.w
-    : (d.x === r.x || d.x === r.x + r.w) && d.z > r.z && d.z < r.z + r.d;
+  return doorTouches(d, r);
 }

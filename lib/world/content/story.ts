@@ -24,6 +24,7 @@ import type {
   NpcId,
 } from "@/lib/world/types";
 import { tr } from "@/lib/i18n";
+import { planPoint } from "@/lib/world/content/map";
 
 export const INSIGHTS: readonly InsightDef[] = [
   // Strom
@@ -365,6 +366,46 @@ export const INSIGHTS: readonly InsightDef[] = [
     ),
   },
   // Damien
+  // Damien's studio (content/studio.ts): three scraps of a song, then the room.
+  {
+    id: "studio_frag1",
+    thread: "damien",
+    title: tr("Song Scrap I"),
+    text: tr("A torn tape label in Damien's hand: “JL — the song for the door, bars 1–2: 3 · 5.”"),
+  },
+  {
+    id: "studio_frag2",
+    thread: "damien",
+    title: tr("Song Scrap II"),
+    text: tr("On a frosted lid in the cold archive: “…then climb to 8 and let it fall to 6.”"),
+  },
+  {
+    id: "studio_frag3",
+    thread: "damien",
+    title: tr("Song Scrap III"),
+    text: tr(
+      "On the back of a radio log: “Last part: 7 · 5. Never end on the 1.” And: the door listens on Level −2, where the ring listens too.",
+    ),
+  },
+  {
+    id: "studio_song",
+    thread: "damien",
+    title: tr("Damien's Song"),
+    text: tr(
+      "Three scraps, one tune: 3 · 5 · 8 · 6 · 7 · 5. It does not end on the 1 — it is not finished. Somewhere on Level −2 a panel is waiting for it.",
+    ),
+    auto: {
+      all: [{ insight: "studio_frag1" }, { insight: "studio_frag2" }, { insight: "studio_frag3" }],
+    },
+  },
+  {
+    id: "damiens_studio",
+    thread: "damien",
+    title: tr("The Studio"),
+    text: tr(
+      "Damien built a sound studio behind the listening ring on Level −2. Every song the lab plays is in there — and a mixing desk that lets you play them yourself.",
+    ),
+  },
   {
     id: "damien_zweifel",
     thread: "damien",
@@ -839,7 +880,7 @@ export const NPC_SPEAKERS: Record<string, { name: string; color: string }> = {
 const awake = (npc: NpcId): Condition => ({ flag: `bot_${npc}_awake` });
 const asleep = (npc: NpcId): Condition => ({ not: awake(npc) });
 
-export const NPCS: readonly NpcDef[] = [
+const RAW_NPCS: readonly NpcDef[] = [
   // ── MCP ──────────────────────────────────────────────────────
   {
     id: "mcp",
@@ -2389,6 +2430,9 @@ export const NPCS: readonly NpcDef[] = [
     ],
   },
 ];
+
+/** Placed on the floor plan (content moves with its room, see floorplan.ts). */
+export const NPCS: readonly NpcDef[] = RAW_NPCS.map((n) => planPoint(n, 2));
 
 export const ENDINGS: readonly EndingDef[] = [
   {

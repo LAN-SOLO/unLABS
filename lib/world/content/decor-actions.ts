@@ -23,7 +23,14 @@ import { tr } from "@/lib/i18n";
 import type { Condition, DialogueLine } from "@/lib/world/types";
 
 // Verb ids (German, stored/compared in code); labels live in the UI.
-export type DecorVerb = "benutzen" | "lesen" | "hören" | "ansehen" | "sitzen" | "trinken"; // i18n-ignore
+export type DecorVerb =
+  | "benutzen"
+  | "lesen"
+  | "hören" // i18n-ignore
+  | "ansehen"
+  | "sitzen"
+  | "liegen"
+  | "trinken";
 
 export type BuffKind = "walk_speed" | "hint_boost" | "respawn_boost";
 
@@ -98,12 +105,17 @@ export const PROP_VARIANT_DECOR: Readonly<Record<string, string>> = {
   ergometer: "ergometer",
   food_replicator: "food_replicator",
   jade_bed: "jade_bed",
+  // Jade's personal computer (content/quarters.ts); opens her PC overlay.
+  jade_pc: "jade_workstation",
+  mixing_console: "mixing_console",
   neutro_fridge: "neutro_fridge",
   map_table: "holo_table",
   radio: "radio",
   relay: "diagnostic_rack",
   table: "lab_table",
   telescope: "telescope",
+  // Jade's wardrobe replicator (content/wardrobe.ts); opens the character menu.
+  wardrobe_replicator: "wardrobe_replicator",
 };
 
 /**
@@ -153,6 +165,20 @@ const KALTES_WASSER: DecorBuff = {
   seconds: 45,
   kind: "walk_speed",
   factor: 1.1,
+};
+
+const FRISCHER_KITTEL: DecorBuff = {
+  id: "frischer_kittel",
+  label: tr("Fresh lab coat"),
+  seconds: 90,
+  kind: "walk_speed",
+  factor: 1.1,
+};
+const STUDIERT: DecorBuff = {
+  id: "studiert",
+  label: tr("Well-read"),
+  seconds: 180,
+  kind: "hint_boost",
 };
 
 /** Same interaction for several decor ids (ids become `decor`). */
@@ -1233,7 +1259,7 @@ export const DECOR_ACTIONS: readonly DecorActionDef[] = [
   },
   ...each(["cot", "bunk_bed"], () => ({
     label: tr("Cot"),
-    verb: "sitzen",
+    verb: "liegen",
     idle: tr("I can sleep when Damien is back."),
     outcomes: [
       {
@@ -1858,6 +1884,70 @@ export const DECOR_ACTIONS: readonly DecorActionDef[] = [
           "The beacon turns steadily. Every time it hits me, I cast a shadow that arrives a moment too late.",
         ),
       },
+    ],
+  },
+  // ── Jade's Quarters (refurnished, content/quarters.ts) ─────────
+  {
+    id: "wardrobe",
+    decor: "wardrobe",
+    label: tr("Wardrobe"),
+    verb: "benutzen",
+    idle: tr("Still the same four lab coats. Choice is an illusion with buttons."),
+    outcomes: [
+      {
+        once: true,
+        text: tr(
+          "Four identical lab coats, a winter jacket, a dress I wore exactly once. A note on the door: “If you are reading this, you are procrastinating. — J.L.” Fair.",
+        ),
+        effects: { flags: ["decor_jade_wardrobe"] },
+      },
+      {
+        text: tr(
+          "Fresh lab coat. It smells of cedar and of the year before everything. Pockets checked: pencil, pencil, a fuse, a pencil.",
+        ),
+        effects: { buff: FRISCHER_KITTEL, counters: { decor_kittel: 1 } },
+        cooldown: 300,
+      },
+    ],
+  },
+  {
+    id: "armchair@jadeq",
+    decor: "armchair",
+    room: "jadeq",
+    label: tr("Study chair"),
+    verb: "sitzen",
+    idle: tr("The book is still open on page 212. It can wait a minute."),
+    outcomes: [
+      {
+        text: tr(
+          "I curl up with a textbook under the lamp. Twenty minutes, three pages, one idea that was not in the book. That is the right ratio.",
+        ),
+        effects: { buff: STUDIERT, counters: { decor_lesezeit: 1 } },
+        cooldown: 240,
+      },
+      {
+        who: "mcp",
+        text: tr(
+          "Reading in low light damages nothing but the reading speed. I have dimmed the lamp to 80 % for continuity.",
+        ),
+        effects: { buff: STUDIERT, counters: { decor_lesezeit: 1 } },
+        cooldown: 240,
+      },
+    ],
+  },
+  {
+    id: "photo_wall",
+    decor: "photo_wall",
+    label: tr("Photo wall"),
+    verb: "ansehen",
+    outcomes: [
+      { text: tr("Cottbus, 1999: me with a telescope taller than me. Both of us looking up.") },
+      {
+        text: tr(
+          "Santa Fe, the team photo. D.F. is blurred — he moved, as always, the moment it mattered.",
+        ),
+      },
+      { text: tr("A fairy-light bulb flickers. It has been flickering since 2019. I kept it.") },
     ],
   },
   {

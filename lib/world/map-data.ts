@@ -32,7 +32,11 @@ import {
   ROOMS,
   SLICE_PICKUPS,
   roomAt,
+  doorTouches,
+  floorGeomOf,
+  roomAnchor,
 } from "@/lib/world/content/map";
+import { roomOutline } from "@/lib/world/floor-geom";
 import { BOT_QUESTS, NPCS } from "@/lib/world/content/story";
 import { ROOM_TERMINALS } from "@/lib/world/content/terminals";
 import { decorActionFor, propDecorAction, seenFlag } from "@/lib/world/decor-actions";
@@ -54,7 +58,7 @@ import {
   stagesDone,
 } from "@/lib/world/game";
 import { canTrack, objectives, objectivesCached, trackedObjectiveId } from "@/lib/world/quests";
-import type { DoorDef, FloorId, NpcId, RoomDef, RoomTheme, WorldState } from "@/lib/world/types";
+import type { DoorDef, FloorId, NpcId, RoomTheme, WorldState } from "@/lib/world/types";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -202,6 +206,11 @@ export interface MapRoom {
   z: number;
   w: number;
   d: number;
+  /** SVG path of the room's real shape (floor-geom.ts `roomOutline`). */
+  outline: string;
+  /** A point inside the room (labels, focus) — see map.ts `roomAnchor`. */
+  ax: number;
+  az: number;
   theme: RoomTheme;
   fog: RoomFog;
   /** Lights on (main power and the room's light device). */
@@ -290,12 +299,6 @@ export interface MapModel {
 // ── Static helpers ───────────────────────────────────────────────
 
 const FLOOR_IDS: readonly FloorId[] = [0, 1, 2, 3, 4, 5];
-
-function doorTouches(d: DoorDef, r: RoomDef): boolean {
-  return d.axis === "x"
-    ? (d.z === r.z || d.z === r.z + r.d) && d.x > r.x && d.x < r.x + r.w
-    : (d.x === r.x || d.x === r.x + r.w) && d.z > r.z && d.z < r.z + r.d;
-}
 
 /** Doors touching each room (static). */
 const ROOM_DOORS: ReadonlyMap<string, DoorDef[]> = new Map(
@@ -801,6 +804,9 @@ export function buildMapModel(s: WorldState, version?: number): MapModel {
         z: r.z,
         w: r.w,
         d: r.d,
+        outline: roomOutline(floorGeomOf(f), r.id),
+        ax: roomAnchor(r.id)?.x ?? r.x + r.w / 2,
+        az: roomAnchor(r.id)?.z ?? r.z + r.d / 2,
         theme: r.theme ?? "generic",
         fog,
         lit: p.generation >= 50 && (!r.litBy || p.online.has(r.litBy)),
@@ -976,8 +982,8 @@ export function searchMap(model: MapModel, query: string, limit = 40): MapSearch
           name: r.fog === "unknown" ? `${r.code} · ?` : `${r.code} · ${r.name}`,
           kind: "room",
           statusText: ROOM_FOG_LABEL[r.fog],
-          x: r.x + r.w / 2,
-          z: r.z + r.d / 2,
+          x: r.ax,
+          z: r.az,
         });
     }
     for (const e of fl.entities)

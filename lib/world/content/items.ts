@@ -455,8 +455,8 @@ export const ITEMS: readonly ItemDef[] = [
     tr("Crystal #0089"),
     "relikt",
     { quantum: 5, daten: 5, resonanz: 3 },
-    "blau",
-    3,
+    "orange",
+    2,
     tr("30 slices, one of them warm. Jade's consciousness interface."),
   ),
   item(
@@ -492,7 +492,7 @@ export const ITEMS: readonly ItemDef[] = [
     tr("Slice of Crystal #0089"),
     "relikt",
     { quantum: 2, daten: 2, resonanz: 2 },
-    "blau",
+    "orange",
     2,
     tr(
       "An _unSLC — one of thirty slices. Wafer-thin, lukewarm, humming at 847 Hz. Thirty facets of a single moment.",
@@ -613,6 +613,45 @@ export const ITEMS: readonly ItemDef[] = [
     "infrarot",
     1,
     tr("Broken rock from the collapsed Shaft. Contains ore — and chalk marks."),
+  ),
+
+  // ── Textiles (Jade's wardrobe replicator, content/wardrobe.ts) ──
+  // Weak on every axis (≤ 1): they never fill a device slot by traits.
+  item(
+    "stoffreste",
+    tr("Fabric Scraps"),
+    "rohstoff",
+    { mechanik: 1, thermik: 1 },
+    "orange",
+    1,
+    tr("Offcuts, old shirts, a curtain nobody will miss. Soft, patient, slightly flammable."),
+  ),
+  item(
+    "polymerfaser",
+    tr("Polymer Fibre"),
+    "rohstoff",
+    { mechanik: 1, optik: 1 },
+    "blau",
+    1,
+    tr("Stripped cable sleeve and carded filter fleece, spun into one tough strand."),
+  ),
+  item(
+    "farbpigment",
+    tr("Pigment"),
+    "rohstoff",
+    { optik: 1, resonanz: 1 },
+    "rot",
+    1,
+    tr("A jar of ground colour. It stains everything, including plans."),
+  ),
+  item(
+    "leuchtfaden",
+    tr("Glow Thread"),
+    "rohstoff",
+    { optik: 1, signal: 1, energie: 1 },
+    "gruen",
+    1,
+    tr("Fibre-optic filament dyed with algae pigment. Glows faintly, even in a drawer."),
   ),
 
   // ── Schlacke ─────────────────────────────────────────────────

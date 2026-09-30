@@ -11,14 +11,20 @@ import { greedyMesh } from "@/lib/voxel/mesher";
 import { CHUNK, type VoxelWorld } from "@/lib/voxel/world";
 import type { FloorId } from "@/lib/world/types";
 
-/** Greedy-mesher quads per floor before the detail pass (terrain as the renderer meshes it). */
+/**
+ * Greedy-mesher quads per floor before the detail pass (terrain as the
+ * renderer meshes it). Re-measured on 29 Sep 2026 for the shaped floor plans
+ * (floorplan.ts): 176 × 160 floors (+72 % area), round / cut rooms and the
+ * poché mass around them — the old rectangle grid needed 9.6k–12.5k.
+ */
 const QUADS_BEFORE: Record<FloorId, number> = {
-  0: 9580,
-  1: 11508,
-  2: 10770,
-  3: 12341,
-  4: 11667,
-  5: 12540,
+  0: 17989,
+  1: 19520,
+  // + Damien's Sound Studio (a new plan room behind the ring, 2026-09-29): ~+320 quads.
+  2: 19700,
+  3: 20052,
+  4: 17472,
+  5: 20371,
 };
 const QUAD_BUDGET = 1.35;
 
@@ -73,7 +79,11 @@ describe("layout detail", () => {
 
   it("corridor chevrons point toward the elevator", () => {
     // Shaft corridors (Ebene −4) have mine rails instead.
-    const corridors = ROOMS.filter((r) => r.theme === "corridor" && r.floor !== 5);
+    // Straight corridors only — bent / curved passages get wall-following guide lines.
+    const corridors = ROOMS.filter(
+      (r) =>
+        r.theme === "corridor" && r.floor !== 5 && (r.shape ?? []).every((p) => p.kind === "rect"),
+    );
     expect(corridors.length).toBeGreaterThan(0);
     for (const r of corridors) {
       const { world } = buildFloor(r.floor);

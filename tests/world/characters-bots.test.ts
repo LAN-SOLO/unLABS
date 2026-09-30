@@ -5,7 +5,12 @@
 import { describe, expect, it } from "vitest";
 import { C } from "@/lib/world/content/palette";
 import { NPCS } from "@/lib/world/content/story";
-import { animTransform, lightIntensity, type DeviceVisual } from "@/lib/world/models/anim";
+import {
+  animTransform,
+  gaitTransform,
+  lightIntensity,
+  type DeviceVisual,
+} from "@/lib/world/models/anim";
 import {
   BOT_IDS,
   BOT_MAX_HEIGHT,
@@ -259,5 +264,41 @@ describe("dormant bots", () => {
         .sort(),
     ).toEqual(["antenna", "eyes"]);
     expect(botVisual("nope", false).parts.every((p) => p.requiresPower)).toBe(true);
+  });
+});
+
+describe("bot locomotion parts follow the ground", () => {
+  it("wheels and tracks roll by the distance travelled (no slip), legs rest when standing", () => {
+    const scale = BOT_SCALE;
+    let rollers = 0;
+    let striders = 0;
+    for (const id of BOT_IDS) {
+      for (const part of botVisual(id).parts) {
+        if (part.gait === "roll") {
+          rollers++;
+          const r = (part.rollRadius ?? 0) * scale;
+          expect(r, `${id} ${part.name}`).toBeGreaterThan(0);
+          const a = gaitTransform(part, 5, true, 0, 1, scale);
+          const b = gaitTransform(part, 9, true, 1, 1, scale);
+          const i = { x: 0, y: 1, z: 2 }[part.axis ?? "y"];
+          // One unit of travel turns the rim by exactly one unit of arc — regardless of the clock.
+          expect((b.rot[i] - a.rot[i]) * r, `${id} ${part.name}`).toBeCloseTo(1, 6);
+        }
+        if (part.gait === "stride") {
+          striders++;
+          const still = gaitTransform(part, 3.3, true, 7.7, 0, scale);
+          expect(Math.max(...still.rot.map(Math.abs), ...still.pos.map(Math.abs))).toBeLessThan(
+            1e-9,
+          );
+          const go = [0.1, 0.3, 0.5].map((d) => gaitTransform(part, 0, true, d, 1, scale));
+          const spread = Math.max(
+            ...go.map((s) => Math.max(...s.rot.map(Math.abs), ...s.pos.map(Math.abs))),
+          );
+          expect(spread, `${id} ${part.name}`).toBeGreaterThan(0.05);
+        }
+      }
+    }
+    expect(rollers).toBeGreaterThanOrEqual(6);
+    expect(striders).toBeGreaterThanOrEqual(6);
   });
 });

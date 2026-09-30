@@ -19,6 +19,7 @@ export const THEME_TINT: Record<RoomTheme, string> = {
   archive: "#1d3438",
   airlock: "#2e3128",
   elevator: "#33301c",
+  hub: "#2c2a1e",
   geothermal: "#3a2a1c",
   power: "#1f2a3a",
   cooling: "#1c3040",

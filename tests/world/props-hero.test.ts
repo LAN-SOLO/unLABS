@@ -23,7 +23,7 @@ const PROP_BASELINE: Record<string, [number, number, number, number]> = {
   desk: [14, 12, 8, 466],
   board: [12, 14, 2, 238],
   pult: [12, 12, 8, 631],
-  chair: [6, 10, 6, 118],
+  chair: [6, 8, 6, 94], // seat lowered to knee height
   plant: [6, 12, 6, 153],
   pipe: [4, 14, 16, 160],
   cable: [2, 1, 2, 4],
@@ -106,8 +106,9 @@ describe("prop hero pass", () => {
     }
     // Stands clearly taller than the lab walls (WALL_HEIGHT 8 = 16 model voxels).
     expect(forge.h).toBeGreaterThanOrEqual(30);
+    // Crystal #0089 is orange (archive ID 89: pure, orange, T2).
     const cs = colours(forge);
-    for (const c of [C.cerulean, C.crystal_violet, C.crystal_cyan, C.glass, C.gold])
+    for (const c of [C.cerulean, C.orange_neon, C.glass_amber, C.glass, C.gold])
       expect(cs.has(c)).toBe(true);
     // The gate is a ring: its eye (between column and plates) is open on the
     // front plate plane, its rim is solid.

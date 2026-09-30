@@ -1,6 +1,8 @@
 "use client";
 
 import { tr } from "@/lib/i18n";
+import { ArchiveTab } from "@/components/world/panels/archive";
+import { RememberButton } from "@/components/world/knowledge/Remember";
 import { useMemo, useState } from "react";
 import {
   FOCUS_RING,
@@ -56,11 +58,12 @@ const THREAD_LABEL: Record<InsightDef["thread"], string> = {
   bots: tr("Bots & MCP"),
 };
 
-type Tab = "auftraege" | "wege" | "insights" | "devices" | "log";
+type Tab = "auftraege" | "wege" | "insights" | "archive" | "devices" | "log";
 const TABS: readonly [Tab, string][] = [
   ["auftraege", tr("Objectives")],
   ["wege", tr("Paths to Damien")],
   ["insights", tr("Insights")],
+  ["archive", tr("Archive")],
   ["devices", tr("Devices")],
   ["log", tr("Log")],
 ];
@@ -383,10 +386,22 @@ function JournalPanelImpl({ api, onClose }: { api: WorldApi; onClose: () => void
               <SectionTitle>{THREAD_LABEL[t] ?? t}</SectionTitle>
               <ul className="space-y-1">
                 {list.map((i) => (
-                  <li key={i.id} className="text-xs">
-                    <span className="text-[#00FFFF]">{i.title}</span>{" "}
-                    {seen.isNew(i.id) && <NewBadge className="mr-1" />}
-                    <span className="text-[#d8ffd8]/70">— {i.text}</span>
+                  <li key={i.id} className="flex items-start gap-2 text-xs">
+                    <span className="min-w-0 flex-1">
+                      <span className="text-[#00FFFF]">{i.title}</span>{" "}
+                      {seen.isNew(i.id) && <NewBadge className="mr-1" />}
+                      <span className="text-[#d8ffd8]/70">— {i.text}</span>
+                    </span>
+                    <RememberButton
+                      api={api}
+                      src={{
+                        kind: "insight",
+                        id: i.id,
+                        title: i.title,
+                        text: i.text,
+                        tags: [i.thread],
+                      }}
+                    />
                   </li>
                 ))}
               </ul>
@@ -451,18 +466,32 @@ function JournalPanelImpl({ api, onClose }: { api: WorldApi; onClose: () => void
         </>
       )}
 
+      {tab === "archive" && <ArchiveTab api={api} query={query} />}
+
       {tab === "log" && (
         <ul className="space-y-0.5 text-xs text-[#d8ffd8]/70">
           {[...s.log]
             .reverse()
             .filter((l) => has(l.text, q))
             .map((l, i) => (
-              <li key={i}>
-                <span className="text-white/30">
-                  [{String(Math.floor(l.t / 60)).padStart(3, "0")}:
-                  {String(l.t % 60).padStart(2, "0")}]
-                </span>{" "}
-                {l.text}
+              <li key={i} className="group flex items-start gap-2">
+                <span className="min-w-0 flex-1">
+                  <span className="text-white/30">
+                    [{String(Math.floor(l.t / 60)).padStart(3, "0")}:
+                    {String(l.t % 60).padStart(2, "0")}]
+                  </span>{" "}
+                  {l.text}
+                </span>
+                <RememberButton
+                  api={api}
+                  className="opacity-0 group-focus-within:opacity-100 group-hover:opacity-100"
+                  src={{
+                    kind: "log",
+                    id: `${l.t}:${l.text.slice(0, 40)}`,
+                    title: l.text.slice(0, 40),
+                    text: l.text,
+                  }}
+                />
               </li>
             ))}
         </ul>

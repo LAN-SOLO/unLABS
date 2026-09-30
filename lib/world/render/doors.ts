@@ -81,9 +81,15 @@ type Vec3 = readonly [number, number, number];
 
 // ── Door timing & geometry (pure) ────────────────────────────────
 
-export const DOOR_ANIM_TIME = 0.6;
-export const DOOR_OPEN_RADIUS = 6;
-export const DOOR_CLOSE_RADIUS = 8;
+export const DOOR_ANIM_TIME = 0.45;
+export const DOOR_OPEN_RADIUS = 7;
+export const DOOR_CLOSE_RADIUS = 9;
+/**
+ * Doors open for where the walker WILL be: its position this far ahead
+ * (s) along its velocity counts too — at running speed a door that only
+ * reacted to the current position was still half shut when she arrived.
+ */
+export const DOOR_LOOKAHEAD = 0.6;
 /** Walker half-width + margin used to keep a door from closing on the player. */
 const PLAYER_HALF = 1.3;
 /** Leaf width in world units (2.5). */
@@ -120,6 +126,82 @@ export function doorCellCovered(o: number, open: number): boolean {
 
 /** Opening amount at which the middle three cells are clear (walker is 2.2 wide). */
 export const DOOR_PASSABLE_AT = 0.6;
+
+type XZ2 = readonly [number, number];
+
+/**
+ * Proximity part of a door's wish to open: the walker (or where it will be
+ * after DOOR_LOOKAHEAD at velocity `vel`) is within DOOR_OPEN_RADIUS, or
+ * its box touches the doorway; an open door stays open until both are
+ * beyond DOOR_CLOSE_RADIUS (hysteresis). Pure — tested.
+ */
+export function doorWantsOpen(
+  def: Pick<DoorDef, "x" | "z" | "axis" | "width">,
+  pos: XZ2,
+  vel: XZ2,
+  openNow: boolean,
+): boolean {
+  const cx = def.x + 0.5;
+  const cz = def.z + 0.5;
+  const dx = pos[0] - cx;
+  const dz = pos[1] - cz;
+  const along = def.axis === "x" ? Math.abs(dx) : Math.abs(dz);
+  const across = def.axis === "x" ? Math.abs(dz) : Math.abs(dx);
+  if (along < def.width / 2 + PLAYER_HALF && across < 0.5 + PLAYER_HALF) return true;
+  const now = Math.hypot(dx, dz);
+  const ahead = Math.hypot(dx + vel[0] * DOOR_LOOKAHEAD, dz + vel[1] * DOOR_LOOKAHEAD);
+  const dist = Math.min(now, ahead);
+  if (dist < DOOR_OPEN_RADIUS) return true;
+  return openNow && dist < DOOR_CLOSE_RADIUS;
+}
+
+/**
+ * Door "magnetism": a walker heading into a doorway is steered onto its
+ * centre line, so it passes the opening instead of catching a jamb or a
+ * leaf that is still sliding. `move` is the input direction (length ≤ 1);
+ * returns the corrected direction with the same length. Doors that are
+ * locked (`passable` false and not opening) are ignored. Pure — tested.
+ */
+export function doorAssist(
+  doors: readonly Pick<DoorDef, "x" | "z" | "axis" | "width">[],
+  pos: XZ2,
+  move: XZ2,
+  usable: (i: number) => boolean,
+): [number, number] {
+  const len = Math.hypot(move[0], move[1]);
+  if (len < 1e-3) return [move[0], move[1]];
+  let best = -1;
+  let bestAcross = Infinity;
+  for (let i = 0; i < doors.length; i++) {
+    const d = doors[i]!;
+    const dx = pos[0] - (d.x + 0.5);
+    const dz = pos[1] - (d.z + 0.5);
+    const along = d.axis === "x" ? dx : dz;
+    const across = d.axis === "x" ? dz : dx;
+    // Only close in front of the opening, heading towards the door line.
+    if (Math.abs(across) > 4 || Math.abs(along) > d.width / 2 + 1.5) continue;
+    const toward = (d.axis === "x" ? move[1] : move[0]) * -Math.sign(across || 1);
+    if (toward < 0.3 * len || !usable(i)) continue;
+    if (Math.abs(across) < bestAcross) {
+      bestAcross = Math.abs(across);
+      best = i;
+    }
+  }
+  if (best < 0) return [move[0], move[1]];
+  const d = doors[best]!;
+  const along = d.axis === "x" ? pos[0] - (d.x + 0.5) : pos[1] - (d.z + 0.5);
+  // Free lateral room inside the opening for the walker's half-width.
+  const slack = Math.max(0, d.width / 2 - PLAYER_HALF + 0.2);
+  const off = Math.abs(along) - slack * 0.35;
+  if (off <= 0) return [move[0], move[1]];
+  // Push towards the centre line, harder the closer to the door line.
+  const k = Math.min(0.9, off * 0.6) * (1 - Math.min(1, bestAcross / 4) * 0.5);
+  const push = -Math.sign(along) * k * len;
+  const mx = d.axis === "x" ? move[0] + push : move[0];
+  const mz = d.axis === "x" ? move[1] : move[1] + push;
+  const n = Math.hypot(mx, mz) || 1;
+  return [(mx / n) * len, (mz / n) * len];
+}
 
 interface DoorView {
   def: DoorDef;
@@ -180,6 +262,8 @@ export class DoorSystem {
   private cut = Infinity;
   private still = false;
   private calm = false;
+  /** Player velocity (world units / s, x/z) of the last update — door lookahead. */
+  private vel: XZ2 = [0, 0];
 
   constructor(opts: DoorSystemOpts = {}) {
     this.onMove = opts.onMove;
@@ -311,7 +395,8 @@ export class DoorSystem {
     }
   }
 
-  update(dt: number, playerPos: Vec3): void {
+  update(dt: number, playerPos: Vec3, playerVel: XZ2 = [0, 0]): void {
+    this.vel = playerVel;
     for (const v of this.doors.values()) {
       if (v.unlockT >= 0) this.stepUnlock(v, dt);
       this.setTarget(v, this.wanted(v, playerPos), true);
@@ -335,6 +420,17 @@ export class DoorSystem {
   openAmount(id: string): number {
     const v = this.doors.get(id);
     return v ? easeInOut(v.t) : 0;
+  }
+
+  /** Door "magnetism" for a walker at `pos` moving `move` (see `doorAssist`). */
+  assist(pos: Vec3, move: XZ2): [number, number] {
+    const list = [...this.doors.values()];
+    return doorAssist(
+      list.map((v) => v.def),
+      [pos[0], pos[2]],
+      move,
+      (i) => list[i]!.unlocked,
+    );
   }
 
   /** True if a leaf occupies the world voxel (x, y, z): wrap the floor collision with this. */
@@ -369,16 +465,8 @@ export class DoorSystem {
     // Bolts first: an unlocking door holds still until they are back in the leaf.
     if (v.unlockT >= 0 && !unlockPose(v.unlockT).release) return 0;
     if (!this.autoOpen) return 1;
-    const dx = p[0] - (v.def.x + 0.5);
-    const dz = p[2] - (v.def.z + 0.5);
-    const dist = Math.hypot(dx, dz);
-    // Never close on the player: stay open while their box touches the doorway.
-    const along = v.def.axis === "x" ? Math.abs(dx) : Math.abs(dz);
-    const across = v.def.axis === "x" ? Math.abs(dz) : Math.abs(dx);
-    const inDoorway = along < OPENING_W / 2 + PLAYER_HALF && across < 0.5 + PLAYER_HALF;
-    if (inDoorway || dist < DOOR_OPEN_RADIUS) return 1;
-    if (v.target === 1 && dist < DOOR_CLOSE_RADIUS) return 1;
-    return 0;
+    // Never close on the player; open ahead of where they are heading.
+    return doorWantsOpen(v.def, [p[0], p[2]], this.vel, v.target === 1) ? 1 : 0;
   }
 
   private setTarget(v: DoorView, target: 0 | 1, notify: boolean): void {

@@ -333,24 +333,25 @@ const JUNK: readonly unknown[] = [
 
 function mutate(raw: Record<string, unknown>, r: () => number): void {
   const pick = <T>(xs: readonly T[]): T => xs[Math.floor(r() * xs.length)]!;
+  // Junk values are cloned: a shared junk array must never end up inside itself.
+  const junk = (): unknown => structuredClone(pick(JUNK));
   const keys = Object.keys(raw);
   const key = pick(keys);
   const kind = Math.floor(r() * 5);
   if (kind === 0) {
     delete raw[key];
   } else if (kind === 1) {
-    raw[key] = pick(JUNK);
+    raw[key] = junk();
   } else {
     const obj = raw[key];
     if (typeof obj !== "object" || obj === null) {
-      raw[key] = pick(JUNK);
+      raw[key] = junk();
       return;
     }
     const inner = obj as Record<string, unknown>;
     const innerKeys = Object.keys(inner);
-    if (kind === 2 || innerKeys.length === 0)
-      inner[`unbekannt_${Math.floor(r() * 1e6)}`] = pick(JUNK);
-    else if (kind === 3) inner[pick(innerKeys)] = pick(JUNK);
+    if (kind === 2 || innerKeys.length === 0) inner[`unbekannt_${Math.floor(r() * 1e6)}`] = junk();
+    else if (kind === 3) inner[pick(innerKeys)] = junk();
     else delete inner[pick(innerKeys)];
   }
 }

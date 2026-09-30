@@ -21,6 +21,7 @@ import type {
   Traits,
 } from "@/lib/world/types";
 import { tr } from "@/lib/i18n";
+import { roomDelta } from "@/lib/world/content/map";
 
 function r(label: string, item?: string, t?: Partial<Traits>, count = 1): Requirement {
   const req: Requirement = { label, count };
@@ -80,7 +81,7 @@ function dev(
   };
 }
 
-export const DEVICES: readonly DeviceDef[] = [
+const RAW_DEVICES: readonly DeviceDef[] = [
   dev(
     "MCP-000",
     "Master Control Program",
@@ -726,6 +727,13 @@ export const DEVICES: readonly DeviceDef[] = [
         tr("Focus"),
         [r(tr("Oscillator"), "oszillator", { resonanz: 3 })],
         tr("The tone narrows like a laser."),
+        {
+          // Link gate (content/links.ts): the echo feed over the network.
+          when: { link: "NET-001", to: "ECR-001" },
+          whenHint: tr(
+            "The focus locks onto the Echo Recorder's feed — and that feed only travels over the network. Link the Echo Recorder to NET-001 (Network Monitor → Links).",
+          ),
+        },
       ),
     ],
   ),
@@ -933,6 +941,13 @@ export const DEVICES: readonly DeviceDef[] = [
           r(tr("Batteries"), "batteriezelle", { energie: 5 }, 2),
         ],
         tr("GPS lock: impossible, 40 m underground. It flies anyway."),
+        {
+          // Firmware gate (content/firmware.ts): NET-001's manual service image.
+          when: { firmware: "NET-001", min: "2.2.0" },
+          whenHint: tr(
+            "Without GPS the drone navigates by the lab network's beacons — and NET-001's factory firmware drops its telemetry as noise. Flash the Network Monitor's service image 2.2.0 (NET-001 → Firmware). The checksum label never made it onto the device; Jade stuck the spare strips somewhere draughty in the Outer Airlock.",
+          ),
+        },
       ),
     ],
   ),
@@ -1063,6 +1078,13 @@ export const DEVICES: readonly DeviceDef[] = [
           r(tr("Superconductor"), "supraleiter", { quantum: 3 }),
         ],
         tr("Magnetic rings rotate."),
+        {
+          // Firmware gate: PWR-001's `fusion-sequencer`, pushed by the MCP.
+          when: { firmware: "PWR-001", min: "1.1.0" },
+          whenHint: tr(
+            "Spinning up the rings takes a load-shedding start sequence the Power Management System does not know yet. The MCP holds update 1.1.0: add PWR-001 to the MCP's device registry (MCP → Links), then flash it (PWR-001 → Firmware).",
+          ),
+        },
       ),
       st(
         tr("Ignition"),
@@ -1274,11 +1296,24 @@ export const DEVICES: readonly DeviceDef[] = [
         "Portal",
         [r(tr("Antimatter"), "antimaterie"), r("Plasma", "plasmaring", { energie: 5, thermik: 4 })],
         tr("A circle of light that does not fall."),
-        { puzzle: "pz_wiring_kabelbaum" },
+        {
+          puzzle: "pz_wiring_kabelbaum",
+          // Link gate: the portal maths runs on the compute mesh.
+          when: { link: "SCA-001", to: "AIC-001" },
+          whenHint: tr(
+            "The portal needs its coordinates solved in real time — a job for the AI core with the whole array behind it. Link the AI Assistant Core to the Supercomputer Array (SCA-001 → Links).",
+          ),
+        },
       ),
     ],
   ),
 ];
+
+/** Placed on the floor plan (content moves with its room, see floorplan.ts). */
+export const DEVICES: readonly DeviceDef[] = RAW_DEVICES.map((d) => {
+  const [dx, dz] = roomDelta(d.room);
+  return { ...d, x: d.x + dx, z: d.z + dz };
+});
 
 export const DEVICE_BY_ID: ReadonlyMap<string, DeviceDef> = new Map(DEVICES.map((d) => [d.id, d]));
 

@@ -23,6 +23,7 @@ const VERB_TAG: Record<DecorActionResult["verb"], string> = {
   hören: tr("decor verb::heard"),
   ansehen: tr("decor verb::viewed"),
   sitzen: tr("decor verb::break"),
+  liegen: tr("decor verb::rest"),
   trinken: tr("decor verb::drunk"),
 };
 

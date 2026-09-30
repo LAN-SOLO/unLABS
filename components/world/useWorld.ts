@@ -7,6 +7,9 @@ import { bioTick } from "@/lib/world/biorhythm";
 import { loadWorld, resetWorld, saveWorld } from "@/lib/world/save";
 import { getSettings } from "@/lib/world/settings";
 import { ACHIEVEMENT_BY_ID, evaluateAchievements } from "@/lib/world/achievements";
+import { ITEM_BY_ID } from "@/lib/world/content/items";
+import { REFINE_RECIPES, WEAR_BY_ID, WEAR_ITEM_PREFIX } from "@/lib/world/content/wardrobe";
+import { wardrobeTick, type JobResult } from "@/lib/world/wardrobe";
 import type { WorldState } from "@/lib/world/types";
 
 export interface Toast {
@@ -28,7 +31,9 @@ export function useWorld() {
   const toastId = useRef(0);
   const listeners = useRef(new Set<() => void>());
   const paused = useRef(false);
-  const toastRef = useRef<((text: string, tone?: Toast["tone"]) => void) | null>(null);
+  const toastRef = useRef<((text: string, tone?: Toast["tone"], item?: string) => void) | null>(
+    null,
+  );
 
   if (ref.current === null && typeof window !== "undefined") {
     ref.current = loadWorld();
@@ -96,6 +101,27 @@ export function useWorld() {
         setVersion((v) => v + 1);
         listeners.current.forEach((l) => l());
       }
+      // Jade's wardrobe: the replicator finishes its job, reward pieces arrive.
+      const wt = wardrobeTick(s);
+      if (wt.job || wt.rewards.length) {
+        if (wt.job) {
+          const t = replicatorPing(wt.job);
+          toastRef.current?.(t.text, "good", t.item);
+        }
+        for (const id of wt.rewards)
+          toastRef.current?.(
+            tr("New in the wardrobe: {name}", { name: WEAR_BY_ID.get(id)?.name ?? id }),
+            "good",
+            `${WEAR_ITEM_PREFIX}${id}`,
+          );
+        for (const id of evaluateAchievements(s)) {
+          const a = ACHIEVEMENT_BY_ID.get(id);
+          if (a) toastRef.current?.(tr("★ Achievement: {title}", { title: a.title }), "good");
+        }
+        saveWorld(s);
+        setVersion((v) => v + 1);
+        listeners.current.forEach((l) => l());
+      }
       if (++n % 10 === 0) {
         saveWorld(s);
         setVersion((v) => v + 1);
@@ -116,4 +142,30 @@ export function useWorld() {
   }, []);
 
   return { get, act, version, toasts, toast, onChange, reset, setPaused };
+}
+
+/** Toast for a finished replicator job (text + icon item id). */
+export function replicatorPing(j: JobResult): { text: string; item?: string } {
+  if (j.kind === "craft")
+    return {
+      text: tr("The replicator pings: {name} is ready.", {
+        name: WEAR_BY_ID.get(j.id)?.name ?? j.id,
+      }),
+      item: `${WEAR_ITEM_PREFIX}${j.id}`,
+    };
+  if (j.kind === "refine") {
+    const r = REFINE_RECIPES.find((x) => x.id === j.id);
+    return {
+      text: tr("The replicator pings: {n}× {item}.", {
+        n: r?.count ?? 1,
+        item: ITEM_BY_ID.get(r?.output ?? "")?.name ?? j.id,
+      }),
+      ...(r ? { item: r.output } : {}),
+    };
+  }
+  const [item] = j.id.split(".");
+  return {
+    text: tr("The replicator pings: {text}", { text: j.text }),
+    item: `${WEAR_ITEM_PREFIX}${item}`,
+  };
 }

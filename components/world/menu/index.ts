@@ -8,6 +8,7 @@ export {
   LORE_QUOTES,
 } from "@/components/world/menu/lore";
 export type { CreditBlock, LoreQuote } from "@/components/world/menu/lore";
+export { GarmentMockup, MerchShop } from "@/components/world/menu/MerchShop";
 export { PauseMenu } from "@/components/world/menu/PauseMenu";
 export type { PauseMenuProps } from "@/components/world/menu/PauseMenu";
 export { ControlsTab, SETTINGS_TABS, SettingsPanel } from "@/components/world/menu/SettingsPanel";

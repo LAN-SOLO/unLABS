@@ -16,6 +16,7 @@
  *
  * Everything is deterministic from the seed, so tests can drive it.
  */
+import { clipMove, crowded } from "@/lib/world/crowd";
 import { angleDelta, turnToward, wrapAngle } from "@/lib/world/render/motion";
 
 export type NpcMode = "idle" | "walk" | "work" | "watch";
@@ -49,6 +50,10 @@ export interface NpcWorld {
   playerZ: number;
   /** Other characters (x, z pairs, flat) to keep distance from. */
   others: readonly number[];
+  /** Body radii of `others` (same order); missing → the bot's own radius. */
+  otherRadii?: readonly number[];
+  /** Jade's body radius (default NPC_PLAYER_RADIUS). */
+  playerRadius?: number;
 }
 
 export interface NpcBrain {
@@ -80,6 +85,32 @@ export const NPC_WATCH_NEAR = 6;
 const WATCH_FAR = NPC_WATCH_NEAR + 1.5;
 /** Minimum distance kept to other characters (centre to centre). */
 export const NPC_PERSONAL_SPACE = 2.6;
+/** Jade's body radius for bot ↔ player contact (= WALKER.radius). */
+export const NPC_PLAYER_RADIUS = 0.8;
+
+/**
+ * Solid bodies around a bot as (x, z, r) triples: the other characters and
+ * Jade. Bots never walk into or through any of them (see `crowd.ts`).
+ */
+export function npcBodies(world: NpcWorld, ownRadius: number, out: number[] = []): number[] {
+  out.length = 0;
+  for (let i = 0, k = 0; i + 1 < world.others.length; i += 2, k++)
+    out.push(world.others[i]!, world.others[i + 1]!, world.otherRadii?.[k] ?? ownRadius);
+  out.push(world.playerX, world.playerZ, world.playerRadius ?? NPC_PLAYER_RADIUS);
+  return out;
+}
+const BODIES: number[] = [];
+
+/** A goal nobody stands on (bodies incl. a little elbow room). */
+function goalFree(
+  b: NpcBrain,
+  x: number,
+  z: number,
+  r: number,
+  bodies: readonly number[],
+): boolean {
+  return !crowded(x, z, r + 0.4, bodies, b.x, b.z);
+}
 
 export function hashSeed(id: string): number {
   let h = 2166136261;
@@ -206,13 +237,19 @@ export function effectiveRadius(b: NpcBrain, cfg: NpcBrainConfig, world: NpcWorl
 }
 
 /** Choose what to do after a pause (wandering bots). */
-function chooseNext(b: NpcBrain, cfg: NpcBrainConfig, world: NpcWorld): void {
+function chooseNext(
+  b: NpcBrain,
+  cfg: NpcBrainConfig,
+  world: NpcWorld,
+  bodies: readonly number[],
+): void {
   const reach = cfg.wander + 3;
   const r = effectiveRadius(b, cfg, world);
   const usable = cfg.stations.filter(
     (s) =>
       s !== b.station &&
       Math.hypot(s.sx - cfg.homeX, s.sz - cfg.homeZ) <= reach &&
+      goalFree(b, s.sx, s.sz, cfg.radius, bodies) &&
       pathFree(world, b.x, b.z, s.sx, s.sz, r),
   );
   if (usable.length && rand(b) < 0.45) {
@@ -230,6 +267,7 @@ function chooseNext(b: NpcBrain, cfg: NpcBrainConfig, world: NpcWorld): void {
     const gx = cfg.homeX + Math.sin(a) * d;
     const gz = cfg.homeZ + Math.cos(a) * d;
     if (Math.hypot(gx - b.x, gz - b.z) < 1.2) continue;
+    if (!goalFree(b, gx, gz, cfg.radius, bodies)) continue;
     if (!pathFree(world, b.x, b.z, gx, gz, r)) continue;
     b.station = null;
     b.goalX = gx;
@@ -252,6 +290,7 @@ function faceStation(b: NpcBrain): number {
  * Advance one bot by `dt` seconds. Mutates `b`; returns true while it moves.
  */
 export function stepBrain(b: NpcBrain, cfg: NpcBrainConfig, world: NpcWorld, dt: number): boolean {
+  const bodies = npcBodies(world, cfg.radius, BODIES);
   const pdx = world.playerX - b.x;
   const pdz = world.playerZ - b.z;
   const pd = Math.hypot(pdx, pdz);
@@ -277,19 +316,20 @@ export function stepBrain(b: NpcBrain, cfg: NpcBrainConfig, world: NpcWorld, dt:
     case "work":
       desiredYaw = faceStation(b);
       b.timer -= dt;
-      if (b.timer <= 0 && cfg.wander > 0) chooseNext(b, cfg, world);
+      if (b.timer <= 0 && cfg.wander > 0) chooseNext(b, cfg, world, bodies);
       else if (b.timer <= 0) b.timer = pickPause(b, 4, 6);
       break;
     case "idle": {
       b.timer -= dt;
       b.glanceIn -= dt;
       if (b.glanceIn <= 0) {
-        b.glance = wrapAngle(b.yaw + (rand(b) - 0.5) * 1.8);
+        // Small glances only: a big one would spin the whole body on the spot.
+        b.glance = wrapAngle(b.yaw + (rand(b) - 0.5) * 1.1);
         b.glanceIn = pickPause(b, 1.8, 3);
       }
       desiredYaw = b.glance;
       if (b.timer <= 0) {
-        if (cfg.wander > 0) chooseNext(b, cfg, world);
+        if (cfg.wander > 0) chooseNext(b, cfg, world, bodies);
         else {
           // Stationary bots work at a station right beside them, if any.
           const s = nearestStation(b, cfg, 2.5);
@@ -306,8 +346,8 @@ export function stepBrain(b: NpcBrain, cfg: NpcBrainConfig, world: NpcWorld, dt:
       const gx = b.goalX - b.x;
       const gz = b.goalZ - b.z;
       const gd = Math.hypot(gx, gz);
-      if (gd < 0.35) {
-        b.speed = 0;
+      if (gd < ARRIVE) {
+        // The remaining (slow) speed bleeds off below, so the bot never stops dead.
         if (b.station) {
           b.mode = "work";
           b.timer = pickPause(b, 4, 5);
@@ -351,34 +391,53 @@ export function stepBrain(b: NpcBrain, cfg: NpcBrainConfig, world: NpcWorld, dt:
       desiredYaw = Math.atan2(sx, sz);
       // Turn first, then walk: speed scales with how well we face the goal.
       const align = Math.max(0, Math.cos(angleDelta(b.yaw, desiredYaw)));
-      targetSpeed = cfg.speed * align * align * Math.min(1, gd / 1.2 + 0.25);
+      // Arrive: slow down over the last stretch instead of braking at the goal.
+      targetSpeed = cfg.speed * align * align * Math.min(1, Math.max(0.12, gd / SLOW_RADIUS));
       moveX = Math.sin(b.yaw);
       moveZ = Math.cos(b.yaw);
       break;
     }
   }
 
-  // Smooth turn and acceleration.
-  b.yaw = turnToward(b.yaw, desiredYaw, dt, b.mode === "watch" ? 4 : 5, 3.2);
-  b.speed += (targetSpeed - b.speed) * (1 - Math.exp(-dt * 5));
+  // Smooth turn and acceleration. Standing bots turn slowly (a shuffle, not a
+  // spin); walking ones turn briskly before they set off.
+  const [rate, maxTurn] = TURN[b.mode];
+  b.yaw = turnToward(b.yaw, desiredYaw, dt, rate, maxTurn);
+  // Speed up gently, slow down a little quicker (and still keep moving while
+  // slowing — a bot that stops for the player coasts out its last step).
+  const accel = targetSpeed > b.speed ? 4 : b.mode === "walk" ? 5 : 8;
+  b.speed += (targetSpeed - b.speed) * (1 - Math.exp(-dt * accel));
+  if (b.mode !== "walk") {
+    moveX = Math.sin(b.yaw);
+    moveZ = Math.cos(b.yaw);
+    if (b.speed < 0.05) b.speed = 0;
+  }
   let moved = false;
-  if (b.mode === "walk" && b.speed > 0.01) {
+  if (b.speed > 0.01) {
     const r = effectiveRadius(b, cfg, world);
     const step = b.speed * dt;
     const nx = b.x + moveX * step;
     const nz = b.z + moveZ * step;
     const leash = Math.hypot(nx - cfg.homeX, nz - cfg.homeZ) <= cfg.wander + 4;
-    if (leash && bodyFree(world, nx, nz, r)) {
-      b.x = nx;
-      b.z = nz;
-      moved = true;
-      b.stuck = 0;
-    } else if (leash && bodyFree(world, nx, b.z, r)) {
-      b.x = nx; // slide along a wall
-      moved = true;
-    } else if (leash && bodyFree(world, b.x, nz, r)) {
-      b.z = nz;
-      moved = true;
+    // Straight on, else slide along a wall (x or z only). Every candidate is
+    // clipped against the other characters first — bots never walk into or
+    // through each other or Jade, they slide round them.
+    if (leash) {
+      for (let k = 0; k < 3 && !moved; k++) {
+        const [cx, cz] = clipMove(
+          b.x,
+          b.z,
+          k === 2 ? b.x : nx,
+          k === 1 ? b.z : nz,
+          cfg.radius,
+          bodies,
+        );
+        if (Math.hypot(cx - b.x, cz - b.z) < step * 0.25 || !bodyFree(world, cx, cz, r)) continue;
+        b.x = cx;
+        b.z = cz;
+        moved = true;
+        if (k === 0) b.stuck = 0;
+      }
     }
     if (!moved) {
       b.stuck += dt;
@@ -390,8 +449,6 @@ export function stepBrain(b: NpcBrain, cfg: NpcBrainConfig, world: NpcWorld, dt:
       b.timer = pickPause(b, 0.6, 1);
       b.stuck = 0;
     }
-  } else if (b.mode !== "walk") {
-    b.speed = 0;
   }
 
   const k = 1 - Math.exp(-dt * 3);
@@ -401,3 +458,14 @@ export function stepBrain(b: NpcBrain, cfg: NpcBrainConfig, world: NpcWorld, dt:
 }
 
 const FEELERS = [0, 0.7, -0.7] as const;
+/** Goal reached within this distance (units). */
+const ARRIVE = 0.3;
+/** Start slowing down this far from the goal (units). */
+const SLOW_RADIUS = 1.8;
+/** Turn [rate (1/s), max speed (rad/s)] per mode. */
+const TURN: Record<NpcMode, readonly [number, number]> = {
+  walk: [5, 3.2],
+  idle: [3, 1.4],
+  work: [3, 1.6],
+  watch: [4, 2.4],
+};

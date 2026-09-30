@@ -34,6 +34,7 @@ import {
   ROOMS,
   SLICE_PICKUPS,
   SPAWN,
+  roomAnchor,
   roomAt,
 } from "@/lib/world/content/map";
 import { PUZZLE_BY_ID } from "@/lib/world/content/puzzles";
@@ -92,6 +93,8 @@ import {
   inReach,
   snapshot,
   talk,
+  runSystems,
+  visitArchive,
 } from "./simPlayer";
 
 // ── Timing model ─────────────────────────────────────────────────
@@ -355,8 +358,9 @@ function smartCombo(s: WorldState, req: Requirement): boolean {
 }
 
 function roomCenter(id: string): Pos {
-  const r = ROOMS.find((x) => x.id === id)!;
-  return { floor: r.floor, x: Math.round(r.x + r.w / 2), z: Math.round(r.z + r.d / 2) };
+  // A point inside the room (bent / crescent rooms: the bounding-box centre may lie outside).
+  const a = roomAnchor(id)!;
+  return { floor: a.floor, x: Math.floor(a.x), z: Math.floor(a.z) };
 }
 
 // ── Measurements ─────────────────────────────────────────────────
@@ -957,6 +961,10 @@ class RealisticPlayer {
     const r = this.report;
     let objectiveAtStall = topObjective(this.s)?.text ?? "—";
     while (this.now < MAX_TIME && !defaultDone(this.s)) {
+      // Archive spots, hub links and firmware flashes (see simPlayer.ts) — quick
+      // interface actions, not timed separately.
+      visitArchive(this.s);
+      runSystems(this.s);
       let list = this.tasks(false);
       let t = this.pick(list);
       if (!t) {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { Credits } from "@/components/world/menu/Credits";
+import { MerchShop } from "@/components/world/menu/MerchShop";
 import { BOOT_LINES, LORE_QUOTES } from "@/components/world/menu/lore";
 import { SettingsPanel } from "@/components/world/menu/SettingsPanel";
 import {
@@ -9,7 +10,6 @@ import {
   MenuKeyframes,
   MenuList,
   MenuPanel,
-  Octahedron,
   SCANLINES,
   UiScale,
   isElectron,
@@ -19,6 +19,7 @@ import {
   type MenuItem,
 } from "@/components/world/menu/shared";
 import { TitleBackdrop } from "@/components/world/menu/TitleBackdrop";
+import { UnethCrystal } from "@/components/world/menu/UnethCrystal";
 import { SlotList } from "@/components/world/menu/SlotList";
 import {
   finishedSlots,
@@ -34,6 +35,7 @@ import {
 } from "@/lib/world/save";
 import { LANGUAGE_LABEL, textCharsPerSecond, useSettings } from "@/lib/world/settings";
 import { LOCALES, getLocale, setLocale, tr } from "@/lib/i18n";
+import { VERSION_LABEL } from "@/lib/version";
 
 /** Stable string snapshot for useSyncExternalStore (arrays would re-render forever). */
 function finishedSlotsKey(): string {
@@ -70,17 +72,26 @@ function BootLog() {
     budget -= l.length + 8; // small pause between lines
   }
   const done = shown >= total;
+  // Once booted, fold down to the last line so the lab behind stays in view.
+  const [folded, setFolded] = useState(false);
+  useEffect(() => {
+    if (!done) return;
+    const id = window.setTimeout(() => setFolded(true), 4000);
+    return () => window.clearTimeout(id);
+  }, [done]);
   return (
     <div
       className="font-mono text-[11px] leading-5 text-[#33FF33]/70"
       aria-live="polite"
       aria-label={tr("Boot log")}
     >
-      {lines.map((l, i) => (
-        <div key={i} className={i === 2 || i === 3 ? "text-[#FFB800]" : ""}>
-          <span className="text-[#33FF33]/35">[{String(i).padStart(2, "0")}]</span> {l}
-        </div>
-      ))}
+      {lines.map((l, i) =>
+        folded && i < lines.length - 1 ? null : (
+          <div key={i} className={i === 2 || i === 3 ? "text-[#FFB800]" : ""}>
+            <span className="text-[#33FF33]/35">[{String(i).padStart(2, "0")}]</span> {l}
+          </div>
+        ),
+      )}
       <span
         aria-hidden
         className="inline-block h-3 w-2 bg-[#33FF33]/80 align-middle"
@@ -126,7 +137,16 @@ function LanguageToggle() {
 
 // ── Title screen ─────────────────────────────────────────────────
 
-type View = "main" | "new" | "ngplus" | "load" | "settings" | "controls" | "credits" | "quit";
+type View =
+  | "main"
+  | "new"
+  | "ngplus"
+  | "load"
+  | "settings"
+  | "controls"
+  | "credits"
+  | "merch"
+  | "quit";
 
 export interface TitleScreenProps {
   /** Resume the active slot (already selected by the title screen). */
@@ -186,6 +206,13 @@ export function TitleScreen({ onContinue, onNewGame, onLoad, onTerminal }: Title
     { id: "load", label: tr("Load"), disabled: !canContinue, onSelect: () => setView("load") },
     { id: "settings", label: tr("Settings"), onSelect: () => setView("settings") },
     { id: "controls", label: tr("Controls"), onSelect: () => setView("controls") },
+    {
+      id: "merch",
+      label: tr("Merch"),
+      tone: "amber",
+      hint: tr("Shirts & hoodies"),
+      onSelect: () => setView("merch"),
+    },
     { id: "credits", label: tr("Credits"), onSelect: () => setView("credits") },
     { id: "terminal", label: tr("To the terminal"), tone: "cyan", onSelect: onTerminal },
     {
@@ -232,7 +259,7 @@ export function TitleScreen({ onContinue, onNewGame, onLoad, onTerminal }: Title
       <UiScale className="relative flex h-full w-full flex-col gap-6 overflow-y-auto p-6 md:flex-row md:items-center md:justify-between md:p-12">
         <div className="flex max-w-md flex-col gap-6">
           <div className="flex items-center gap-4">
-            <Octahedron size={96} />
+            <UnethCrystal size={120} />
             <div>
               <h1
                 className="text-5xl font-bold tracking-[0.12em] text-[#33FF33] md:text-6xl"
@@ -256,8 +283,9 @@ export function TitleScreen({ onContinue, onNewGame, onLoad, onTerminal }: Title
             className="relative rounded-sm border border-[#33FF33]/25 bg-[#0D0D0D]/85 p-3 shadow-[0_0_30px_rgba(0,0,0,0.7)]"
           >
             <MenuList items={items} index={index} onHover={setIndex} />
-            <p className="mt-2 px-3 text-[10px] text-[#33FF33]/35">
-              {tr("↑ ↓ select · Enter confirm · Esc back")}
+            <p className="mt-2 flex justify-between gap-3 px-3 text-[10px] text-[#33FF33]/35">
+              <span>{tr("↑ ↓ select · Enter confirm · Esc back")}</span>
+              <span className="shrink-0 tabular-nums">{VERSION_LABEL}</span>
             </p>
           </nav>
         </div>
@@ -338,6 +366,7 @@ export function TitleScreen({ onContinue, onNewGame, onLoad, onTerminal }: Title
         <SettingsPanel initialTab="steuerung" onClose={() => setView("main")} />
       )}
       {view === "credits" && <Credits onClose={() => setView("main")} />}
+      {view === "merch" && <MerchShop onClose={() => setView("main")} />}
       {view === "quit" && (
         <ConfirmDialog
           title={tr("Quit?")}

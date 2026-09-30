@@ -26,7 +26,16 @@
  * per-decor scale (`decorScale`).
  */
 import { DEVICES } from "@/lib/world/content/devices";
-import { ELEVATORS, FLOORS, FLOOR_SIZE, PROPS, ROOMS, SPAWN } from "@/lib/world/content/map";
+import {
+  ELEVATORS,
+  FLOORS,
+  FLOOR_SIZE,
+  PROPS,
+  ROOMS,
+  SPAWN,
+  floorGeomOf,
+  roomDelta,
+} from "@/lib/world/content/map";
 import { buildFloor, ELEVATOR_AREA, interactableZones, type Zone } from "@/lib/world/layout";
 import { MODEL_SCALE } from "@/lib/world/models/core";
 import { deviceModel, deviceVisual } from "@/lib/world/models/devices";
@@ -167,21 +176,53 @@ interface Spec {
 
 const SIDE_ROT: Record<Side, Rot> = { n: 0, w: 1, s: 2, e: 3 };
 
+/**
+ * Where the wall of `side` really is at position `t` along it: rooms may be
+ * round or cut, so walk in from the bounding box until the room's interior
+ * starts (floor geometry). Returns the wall line coordinate.
+ */
+function wallLine(r: RoomDef, side: Side, t: number): number {
+  const g = floorGeomOf(r.floor);
+  const own = g.byId.get(r.id);
+  const fallback = side === "n" ? r.z : side === "s" ? r.z + r.d : side === "w" ? r.x : r.x + r.w;
+  if (!own) return fallback;
+  const o = own.index + 1;
+  const c = Math.floor(t);
+  const at = (x: number, z: number) =>
+    x >= 0 && z >= 0 && x < g.W && z < g.Z && g.owner[x + z * g.W] === o;
+  switch (side) {
+    case "n":
+      for (let z = r.z; z <= r.z + r.d; z++) if (at(c, z)) return z - 1;
+      break;
+    case "s":
+      for (let z = r.z + r.d; z >= r.z; z--) if (at(c, z)) return z + 1;
+      break;
+    case "w":
+      for (let x = r.x; x <= r.x + r.w; x++) if (at(x, c)) return x - 1;
+      break;
+    case "e":
+      for (let x = r.x + r.w; x >= r.x; x--) if (at(x, c)) return x + 1;
+      break;
+  }
+  return fallback;
+}
+
 /** Place `decor` with its back against a wall of `r`, centred on `t` along the wall. */
 function wallSpec(r: RoomDef, side: Side, t: number, decor: string, gap = 0, on?: string[]): Spec {
   const depth = decorModel(decor).d * decorScale(decor);
   const rot = SIDE_ROT[side];
   const off = 0.5 + depth / 2 + gap;
   const extra = on ? { on } : {};
+  const wall = wallLine(r, side, t);
   switch (side) {
     case "n":
-      return { decor, rot, x: t, z: r.z + off, side, gap, ...extra };
+      return { decor, rot, x: t, z: wall + off, side, gap, ...extra };
     case "s":
-      return { decor, rot, x: t, z: r.z + r.d - off, side, gap, ...extra };
+      return { decor, rot, x: t, z: wall - off, side, gap, ...extra };
     case "w":
-      return { decor, rot, x: r.x + off, z: t, side, gap, ...extra };
+      return { decor, rot, x: wall + off, z: t, side, gap, ...extra };
     case "e":
-      return { decor, rot, x: r.x + r.w - off, z: t, side, gap, ...extra };
+      return { decor, rot, x: wall - off, z: t, side, gap, ...extra };
   }
 }
 
@@ -326,10 +367,11 @@ const AUTHORED: Record<string, Authoring> = {
 
   // ── Ebene −1 ──
   versorgung: ({ w, f }) => [
+    // P1N-DR0's work spot: the gauge cluster right beside its parcel corner.
+    w("s", 98, "gauge_cluster"),
     w("n", 90, "pipe_straight"),
     w("n", 106, "pipe_straight"),
     w("s", 90, "cable_loops"),
-    w("s", 106, "gauge_cluster"),
     w("n", 104, "barrel"),
     w("s", 88, "barrel_rust"),
     f("floor_cables", 94, 62),
@@ -617,33 +659,62 @@ const AUTHORED: Record<string, Authoring> = {
     w("n", 98, "wall_sconce"),
     w("s", 92, "radiator"),
     f("boots_pair", 100, 64),
+    // Live pinboard for everyone on the corridor (memos pinned here show up on it).
+    w("n", 101, "cork_board_live"),
   ],
   jadeq: ({ w, f }) => [
     // Neat: a made bed nobody slept in, notebooks sorted by colour.
     w("n", 96, "bookshelf_jade"),
-    w("n", 90, "poster_telescope"),
-    w("n", 104, "star_chart"),
-    w("w", 36, "office_desk", [
-      "books_compression",
-      "notebook_open",
-      "photo_cottbus",
-      "pen_cup",
-      "mug_cold",
-    ]),
-    f("swivel_chair", 91, 36, 3),
+    w("n", 88.5, "poster_telescope"),
+    w("n", 96, "star_chart"),
+    // Her study desk under the wall shelf (the computer is the jade_pc prop).
+    w("s", 92.8, "study_desk", ["book_stack", "notebook_open", "coffee_mug", "pen_cup"]),
+    f("swivel_chair", 92.8, 46, 0),
     f("mug_table", 108, 45, 0, ["mug_cold"]),
     w("w", 46, "filing_cabinet", ["plant_dusty"]),
-    w("e", 30, "trophy_shelf"),
-    w("n", 109, "plant_fern"),
+    w("n", 91.5, "star_chart"), // the southern sky, next to the northern one
+    f("plant_ficus", 99, 37.4), // at the foot of the bed
     w("e", 48, "lab_coat_hook"),
-    w("w", 26, "goggles_hook"),
+    w("w", 26, "hanging_plant"),
     w("s", 106, "wall_clock"),
     f("rug_round", 96, 36),
-    w("e", 40, "wall_shelf"),
+    w("w", 40, "wall_shelf"),
     w("w", 30, "wall_sconce"),
-    // Her private corner for rest (biorhythm): a reading lamp by the desk; the
-    // mug table moved beside the bed as a nightstand.
-    f("floor_lamp", 88, 46),
+    // Her private corner for rest (biorhythm): a reading lamp by the armchair
+    // in the east bay; the mug table stands beside the bed as a nightstand.
+    // (Moved to the north-west corner when the replicator took the east bay.)
+    f("floor_lamp", 86.25, 22.75),
+    // ── Refurnished (append only: placement ids a0–a15 stay stable) ──
+    // The live pinboard over the work corner (jade_pc prop, north-east).
+    w("n", 105.5, "cork_board_live"),
+    // Study corner in the north-west: armchair under the lamp, textbooks
+    // beside it (the east bay is her dressing corner: the wardrobe and the
+    // wardrobe replicator prop “Needle's Eye”, content/map.ts).
+    f("armchair", 90.25, 23.25, 0),
+    f("book_stack", 93.5, 22.5),
+    f("book_stack", 93.3, 24.8, 1),
+    // Wardrobe at the south end of the bay, photos over the study desk.
+    f("wardrobe", 112.75, 42.55, 3),
+    w("s", 102, "photo_wall"),
+    w("e", 33, "hanging_plant"),
+  ],
+  // Damien's Sound Studio (Level −2, content/studio.ts) — a plan room, so
+  // coordinates are absolute (x 122–158, z 60–82). The mixing desk is the
+  // studio_console prop.
+  studio: ({ w, f }) => [
+    w("n", 128, "acoustic_panel"),
+    w("n", 136, "speaker_wall"),
+    w("n", 146, "speaker_wall"),
+    w("n", 154, "acoustic_panel"),
+    w("e", 66, "tape_machine"),
+    w("e", 74, "speaker_stack"),
+    w("s", 128, "synth"),
+    w("s", 138, "acoustic_panel"),
+    w("s", 150, "vinyl_crate"),
+    w("s", 156, "acoustic_panel"),
+    f("rug", 140, 72),
+    f("floor_cables", 134, 76, 1),
+    f("stool", 130, 70),
   ],
   damienq: ({ w, f }) => [
     // Chaos with a system: legal pads 1–17, cold coffee, forty fridge magnets.
@@ -669,14 +740,15 @@ const AUTHORED: Record<string, Authoring> = {
     f("rug", 70, 38),
     f("mug_cold", 58, 48),
     f("laundry_pile", 60, 38),
-    w("s", 70, "space_heater"),
+    w("s", 64, "space_heater"),
     w("n", 70, "hanging_plant"),
     w("s", 62, "wall_sconce"),
   ],
   kantine: ({ w, f }) => [
     // The singularity-bus coffee machine; two chairs used, forty not.
     w("e", 80, "singularity_conduit"),
-    w("e", 94, "kitchenette", ["coffee_mug", "food_tray", "mug_cold", "thermos"]),
+    // In the new alcove (floorplan.ts): a proper kitchen niche.
+    w("s", 100, "kitchenette", ["coffee_mug", "food_tray", "mug_cold", "thermos"]),
     w("n", 106, "menu_board"),
     w("n", 90, "wall_clock"),
     f("canteen_table", 94, 82, 0, ["food_tray", "coffee_mug"]),
@@ -984,6 +1056,14 @@ const THEME_KITS: Record<RoomTheme, ThemeKit> = {
     0.45,
   ),
   elevator: K([], [], [], [], 0),
+  // Floor core around the elevator: light and open — benches, plants, signage.
+  hub: K(
+    ["bench_long", "plant_ficus", "trash_bin"],
+    ["exit_sign", "wall_clock", "poster_safety", "wall_sconce"],
+    [],
+    ["floor_cables"],
+    0.18,
+  ),
   geothermal: K(
     ["heat_exchanger", "barrel_rust", "floor_pipes", "gas_cylinders"],
     ["pipe_riser", "pipe_valve", "gauge_cluster", "pipe_straight"],
@@ -1745,7 +1825,10 @@ function fillRoom(ctx: Ctx, r: RoomDef, clutterOnly: boolean, out: Placed[]): vo
     return v;
   };
   const sides: Side[] = ["n", "w", "s", "e"];
-  const density = clutterOnly ? kit.density * 0.35 : kit.density;
+  // Shaped rooms grew around their content (rounded / cut / winged): keep the
+  // dressing at the old amount instead of scaling it with the longer walls.
+  const shaped = r.shape ? 0.72 : 1;
+  const density = (clutterOnly ? kit.density * 0.35 : kit.density) * shaped;
 
   // Floor pieces along the walls.
   if (!clutterOnly)
@@ -1852,10 +1935,14 @@ function generate(floor: FloorId): FloorInterior {
     const onTop = new Map<Placed, string[]>();
     const author = AUTHORED[r.id];
     if (author) {
+      const [dx, dz] = roomDelta(r.id);
       const kit: Kit = {
         r,
-        w: (side, t, decor, on) => wallSpec(r, side, t, decor, 0, on),
-        f: (decor, x, z, rot = 0, on) => (on ? { decor, x, z, rot, on } : { decor, x, z, rot }),
+        // Authored on the room's design rectangle: shift onto the floor plan.
+        w: (side, t, decor, on) =>
+          wallSpec(r, side, t + (side === "n" || side === "s" ? dx : dz), decor, 0, on),
+        f: (decor, x, z, rot = 0, on) =>
+          on ? { decor, x: x + dx, z: z + dz, rot, on } : { decor, x: x + dx, z: z + dz, rot },
       };
       const specs = author(kit);
       specs.forEach((spec, i) => {

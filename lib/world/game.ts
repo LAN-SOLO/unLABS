@@ -7,6 +7,16 @@
  * layer calls these and re-renders; the 3D layer only reads the state.
  * Functions mutate the passed state in place and return a small report.
  */
+import {
+  FIRMWARE,
+  FW_TUNING,
+  effectiveDraw,
+  firmwareAtLeast,
+  hasFeature,
+  isUpdated,
+} from "@/lib/world/firmware";
+import { isLinked, linksOf } from "@/lib/world/links";
+import { PERK_TUNING, hasPerk } from "@/lib/world/perks";
 import { sourceOf, tr } from "@/lib/i18n";
 import { buffMultiplier } from "@/lib/world/buffs";
 import {
@@ -48,6 +58,7 @@ import {
   SLICE_PICKUPS,
   SPAWN,
   roomAt,
+  doorTouches,
 } from "@/lib/world/content/map";
 import { PUZZLE_BY_ID } from "@/lib/world/content/puzzles";
 import {
@@ -60,6 +71,7 @@ import {
 } from "@/lib/world/content/story";
 import { fnv1a, meetsTraits, signatureMatch, traitTotal } from "@/lib/world/traits";
 import type {
+  Experiment,
   Condition,
   DeviceDef,
   DialogueLine,
@@ -74,6 +86,8 @@ import type {
   WorldState,
 } from "@/lib/world/types";
 import { dailyPriceModifier } from "@/lib/game/volatility";
+import { WEAR_BY_ID } from "@/lib/world/content/wardrobe";
+import { grantWear, initialWardrobe, isWearPickupItem, wearIdFromItem } from "@/lib/world/wardrobe";
 
 export const STARTER_DEVICES = ["MCP-000", "CLK-001", "VNT-001", "BTK-001", "UEC-001"] as const;
 
@@ -82,7 +96,7 @@ export const STARTER_DEVICES = ["MCP-000", "CLK-001", "VNT-001", "BTK-001", "UEC
  * Bump it together with a new migration step whenever the persisted shape
  * or the meaning of a field changes.
  */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 6;
 
 export function initialState(): WorldState {
   const s: WorldState = {
@@ -106,6 +120,15 @@ export function initialState(): WorldState {
     playTime: 0,
     combos: 0,
     counters: {},
+    firmware: {},
+    links: {},
+    archive: {},
+    tuning: {},
+    memos: [],
+    courses: {},
+    readouts: {},
+    experiments: [],
+    wardrobe: initialWardrobe(),
   };
   for (const id of STARTER_DEVICES) s.discovered[id] = true;
   log(s, tr("Cold start. Residual charge 0.3 %. Something is humming somewhere."));
@@ -213,7 +236,9 @@ const powerCache = new WeakMap<WorldState, { key: string; status: PowerStatus }>
 export function power(s: WorldState, dayKey?: string): PowerStatus {
   const day = dayKey ?? todayKey();
   const puffer = Math.min(PROTO_PUFFER_MAX, s.counters.proto_puffer ?? 0);
-  const key = `${JSON.stringify(s.built)}|${JSON.stringify(s.switchedOn)}|${s.flags.geo_routed ? 1 : 0}|${puffer}|${day}`;
+  const priority = s.links["PWR-001"] ?? [];
+  const cooled = s.links["THM-001"] ?? [];
+  const key = `${JSON.stringify(s.built)}|${JSON.stringify(s.switchedOn)}|${s.flags.geo_routed ? 1 : 0}|${puffer}|${day}|${priority.join(",")}|${JSON.stringify(s.firmware)}|${cooled.join(",")}`;
   const hit = powerCache.get(s);
   if (hit && hit.key === key) return hit.status;
 
@@ -231,34 +256,40 @@ export function power(s: WorldState, dayKey?: string): PowerStatus {
   }
   for (const d of DEVICES) {
     if (d.power >= 0 || !isBuilt(s, d.id) || !isSwitchedOn(s, d.id)) continue;
-    const w = d.id === "UEC-001" ? uecOutput(day) : -d.power;
+    const w = d.id === "UEC-001" ? uecOutput(day) : d.id === "MFR-001" ? fusionOutput(s) : -d.power;
     generation += w;
     online.add(d.id);
     sources.push({ label: d.name, watts: w });
   }
   let demand = 0;
-  for (const id of CONSUMER_ORDER) {
+  // PWR-001 priority circuits: linked consumers are served right after the
+  // grid's own head (battery, MCP, PWR, THM) — only while PWR-001 itself
+  // came up in that head.
+  const serve = (id: string): void => {
     const d = DEVICE_BY_ID.get(id);
-    if (!d || d.power < 0) continue;
+    if (!d || d.power < 0) return;
     const partial = id === "MCP-000" && stagesDone(s, id) > 0;
-    if (!(isBuilt(s, id) || partial) || !isSwitchedOn(s, id)) continue;
+    if (!(isBuilt(s, id) || partial) || !isSwitchedOn(s, id)) return;
     if (NEEDS_COOLING(d) && !online.has("THM-001")) {
       starved.push({ id, reason: "hitze" });
-      continue;
+      return;
     }
-    if (demand + d.power > generation + 1e-9) {
+    // Firmware and the THM-001 cooling loop can lower the draw.
+    const draw = effectiveDraw(s, id, d.power, online.has("THM-001"));
+    if (demand + draw > generation + 1e-9) {
       starved.push({ id, reason: "strom" });
-      continue;
+      return;
     }
-    demand += d.power;
+    demand += draw;
     online.add(id);
     if (id === "PWR-001" && s.flags.geo_routed) {
       generation += 100;
       sources.push({ label: tr("Geothermal full load (PWR-001)"), watts: 100 });
     }
     if (id === "BAT-001") {
-      generation += 40;
-      sources.push({ label: tr("Battery buffer"), watts: 40 });
+      const buffer = batteryBuffer(s);
+      generation += buffer;
+      sources.push({ label: tr("Battery buffer"), watts: buffer });
     }
     if (id === "PWD-001") {
       generation += PWD_BONUS;
@@ -271,7 +302,13 @@ export function power(s: WorldState, dayKey?: string): PowerStatus {
         sources.push({ label: tr("Voltage stabilisation (VLT-001)"), watts: dip });
       }
     }
-  }
+  };
+  const head = CONSUMER_ORDER.slice(0, 4);
+  const rest = CONSUMER_ORDER.slice(4);
+  for (const id of head) serve(id);
+  const first = online.has("PWR-001") ? rest.filter((id) => priority.includes(id)) : [];
+  for (const id of first) serve(id);
+  for (const id of rest) if (!first.includes(id)) serve(id);
   const status: PowerStatus = {
     generation,
     demand: Math.round(demand * 10) / 10,
@@ -281,6 +318,18 @@ export function power(s: WorldState, dayKey?: string): PowerStatus {
   };
   powerCache.set(s, { key, status });
   return status;
+}
+
+/** BAT-001's buffer on the grid (W; more with its `fast-charge` update). */
+export function batteryBuffer(s: WorldState): number {
+  return hasFeature(s, "BAT-001", "fast-charge") ? FW_TUNING.batteryBuffer : 40;
+}
+
+/** MFR-001's output (W; more with its `fuel-autotune` update). */
+export function fusionOutput(s: WorldState): number {
+  return hasFeature(s, "MFR-001", "fuel-autotune")
+    ? FW_TUNING.fusionOutput
+    : -(DEVICE_BY_ID.get("MFR-001")?.power ?? -250);
 }
 
 export function isOnline(s: WorldState, id: string): boolean {
@@ -301,6 +350,9 @@ export function evalCond(s: WorldState, c: Condition | undefined): boolean {
   if ("puzzle" in c) return !!s.puzzles[c.puzzle];
   if ("power" in c) return power(s).generation >= c.power;
   if ("counter" in c) return (s.counters[c.counter] ?? 0) >= c.min;
+  if ("link" in c) return isLinked(s, c.link, c.to);
+  if ("firmware" in c) return firmwareAtLeast(s, c.firmware, c.min);
+  if ("archive" in c) return s.archive[c.archive] !== undefined;
   return false;
 }
 
@@ -322,6 +374,17 @@ export function describeCond(c: Condition): string {
   if ("puzzle" in c)
     return tr("Puzzle “{title}”", { title: PUZZLE_BY_ID.get(c.puzzle)?.title ?? c.puzzle });
   if ("counter" in c) return counterLabel(c.counter, c.min);
+  if ("link" in c)
+    return tr("{device} linked to {hub}", {
+      device: DEVICE_BY_ID.get(c.to)?.name ?? c.to,
+      hub: DEVICE_BY_ID.get(c.link)?.name ?? c.link,
+    });
+  if ("firmware" in c)
+    return tr("{device} firmware {version} or newer", {
+      device: DEVICE_BY_ID.get(c.firmware)?.name ?? c.firmware,
+      version: c.min,
+    });
+  if ("archive" in c) return tr("a certain record found");
   return tr("{watts} W output", { watts: c.power });
 }
 
@@ -360,6 +423,14 @@ export function counterLabel(counter: string, min: number): string {
   if (counter === "drone_runs")
     return min === 1 ? tr("one drone flight") : tr("{n} drone flights", { n: min });
   if (counter === "research") return tr("{n} research points", { n: min });
+  if (counter === "bots_awake")
+    return min === 1 ? tr("one lore bot awake") : tr("{n} lore bots awake", { n: min });
+  if (counter === "explosions")
+    return min === 1
+      ? tr("one explosion at the workbench")
+      : tr("{n} explosions at the workbench", { n: min });
+  if (counter === "endings")
+    return min === 1 ? tr("any ending reached") : tr("{n} endings reached", { n: min });
   return `${counter} ≥ ${min}`;
 }
 
@@ -672,6 +743,7 @@ export function doCombine(s: WorldState, inputs: Record<string, number>): Combin
   }
   const res = combine(inputs, s.generated, (dev) => isOnline(s, dev));
   if (!res.output || res.kind === "invalid" || res.kind === "missing-station") {
+    if (res.kind === "invalid") recordExperiment(s, { inputs, outcome: "fail" });
     return { ...res, ...base, ok: false };
   }
   for (const [id, n] of Object.entries(inputs)) removeItem(s, id, n);
@@ -681,6 +753,11 @@ export function doCombine(s: WorldState, inputs: Record<string, number>): Combin
   addItem(s, res.output.id, res.count);
   s.combos += 1;
   bump(s, `combo_${res.kind}`);
+  recordExperiment(s, {
+    inputs,
+    outcome: res.kind === "prototype" || res.kind === "explosion" ? res.kind : "recipe",
+    output: res.output.id,
+  });
 
   // Explosions: the side event only pays out the first time a mix blows up.
   let message = res.message;
@@ -694,6 +771,35 @@ export function doCombine(s: WorldState, inputs: Record<string, number>): Combin
         "Volatility {vol} > {limit}. It goes bang. Slag is all that is left. Same mix — nothing special left over this time.",
         { vol: res.volatility ?? 0, limit: VOLATILITY_LIMIT },
       );
+    }
+  }
+  // EMC-001 `breach-guard`: the containment field catches one input part.
+  const fieldCatch =
+    res.kind === "explosion" && hasFeature(s, "EMC-001", "breach-guard") && isOnline(s, "EMC-001");
+  if (fieldCatch) {
+    const caught = Object.keys(inputs)
+      .filter((id) => (inputs[id] ?? 0) > 0)
+      .sort()[0];
+    if (caught) {
+      addItem(s, caught, 1);
+      message = tr("{message} The containment field caught 1× {name}.", {
+        message,
+        name: itemDef(s, caught)?.name ?? caught,
+      });
+    }
+  }
+  // Perk `blast_catch` (course "Volatility"): Jade's own reflex saves one part when
+  // the containment field did not.
+  if (res.kind === "explosion" && !fieldCatch && hasPerk(s, "blast_catch")) {
+    const caught = Object.keys(inputs)
+      .filter((id) => (inputs[id] ?? 0) > 0)
+      .sort()[0];
+    if (caught) {
+      addItem(s, caught, 1);
+      message = tr("{message} You snatched 1× {name} off the bench in time.", {
+        message,
+        name: itemDef(s, caught)?.name ?? caught,
+      });
     }
   }
   // Named archetypes: flag on first creation (the codex lists them).
@@ -795,12 +901,16 @@ export function disassemble(
     };
   removeItem(s, id, 1);
   parts.sort();
-  parts.pop(); // Zerlegungsverlust
+  // BTK-001 `torque-profiles`: two-part assemblies come apart without loss.
+  const lossless = parts.length === 2 && hasFeature(s, "BTK-001", "torque-profiles");
+  if (!lossless) parts.pop(); // Zerlegungsverlust
   for (const p of parts) addItem(s, p, 1);
   log(s, tr("Taken apart: {name}", { name: def.name }));
   return {
     ok: true,
-    message: tr("{name} taken apart. One part was lost.", { name: def.name }),
+    message: lossless
+      ? tr("{name} taken apart. The torque profiles saved every part.", { name: def.name })
+      : tr("{name} taken apart. One part was lost.", { name: def.name }),
     returned: parts,
   };
 }
@@ -820,11 +930,21 @@ export function fabricate(s: WorldState, id: string): { ok: boolean; message: st
   const def = ITEM_BY_ID.get(id);
   if (!def || def.kind !== "bauteil" || !printable(s, id))
     return { ok: false, message: tr("Unknown print pattern.") };
-  if (!removeItem(s, "basislegierung", 1))
+  // P3D-001 `purge-saver`: every third print needs no filament.
+  const free =
+    hasFeature(s, "P3D-001", "purge-saver") &&
+    ((s.counters.prints ?? 0) + 1) % FW_TUNING.freePrintEvery === 0;
+  if (!free && !removeItem(s, "basislegierung", 1))
     return { ok: false, message: tr("Needs 1× Base Alloy as filament.") };
   addItem(s, id, 1);
+  bump(s, "prints");
   log(s, tr("Printed: {name}", { name: def.name }));
-  return { ok: true, message: tr("{name} printed.", { name: def.name }) };
+  return {
+    ok: true,
+    message: free
+      ? tr("{name} printed — purge saver: no filament used.", { name: def.name })
+      : tr("{name} printed.", { name: def.name }),
+  };
 }
 
 export function fabricable(s: WorldState): ItemDef[] {
@@ -949,7 +1069,12 @@ export function pickupAvailable(s: WorldState, p: PickupDef): boolean {
 export function pickupRespawnSeconds(s: WorldState, p: PickupDef): number {
   if (!p.respawn) return 0;
   const speed = p.id === "p_geo_seep" && isOnline(s, "ATK-001") ? 2 : 1;
-  return (p.respawn / speed) * buffMultiplier(s, s.playTime, "respawn_boost");
+  // CLK-001 `event-scheduler`: the clock schedules refills sooner.
+  const sched =
+    hasFeature(s, "CLK-001", "event-scheduler") && isOnline(s, "CLK-001")
+      ? FW_TUNING.respawnFactor
+      : 1;
+  return (p.respawn / speed) * sched * buffMultiplier(s, s.playTime, "respawn_boost");
 }
 
 /** Seconds until a taken pickup is back (0 = available or never respawns). */
@@ -1006,22 +1131,43 @@ export function takePickup(s: WorldState, id: string): TakeReport {
     }
   }
   const bonus = p.id === "p_geo_seep" && isOnline(s, "ATK-001") ? 2 : 1;
-  const given = items.map((it) => ({ item: it.item, count: it.count * bonus }));
+  // Wardrobe finds (`wear:<id>`) go to Jade's wardrobe, not the inventory.
+  const worn = items.filter((it) => isWearPickupItem(it.item));
+  const given = items
+    .filter((it) => !isWearPickupItem(it.item))
+    .map((it) => ({ item: it.item, count: it.count * bonus }));
+  // Perk `scrap_sense` (course "Salvage"): every n-th finished pile gives one part more.
+  if (done && given.length && hasPerk(s, "scrap_sense")) {
+    if (bump(s, "perk_scrap_n") % PERK_TUNING.scrapEvery === 0) given[0]!.count += 1;
+  }
   for (const it of given) addItem(s, it.item, it.count);
-  bump(
-    s,
-    "salvaged",
-    given.reduce((a, it) => a + it.count, 0),
-  );
+  if (given.length)
+    bump(
+      s,
+      "salvaged",
+      given.reduce((a, it) => a + it.count, 0),
+    );
+  const pieces: string[] = [];
+  for (const it of worn) {
+    const id = wearIdFromItem(it.item);
+    if (!id) continue;
+    grantWear(s, id, "find");
+    pieces.push(WEAR_BY_ID.get(id)?.name ?? id);
+  }
   if (done) s.taken[p.id] = s.playTime;
-  const names = given
-    .map((it) => `${it.count}× ${ITEM_BY_ID.get(it.item)?.name ?? it.item}`)
-    .join(", ");
+  const names = [
+    ...given.map((it) => `${it.count}× ${ITEM_BY_ID.get(it.item)?.name ?? it.item}`),
+    ...pieces.map((name) => tr("{name} — for the wardrobe", { name })),
+  ].join(", ");
   log(s, `${p.label}: ${names}`);
   const message = done
     ? names
     : tr("{items} — by hand. The Basic Toolkit could salvage more.", { items: names });
-  return { ok: true, message, items: given };
+  return {
+    ok: true,
+    message,
+    items: [...given, ...worn.map((it) => ({ item: it.item, count: 1 }))],
+  };
 }
 
 /** True when a pile was salvaged by hand and needs the tool for the rest. */
@@ -1129,7 +1275,31 @@ export function operateDevice(s: WorldState, id: string): UseReport {
     out.insights.push(...r.insights);
   }
   out.lines.push(...deviceReadout(s, id));
+  // Perk `second_look` (course "Reading the needles"): one more line — the grid margin.
+  if (out.lines.length && hasPerk(s, "second_look")) {
+    const p = power(s);
+    out.lines.push(
+      tr("Second look: {gen} W generated, {demand} W drawn, margin {margin} W.", {
+        gen: Math.round(p.generation),
+        demand: Math.round(p.demand),
+        margin: Math.round(p.generation - p.demand),
+      }),
+    );
+  }
+  // Kept for the knowledge panel ("processed information").
+  if (out.lines.length)
+    s.readouts[id] = { t: Math.round(s.playTime), lines: out.lines.slice(0, 12) };
   return out;
+}
+
+/** Most recent workbench experiments kept in the save. */
+export const EXPERIMENT_LOG_MAX = 60;
+
+/** Record a workbench experiment (knowledge panel "Experiments"). */
+export function recordExperiment(s: WorldState, e: Omit<Experiment, "t">): void {
+  s.experiments.push({ ...e, inputs: { ...e.inputs }, t: Math.round(s.playTime) });
+  if (s.experiments.length > EXPERIMENT_LOG_MAX)
+    s.experiments.splice(0, s.experiments.length - EXPERIMENT_LOG_MAX);
 }
 
 // ── Research (NXS-01) ────────────────────────────────────────────
@@ -1179,9 +1349,30 @@ export function researchFlag(topic: string): string {
   return `research_${topic}`;
 }
 
+/** Seconds per research cycle (shorter while an updated AIC-001 plans the queue). */
+export function researchCooldown(s: WorldState): number {
+  return hasFeature(s, "AIC-001", "self-optimize") && isOnline(s, "AIC-001")
+    ? FW_TUNING.researchCooldown
+    : RESEARCH_COOLDOWN;
+}
+
+/**
+ * Research points per cycle: the base, +2 with the Nexus' `prereq-chain`
+ * update, +1 for every online machine on the SCA-001 compute mesh.
+ */
+export function researchPerCycle(s: WorldState): number {
+  const mesh = isOnline(s, "SCA-001")
+    ? linksOf(s, "SCA-001").filter((id) => isOnline(s, id)).length * FW_TUNING.meshResearch
+    : 0;
+  const chain = hasFeature(s, "NXS-01", "prereq-chain") ? FW_TUNING.researchBonus : 0;
+  // Perk `research_notes` (course "Research on the Nexus").
+  const notes = hasPerk(s, "research_notes") ? PERK_TUNING.research : 0;
+  return RESEARCH_PER_CYCLE + chain + mesh + notes;
+}
+
 export function researchReady(s: WorldState): boolean {
   const last = s.counters.research_last;
-  return last === undefined || s.playTime - last >= RESEARCH_COOLDOWN;
+  return last === undefined || s.playTime - last >= researchCooldown(s);
 }
 
 /** Run one research cycle on the Nexus: +5 points, finished topics unlock recipes. */
@@ -1194,7 +1385,7 @@ export function research(s: WorldState): {
   if (!isOnline(s, "NXS-01"))
     return { ok: false, message: tr("The Nexus is not online."), unlocked: [], insights: [] };
   if (!researchReady(s)) {
-    const left = Math.ceil(RESEARCH_COOLDOWN - (s.playTime - (s.counters.research_last ?? 0)));
+    const left = Math.ceil(researchCooldown(s) - (s.playTime - (s.counters.research_last ?? 0)));
     return {
       ok: false,
       message: tr("Research cycle still running ({left} s).", { left }),
@@ -1203,7 +1394,8 @@ export function research(s: WorldState): {
     };
   }
   s.counters.research_last = s.playTime;
-  const points = bump(s, "research", RESEARCH_PER_CYCLE);
+  const gain = researchPerCycle(s);
+  const points = bump(s, "research", gain);
   const unlocked: string[] = [];
   for (const t of RESEARCH_TOPICS) {
     if (s.flags[researchFlag(t.id)] || points < t.cost) continue;
@@ -1227,7 +1419,7 @@ export function research(s: WorldState): {
   return {
     ok: true,
     message: [
-      tr("Research cycle: +{gain} ({points} points).", { gain: RESEARCH_PER_CYCLE, points }),
+      tr("Research cycle: +{gain} ({points} points).", { gain, points }),
       ...done,
       tail,
     ].join(" "),
@@ -1252,6 +1444,8 @@ function where(floor: FloorId, x: number, z: number): string {
 
 /** Devices with a live readout (shown after »Benutzen«). */
 const READOUT_DEVICES = new Set([
+  "CDC-001",
+  "MSC-001",
   "UEC-001",
   "MFR-001",
   "PWR-001",
@@ -1272,6 +1466,113 @@ const READOUT_DEVICES = new Set([
   "QAN-001",
   "TLP-001",
 ]);
+
+/** CDC-001: slices catalogued; per level with the `slice-cache` update. */
+function cacheReadout(s: WorldState): string[] {
+  const lines = [
+    tr("Crystal index: {n} of {total} slices of Crystal #0089 catalogued.", {
+      n: s.counters.slices ?? 0,
+      total: SLICE_TOTAL,
+    }),
+  ];
+  if (!hasFeature(s, "CDC-001", "slice-cache")) return lines;
+  const per = new Map<FloorId, number>();
+  for (const pid of SLICE_PICKUPS) {
+    const pk = PICKUPS.find((x) => x.id === pid);
+    if (!pk || s.taken[pid] !== undefined) continue;
+    per.set(pk.floor, (per.get(pk.floor) ?? 0) + 1);
+  }
+  lines.push(
+    per.size
+      ? tr("Slice cache — still missing: {list}.", {
+          list: [...per]
+            .sort((a, b) => a[0] - b[0])
+            .map(([f, n]) => `${FLOOR_BY_ID[f].short} ×${n}`)
+            .join(" · "),
+        })
+      : tr("Slice cache: every slice is accounted for."),
+  );
+  return lines;
+}
+
+/** MSC-001: refilling sources in reach; which are full with the `batch-scan` update. */
+function scanReadout(s: WorldState): string[] {
+  const sources = PICKUPS.filter(
+    (p) =>
+      !!p.respawn &&
+      floorAccessible(s, p.floor) &&
+      pickupVisible(s, p) &&
+      reachableRooms(s, p.floor).has(roomAt(p.floor, p.x, p.z)?.id ?? ""),
+  );
+  const lines = [tr("Material scan: {n} refilling source(s) within reach.", { n: sources.length })];
+  if (!hasFeature(s, "MSC-001", "batch-scan")) return lines;
+  const full = sources.filter((p) => pickupAvailable(s, p));
+  lines.push(
+    full.length
+      ? tr("Batch scan — ready to harvest: {list}.", {
+          list: full
+            .slice(0, 4)
+            .map((p) => `${p.label} (${where(p.floor, p.x, p.z)})`)
+            .join(", "),
+        })
+      : tr("Batch scan: every source is still refilling."),
+  );
+  return lines;
+}
+
+/** NET-001 data hub: first readout line of up to four linked devices. */
+function remoteReadouts(s: WorldState): string[] {
+  const out: string[] = [];
+  for (const id of linksOf(s, "NET-001")) {
+    if (out.length >= 4) break;
+    if (!isOnline(s, id)) continue;
+    const device = DEVICE_BY_ID.get(id)?.name ?? id;
+    const first = READOUT_DEVICES.has(id) ? deviceReadout(s, id)[0] : undefined;
+    out.push(
+      first
+        ? tr("Remote {device}: {line}", { device, line: first })
+        : tr("Remote {device}: online.", { device }),
+    );
+  }
+  return out;
+}
+
+/** DGN-001 diag hub: health of every probed device (+ pending updates with `deep-scan`). */
+function probeReadouts(s: WorldState, deep: boolean): string[] {
+  const p = power(s);
+  const out: string[] = [];
+  for (const id of linksOf(s, "DGN-001")) {
+    const device = DEVICE_BY_ID.get(id)?.name ?? id;
+    const starved = p.starved.find((x) => x.id === id);
+    out.push(
+      p.online.has(id)
+        ? tr("Probe {device}: healthy.", { device })
+        : starved?.reason === "hitze"
+          ? tr("Probe {device}: overheating — the Thermal Manager must run.", { device })
+          : starved
+            ? tr("Probe {device}: no power — shed load or add generation.", { device })
+            : tr("Probe {device}: switched off.", { device }),
+    );
+    const m = FIRMWARE.get(id);
+    if (deep && m?.update && m.world && !isUpdated(s, id))
+      out.push(
+        `  ${
+          m.world.source === "net"
+            ? tr("Update {version} waiting on the network mirror (NET-001).", {
+                version: m.update.version,
+              })
+            : m.world.source === "mcp"
+              ? tr("Update {version} waiting in the MCP's device registry.", {
+                  version: m.update.version,
+                })
+              : tr("Service image {version} on board — its checksum is somewhere in the lab.", {
+                  version: m.update.version,
+                })
+        }`,
+      );
+  }
+  return out;
+}
 
 /** True when the device panel should offer »Benutzen«. */
 export function deviceHasUse(id: string): boolean {
@@ -1294,7 +1595,11 @@ export function deviceReadout(s: WorldState, id: string): string[] {
       ];
     }
     case "MFR-001":
-      return [tr("Micro-fusion: 250 W. Auto-SCRAM armed. Cooling via THM-001.")];
+      return [
+        tr("Micro-fusion: {w} W. Auto-SCRAM armed. Cooling via THM-001.", {
+          w: fusionOutput(s),
+        }),
+      ];
     case "PWR-001":
       return [
         s.flags.geo_routed
@@ -1302,7 +1607,11 @@ export function deviceReadout(s: WorldState, id: string): string[] {
           : tr("Geothermal tap not connected — solve the distribution panel on Level −1 first."),
       ];
     case "BAT-001":
-      return [tr("Buffer storage: +40 W reserve on the grid.")];
+      return [tr("Buffer storage: +{w} W reserve on the grid.", { w: batteryBuffer(s) })];
+    case "CDC-001":
+      return cacheReadout(s);
+    case "MSC-001":
+      return scanReadout(s);
     case "ATK-001": {
       const seep = PICKUPS.find((x) => x.id === "p_geo_seep");
       const left = seep ? pickupRespawnLeft(s, seep) : 0;
@@ -1352,7 +1661,7 @@ export function deviceReadout(s: WorldState, id: string): string[] {
           droneReady(s)
             ? tr("Drone: ready for launch.")
             : tr("Drone: charging, {time} to go.", {
-                time: mmss(DRONE_COOLDOWN - (s.playTime - (s.counters.drone_last ?? 0))),
+                time: mmss(droneCooldown(s) - (s.playTime - (s.counters.drone_last ?? 0))),
               }),
         );
       if (isBuilt(s, "NXS-01"))
@@ -1360,7 +1669,7 @@ export function deviceReadout(s: WorldState, id: string): string[] {
           researchReady(s)
             ? tr("Nexus: next research cycle ready.")
             : tr("Nexus: next cycle in {time}.", {
-                time: mmss(RESEARCH_COOLDOWN - (s.playTime - (s.counters.research_last ?? 0))),
+                time: mmss(researchCooldown(s) - (s.playTime - (s.counters.research_last ?? 0))),
               }),
         );
       return lines;
@@ -1370,6 +1679,23 @@ export function deviceReadout(s: WorldState, id: string): string[] {
       const lines = [tr("Memory: {n} of {total} insights indexed.", { n, total: INSIGHTS.length })];
       if (stagesDone(s, "MCP-000") < 3)
         lines.push(tr("MCP memory bank ready for inspection — the MCP needs 2 Memory Chips."));
+      if (hasFeature(s, "MEM-001", "leak-trace")) {
+        const unread = NOTES.find(
+          (n) =>
+            !s.read[n.id] &&
+            floorAccessible(s, n.floor) &&
+            evalCond(s, n.hidden) &&
+            reachableRooms(s, n.floor).has(roomAt(n.floor, n.x, n.z)?.id ?? ""),
+        );
+        lines.push(
+          unread
+            ? tr("Leak trace: an unindexed record in {room} ({floor}).", {
+                room: where(unread.floor, unread.x, unread.z),
+                floor: FLOOR_BY_ID[unread.floor].short,
+              })
+            : tr("Leak trace: every reachable record is indexed."),
+        );
+      }
       return lines;
     }
     case "CPU-001":
@@ -1409,6 +1735,7 @@ export function deviceReadout(s: WorldState, id: string): string[] {
       return [
         tr("BNET-001: {awake} of {total} lore bots awake.", { awake, total: BOT_QUESTS.length }),
         tr("Network-controlled doors (Teleport, Radio Room) are released."),
+        ...remoteReadouts(s),
       ];
     }
     case "QCP-001": {
@@ -1436,16 +1763,18 @@ export function deviceReadout(s: WorldState, id: string): string[] {
               n: s.counters.drone_runs ?? 0,
             })
           : tr("Drone charging: {time}.", {
-              time: mmss(DRONE_COOLDOWN - (s.playTime - (s.counters.drone_last ?? 0))),
+              time: mmss(droneCooldown(s) - (s.playTime - (s.counters.drone_last ?? 0))),
             }),
       ];
     case "DGN-001": {
       const open = openBlueprints(s);
       const lines = [tr("Findings: {n} open blueprint(s).", { n: open.length })];
-      for (const d of open.slice(0, 3)) {
+      const deep = hasFeature(s, "DGN-001", "deep-scan");
+      for (const d of deep ? open : open.slice(0, 3)) {
         const c = checkStage(s, d.id);
         lines.push(`  ${d.name}: ${c?.blockers[0] ?? tr("ready to build.")}`);
       }
+      lines.push(...probeReadouts(s, deep));
       return lines;
     }
     case "TLP-001": {
@@ -1511,9 +1840,16 @@ const DRONE_RUNS: readonly { item: string; count: number }[][] = [
 ];
 export const DRONE_COOLDOWN = 150;
 
+/** Seconds between drone flights (shorter with EXD-001's `fast-return` update). */
+export function droneCooldown(s: WorldState): number {
+  const base = hasFeature(s, "EXD-001", "fast-return") ? FW_TUNING.droneCooldown : DRONE_COOLDOWN;
+  // Perk `drone_routes` (course "Drone flight"): pre-planned routes.
+  return hasPerk(s, "drone_routes") ? Math.round(base * PERK_TUNING.droneCooldown) : base;
+}
+
 export function droneReady(s: WorldState): boolean {
   const last = s.counters.drone_last;
-  return last === undefined || s.playTime - last >= DRONE_COOLDOWN;
+  return last === undefined || s.playTime - last >= droneCooldown(s);
 }
 
 export function flyDrone(s: WorldState): { ok: boolean; message: string; insights: string[] } {
@@ -1762,12 +2098,6 @@ export function reachableRooms(s: WorldState, floor: FloorId): Set<string> {
     }
   }
   return seen;
-}
-
-function doorTouches(d: DoorDef, r: RoomDef): boolean {
-  return d.axis === "x"
-    ? (d.z === r.z || d.z === r.z + r.d) && d.x > r.x && d.x < r.x + r.w
-    : (d.x === r.x || d.x === r.x + r.w) && d.z > r.z && d.z < r.z + r.d;
 }
 
 /** Keypad doors are reachable for interaction from either side. */

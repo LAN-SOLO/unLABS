@@ -58,6 +58,8 @@ import { Model } from "@/lib/world/models/core";
 
 /** Awake parts ignore rig power (the engine animates them whatever `rig.powered` says). */
 export const ALWAYS = { power: false } as const;
+/** W2-REK: world units covered per full tripod cycle (legs sway ±0.4 rad). */
+const W2REK_STRIDE = 1.1;
 
 /** A part's resting angle while its bot sleeps. */
 export interface Slump {
@@ -266,6 +268,8 @@ function f1ndr(): BotDesign {
           {
             axis: "x",
             speed: 0.9,
+            gait: "roll",
+            rollRadius: 2.6,
             ...ALWAYS,
           },
         ),
@@ -675,11 +679,15 @@ function p1ndr0(): BotDesign {
       mount("wheel_l", wheel(4.6, C.rubber, C.steel, C.safety_orange, 6), [3, 4.5, 11], "spin", {
         axis: "x",
         speed: 1.1,
+        gait: "roll",
+        rollRadius: 4.6,
         ...ALWAYS,
       }),
       mount("wheel_r", wheel(4.6, C.rubber, C.steel, C.safety_orange, 6), [23, 4.5, 11], "spin", {
         axis: "x",
         speed: 1.1,
+        gait: "roll",
+        rollRadius: 4.6,
         ...ALWAYS,
       }),
       mount("claw_l", finger(-1), [15, 19, 20], "sway", {
@@ -1210,6 +1218,9 @@ function w2rek(): BotDesign {
     mount("shell", shell, [13.5, 11, 11.5], "bob", {
       speed: 5,
       amplitude: 0.5,
+      // Two bounces per leg cycle.
+      gait: "stride",
+      stride: W2REK_STRIDE / 2,
       pivot: [7.5, 0, 7.5],
       ...ALWAYS,
     }),
@@ -1224,6 +1235,8 @@ function w2rek(): BotDesign {
         speed: 2.6,
         amplitude: 0.4,
         phase: a,
+        gait: "stride",
+        stride: W2REK_STRIDE,
         pivot: [0, 6.5, 1],
         ...ALWAYS,
       }),
@@ -1232,6 +1245,8 @@ function w2rek(): BotDesign {
         speed: 2.6,
         amplitude: 0.4,
         phase: a + Math.PI,
+        gait: "stride",
+        stride: W2REK_STRIDE,
         pivot: [8, 6.5, 1],
         ...ALWAYS,
       }),

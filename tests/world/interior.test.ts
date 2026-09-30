@@ -10,7 +10,15 @@ import {
   placementRect,
   type DecorPlacement,
 } from "@/lib/world/content/interior";
-import { DOORS, FLOORS, FLOOR_SIZE, ROOMS, ROOM_BY_ID, WALL_HEIGHT } from "@/lib/world/content/map";
+import {
+  DOORS,
+  FLOORS,
+  FLOOR_SIZE,
+  ROOMS,
+  ROOM_BY_ID,
+  WALL_HEIGHT,
+  floorGeomOf,
+} from "@/lib/world/content/map";
 import {
   DOOR_HEIGHT,
   ELEVATOR_AREA,
@@ -313,26 +321,22 @@ describe("layout architecture", () => {
   for (const floor of floors) {
     it(`floor ${floor}: room interiors are free from y = 1 to the head (except wall lines)`, () => {
       const { world } = buildFloor(floor);
-      const rooms = ROOMS.filter((r) => r.floor === floor);
-      const wallCell = new Set<number>();
-      for (const r of rooms)
-        for (let z = r.z; z <= r.z + r.d; z++)
-          for (let x = r.x; x <= r.x + r.w; x++)
-            if (x === r.x || x === r.x + r.w || z === r.z || z === r.z + r.d)
-              wallCell.add(x + z * FLOOR_SIZE.x);
+      // Interior cells of the real room shapes (floor-geom.ts); walls and poché excluded.
+      const g = floorGeomOf(floor);
       const elevatorPillar = (x: number, z: number) =>
         x >= ELEVATOR_AREA.x0 &&
         x <= ELEVATOR_AREA.x1 &&
         z >= ELEVATOR_AREA.z0 &&
         z <= ELEVATOR_AREA.z1;
-      for (const r of rooms)
-        for (let z = r.z + 1; z < r.z + r.d; z++)
-          for (let x = r.x + 1; x < r.x + r.w; x++) {
-            if (wallCell.has(x + z * FLOOR_SIZE.x) || elevatorPillar(x, z)) continue;
-            expect(world.get(x, 0, z), `floor ${x},${z}`).not.toBe(0);
-            for (let y = 1; y <= WALL_HEIGHT - 2; y++)
-              expect(world.get(x, y, z), `${r.id} ${x},${y},${z}`).toBe(0);
-          }
+      for (const rg of g.rooms)
+        for (const i of rg.cells) {
+          const x = i % g.W;
+          const z = (i - x) / g.W;
+          if (elevatorPillar(x, z)) continue;
+          expect(world.get(x, 0, z), `floor ${x},${z}`).not.toBe(0);
+          for (let y = 1; y <= WALL_HEIGHT - 2; y++)
+            expect(world.get(x, y, z), `${rg.room.id} ${x},${y},${z}`).toBe(0);
+        }
     });
 
     it(`floor ${floor}: door openings are clear`, () => {

@@ -194,7 +194,7 @@ function MapOverlayImpl({
       if (suppressClick.current) return;
       const e = model.entities.get(key);
       const r = model.rooms.get(key);
-      const at = e ?? (r ? { floor: r.floor, x: r.x + r.w / 2, z: r.z + r.d / 2 } : null);
+      const at = e ?? (r ? { floor: r.floor, x: r.ax, z: r.az } : null);
       if (!at) return;
       setSelected(key);
       setTip(null);

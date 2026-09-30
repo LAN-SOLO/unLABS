@@ -156,7 +156,12 @@ describe("content", () => {
   it("every puzzle kind has usable params", () => {
     for (const p of PUZZLES) {
       if (p.kind === "keypad") expect(str(p.params, "code", "")).toMatch(/^\d{4}$/);
-      if (p.kind === "tones") expect(nums(p.params, "tones", [])).toHaveLength(4);
+      if (p.kind === "tones") {
+        // Four-tone sequences, and Damien's six-note studio song (pz_studio_door).
+        const n = nums(p.params, "tones", []).length;
+        expect(n).toBeGreaterThanOrEqual(4);
+        expect(n).toBeLessThanOrEqual(8);
+      }
       if (p.kind === "temporal") {
         const lines = strs(p.params, "lines", []);
         expect(num(p.params, "answer", -1)).toBeLessThan(lines.length);

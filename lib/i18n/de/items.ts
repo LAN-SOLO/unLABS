@@ -193,4 +193,16 @@ export const DE_ITEMS: Record<string, string> = {
     "Myzel frisst Schlacke: Was explodiert ist, wird wieder Gestein",
   "Dust sample: under the lens, the rubble reveals a shard that casts two shadows":
     "Staubprobe: Unter der Linse zeigt das Geröll einen Splitter, der zwei Schatten wirft",
+  "Fabric Scraps": "Stoffreste",
+  "Polymer Fibre": "Polymerfaser",
+  Pigment: "Farbpigment",
+  "Glow Thread": "Leuchtfaden",
+  "Offcuts, old shirts, a curtain nobody will miss. Soft, patient, slightly flammable.":
+    "Verschnitt, alte Hemden, ein Vorhang, den niemand vermissen wird. Weich, geduldig, leicht entflammbar.",
+  "Stripped cable sleeve and carded filter fleece, spun into one tough strand.":
+    "Abisolierte Kabelummantelung und kardiertes Filtervlies, zu einem zähen Strang versponnen.",
+  "A jar of ground colour. It stains everything, including plans.":
+    "Ein Glas gemahlene Farbe. Färbt alles ein, auch Pläne.",
+  "Fibre-optic filament dyed with algae pigment. Glows faintly, even in a drawer.":
+    "Glasfaserfilament, mit Algenpigment gefärbt. Leuchtet schwach, sogar in der Schublade.",
 };

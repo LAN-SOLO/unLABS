@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { isDesktopApp } from "@/lib/desktop";
 import { EMBED_TERMINAL_PATH } from "@/lib/auth/next";
+import { VERSION_LABEL } from "@/lib/version";
 
 interface TerminalFrameProps {
   username: string | null;
@@ -111,7 +112,7 @@ export function TerminalFrame({
       {!isFullscreen && (
         <div className="mt-2 flex shrink-0 justify-between px-2 text-xs text-green-500/40">
           <span>SOLANA DEVNET</span>
-          <span>v{process.env.NEXT_PUBLIC_APP_VERSION}</span>
+          <span>{VERSION_LABEL}</span>
           <span>↑↓ HISTORY | ESC CLEAR | ENTER EXECUTE</span>
         </div>
       )}

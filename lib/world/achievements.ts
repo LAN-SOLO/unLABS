@@ -24,6 +24,8 @@ import {
 import { BOT_QUESTS, ENDINGS, NPCS } from "@/lib/world/content/story";
 import { isBuilt, isOnline, log, power } from "@/lib/world/game";
 import { bioBalanced } from "@/lib/world/biorhythm";
+import { WEAR_SLOTS } from "@/lib/world/content/wardrobe";
+import { wardrobeStats } from "@/lib/world/wardrobe";
 import type { WorldState } from "@/lib/world/types";
 
 export type AchievementBranch =
@@ -36,7 +38,8 @@ export type AchievementBranch =
   | "kosmos"
   | "ki"
   | "transzendenz"
-  | "labor";
+  | "labor"
+  | "garderobe";
 
 export interface AchievementDef {
   id: string;
@@ -64,6 +67,7 @@ export const BRANCH_LABEL: Record<AchievementBranch, string> = {
   ki: tr("branch::AI Awakening"),
   transzendenz: tr("branch::Transcendence"),
   labor: tr("branch::Lab"),
+  garderobe: tr("branch::Wardrobe"),
 };
 
 export const BRANCH_ORDER: readonly AchievementBranch[] = [
@@ -77,6 +81,7 @@ export const BRANCH_ORDER: readonly AchievementBranch[] = [
   "ki",
   "transzendenz",
   "labor",
+  "garderobe",
 ];
 
 const built = (s: WorldState): number => DEVICES.filter((d) => isBuilt(s, d.id)).length;
@@ -93,9 +98,13 @@ const mainEndings = ENDINGS.filter((e) => !e.secret).map((e) => e.id);
 const puzzlesSolved = (s: WorldState): number => PUZZLES.filter((p) => s.puzzles[p.id]).length;
 const solvedOf = (s: WorldState, ids: readonly string[]): number =>
   ids.filter((id) => s.puzzles[id]).length;
+/** Wardrobe targets: look changes, pieces owned, pieces replicated. */
+const WEAR_CHANGE_GOAL = 10;
+const WEAR_OWN_GOAL = 25;
+const WEAR_CRAFT_GOAL = 5;
 /** "Nebenschauplätze" target — ten of the optional side caches. */
 const SIDE_GOAL = 10;
-const visitable = ROOMS.filter((r) => r.theme !== "elevator");
+const visitable = ROOMS.filter((r) => r.theme !== "elevator" && r.theme !== "hub");
 const roomsVisited = (s: WorldState): number =>
   visitable.filter((r) => s.flags[`visited_${r.id}`]).length;
 const notesRead = (s: WorldState): number => NOTES.filter((n) => s.read[n.id]).length;
@@ -442,6 +451,14 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     check: (s) => !!s.endings.kristall,
   },
   {
+    id: "tonmeister",
+    title: tr("Sound Engineer"),
+    description: tr("Find Damien's hidden sound studio."),
+    branch: "labor",
+    hidden: true,
+    check: (s) => !!s.flags.visited_studio,
+  },
+  {
     id: "recycler",
     title: tr("Circular Economy"),
     description: tr("Empty every recycling source at least once."),
@@ -608,6 +625,104 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
       current: solvedOf(s, SHAFT_SIDE_PUZZLES),
       target: SHAFT_SIDE_PUZZLES.length,
     }),
+  },
+  // ── Garderobe (Jade's wardrobe, lib/world/wardrobe.ts) ──
+  {
+    id: "umgezogen",
+    title: tr("Change of Clothes"),
+    description: tr("Change something about Jade's look in the character menu."),
+    branch: "garderobe",
+    check: (s) => (s.counters.wear_changes ?? 0) >= 1,
+  },
+  {
+    id: "modenschau",
+    title: tr("Fashion Show"),
+    description: tr("Change {n} pieces of Jade's look. The bots have started rating them.", {
+      n: WEAR_CHANGE_GOAL,
+    }),
+    branch: "garderobe",
+    requires: ["umgezogen"],
+    check: (s) => (s.counters.wear_changes ?? 0) >= WEAR_CHANGE_GOAL,
+    progress: (s) => ({
+      current: Math.min(WEAR_CHANGE_GOAL, s.counters.wear_changes ?? 0),
+      target: WEAR_CHANGE_GOAL,
+    }),
+  },
+  {
+    id: "kleiderschrank",
+    title: tr("Walk-in Wardrobe"),
+    description: tr("Own {n} pieces for Jade's wardrobe.", { n: WEAR_OWN_GOAL }),
+    branch: "garderobe",
+    check: (s) => wardrobeStats(s).owned >= WEAR_OWN_GOAL,
+    progress: (s) => ({
+      current: Math.min(WEAR_OWN_GOAL, wardrobeStats(s).owned),
+      target: WEAR_OWN_GOAL,
+    }),
+  },
+  {
+    id: "fundbuero",
+    title: tr("Lost and Found"),
+    description: tr(
+      "Find every hidden piece of clothing in the lab — from the Upper Deck down into the Shaft.",
+    ),
+    branch: "garderobe",
+    check: (s) => {
+      const st = wardrobeStats(s);
+      return st.found >= st.totalFinds;
+    },
+    progress: (s) => {
+      const st = wardrobeStats(s);
+      return { current: st.found, target: st.totalFinds };
+    },
+  },
+  {
+    id: "erste_naht",
+    title: tr("First Stitch"),
+    description: tr("Replicate a piece of clothing at Jade's wardrobe replicator."),
+    branch: "garderobe",
+    check: (s) => s.wardrobe.crafted >= 1,
+  },
+  {
+    id: "schneiderin",
+    title: tr("Tailor of the Deep"),
+    description: tr("Replicate {n} pieces. Fabric scraps are a renewable resource, apparently.", {
+      n: WEAR_CRAFT_GOAL,
+    }),
+    branch: "garderobe",
+    requires: ["erste_naht"],
+    check: (s) => s.wardrobe.crafted >= WEAR_CRAFT_GOAL,
+    progress: (s) => ({
+      current: Math.min(WEAR_CRAFT_GOAL, s.wardrobe.crafted),
+      target: WEAR_CRAFT_GOAL,
+    }),
+  },
+  {
+    id: "gefaerbt",
+    title: tr("Dyed in the Wool"),
+    description: tr("Dye a piece in a new colour at the replicator."),
+    branch: "garderobe",
+    check: (s) => (s.counters.wear_dyed ?? 0) >= 1,
+  },
+  {
+    id: "von_kopf_bis_fuss",
+    title: tr("Head to Toe"),
+    description: tr("Wear something different from the first day in every one of the {n} slots.", {
+      n: WEAR_SLOTS.length,
+    }),
+    branch: "garderobe",
+    check: (s) => wardrobeStats(s).changedSlots >= WEAR_SLOTS.length,
+    progress: (s) => ({ current: wardrobeStats(s).changedSlots, target: WEAR_SLOTS.length }),
+  },
+  {
+    id: "dresscode_optional",
+    title: tr("Dress Code: Optional"),
+    description: tr("Propeller cap, bunny slippers and a fake moustache — at the same time."),
+    branch: "garderobe",
+    hidden: true,
+    check: (s) =>
+      s.wardrobe.look.head?.item === "propeller_cap" &&
+      s.wardrobe.look.feet?.item === "slippers" &&
+      s.wardrobe.look.face?.item === "fake_mustache",
   },
 ];
 

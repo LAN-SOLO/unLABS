@@ -17,6 +17,7 @@ import {
   signInOperator,
   deleteOperator,
 } from "./actions";
+import { VERSION_LABEL } from "@/lib/version";
 
 type Mode = "choose" | "create" | "import";
 
@@ -67,7 +68,7 @@ export default function SetupPage() {
             UNSTABLE LABORATORIES
           </h1>
           <div className="mt-1 text-xs tracking-wider text-gray-500">
-            _unOS DESKTOP v{process.env.NEXT_PUBLIC_APP_VERSION}
+            _unOS DESKTOP {VERSION_LABEL}
           </div>
         </div>
 

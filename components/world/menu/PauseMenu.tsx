@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { MerchShop } from "@/components/world/menu/MerchShop";
 import { SettingsPanel } from "@/components/world/menu/SettingsPanel";
 import {
   ConfirmDialog,
@@ -28,9 +29,19 @@ import {
 } from "@/lib/world/save";
 import { useSettings } from "@/lib/world/settings";
 import { tr } from "@/lib/i18n";
+import { VERSION_LABEL } from "@/lib/version";
 import type { WorldState } from "@/lib/world/types";
 
-type View = "main" | "save" | "load" | "ngplus" | "settings" | "controls" | "mainmenu" | "quit";
+type View =
+  | "main"
+  | "save"
+  | "load"
+  | "ngplus"
+  | "settings"
+  | "controls"
+  | "merch"
+  | "mainmenu"
+  | "quit";
 
 export interface PauseMenuProps {
   /** The running world state (read for playtime/slot; saved on "Save"). */
@@ -48,6 +59,8 @@ export interface PauseMenuProps {
   onTerminal(): void;
   /** Open the in-game help overlay. */
   onHelp(): void;
+  /** Open Jade's character menu (wardrobe, outfits, collection, replicator). */
+  onCharacter?(): void;
   /** Called after a successful "Save" (e.g. to show a toast). */
   onSaved?(slot: SlotId): void;
   /**
@@ -64,6 +77,7 @@ export function PauseMenu({
   onMainMenu,
   onTerminal,
   onHelp,
+  onCharacter,
   onSaved,
   onQuit,
 }: PauseMenuProps) {
@@ -83,6 +97,16 @@ export function PauseMenu({
 
   const items: MenuItem[] = [
     { id: "resume", label: tr("Resume"), onSelect: onResume },
+    ...(onCharacter
+      ? [
+          {
+            id: "character",
+            label: tr("Character"),
+            hint: tr("Wardrobe · O"),
+            onSelect: onCharacter,
+          },
+        ]
+      : []),
     { id: "save", label: tr("Save"), onSelect: () => setView("save") },
     { id: "load", label: tr("Load"), onSelect: () => setView("load") },
     ...(isPostgame(state)
@@ -99,6 +123,13 @@ export function PauseMenu({
     { id: "settings", label: tr("Settings"), onSelect: () => setView("settings") },
     { id: "controls", label: tr("Controls"), onSelect: () => setView("controls") },
     { id: "help", label: tr("Help"), onSelect: onHelp },
+    {
+      id: "merch",
+      label: tr("Merch"),
+      tone: "amber",
+      hint: tr("Shirts & hoodies"),
+      onSelect: () => setView("merch"),
+    },
     {
       id: "mainmenu",
       label: tr("Main menu"),
@@ -156,8 +187,9 @@ export function PauseMenu({
           <div className="relative">
             <MenuList items={items} index={index} onHover={setIndex} />
           </div>
-          <p className="relative mt-2 px-3 text-[10px] text-[#33FF33]/35">
-            {tr("↑ ↓ select · Enter confirm · Esc resume")}
+          <p className="relative mt-2 flex justify-between gap-3 px-3 text-[10px] text-[#33FF33]/35">
+            <span>{tr("↑ ↓ select · Enter confirm · Esc resume")}</span>
+            <span className="shrink-0 tabular-nums">{VERSION_LABEL}</span>
           </p>
         </div>
       </UiScale>
@@ -218,6 +250,7 @@ export function PauseMenu({
       {view === "controls" && (
         <SettingsPanel initialTab="steuerung" onClose={() => setView("main")} />
       )}
+      {view === "merch" && <MerchShop onClose={() => setView("main")} />}
       {view === "mainmenu" && (
         <ConfirmDialog
           title={tr("Back to the main menu?")}

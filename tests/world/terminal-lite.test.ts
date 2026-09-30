@@ -1,6 +1,7 @@
 /**
  * Room terminals — mini shell output, gating, purity and placements.
  */
+import { relocateAt } from "@/lib/world/content/map";
 import { describe, expect, it } from "vitest";
 import { __setLocaleForTests } from "@/lib/i18n";
 import { interiorFor, placementRect } from "@/lib/world/content/interior";
@@ -80,7 +81,9 @@ describe("terminal-lite commands", () => {
   it("scan needs the Material Scanner online", () => {
     const s = powered();
     s.floor = 3;
-    s.pos = [100, 1, 34];
+    // In the containment cell (authored on the design grid, see floorplan.ts).
+    const at = relocateAt(3, 100, 34);
+    s.pos = [at.x, 1, at.z];
     expect(text(s, "scan")).toContain("No scanner");
     s.built["MSC-001"] = 99;
     expect(isOnline(s, "MSC-001")).toBe(true);

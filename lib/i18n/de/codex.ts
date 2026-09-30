@@ -373,4 +373,53 @@ export const DE_CODEX: Record<string, string> = {
     "Rest einer Explosion (Volatilität > {limit}). Taugt für keinen Slot — bis der Nexus die Rückgewinnung erforscht.",
   "Jade's crystal system: every crystal captures the state of a moment, cut into {n} slices (_unSLC). Five traits, fixed at synthesis:":
     "Jades Kristallsystem: Jeder Kristall hält den Zustand eines Moments fest, geschnitten in {n} Slices (_unSLC). Fünf Eigenschaften, festgelegt bei der Synthese:",
+  // ── Lab systems (interfaces, links, firmware, archive) ──
+  "source::Network mirror (NET-001)": "Netzwerk-Spiegel (NET-001)",
+  "source::MCP registry": "MCP-Register",
+  "source::Service image — type the checksum": "Service-Image — Prüfsumme eintippen",
+  "Device interfaces": "Geräteoberflächen",
+  "Every built device has its own": "Jedes fertige Gerät hat seine eigene",
+  "A finished device is used through its own interface: its faceplate pages show live values and its controls (knobs, modes, switches). Every interface also has an Info page — “Read out” for the device's live readout, plus any records stored on the device — and a Firmware page. Hubs have a Links page.":
+    "Ein fertiges Gerät bedienst du über seine eigene Oberfläche: Ihre Frontplatten-Seiten zeigen Live-Werte und die Bedienelemente (Regler, Modi, Schalter). Jede Oberfläche hat außerdem eine Info-Seite — »Auslesen« für die Live-Auslesung des Geräts plus alle darauf gespeicherten Aufzeichnungen — und eine Firmware-Seite. Hubs haben eine Seite »Vernetzung«.",
+  "Switch on / off: top right. Offline devices show no pages, only “no power”.":
+    "Ein / aus: oben rechts. Geräte ohne Strom zeigen keine Seiten, nur »kein Strom«.",
+  "Service: the old build view — stages, slots, hosted puzzles and endings.":
+    "Service: die bekannte Bauansicht — Stufen, Slots, Rätsel des Geräts und Enden.",
+  "Records on an Info page appear only while the device is online.":
+    "Aufzeichnungen auf einer Info-Seite erscheinen nur, solange das Gerät online ist.",
+  "Links & hubs": "Vernetzung & Hubs",
+  "Devices that manage other devices": "Geräte, die andere Geräte verwalten",
+  "Six devices are hubs: on their Links page you connect other finished devices to them. A device can hang on several hubs, but on each kind of hub only once. The hub must be online; unlinking is free and instant. Some build stages need a link — the stage tells you which.":
+    "Sechs Geräte sind Hubs: Auf ihrer Seite »Vernetzung« verbindest du andere fertige Geräte mit ihnen. Ein Gerät kann an mehreren Hubs hängen, an jeder Hub-Art aber nur einmal. Der Hub muss online sein; Trennen geht sofort und kostet nichts. Manche Baustufen brauchen eine Verbindung — die Stufe sagt dir, welche.",
+  Hub: "Hub",
+  "What linking does": "Was die Verbindung bewirkt",
+  "Firmware updates": "Firmware-Updates",
+  "Check → download → verify → flash → reboot":
+    "Prüfen → laden → verifizieren → flashen → neustarten",
+  "Many devices have one lab update. It is flashed on the device's Firmware page while the device is online, and each update adds a feature. Where the image comes from decides what you need first:":
+    "Viele Geräte haben ein Labor-Update. Es wird auf der Firmware-Seite des Geräts geflasht, während das Gerät online ist, und jedes Update bringt eine Funktion. Woher das Image kommt, entscheidet, was du zuerst brauchst:",
+  "Network mirror: NET-001 needs its own update first (the firmware mirror), then link the device to NET-001.":
+    "Netzwerk-Spiegel: NET-001 braucht zuerst sein eigenes Update (den Firmware-Spiegel), dann das Gerät mit NET-001 verbinden.",
+  "MCP registry: add the device to the MCP's device registry (MCP → Links).":
+    "MCP-Register: das Gerät ins Geräteregister des MCP eintragen (MCP → Vernetzung).",
+  "Service image: already on board, but you must type its eight-character checksum. The labels are somewhere in the lab — search.":
+    "Service-Image: schon an Bord, aber du musst seine achtstellige Prüfsumme eintippen. Die Etiketten sind irgendwo im Labor — suchen.",
+  "A rollback restores the factory image at any time; the update stays available. Some build stages need a device to run a certain version.":
+    "Ein Zurücksetzen stellt jederzeit das Werks-Image wieder her; das Update bleibt verfügbar. Manche Baustufen brauchen ein Gerät mit einer bestimmten Version.",
+  Update: "Update",
+  "New feature": "Neue Funktion",
+  "The archive": "Das Archiv",
+  "Everything is written down somewhere": "Alles steht irgendwo geschrieben",
+  "Whatever you might look up in a guide, somebody in this lab wrote down: on boards and posters, in lockers and vents, on device screens. Every record you find lands in the journal under Archive.":
+    "Was du in einem Lösungsbuch nachschlagen würdest, hat in diesem Labor jemand aufgeschrieben: auf Tafeln und Postern, in Spinden und Lüftungsschächten, auf Gerätebildschirmen. Jede gefundene Aufzeichnung landet im Journal unter Archiv.",
+  "Read: boards, posters, screens and notes show their records when used.":
+    "Lesen: Tafeln, Poster, Bildschirme und Notizen zeigen ihre Aufzeichnungen beim Benutzen.",
+  "Search: lockers, cabinets, vents, shelves, boxes and paper piles offer “Search” — empty ones too, so looking is never a giveaway.":
+    "Durchsuchen: Spinde, Schränke, Lüftungsgitter, Regale, Kisten und Papierstapel bieten »Durchsuchen« an — auch leere, damit das Nachsehen nichts verrät.",
+  "Devices: records on a device's Info page, while it is online.":
+    "Geräte: Aufzeichnungen auf der Info-Seite eines Geräts, solange es online ist.",
+  "Combine: some knowledge exists only between several records. Once you have them all, the console in Journal → Archive asks a question — the answer follows from what you found.":
+    "Kombinieren: Manches Wissen steckt nur zwischen mehreren Aufzeichnungen. Hast du alle, stellt die Konsole unter Journal → Archiv eine Frage — die Antwort ergibt sich aus deinen Funden.",
+  "The harder a record is to find (open → tucked away → hidden → well hidden → buried), the further it reaches. The best ones need a device online, a tool in hand or a certain firmware.":
+    "Je schwerer eine Aufzeichnung zu finden ist (offen → abgelegt → versteckt → gut versteckt → vergraben), desto weiter reicht sie. Die besten brauchen ein Gerät online, ein Werkzeug in der Hand oder eine bestimmte Firmware.",
 };
