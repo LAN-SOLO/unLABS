@@ -162,7 +162,6 @@ export type ReserveSource =
   | "quest_reward"
   | "tutorial_skip"
   | "event"
-  | "test"
   | "daily"
   | "staking";
 
@@ -172,10 +171,18 @@ export const RESERVE_SOURCES: readonly ReserveSource[] = [
   "quest_reward",
   "tutorial_skip",
   "event",
-  "test",
   "daily",
   "staking",
 ] as const;
+
+/**
+ * Per-call ceiling for `reserve_burn_and_award`, mirrored in migration
+ * 20261002000001_security_hardening.sql. The largest legitimate payout is
+ * the 250 _unSC 30-day streak milestone; raise both together if a bigger
+ * reward ships. Staking payouts are exempt — they run server-side via
+ * `stake_claim_rewards()`, and the public RPC rejects source 'staking'.
+ */
+export const RESERVE_AWARD_MAX_PER_CALL = 500;
 
 export function isReserveSource(s: string): s is ReserveSource {
   return (RESERVE_SOURCES as readonly string[]).includes(s);
@@ -191,6 +198,7 @@ export interface AwardFromReserveOptions {
 
 export type AwardFromReserveErrorCode =
   | "invalid_amount"
+  | "amount_exceeds_cap"
   | "invalid_source"
   | "unauthorized"
   | "reserve_insufficient"
@@ -227,6 +235,14 @@ export async function awardFromReserve(
       newUserBalance: 0,
       reserveAvailable: 0,
       error: "invalid_amount",
+    };
+  }
+  if (opts.amount > RESERVE_AWARD_MAX_PER_CALL) {
+    return {
+      ok: false,
+      newUserBalance: 0,
+      reserveAvailable: 0,
+      error: "amount_exceeds_cap",
     };
   }
   if (!isReserveSource(opts.source)) {
@@ -282,7 +298,9 @@ export async function awardFromReserve(
             ? "source_not_allowed"
             : msg === "invalid_amount"
               ? "invalid_amount"
-              : "rpc_failed";
+              : msg === "amount_exceeds_cap"
+                ? "amount_exceeds_cap"
+                : "rpc_failed";
     return {
       ok: false,
       newUserBalance: Number(row.new_user_balance ?? 0),

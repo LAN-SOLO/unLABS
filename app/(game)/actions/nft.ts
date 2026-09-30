@@ -20,6 +20,7 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 import { createClient } from "@/lib/supabase/server";
+import { escapeLikePattern } from "@/lib/supabase/escapeLike";
 import { env } from "@/lib/env";
 import { isMintKeypairConfigured } from "@/lib/solana/mintKeypair";
 
@@ -68,7 +69,7 @@ export async function mintCrystalNft(crystalName: string): Promise<MintNftResult
     .from("crystals")
     .select("id, name, mint_address")
     .eq("owner_id", user.id)
-    .ilike("name", crystalName)
+    .ilike("name", escapeLikePattern(crystalName))
     .maybeSingle();
   const crystal = crystalRes.data as {
     id: string;

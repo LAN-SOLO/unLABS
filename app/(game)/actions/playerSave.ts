@@ -13,6 +13,7 @@
  * (inventory, balances) need server-authoritative writes.
  */
 
+import { guardPlayerSave } from "@/lib/panel/playerSaveGuard";
 import { createClient } from "@/lib/supabase/server";
 
 export interface PlayerSavePayload {
@@ -91,13 +92,19 @@ export async function savePlayerSave(payload: PlayerSavePayload): Promise<Player
     return { ok: false, error: "not_authenticated" };
   }
 
+  // Size cap + lastTickAt validation (future timestamps clamp to now).
+  const guarded = guardPlayerSave(payload);
+  if (!guarded.ok) {
+    return { ok: false, error: guarded.error };
+  }
+
   // Upsert the blob. RLS policies restrict writes to auth.uid() = user_id.
   // Cast through `never` — Database generic inference on `.upsert()` resolves
   // to `never` in this project; see app/(game)/terminal/page.tsx convention.
   const { error: saveError } = await supabase.from("player_saves").upsert(
     {
       user_id: user.id,
-      data: payload.data,
+      data: guarded.data,
       updated_at: new Date().toISOString(),
     } as never,
     { onConflict: "user_id" },
@@ -111,7 +118,7 @@ export async function savePlayerSave(payload: PlayerSavePayload): Promise<Player
   const { error: profileError } = await supabase
     .from("profiles")
     .update({
-      last_tick_at: new Date(payload.lastTickAt).toISOString(),
+      last_tick_at: new Date(guarded.lastTickAt).toISOString(),
     } as never)
     .eq("id", user.id);
 

@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { escapeLikePattern } from "@/lib/supabase/escapeLike";
 import { CRYSTAL_COLORS, SLICES_PER_CRYSTAL, COLOR_WAVELENGTHS } from "@/types";
 import type {
   CrystalColor,
@@ -253,7 +254,7 @@ export async function mintCrystal(name: string): Promise<MintResult> {
     .from("crystals")
     .select("id")
     .eq("owner_id", user.id)
-    .ilike("name", name)
+    .ilike("name", escapeLikePattern(name))
     .single();
 
   if (existingCrystal) {
@@ -380,7 +381,7 @@ export async function fetchCrystalByName(name: string): Promise<CrystalDetails |
       "id, name, color, volatility, rotation, state, era, is_genesis, total_power, slice_count, created_at, slices(id, crystal_id, position, power, is_active, hue, saturation, brightness, created_at)",
     )
     .eq("owner_id", user.id)
-    .ilike("name", name)
+    .ilike("name", escapeLikePattern(name))
     .single();
 
   if (error || !crystalData) return null;
@@ -427,7 +428,7 @@ export async function renameCrystal(oldName: string, newName: string): Promise<R
     .from("crystals")
     .select("id, name")
     .eq("owner_id", user.id)
-    .ilike("name", oldName)
+    .ilike("name", escapeLikePattern(oldName))
     .single();
 
   const crystal = crystalData as { id: string; name: string } | null;
@@ -441,7 +442,7 @@ export async function renameCrystal(oldName: string, newName: string): Promise<R
     .from("crystals")
     .select("id")
     .eq("owner_id", user.id)
-    .ilike("name", newName)
+    .ilike("name", escapeLikePattern(newName))
     .single();
 
   if (existingCrystal) {

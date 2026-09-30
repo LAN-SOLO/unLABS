@@ -2,46 +2,9 @@
 
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { createHmac, timingSafeEqual } from "crypto";
+import { PANEL_TOKEN_EXPIRY_MS, issuePanelToken, verifyPanelToken } from "@/lib/panel/panelToken";
 
 const PANEL_ACCESS_COOKIE = "panel_access_token";
-const TOKEN_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
-
-// SECURITY: Use environment variable for HMAC secret
-// Falls back to a derived key from Supabase anon key (not ideal, but better than nothing)
-function getHmacSecret(): string {
-  const secret = process.env.PANEL_TOKEN_SECRET;
-  if (secret) return secret;
-
-  // Fallback: derive from existing env var (still better than hardcoded)
-  const fallback =
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!fallback) {
-    throw new Error("No secret available for token signing");
-  }
-  return `panel_token_${fallback.slice(0, 32)}`;
-}
-
-/**
- * Generate HMAC-SHA256 signature for panel token.
- */
-function signToken(payload: string): string {
-  const hmac = createHmac("sha256", getHmacSecret());
-  hmac.update(payload);
-  return hmac.digest("hex");
-}
-
-/**
- * Verify HMAC-SHA256 signature using timing-safe comparison.
- */
-function verifySignature(payload: string, signature: string): boolean {
-  const expected = signToken(payload);
-  try {
-    return timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"));
-  } catch {
-    return false;
-  }
-}
 
 /**
  * Generate a secure panel access token.
@@ -59,18 +22,19 @@ export async function grantPanelAccess(): Promise<{ success: boolean; error?: st
     return { success: false, error: "Not authenticated" };
   }
 
-  // Create HMAC-signed token: userId:timestamp:signature
-  const timestamp = Date.now();
-  const payload = `${user.id}:${timestamp}`;
-  const signature = signToken(payload);
-  const token = `${payload}:${signature}`;
+  // HMAC-signed token: userId:timestamp:signature. Fails closed when no
+  // signing secret (PANEL_TOKEN_SECRET / service-role key) is configured.
+  const token = issuePanelToken(user.id);
+  if (!token) {
+    return { success: false, error: "Panel access is not configured" };
+  }
 
   const cookieStore = await cookies();
   cookieStore.set(PANEL_ACCESS_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    maxAge: TOKEN_EXPIRY_MS / 1000, // seconds
+    maxAge: PANEL_TOKEN_EXPIRY_MS / 1000, // seconds
     path: "/",
   });
 
@@ -99,37 +63,14 @@ export async function verifyPanelAccess(): Promise<{ valid: boolean; userId?: st
     return { valid: false };
   }
 
-  try {
-    const parts = token.split(":");
-    if (parts.length !== 3) {
-      return { valid: false };
-    }
-
-    const [userId, timestampStr, signature] = parts;
-    const timestamp = parseInt(timestampStr, 10);
-
-    // Verify token belongs to current user
-    if (userId !== user.id) {
-      return { valid: false };
-    }
-
-    // Verify token hasn't expired
-    if (Date.now() - timestamp > TOKEN_EXPIRY_MS) {
-      // Clean up expired token
-      cookieStore.delete(PANEL_ACCESS_COOKIE);
-      return { valid: false };
-    }
-
-    // Verify HMAC signature using timing-safe comparison
-    const payload = `${userId}:${timestampStr}`;
-    if (!verifySignature(payload, signature)) {
-      return { valid: false };
-    }
-
-    return { valid: true, userId: user.id };
-  } catch {
+  const check = verifyPanelToken(token, user.id);
+  if (!check.valid) {
+    // Clean up expired tokens so the cookie doesn't linger.
+    if (check.reason === "expired") cookieStore.delete(PANEL_ACCESS_COOKIE);
     return { valid: false };
   }
+
+  return { valid: true, userId: user.id };
 }
 
 /**

@@ -1,7 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { ACHIEVEMENTS } from "@/lib/game/achievements";
+import { STREAK_MILESTONES } from "@/lib/game/daily/engine";
+import { DAILY_CONTRACT_TEMPLATES } from "@/lib/game/daily/templates";
 import {
+  RESERVE_AWARD_MAX_PER_CALL,
   RESERVE_SOURCES,
   awardFromReserve,
   burnUnsc,
@@ -44,6 +48,36 @@ describe("isReserveSource", () => {
 
   it("accepts 'daily' (requires migration 20260808000001 on the DB side)", () => {
     expect(isReserveSource("daily")).toBe(true);
+  });
+});
+
+describe("reserve per-call cap", () => {
+  it("does not allow the removed 'test' source", () => {
+    expect(isReserveSource("test")).toBe(false);
+  });
+
+  it("covers every legitimate reserve payout (achievements, dailies, streak milestones)", () => {
+    const payouts = [
+      ...ACHIEVEMENTS.map((a) => a.reward.unsc),
+      ...DAILY_CONTRACT_TEMPLATES.map((t) => t.payout),
+      ...Object.values(STREAK_MILESTONES),
+    ];
+    expect(payouts.length).toBeGreaterThan(0);
+    for (const p of payouts) {
+      expect(p).toBeLessThanOrEqual(RESERVE_AWARD_MAX_PER_CALL);
+    }
+  });
+
+  it("rejects amounts above the cap before touching the RPC", async () => {
+    const rpc = vi.fn();
+    const r = await awardFromReserve(mockSupabase({ rpc }), {
+      userId: "u1",
+      amount: RESERVE_AWARD_MAX_PER_CALL + 1,
+      source: "daily",
+    });
+    expect(r.ok).toBe(false);
+    expect(r.error).toBe("amount_exceeds_cap");
+    expect(rpc).not.toHaveBeenCalled();
   });
 });
 
@@ -119,6 +153,7 @@ describe("awardFromReserve — RPC response handling", () => {
       ["unauthorized", "unauthorized"],
       ["source_not_allowed", "source_not_allowed"],
       ["invalid_amount", "invalid_amount"],
+      ["amount_exceeds_cap", "amount_exceeds_cap"],
       ["something_weird", "rpc_failed"],
     ];
     for (const [dbMsg, expected] of cases) {
@@ -138,7 +173,7 @@ describe("awardFromReserve — RPC response handling", () => {
       const r = await awardFromReserve(supabase, {
         userId: "u1",
         amount: 1,
-        source: "test",
+        source: "event",
       });
       expect(r.ok).toBe(false);
       expect(r.error).toBe(expected);
@@ -152,7 +187,7 @@ describe("awardFromReserve — RPC response handling", () => {
     const r = await awardFromReserve(supabase, {
       userId: "u1",
       amount: 1,
-      source: "test",
+      source: "event",
     });
     expect(r.ok).toBe(false);
     expect(r.error).toBe("rpc_failed");
@@ -165,7 +200,7 @@ describe("awardFromReserve — RPC response handling", () => {
     const r = await awardFromReserve(supabase, {
       userId: "u1",
       amount: 1,
-      source: "test",
+      source: "event",
     });
     expect(r.ok).toBe(false);
     expect(r.error).toBe("rpc_no_row");
