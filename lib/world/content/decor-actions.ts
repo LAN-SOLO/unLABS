@@ -50,6 +50,8 @@ export interface DecorEffects {
   items?: { item: string; count: number }[];
   insights?: string[];
   buff?: DecorBuff;
+  /** Care for the room (lib/world/aging.ts): "water" its plants. */
+  care?: "water";
 }
 
 export interface DecorOutcome {
@@ -1408,7 +1410,7 @@ export const DECOR_ACTIONS: readonly DecorActionDef[] = [
             : tr(
                 "I pour a little from the watering can. The leaves straighten up, almost visibly. Down here, everything grows that dares to.",
               ),
-        effects: { buff: WACHSTUM },
+        effects: { buff: WACHSTUM, care: "water" },
         cooldown: 600,
       },
     ],

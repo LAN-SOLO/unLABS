@@ -32,6 +32,7 @@ import {
 } from "@/lib/world/content/decor-actions";
 import { addItem, bump, evalCond, grant } from "@/lib/world/game";
 import { buffKey, type ActiveBuff } from "@/lib/world/buffs";
+import { tidyRoom, waterRoom } from "@/lib/world/aging";
 import { roomAt } from "@/lib/world/content/map";
 import { DECOR_BY_ID, decorSize } from "@/lib/world/models/decor";
 import { SEATS } from "@/lib/world/stand-spots";
@@ -298,6 +299,9 @@ export function runDecorAction(
   }
   bump(state, usesKey(action.id));
   bump(state, "decor_used");
+  // Using the room tidies it a little; watering keeps its plants growing.
+  tidyRoom(state, room);
+  if (o.effects?.care === "water") waterRoom(state, room);
   if (!state.flags[seenFlag(action.id)]) {
     state.flags[seenFlag(action.id)] = true;
     bump(state, "decor_found");
