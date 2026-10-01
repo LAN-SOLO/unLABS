@@ -561,3 +561,35 @@ export function traitCode(tr: SliceTraits): string {
   const io = tr.io === "IO" ? "I/O" : tr.io;
   return `T${tr.tier} · ${io} · ${tr.era} bit · ${tr.rotation}`;
 }
+
+// ── Capture names (release convention, as in the undevbook) ─────
+
+/** Release date of the captures (YYMMDD). */
+export const RELEASE_DATE = "180307";
+
+/** Tint letter of a colour in capture file names. */
+export const COLOR_LETTER: Record<SliceColor, string> = {
+  white: "w",
+  green: "g",
+  yellow: "y",
+  blue: "b",
+  purple: "p",
+  red: "r",
+  orange: "o",
+  rgb: "rgb",
+};
+
+/**
+ * Capture file name (no extension), e.g.
+ * `usc_unETH_ID-0089_P02_L02_pure_o_T2_64bit_CW_O_180307` — see the
+ * undevbook's `captureName` for the full convention.
+ */
+export function captureName(tr: SliceTraits, date = RELEASE_DATE): string {
+  const mono = tr.style === "mono";
+  const rgb = !mono && tr.color === "rgb";
+  const phase = mono ? "P01_L01" : rgb ? "P03_L04" : "P02_L02";
+  const style = rgb ? "RGB" : `${mono ? "mono" : "pure"}_${COLOR_LETTER[tr.color]}`;
+  const bit = mono ? "" : `_${tr.era}bit`;
+  const id = String(tr.id).padStart(4, "0");
+  return `usc_unETH_ID-${id}_${phase}_${style}_T${tr.tier}${bit}_${tr.rotation}_${tr.io}_${date}`;
+}
