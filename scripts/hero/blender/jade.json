@@ -1,0 +1,66 @@
+{
+  "$comment": "Jade Lawrence for MPFB2 (Blender). phenotype = MakeHuman macro sliders (gender 0 = female); targets = face/body targets (name \u2192 weight 0..1, the decr/incr pair is chosen by the name). Tuned against ~/Desktop/JadeLawrence/Portrait_lawrence_usc.jpg (never copied into the repo). Build: blender -b -P scripts/hero/blender/jade_mpfb.py -- --out .crystal/jade",
+  "phenotype": {
+    "gender": 0.0,
+    "age": 0.75,
+    "muscle": 0.45,
+    "weight": 0.5,
+    "proportions": 0.75,
+    "height": 0.68,
+    "cupsize": 0.45,
+    "firmness": 0.55,
+    "race": {
+      "caucasian": 1.0,
+      "asian": 0.0,
+      "african": 0.0
+    }
+  },
+  "targets": {
+    "head-oval": 0.35,
+    "head-round": 0.55,
+    "head-scale-vert-incr": 0.15,
+    "forehead-scale-vert-incr": 0.45,
+    "forehead-trans-backward": 0.2,
+    "cheek-bones-incr": 0.55,
+    "cheek-volume-incr": 0.6,
+    "cheek-trans-up": 0.3,
+    "nose-scale-vert-decr": 0.15,
+    "nose-point-width-incr": 0.5,
+    "nose-volume-incr": 0.15,
+    "nose-flaring-incr": 0.25,
+    "nose-trans-up": 0.15,
+    "mouth-scale-horiz-incr": 0.55,
+    "mouth-upperlip-volume-decr": 0.45,
+    "mouth-lowerlip-volume-decr": 0.2,
+    "mouth-angles-up": 0.45,
+    "mouth-laugh-lines-out": 0.2,
+    "chin-width-incr": 0.5,
+    "eye-scale-decr": 0.35,
+    "l-eye-height2-decr": 0.25,
+    "r-eye-height2-decr": 0.25,
+    "eyebrows-trans-up": 0.6,
+    "eyebrows-angle-up": 0.4,
+    "neck-scale-horiz-decr": 0.15,
+    "mouth-trans-up": 0.35,
+    "nose-scale-horiz-incr": 0.35,
+    "chin-height-incr": 0.2,
+    "head-fat-incr": 0.3
+  },
+  "bodyparts": {
+    "eyes": "high-poly",
+    "eyes_material": "brown",
+    "eyebrows": "eyebrow010",
+    "eyelashes": "eyelashes02",
+    "tongue": "tongue01"
+  },
+  "skin": "young_caucasian_female",
+  "expressions": {
+    "mouth-corner-puller": 0.35,
+    "mouth-upward-retraction": 0.05,
+    "eye-left-slit": 0.35,
+    "eye-right-slit": 0.35,
+    "eyebrows-left-extern-up": 0.3,
+    "eyebrows-right-extern-up": 0.3
+  },
+  "clothes": ["female_elegantsuit01"]
+}
