@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { WorldClient } from "./world-client";
+import { DesktopGate } from "@/components/native/DesktopGate";
 
 export const metadata = { title: "_unLABS · Lab World" };
 
@@ -15,5 +16,9 @@ export default async function WorldPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  return <WorldClient />;
+  return (
+    <DesktopGate>
+      <WorldClient />
+    </DesktopGate>
+  );
 }

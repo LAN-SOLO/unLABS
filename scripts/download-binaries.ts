@@ -1,7 +1,7 @@
 /**
  * Download platform-specific binaries for PostgreSQL, PostgREST, and GoTrue.
  *
- * Usage: npx ts-node scripts/download-binaries.ts [--platform darwin-arm64|darwin-x64|win32-x64]
+ * Usage: npx ts-node scripts/download-binaries.ts [--platform darwin-arm64|darwin-x64|win32-x64|linux-x64]
  *
  * Downloads are placed in bin/{platform}/.
  */
@@ -39,12 +39,23 @@ const SHA256: Record<string, string> = {
     "077349a572279a4cf99ff306032f665ccba018e78cc4386d13237960094d7b8d",
   [`auth-v${GOTRUE_VERSION}-darwin-arm64.tar.gz`]:
     "aeadc0226ceab5f5d525311887667521047589dc7d1a407488c7ae08fa060892",
+  // Linux x64 (2026-10-01). Postgres: SHA-1 matches Maven Central's .sha1
+  // (035ad4fb207aee53c1f5c2965a336fc36bc9186d). GoTrue: equals the digest
+  // GitHub publishes for the release asset. PostgREST publishes no digest
+  // for v12.2.8 — pinned on first download over TLS from the GitHub release
+  // (same trust basis as the macOS/Windows PostgREST pins).
+  [`embedded-postgres-binaries-linux-amd64-${POSTGRES_VERSION}.jar`]:
+    "bfee37aa1ab2d465abf471ad2a478fb31a527fbae1c2e7bda024544244870eb2",
+  [`postgrest-v${POSTGREST_VERSION}-linux-static-x86-64.tar.xz`]:
+    "7da60261909ab7e6fc2f0c0c1d484985f17710151e1c94e8229559eaa23cd611",
+  [`auth-v${GOTRUE_VERSION}-x86.tar.gz`]:
+    "f3472263b480d2192f34ab2e38687c1a42072617c4967ebc4fdc4087fd3bec77",
 };
 
 // ── Platform detection ────────────────────────────────────────────────
 
-type Platform = "darwin-arm64" | "darwin-x64" | "win32-x64";
-const PLATFORMS: readonly Platform[] = ["darwin-arm64", "darwin-x64", "win32-x64"];
+type Platform = "darwin-arm64" | "darwin-x64" | "win32-x64" | "linux-x64";
+const PLATFORMS: readonly Platform[] = ["darwin-arm64", "darwin-x64", "win32-x64", "linux-x64"];
 
 function detectPlatform(): Platform {
   const arg = process.argv.find((a) => a.startsWith("--platform="));
@@ -61,6 +72,7 @@ function detectPlatform(): Platform {
   if (platform === "darwin" && arch === "arm64") return "darwin-arm64";
   if (platform === "darwin" && arch === "x64") return "darwin-x64";
   if (platform === "win32" && arch === "x64") return "win32-x64";
+  if (platform === "linux" && arch === "x64") return "linux-x64";
 
   throw new Error(`Unsupported platform: ${platform}-${arch}`);
 }
@@ -114,7 +126,11 @@ function downloadPostgres(platform: Platform, binDir: string): void {
   ensureDir(tmpDir);
 
   // Use embedded-postgres-binaries from zonky.io
-  const os = platform.startsWith("darwin") ? "darwin" : "windows";
+  const os = platform.startsWith("darwin")
+    ? "darwin"
+    : platform.startsWith("linux")
+      ? "linux"
+      : "windows";
   const mavenArch = platform.includes("arm64") ? "arm64v8" : "amd64";
   // Inner archive uses different naming: arm_64 not arm64v8, x86_64 not amd64
   const innerArch = platform.includes("arm64") ? "arm_64" : "x86_64";
@@ -186,6 +202,11 @@ function downloadPostgREST(platform: Platform, binDir: string): void {
     os = "macos";
     arch = "x86-64";
     fileExt = "tar.xz";
+  } else if (platform === "linux-x64") {
+    // Statically linked: runs on any glibc/musl distro and inside the Flatpak sandbox.
+    os = "linux-static";
+    arch = "x86-64";
+    fileExt = "tar.xz";
   } else {
     os = "windows";
     arch = "x86-64";
@@ -232,6 +253,9 @@ function downloadGoTrue(platform: Platform, binDir: string): void {
   if (platform === "darwin-arm64") {
     os = "darwin";
     arch = "arm64";
+  } else if (platform === "linux-x64") {
+    os = "";
+    arch = "x86";
   } else {
     // supabase/auth publishes no Windows or Intel-Mac release binaries
     // (only linux x86/arm64 and darwin-arm64). Build it from the tagged
@@ -244,8 +268,9 @@ function downloadGoTrue(platform: Platform, binDir: string): void {
     );
   }
 
-  const fileExt = platform.startsWith("win") ? "tar.gz" : "tar.gz";
-  const url = `https://github.com/supabase/auth/releases/download/v${GOTRUE_VERSION}/auth-v${GOTRUE_VERSION}-${os}-${arch}.tar.gz`;
+  // Linux assets carry no OS in their name (auth-v<ver>-x86.tar.gz).
+  const asset = os ? `${os}-${arch}` : arch;
+  const url = `https://github.com/supabase/auth/releases/download/v${GOTRUE_VERSION}/auth-v${GOTRUE_VERSION}-${asset}.tar.gz`;
 
   const tmpDir = join(binDir, "_gt_tmp");
   ensureDir(tmpDir);

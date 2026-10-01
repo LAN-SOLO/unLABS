@@ -1,7 +1,10 @@
 /**
  * Full desktop build pipeline.
  *
- * Usage: npx ts-node scripts/build-desktop.ts [--mac] [--win] [--all]
+ * Usage: npx ts-node scripts/build-desktop.ts [--mac] [--win] [--linux] [--all]
+ *
+ * Linux packages as Flatpak (+ AppImage fallback) and needs a Linux host
+ * with flatpak-builder and the 24.08 runtimes (see docs/NATIVE.md).
  *
  * Steps:
  * 0. Verify the bundled migrations carry all game content of the local
@@ -28,12 +31,14 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const buildMac = args.includes("--mac") || args.includes("--all");
   const buildWin = args.includes("--win") || args.includes("--all");
+  const buildLinux = args.includes("--linux") || args.includes("--all");
 
-  if (!buildMac && !buildWin) {
-    console.log("Usage: npx ts-node scripts/build-desktop.ts [--mac] [--win] [--all]");
-    console.log("  --mac   Build macOS DMG");
-    console.log("  --win   Build Windows installer");
-    console.log("  --all   Build both");
+  if (!buildMac && !buildWin && !buildLinux) {
+    console.log("Usage: npx ts-node scripts/build-desktop.ts [--mac] [--win] [--linux] [--all]");
+    console.log("  --mac    Build macOS DMG");
+    console.log("  --win    Build Windows installer");
+    console.log("  --linux  Build Linux Flatpak + AppImage (Linux host)");
+    console.log("  --all    Build all three");
     process.exit(1);
   }
 
@@ -51,10 +56,20 @@ async function main(): Promise<void> {
       "npx ts-node scripts/download-binaries.ts --platform=win32-x64",
       "Step 1b: Binaries (Windows)",
     );
+  if (buildLinux)
+    run(
+      "npx ts-node scripts/download-binaries.ts --platform=linux-x64",
+      "Step 1c: Binaries (Linux)",
+    );
 
   // 2. Build Next.js
   // UNLABS_DESKTOP_BUILD lets the CSP allow the bundled gateway (next.config.mjs).
-  run("pnpm build", "Step 2: Build Next.js production bundle", { UNLABS_DESKTOP_BUILD: "1" });
+  // NEXT_PUBLIC_DESKTOP_ONLY turns on the browser gate (lib/native/gate.ts):
+  // the bundled game runs only inside the desktop app.
+  run("pnpm build", "Step 2: Build Next.js production bundle", {
+    UNLABS_DESKTOP_BUILD: "1",
+    NEXT_PUBLIC_DESKTOP_ONLY: "1",
+  });
 
   // 3. Compile Electron TypeScript
   run("npx tsc -p electron/tsconfig.json", "Step 3: Compile Electron main process");
@@ -63,6 +78,7 @@ async function main(): Promise<void> {
   const targets: string[] = [];
   if (buildMac) targets.push("--mac");
   if (buildWin) targets.push("--win");
+  if (buildLinux) targets.push("--linux");
 
   run(
     `npx electron-builder ${targets.join(" ")} --config electron-builder.config.ts`,

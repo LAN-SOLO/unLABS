@@ -16,6 +16,7 @@ import { startNextServer, stopNextServer } from "./services/nextServer";
 import { runMigrations } from "./services/migrator";
 import { generateAnonKey, generateServiceRoleKey } from "./config/jwt";
 import { loadOrCreateSecret } from "./config/secrets";
+import { gpuSwitches } from "./gpu-switches";
 
 // ── State ─────────────────────────────────────────────────────────────
 
@@ -33,6 +34,12 @@ let anonKey: string;
 let serviceRoleKey: string;
 let dbPassword: string;
 let operatorSecret: string;
+
+// GPU: the fast GPU and hardware WebGL2 for the game (before app "ready").
+for (const [name, value] of gpuSwitches(process.platform, process.env)) {
+  if (value === undefined) app.commandLine.appendSwitch(name);
+  else app.commandLine.appendSwitch(name, value);
+}
 
 // Test hook: run against a throw-away profile (e.g. smoke tests) without
 // touching the player's real data.

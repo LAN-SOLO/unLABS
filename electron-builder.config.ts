@@ -94,6 +94,51 @@ const config: Configuration = {
     artifactName: "UnstableLabs-Setup-${version}.exe",
     extraResources: [{ from: "bin/win32-x64", to: "bin", filter: ["**/*"] }],
   },
+  linux: {
+    // Flatpak is the primary Linux package (sandboxed, distro-independent,
+    // Flathub-ready); the AppImage is a no-install fallback for testers.
+    target: [
+      { target: "flatpak", arch: ["x64"] },
+      { target: "AppImage", arch: ["x64"] },
+    ],
+    icon: "public/icon-1024.png",
+    category: "Game",
+    executableName: "unstablelabs",
+    artifactName: "UnstableLabs-${version}-${arch}.${ext}",
+    synopsis: "A lab that sharpens from pixels to crystal clear",
+    description:
+      "UnstableLabs — an isometric lab game: wake up in a pixel world and invent it clear.",
+    extraResources: [{ from: "bin/linux-x64", to: "bin", filter: ["**/*"] }],
+  },
+  flatpak: {
+    // electron-builder's defaults (20.08) are end-of-life; 24.08 is the
+    // current freedesktop runtime and Electron BaseApp branch.
+    runtime: "org.freedesktop.Platform",
+    runtimeVersion: "24.08",
+    sdk: "org.freedesktop.Sdk",
+    base: "org.electronjs.Electron2.BaseApp",
+    baseVersion: "24.08",
+    branch: "stable",
+    useWaylandFlags: false,
+    finishArgs: [
+      // Window: Wayland first, X11 only where no Wayland session exists.
+      "--socket=wayland",
+      "--socket=fallback-x11",
+      "--share=ipc",
+      // GPU (WebGL2 via Mesa / vendor drivers).
+      "--device=dri",
+      // Game audio (Web Audio).
+      "--socket=pulseaudio",
+      // The game is a local stack: Next, Postgres, PostgREST and GoTrue talk
+      // over 127.0.0.1. Flatpak has no loopback-only permission, so the
+      // network share is required; the gateway/Next still accept loopback
+      // hosts only (lib/auth/loopback.ts, docs/AUDIT.md).
+      "--share=network",
+      // No home-directory access: saves and the database live in the
+      // sandbox's own ~/.var/app/<id>/ data dir (Electron userData).
+      "--talk-name=org.freedesktop.Notifications",
+    ],
+  },
   nsis: {
     oneClick: false,
     allowToChangeInstallationDirectory: true,

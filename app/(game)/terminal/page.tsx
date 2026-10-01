@@ -8,6 +8,7 @@ import { EmbedBridge } from "./embed-bridge";
 import { EMBED_TERMINAL_PATH, loginUrlFor } from "@/lib/auth/next";
 import { QuestOverlay } from "@/components/quest/QuestOverlay";
 import { AnomalyOverlay } from "@/components/quest/AnomalyOverlay";
+import { DesktopGate } from "@/components/native/DesktopGate";
 
 interface ProfileData {
   username: string | null;
@@ -48,50 +49,52 @@ export default async function TerminalPage({ searchParams }: TerminalPageProps) 
   const availableBalance = balance?.available || 0;
 
   return (
-    <div className="min-h-screen bg-black font-mono text-green-500">
-      {/* Scanline overlay */}
-      <div
-        className="pointer-events-none fixed inset-0 z-50"
-        style={{
-          background:
-            "repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 2px)",
-        }}
-      />
+    <DesktopGate>
+      <div className="min-h-screen bg-black font-mono text-green-500">
+        {/* Scanline overlay */}
+        <div
+          className="pointer-events-none fixed inset-0 z-50"
+          style={{
+            background:
+              "repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 2px)",
+          }}
+        />
 
-      {/* CRT glow effect */}
-      <div
-        className="pointer-events-none fixed inset-0 z-40"
-        style={{
-          boxShadow: "inset 0 0 100px rgba(34, 197, 94, 0.1)",
-        }}
-      />
+        {/* CRT glow effect */}
+        <div
+          className="pointer-events-none fixed inset-0 z-40"
+          style={{
+            boxShadow: "inset 0 0 100px rgba(34, 197, 94, 0.1)",
+          }}
+        />
 
-      <TerminalFrame
-        username={username}
-        availableBalance={availableBalance}
-        logoutAction={logout}
-        embed={embed}
-      >
-        <TerminalPowerWrapper userId={user.id} username={username} balance={availableBalance} />
-      </TerminalFrame>
+        <TerminalFrame
+          username={username}
+          availableBalance={availableBalance}
+          logoutAction={logout}
+          embed={embed}
+        >
+          <TerminalPowerWrapper userId={user.id} username={username} balance={availableBalance} />
+        </TerminalFrame>
 
-      {/* Phase 2: quest overlay. Renders null when there is no active step. */}
-      <QuestOverlay />
+        {/* Phase 2: quest overlay. Renders null when there is no active step. */}
+        <QuestOverlay />
 
-      {/* Phase 3: ambient anomaly effect. Active once EP1 ep1.reveal fires. */}
-      <AnomalyOverlay />
+        {/* Phase 3: ambient anomaly effect. Active once EP1 ep1.reveal fires. */}
+        <AnomalyOverlay />
 
-      {/* Back into the lab world — the terminal is one area of the lab. In the
+        {/* Back into the lab world — the terminal is one area of the lab. In the
           overlay the world's own "Back to the lab" button replaces the link. */}
-      {embed ? <EmbedBridge /> : <LabReturnLink />}
+        {embed ? <EmbedBridge /> : <LabReturnLink />}
 
-      {/* Phase 4: persistent link to the production hub. */}
-      <a
-        href="/lab"
-        className="fixed right-4 bottom-4 z-40 border border-green-500/60 bg-black/80 px-3 py-1 font-mono text-xs text-green-300 hover:bg-green-500/20"
-      >
-        &gt; /lab · production
-      </a>
-    </div>
+        {/* Phase 4: persistent link to the production hub. */}
+        <a
+          href="/lab"
+          className="fixed right-4 bottom-4 z-40 border border-green-500/60 bg-black/80 px-3 py-1 font-mono text-xs text-green-300 hover:bg-green-500/20"
+        >
+          &gt; /lab · production
+        </a>
+      </div>
+    </DesktopGate>
   );
 }
