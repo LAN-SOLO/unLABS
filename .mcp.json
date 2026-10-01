@@ -3,6 +3,12 @@
     "supabase": {
       "type": "http",
       "url": "https://mcp.supabase.com/mcp?project_ref=bnqnvpxcmzdeuyxtffwh"
+    },
+    "crystal": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--quiet", "--script", "scripts/crystal/mcp/server.py"],
+      "env": {}
     }
   }
 }
