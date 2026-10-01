@@ -14,6 +14,9 @@ import { DE_MAP_UI } from "@/lib/i18n/de/map-ui";
 import { DE_FLOORPLAN } from "@/lib/i18n/de/floorplan";
 import { DE_TITLE } from "@/lib/i18n/de/title";
 import { DE_MENU } from "@/lib/i18n/de/menu";
+import { DE_CLARITY } from "@/lib/i18n/de/clarity";
+import { DE_MATRIX } from "@/lib/i18n/de/matrix";
+import { DE_NATIVE } from "@/lib/i18n/de/native";
 import { DE_MERCH } from "@/lib/i18n/de/merch";
 import { DE_PUZZLES } from "@/lib/i18n/de/puzzles";
 import { DE_SCENES } from "@/lib/i18n/de/scenes";
@@ -87,6 +90,9 @@ export const DE_AREAS: Readonly<Record<string, Readonly<Record<string, string>>>
   archiveCombos: DE_ARCHIVE_COMBOS,
   archiveSystems: DE_ARCHIVE_SYSTEMS,
   menu: DE_MENU,
+  clarity: DE_CLARITY,
+  matrix: DE_MATRIX,
+  native: DE_NATIVE,
   floorplan: DE_FLOORPLAN,
   title: DE_TITLE,
   merch: DE_MERCH,

@@ -319,7 +319,8 @@ export interface PropDef {
     | "rack"
     | "lamp"
     | "barrel"
-    | "sofa";
+    | "sofa"
+    | "matrix";
   rot?: 0 | 1 | 2 | 3;
   /** Finer look hint for the renderer (e.g. "telescope", "coffee", "bed"); falls back to `model`. */
   variant?: string;
@@ -505,6 +506,54 @@ export interface WorldState {
   experiments: Experiment[];
   /** Jade's wardrobe: owned pieces, dyes, the current look, presets, replicator job (lib/world/wardrobe.ts). */
   wardrobe: WardrobeState;
+  /** The Matrix Chamber: extraction job, extracted slices, composed crystals (lib/world/matrix/). */
+  matrix: MatrixState;
+}
+
+/** Field strength of a Matrix extraction (energy level 1…5). */
+export type MatrixField = 1 | 2 | 3 | 4 | 5;
+
+/** A running extraction. Times are wall-clock epoch milliseconds: it runs on while the game is closed. */
+export interface MatrixJob {
+  start: number;
+  end: number;
+  field: MatrixField;
+  /** The ledger day the chamber is tuned to (ISO date, content/eth-history.json). */
+  day: string;
+  /** Seed of the outcome (decided at the start, revealed at the end). */
+  seed: number;
+}
+
+/** One slice that dissolved out of the Matrix: a frame of a released unETH capture. */
+export interface MatrixSlice {
+  /** Unique within the save (`m1`, `m2`, …). */
+  uid: string;
+  /** unETH archive token ID (content/uneth-release.json). */
+  token: number;
+  /** Position 1…30 in the capture. */
+  pos: number;
+  /** Epoch ms when it materialised. */
+  at: number;
+  /** Ledger day the chamber was tuned to. */
+  day: string;
+  field: MatrixField;
+}
+
+/** A crystal composed from slices: 30 positions, each a slice uid or empty. */
+export interface MatrixCrystal {
+  id: string;
+  name: string;
+  slots: (string | null)[];
+  /** Epoch ms of the last save. */
+  at: number;
+}
+
+export interface MatrixState {
+  job: MatrixJob | null;
+  slices: MatrixSlice[];
+  crystals: MatrixCrystal[];
+  /** Next uid number for slices / crystals. */
+  next: number;
 }
 
 export interface WardrobeState {

@@ -1,5 +1,6 @@
 "use client";
 
+import { agingTick, waterRoom } from "@/lib/world/aging";
 import { tr } from "@/lib/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { PuzzleView } from "@/components/world/puzzles/PuzzleView";
@@ -53,6 +54,8 @@ import { PersonalComputer } from "@/components/world/pc/PersonalComputer";
 import { PC_PROP } from "@/lib/world/content/quarters";
 import { STUDIO_PROP } from "@/lib/world/content/studio";
 import { StudioPanel } from "@/components/world/studio/StudioPanel";
+import { MatrixPanel } from "@/components/world/matrix/MatrixPanel";
+import { MATRIX_PROP, debugFeed, debugFinishNow, debugWake } from "@/lib/world/matrix/rules";
 import { CharacterMenu, type CharacterTab } from "@/components/world/wardrobe/CharacterMenu";
 import { WearIcon } from "@/components/world/wardrobe/WearIcon";
 import { REPLICATOR_PROP } from "@/lib/world/content/wardrobe";
@@ -180,6 +183,7 @@ type Overlay =
   | { kind: "pc" }
   /** Damien's Sound Studio: the mixing desk (prop `studio_console`, Level −2). */
   | { kind: "studio" }
+  | { kind: "matrix" }
   /**
    * Jade's character menu (O, pause menu, inventory; the wardrobe and the
    * replicator “Needle's Eye” in her quarters open it with `atWardrobe`).
@@ -613,6 +617,11 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
             open({ kind: "studio" });
             return;
           }
+          // The Matrix Chamber (post-game slices, lib/world/matrix/).
+          if (p.id === MATRIX_PROP) {
+            open({ kind: "matrix" });
+            return;
+          }
           // Jade's wardrobe replicator “Needle's Eye” (stands at the wardrobe, mirror included).
           if (p.id === REPLICATOR_PROP) {
             open({ kind: "character", atWardrobe: true, atReplicator: true, tab: "replicator" });
@@ -732,8 +741,24 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
             __lab: {
               engine,
               world,
+              /** Matrix Chamber dev helpers: finish the running extraction now, feed field-5 materials. */
+              matrix: {
+                finishNow: () => world.act((st) => debugFinishNow(st, Date.now())),
+                feed: () => world.act((st) => debugFeed(st)),
+                open: () => open({ kind: "matrix" }),
+                wake: () => world.act((st) => debugWake(st)),
+              },
               get audio() {
                 return getAudioRef.current();
+              },
+              /** Aging dev helpers: fast-forward the slow processes, water a room, neglect it. */
+              aging: {
+                advance: (seconds: number, lit = true) =>
+                  world.act((st) => {
+                    st.playTime += seconds;
+                    agingTick(st, seconds, () => lit);
+                  }),
+                water: (room: string) => world.act((st) => waterRoom(st, room)),
               },
             },
           });
@@ -1516,6 +1541,7 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
           />
         )}
         {overlay?.kind === "studio" && <StudioPanel getAudio={director.getAudio} onClose={close} />}
+        {overlay?.kind === "matrix" && <MatrixPanel api={api} onClose={close} />}
         {overlay?.kind === "deviceui" && (
           <DeviceInterface
             key={overlay.id}

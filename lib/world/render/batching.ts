@@ -303,6 +303,11 @@ export class StaticBatcher {
     this.fixed.set(k, list);
   }
 
+  /** Forget every tile signature: the next `update` re-merges all tiles (fixed parts changed). */
+  invalidate(): void {
+    for (const t of this.tiles.values()) t.sig = "";
+  }
+
   /** Number of tile meshes (each costs one draw per material class). */
   get tileCount(): number {
     return this.tiles.size;

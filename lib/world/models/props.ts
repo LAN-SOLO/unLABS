@@ -417,8 +417,162 @@ function benchRig(): PropRig {
   };
 }
 
+/**
+ * The Matrix Chamber (post-game station, lib/world/matrix/): an octagonal
+ * plinth, a glass column between a floor and a ceiling emitter with a
+ * slice of light turning inside, four lens emitters on the diagonals aimed
+ * at the column, the eight-armed matrix star on top (the mockup's top view)
+ * and the operator console in front. Faces +z (the console side).
+ */
+function matrixRig(): PropRig {
+  const W = 20;
+  const H = 26;
+  const D = 25;
+  const cx = 9.5;
+  const cz = 9.5;
+  const m = new Model(W, H, D);
+  /** Octagon "radius" (a regular octagon's distance function). */
+  const oct = (x: number, z: number) => {
+    const dx = Math.abs(x - cx);
+    const dz = Math.abs(z - cz);
+    return Math.max(dx, dz, (dx + dz) / Math.SQRT2);
+  };
+
+  // Plinth: dark skirt, hazard rim, deck with a cerulean channel octagon.
+  for (let z = 0; z < W; z++)
+    for (let x = 0; x < W; x++) {
+      const r = oct(x + 0.5, z + 0.5);
+      if (r > 9.9) continue;
+      m.set(x, 0, z, C.metal_dark);
+      const a = Math.atan2(z - cz, x - cx) + Math.PI;
+      const chevron = Math.floor((a / TAU) * 32) % 2 === 0;
+      let c: number = C.steel_dark;
+      if (r > 9) c = chevron ? C.safety_yellow : C.hazard_black;
+      else if (Math.abs(r - 6.2) < 0.45) c = C.cerulean;
+      else if (r < 3.6) c = C.metal_dark;
+      m.set(x, 1, z, c);
+    }
+
+  // Floor emitter, glass column, ceiling emitter.
+  m.cyl(cx, cz, 3.2, 2, 2, C.chrome).ring(cx, cz, 3.2, 2, C.gold);
+  m.cyl(cx, cz, 1.4, 3, 3, C.plasma_blue);
+  m.cyl(cx, cz, 3.2, 3, 17, C.glass, true);
+  m.cyl(cx, cz, 3.6, 18, 19, C.metal_dark).ring(cx, cz, 3.6, 18, C.gold);
+  m.cyl(cx, cz, 1.4, 17, 17, C.plasma_blue);
+  m.cyl(cx, cz, 2.2, 20, 21, C.metal);
+  // Struts from the ceiling emitter down to the plinth on two sides.
+  for (const [x, z] of [
+    [cx - 4.5, cz],
+    [cx + 3.5, cz],
+  ] as const) {
+    m.box(Math.round(x), 2, Math.round(z), Math.round(x), 19, Math.round(z), C.chrome);
+  }
+
+  // Lens emitters on the diagonals: post, collar, lens aimed at the column.
+  for (const [px, pz] of [
+    [2, 2],
+    [16, 2],
+    [2, 16],
+    [16, 16],
+  ] as const) {
+    m.box(px, 2, pz, px + 1, 9, pz + 1, C.metal);
+    m.box(px, 5, pz, px + 1, 5, pz + 1, C.brass);
+    m.box(px, 10, pz, px + 1, 12, pz + 1, C.metal_dark);
+    const lx = px < cx ? px + 1 : px;
+    const lz = pz < cz ? pz + 1 : pz;
+    m.set(lx, 11, lz, C.crystal_cyan);
+    m.set(px < cx ? px : px + 1, 12, pz < cz ? pz : pz + 1, C.led_blue);
+  }
+
+  // Operator console in front (+z): desk, keyboard, three screens, status LEDs.
+  m.box(4, 0, 20, 15, 5, 23, C.metal_dark);
+  m.box(4, 0, 24, 15, 0, 24, C.hazard_black);
+  m.box(4, 6, 20, 15, 6, 23, C.metal_light);
+  for (let x = 5; x <= 14; x++) m.set(x, 6, 22, x % 2 ? C.paint_black : C.metal_dark);
+  m.box(4, 7, 20, 15, 11, 20, C.metal_dark);
+  m.screen(5, 8, 7, 10, 21, C.screen_cyan);
+  m.screen(8, 8, 11, 10, 21, C.screen_green);
+  m.screen(12, 8, 14, 10, 21, C.screen_amber);
+  m.leds(5, 14, 4, 24, [C.led_green, C.led_amber, C.led_blue, C.led_green]);
+  // Cable run from the console to the plinth.
+  m.box(9, 1, 18, 10, 1, 19, C.cable_black);
+
+  // ── Animated parts ──
+  // A slice of light: an unETH octahedron turning in the column.
+  const slice = new Model(5, 9, 5);
+  for (let y = 0; y < 9; y++) {
+    const r = 2 - Math.abs(y - 4) / 2;
+    for (let z = 0; z < 5; z++)
+      for (let x = 0; x < 5; x++) {
+        const d = Math.abs(x - 2) + Math.abs(z - 2);
+        if (d > r + 0.01) continue;
+        const edge = d >= r - 0.6;
+        slice.set(x, y, z, y === 4 && d < 1 ? C.halo_glow : edge ? C.crystal_cyan : C.plasma_blue);
+      }
+  }
+  // The matrix star: eight arms over the ceiling emitter, tips glowing.
+  const star = partModel(m, [W, 1, W], [0, 22, 0], (x, _y, z) => {
+    const dx = x + 0.5 - (cx + 0.5);
+    const dz = z + 0.5 - (cz + 0.5);
+    const r = Math.hypot(dx, dz);
+    if (r < 2 || r > 9.6) return 0;
+    const a = (Math.atan2(dz, dx) + TAU) % (TAU / 8);
+    const off = Math.min(a, TAU / 8 - a) * r;
+    if (off > 0.6) return 0;
+    return r > 8.4 ? C.cerulean : C.metal_light;
+  });
+  // Lens beams: faint glass rays from the four emitters to the column.
+  const beams = partModel(m, [W, 1, W], [0, 11, 0], (x, _y, z) => {
+    const dx = x + 0.5 - (cx + 0.5);
+    const dz = z + 0.5 - (cz + 0.5);
+    const r = Math.hypot(dx, dz);
+    if (r < 3.6 || r > 9) return 0;
+    return Math.abs(Math.abs(dx) - Math.abs(dz)) < 0.8 ? C.holo_cyan : 0;
+  });
+
+  return {
+    base: m,
+    parts: [
+      {
+        name: "matrix_slice",
+        model: slice,
+        offset: [7, 6, 7],
+        pivot: [2.5, 4.5, 2.5],
+        kind: "spin",
+        axis: "y",
+        speed: 0.9,
+        requiresPower: true,
+      },
+      {
+        name: "matrix_star",
+        model: star,
+        offset: [0, 22, 0],
+        pivot: [cx + 0.5, 0.5, cz + 0.5],
+        kind: "spin",
+        axis: "y",
+        speed: 0.15,
+        requiresPower: true,
+      },
+      {
+        name: "lens_beams",
+        model: beams,
+        offset: [0, 11, 0],
+        pivot: [cx + 0.5, 0.5, cz + 0.5],
+        kind: "pulse",
+        speed: 0.6,
+        amplitude: 0.8,
+        requiresPower: true,
+      },
+    ],
+    lights: [
+      { pos: [10, 11, 10], color: "#5cf2ff", intensity: 1.8, distance: 12, requiresPower: true },
+    ],
+  };
+}
+
 const PROP_RIGS: Record<string, () => PropRig> = {
   forge: forgeRig,
+  matrix: matrixRig,
   valve: valveRig,
   bench: benchRig,
 };

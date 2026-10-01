@@ -18,7 +18,35 @@ import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { GTAOPass } from "three/addons/postprocessing/GTAOPass.js";
 import { createCrtPass, type CrtPass } from "@/lib/world/render/crt-pass";
+import {
+  ClarityGradePass,
+  HERO_LAYER,
+  HeroPass,
+  clarityRenderTarget,
+} from "@/lib/world/render/clarity-pass";
+import { loadHeroHead, type HeroHead } from "@/lib/world/render/hero/head-glb";
+import { buildHeroRig, type HeroRig } from "@/lib/world/render/hero/hero-rig";
+import {
+  JADE_DEFAULT_COLORS,
+  heroColorsFromHex,
+  setHeroColors,
+} from "@/lib/world/render/hero/materials";
+import { heroColorsForLook } from "@/lib/world/hero/look-colors";
+import type { HeroBundle, HeroLayerMesh } from "@/lib/world/hero/build";
+import { loadJadeHero } from "@/lib/world/hero/load";
+import { heroBlinkFromLids } from "@/lib/world/hero/jade-blink";
+import { loadDamienHero } from "@/lib/world/hero/damien-load";
+import { buildDamienRig, type DamienRig } from "@/lib/world/render/hero/damien-rig";
+import { clarityLevel, paramsAt, type ClarityParams } from "@/lib/world/clarity";
+import type { MeshTier } from "@/lib/world/models/refine";
+import {
+  SYNC_TIER,
+  clearFineMeshQueue,
+  pendingFineMeshes,
+  requestModelMesh,
+} from "@/lib/world/render/fine-mesh-pool";
 import {
   DOOR_OPEN_RADIUS,
   DoorSystem,
@@ -71,11 +99,16 @@ import {
 import { DECOR_BY_ID, decorModel, decorScale, decorVisual } from "@/lib/world/models/decor";
 import {
   decorFamily,
+  gridHash,
   refineTerrainRegion,
   familyFor,
   refinedModelMesh,
   type RefineFamily,
 } from "@/lib/world/models/refine";
+import { crystalWanted } from "@/lib/world/crystal";
+import { lookFor, lookKey } from "@/lib/world/aging";
+import { agedDecorModel, agedVisual } from "@/lib/world/models/decor-aging";
+import { CrystalLibrary } from "@/lib/world/render/crystal";
 import {
   animTransform,
   gaitTransform,
@@ -231,7 +264,12 @@ import {
   type XZ,
 } from "@/lib/world/pathfind";
 import { MODEL_SCALE, pickupModel, propVisual, stagedGrid, type Model } from "@/lib/world/models";
-import { createVoxelMaterials, toGeometry, toMesh } from "@/lib/world/render/voxel-mesh";
+import {
+  VOXEL_CLARITY,
+  createVoxelMaterials,
+  toGeometry,
+  toMesh,
+} from "@/lib/world/render/voxel-mesh";
 import { WorldRenderer } from "@/lib/world/render/world-renderer";
 import { DEFAULT_LOOK, type JadeLook } from "@/lib/world/content/wardrobe";
 import { jadeLookKey, jadeLookRig } from "@/lib/world/models/jade-look";
@@ -239,6 +277,7 @@ import { visibleLook } from "@/lib/world/wardrobe";
 import {
   AutoInstancer,
   HIDDEN_LAYER,
+  SHADOW_LAYER,
   StaticBatcher,
   installShadowLayerHook,
   markInstanced,
@@ -246,7 +285,7 @@ import {
 } from "@/lib/world/render/batching";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import type { DoorDef, FloorId, WorldState } from "@/lib/world/types";
-import { MATERIAL_CLASSES, type MaterialClass } from "@/lib/voxel/mesher";
+import { MATERIAL_CLASSES, type MaterialClass, type MeshData } from "@/lib/voxel/mesher";
 
 const MATERIAL_ORDER = MATERIAL_CLASSES;
 import type { VoxelGrid, Vec3, VoxelSource } from "@/lib/voxel/grid";
@@ -464,6 +503,8 @@ interface NpcView {
   frames?: CharacterRig[];
   /** Veiled (not yet found): mosaic shimmer and glitch jitter. */
   veiled?: boolean;
+  /** Damien's real (hero) figure once built — replaces the voxel frames. */
+  hero?: DamienRig;
   visual?: VisualRig;
   track?: PoseTrack;
   wasNear?: boolean;
@@ -493,15 +534,39 @@ interface AvatarView {
   placed: boolean;
 }
 
+/** Voxel source of a model mesh, kept so clarity can re-mesh it (cubes ↔ smooth). */
+interface VoxelSrc {
+  grid: VoxelGrid;
+  family: RefineFamily;
+  center: boolean;
+  materialOf?: (i: number) => MaterialClass;
+  /** Shared-geometry key (`sharedMesh`). */
+  shared?: string;
+  /** Voxel divisions the current geometry was meshed with. */
+  tier: MeshTier;
+  /** The mesh shows its crystal model (docs/CRYSTAL.md). */
+  crystal?: boolean;
+  /** Its voxel material array (restored when the crystal age ends). */
+  voxelMats?: THREE.Material[];
+}
+
+/** Seconds the clarity wave of an era change takes to cover the screen. */
+const ERA_WAVE_SECONDS = 2.8;
+
+/** Voxel sources by mesh (a WeakMap: `userData` is JSON-cloned by `Object3D.clone`). */
+const VOXEL_SRC = new WeakMap<THREE.Object3D, VoxelSrc>();
+
 interface CharacterRig {
   root: THREE.Group;
-  joints: Map<string, THREE.Group>;
+  joints: Map<string, THREE.Object3D>;
   rest: Map<string, THREE.Vector3>;
 }
 
 /** A figure a scene materialises (see `LabEngine.showFigure`). */
 interface SceneFigure {
   group: THREE.Group;
+  /** Damien's real figure (materialises by veil strength instead of part by part). */
+  hero?: DamienRig;
   frames: CharacterRig[];
   veiled: boolean;
   /** Part meshes with the height (world units) their lowest voxel rests at. */
@@ -567,7 +632,12 @@ interface FloorView {
   /** Live screens on decor pieces, powered like their room's lights. */
   decorScreens: { room: string; ref: ScreenRef }[];
   /** Animated decor parts (fans, clocks, reels…), gated by their room's power. */
-  decorRigs: { room: string; rig: VisualRig }[];
+  decorRigs: {
+    room: string;
+    rig: VisualRig;
+    /** Aging: rebuilt when the look of the placement changes. */
+    age?: { decor: string; key: string; group: THREE.Group; family: RefineFamily };
+  }[];
   /** Room terminal kiosks and their screens. */
   terminals: { id: string; ref: ScreenRef }[];
   /** Point lights of lamps/screens in the interior, keyed by room. */
@@ -587,6 +657,22 @@ interface FloorView {
   instancer: AutoInstancer;
   /** Static content may have changed (sync, cutaway): re-check the tile batches. */
   staticDirty: boolean;
+  /** Merged decor parts with their voxel source (re-meshed when the voxel divisions change). */
+  fixedSrc: {
+    part: { geometry: THREE.BufferGeometry };
+    grid: VoxelGrid;
+    family: RefineFamily;
+    tier: MeshTier;
+    crystal?: boolean;
+    /** Aging (lib/world/aging.ts): the placement and the look its grid was built for. */
+    age?: { decor: string; room: string; key: string };
+  }[];
+  /** Voxel divisions this floor was built / is being re-meshed with (clarity). */
+  meshTier: MeshTier;
+  /** Meshes still to re-mesh to `meshTier` (time-sliced, nearest first; popped from the end). */
+  remeshQueue: THREE.Mesh[];
+  /** Merged decor parts not at `meshTier` yet (re-merged once all are). */
+  remeshFixed: number;
   /** Click-to-move grid (lazy, see navFor); dirty after collision rebuilds. */
   nav?: NavGrid;
   navDirty: boolean;
@@ -642,6 +728,8 @@ export class LabEngine {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.OrthographicCamera;
   private readonly composer: EffectComposer;
+  /** Crystal age: screen-space AO (computed only; applied in the grade pass). */
+  private readonly gtao: GTAOPass;
   private readonly bloom: UnrealBloomPass;
   private readonly materials = createVoxelMaterials();
   private readonly floors = new Map<FloorId, FloorView>();
@@ -649,7 +737,42 @@ export class LabEngine {
   /** Scene figure (SceneStep "figure"): Damien materialising, veiled until found. */
   private figure: SceneFigure | null = null;
   private readonly walker: Walker;
-  private readonly player: CharacterRig;
+  private player: CharacterRig;
+  /** The real Jade (clarity renderer) once her mesh is built; null = voxel Jade. */
+  private hero: HeroRig | null = null;
+  private readonly gradePass: ClarityGradePass;
+  /** Clarity level shown (eases towards `clarityGoal`), -1 = not set yet. */
+  private clarityNow = -1;
+  private clarityGoal = 0;
+  private clarityPin: number | null = null;
+  /** Running era change: the clarity wave spreading out from Jade. */
+  private eraWave: { from: number; to: number; t: number } | null = null;
+  private readonly tmpV2 = new THREE.Vector2();
+  /** Clarity: how voxel models and the terrain are meshed (see `meshTierAt` in clarity.ts). */
+  private meshTier: MeshTier = 2;
+  /** Meshes made at a cheap tier while their fine mesh is in the workers (see `stepRemesh`). */
+  private readonly fineLate: THREE.Mesh[] = [];
+  /** Blender-built crystal models (docs/CRYSTAL.md), loaded on demand. */
+  private readonly crystal = new CrystalLibrary();
+  /** The lab is crystal (crystal age reached, or the setting / a dev pin says so). */
+  private crystalOn = false;
+  private crystalPin: boolean | null = null;
+  private terrainTier: MeshTier = 2;
+  private clarityLook: ClarityParams = paramsAt(0);
+  /** CRT grain / scan band chosen by the settings (clarity scales them). */
+  /**
+   * CRT film grain and scan band: off. The grain read as a grey haze over
+   * every dark area ("fog", user feedback 2026-10-01); the voxels carry the look.
+   */
+  private crtBase = { grain: 0, scan: 0 };
+  private lightLayerCheck = 0;
+  /**
+   * Jade's own soft fill: the lantern is tuned for matte voxels and would
+   * burn out real skin, so the hero layer gets a gentler copy of it.
+   */
+  private readonly heroLight = new THREE.PointLight("#ffe2c0", 0, 26, 1.4);
+  /** Damien's hero mesh layers (built once in a worker), null until ready. */
+  private damienLayers: HeroLayerMesh[] | null = null;
   private readonly xray: THREE.Group;
   private readonly lantern: THREE.PointLight;
   private readonly hemi: THREE.HemisphereLight;
@@ -885,18 +1008,34 @@ export class LabEngine {
     this.scene.add(this.emergency);
 
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, -500, 1000);
-    // Stencil is needed for the X-ray silhouette (see buildCharacter).
-    const rt = new THREE.WebGLRenderTarget(
+    // Stencil is needed for the X-ray silhouette (see buildCharacter); the
+    // depth texture lets the clarity pass pixelate depth with the colour.
+    const rt = clarityRenderTarget(
       w * this.renderer.getPixelRatio(),
       h * this.renderer.getPixelRatio(),
-      {
-        type: THREE.HalfFloatType,
-        depthBuffer: true,
-        stencilBuffer: true,
-      },
     );
     this.composer = new EffectComposer(this.renderer, rt);
     this.composer.addPass(new RenderPass(this.scene, this.camera));
+    // Crystal age: GTAO at half resolution. It only fills its AO target
+    // (no swap — the read buffer keeps the depth the hero pass tests against);
+    // the grade pass multiplies it in.
+    this.gtao = new GTAOPass(this.scene, this.camera, Math.max(1, w >> 1), Math.max(1, h >> 1));
+    this.gtao.output = GTAOPass.OUTPUT.Off;
+    this.gtao.needsSwap = false;
+    this.gtao.enabled = false;
+    this.gtao.updateGtaoMaterial({
+      radius: 0.9,
+      distanceExponent: 1.4,
+      thickness: 1.2,
+      scale: 1.1,
+      samples: 12,
+    });
+    this.gtao.updatePdMaterial({ radius: 6, rings: 2, samples: 12 });
+    this.composer.addPass(this.gtao);
+    // The world is pixels (by clarity); Jade is drawn sharp on top of them.
+    this.gradePass = new ClarityGradePass();
+    this.composer.addPass(this.gradePass);
+    this.composer.addPass(new HeroPass(this.scene, this.camera));
     this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.5, 0.45, 1.2);
     this.composer.addPass(this.bloom);
     this.crt = createCrtPass();
@@ -1030,11 +1169,32 @@ export class LabEngine {
     this.scene.add(this.blobs);
 
     const s = getState();
+    // Build the first floor with the meshing of the saved clarity (no re-mesh on frame one).
+    const startLook = paramsAt(clarityLevel(s, this.settings.graphics.clarity));
+    this.meshTier = this.capMesh(startLook.mesh);
+    this.terrainTier = this.capTerrain(startLook.terrain);
     this.walker = new Walker([...s.pos], WALKER.radius);
     this.setFloor(s.floor, s.pos);
     this.bindInput();
     this.resize();
     this.renderer.setAnimationLoop((now) => this.frame(now));
+    this.clarityGoal = clarityLevel(s, this.settings.graphics.clarity);
+    if (this.settings.graphics.realJade)
+      void loadDamienHero("game")
+        .then((layers) => {
+          if (this.disposed) return;
+          this.damienLayers = layers;
+          for (const v of this.floors.values()) this.upgradeDamienEcho(v);
+        })
+        .catch(() => {
+          // Keep the voxel veil.
+        });
+    if (this.settings.graphics.realJade)
+      void Promise.all([loadJadeHero("game"), loadHeroHead()])
+        .then(([bundle, head]) => this.installHero(bundle, head))
+        .catch(() => {
+          // Keep the voxel Jade.
+        });
   }
 
   // ── Public API ────────────────────────────────────────────────
@@ -1073,8 +1233,9 @@ export class LabEngine {
     this.bloom.enabled = g.bloom;
     this.bloom.strength = g.bloomStrength;
     const calm = next.accessibility.reduceFlicker;
-    this.crt.uniforms.uGrain.value = calm ? 0.015 : 0.045;
-    this.crt.uniforms.uScanBand.value = calm ? 0 : 0.04;
+    this.crt.uniforms.uGrain.value = this.crtBase.grain;
+    this.crt.uniforms.uScanBand.value = this.crtBase.scan;
+    if (this.clarityNow >= 0) this.clarityGoal = clarityLevel(this.getState(), g.clarity);
     this.crt.uniforms.uAberration.value = next.accessibility.reduceMotion ? 0.0004 : 0.0012;
     for (const f of this.floors.values()) f.doors.setCalm(next.accessibility.reduceMotion, calm);
     this.resize();
@@ -1145,9 +1306,12 @@ export class LabEngine {
     if (!view) {
       view = this.buildFloorView(floor);
       this.floors.set(floor, view);
+      this.upgradeDamienEcho(view);
     }
     this.active = view;
     view.group.visible = true;
+    this.startRemesh(view);
+    view.renderer.setTier(this.terrainTier);
     const e = ELEVATORS.find((x) => x.floor === floor)!;
     // Mid-ride the new floor keeps Lawrence where she stood on the deck.
     const p: Vec3 =
@@ -1208,12 +1372,15 @@ export class LabEngine {
   /** Re-read the state (after any game action) and update the view. */
   sync(): void {
     const s = this.getState();
+    this.clarityGoal = clarityLevel(s, this.settings.graphics.clarity);
     const v = this.active;
     const p = power(s);
     this.powerState = p;
     this.powerAge = 0;
     const switchedOn = newlyOnline(this.prevOnline, p.online);
     this.prevOnline = new Set(p.online);
+    // Slow processes (plants, dust, rust, crystals): swap decor whose look changed.
+    this.refreshAging(v);
     // Devices: rebuild when stage or power changed (power changes ramp, see stepDevice).
     for (const dv of v.devices.values()) {
       const want: DeviceBuild = {
@@ -1369,6 +1536,7 @@ export class LabEngine {
   dispose(): void {
     this.disposed = true;
     this.renderer.setAnimationLoop(null);
+    this.crystal.dispose();
     for (const f of this.cleanup) f();
     this.scene.traverse((o) => {
       if (o instanceof THREE.Mesh || o instanceof THREE.Points) o.geometry.dispose();
@@ -1389,7 +1557,10 @@ export class LabEngine {
     (this.blobs.material as THREE.Material).dispose();
     this.fx.dispose();
     this.screens.dispose();
+    this.hero?.dispose();
+    this.gradePass.dispose();
     this.composer.dispose();
+    this.gtao.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
@@ -1791,12 +1962,15 @@ export class LabEngine {
     materialOf?: (i: number) => MaterialClass,
     materials: Record<MaterialClass, THREE.Material> = this.materials,
   ): THREE.Mesh {
-    const data = refinedModelMesh(grid, family, {
+    const { data, tier } = this.modelMeshNow(grid, family, {
       center,
       ...(materialOf ? { materialOf } : {}),
     });
     const mesh = toMesh(data, materials);
     mesh.scale.setScalar(scale);
+    const src: VoxelSrc = { grid, family, center, tier, ...(materialOf ? { materialOf } : {}) };
+    VOXEL_SRC.set(mesh, src);
+    if (this.needsRemesh(src, this.meshTier)) this.fineLate.push(mesh);
     return mesh;
   }
 
@@ -1812,11 +1986,7 @@ export class LabEngine {
     family: RefineFamily,
     materials: Record<MaterialClass, THREE.Material> = this.materials,
   ): THREE.Mesh {
-    let geo = this.sharedGeo.get(key);
-    if (!geo) {
-      geo = toGeometry(refinedModelMesh(grid, family, { center }));
-      this.sharedGeo.set(key, geo);
-    }
+    const geo = this.sharedGeometry(key, grid, family, center);
     const mesh = new THREE.Mesh(
       geo,
       MATERIAL_ORDER.map((c) => materials[c]),
@@ -1825,7 +1995,261 @@ export class LabEngine {
     mesh.receiveShadow = true;
     mesh.scale.setScalar(scale);
     mesh.userData.sharedGeo = true;
+    const tier = (geo.userData.tier as MeshTier | undefined) ?? this.meshTier;
+    const src: VoxelSrc = { grid, family, center, shared: key, tier };
+    VOXEL_SRC.set(mesh, src);
+    if (this.needsRemesh(src, this.meshTier)) this.fineLate.push(mesh);
     return mesh;
+  }
+
+  /**
+   * A model mesh at the current voxel divisions if it is ready — fine tiers
+   * come from the worker pool — else the best cheap tier now (the engine
+   * swaps in the fine mesh once the workers deliver it).
+   */
+  private modelMeshNow(
+    grid: VoxelGrid,
+    family: RefineFamily,
+    opts: { center: boolean; materialOf?: (i: number) => MaterialClass },
+    want: MeshTier = this.meshTier,
+  ): { data: MeshData; tier: MeshTier } {
+    const data = requestModelMesh(grid, family, { ...opts, tier: want });
+    if (data) return { data, tier: want };
+    const tier = Math.min(want, SYNC_TIER) as MeshTier;
+    return { data: refinedModelMesh(grid, family, { ...opts, tier }), tier };
+  }
+
+  /** Geometry shared by every mesh of `key` in the current model meshing tier. */
+  private sharedGeometry(
+    key: string,
+    grid: VoxelGrid,
+    family: RefineFamily,
+    center: boolean,
+  ): THREE.BufferGeometry {
+    const k = `${key}|${this.meshTier}`;
+    let geo = this.sharedGeo.get(k);
+    if (!geo) {
+      const data = requestModelMesh(grid, family, { center, tier: this.meshTier });
+      if (!data) {
+        // Not ready: the cheap tier's geometry for now (tagged with its tier).
+        const t = Math.min(this.meshTier, SYNC_TIER) as MeshTier;
+        const kt = `${key}|${t}`;
+        let cheap = this.sharedGeo.get(kt);
+        if (!cheap) {
+          cheap = toGeometry(refinedModelMesh(grid, family, { center, tier: t }));
+          cheap.userData.tier = t;
+          this.sharedGeo.set(kt, cheap);
+        }
+        return cheap;
+      }
+      geo = toGeometry(data);
+      geo.userData.tier = this.meshTier;
+      this.sharedGeo.set(k, geo);
+    }
+    return geo;
+  }
+
+  /**
+   * Clarity: queue every voxel model of a floor that is not at the current
+   * voxel divisions for a re-mesh (nearest to Jade first, so the change
+   * spreads out from her like a wave). `stepRemesh` works the queue.
+   */
+  private startRemesh(v: FloorView): void {
+    v.meshTier = this.meshTier;
+    v.renderer.setCrystal(
+      this.crystalOn ? this.crystal : null,
+      this.crystal.materialsFor(MATERIAL_ORDER.map((c) => this.materials[c])),
+    );
+    clearFineMeshQueue();
+    const list: THREE.Mesh[] = [];
+    v.group.traverse((o) => {
+      if (!(o instanceof THREE.Mesh) || o instanceof THREE.InstancedMesh) return;
+      const src = VOXEL_SRC.get(o);
+      if (src && this.needsRemesh(src, this.meshTier)) list.push(o);
+    });
+    const [px, , pz] = this.walker ? this.walker.position : [0, 0, 0];
+    const p = new THREE.Vector3();
+    const dist = new Map<THREE.Mesh, number>();
+    for (const m of list) {
+      m.getWorldPosition(p);
+      dist.set(m, (p.x - px) ** 2 + (p.z - pz) ** 2);
+    }
+    // Popped from the end: farthest first in the array.
+    list.sort((a, b) => dist.get(b)! - dist.get(a)!);
+    v.remeshQueue = list;
+    v.remeshFixed = v.fixedSrc.filter((f) => this.needsRemesh(f, this.meshTier)).length;
+  }
+
+  // ── Crystal age (docs/CRYSTAL.md) ─────────────────────────────
+
+  /** Should this voxel source show its crystal model now? */
+  private wantsCrystal(src: { grid: VoxelGrid; materialOf?: unknown }): boolean {
+    return this.crystalOn && !src.materialOf && this.crystal.has(gridHash(src.grid));
+  }
+
+  /** Geometry out of date: other voxel divisions, or crystal ↔ voxels. */
+  private needsRemesh(
+    src: { grid: VoxelGrid; tier: MeshTier; crystal?: boolean; materialOf?: unknown },
+    tier: MeshTier,
+  ): boolean {
+    const crystal = this.wantsCrystal(src);
+    if (crystal) return !src.crystal;
+    return !!src.crystal || src.tier !== tier;
+  }
+
+  /**
+   * Aging (lib/world/aging.ts): plants grew or wilted, dust settled, rust
+   * crept, crystals grew — swap the affected decor models of a floor. Merged
+   * decor goes through the re-mesh queue; animated decor rigs are rebuilt.
+   */
+  private refreshAging(v: FloorView): void {
+    const st = this.getState();
+    const clarity = Math.max(0, this.clarityNow);
+    let queued = 0;
+    for (const f of v.fixedSrc) {
+      if (!f.age) continue;
+      const look = lookFor(st, f.age.room, f.age.decor, clarity);
+      const key = `${f.age.decor}|${lookKey(f.age.decor, look)}`;
+      if (key === f.age.key) continue;
+      f.age.key = key;
+      f.grid = agedDecorModel(f.age.decor, look).grid;
+      f.tier = 0 as MeshTier;
+      f.crystal = false;
+      queued++;
+    }
+    if (queued) v.remeshFixed += queued;
+    for (const r of v.decorRigs) {
+      if (!r.age) continue;
+      const raw = decorVisual(r.age.decor);
+      if (!raw) continue;
+      const look = lookFor(st, r.room, r.age.decor, clarity);
+      const key = lookKey(r.age.decor, look);
+      if (key === r.age.key) continue;
+      r.age.key = key;
+      this.clearGroup(r.age.group);
+      r.rig = this.buildVisualRig(
+        { ...agedVisual(r.age.decor, raw, look), lights: [] },
+        r.age.group,
+        false,
+        `rig:${r.age.decor}|${key}`,
+        r.age.family,
+      );
+      v.lightsDirty = true;
+      v.instancer.markDirty();
+    }
+  }
+
+  /** Crystal geometry of a voxel source (null while it loads). */
+  private crystalGeometry(src: { grid: VoxelGrid; center: boolean }): THREE.BufferGeometry | null {
+    const g = src.grid;
+    return this.crystal.geometry(gridHash(g), [g.sx, g.sy, g.sz], src.center);
+  }
+
+  /**
+   * Re-mesh queued models of the active floor for at most `budgetMs`. Fine
+   * tiers are meshed by workers: a model whose mesh is not ready yet goes
+   * back to the queue's front and is asked for again on a later frame.
+   */
+  private stepRemesh(budgetMs: number): void {
+    const v = this.active;
+    // Meshes created at a cheap tier while the fine one was being meshed.
+    if (this.fineLate.length) {
+      for (const m of this.fineLate) {
+        const src = VOXEL_SRC.get(m);
+        if (src && this.needsRemesh(src, this.meshTier)) v.remeshQueue.unshift(m);
+      }
+      this.fineLate.length = 0;
+    }
+    if (!v.remeshQueue.length && !v.remeshFixed) return;
+    const t0 = performance.now();
+    let touched = false;
+    const later: THREE.Mesh[] = [];
+    while (v.remeshQueue.length && performance.now() - t0 < budgetMs) {
+      const o = v.remeshQueue.pop()!;
+      const src = VOXEL_SRC.get(o);
+      if (!src || !this.needsRemesh(src, v.meshTier)) continue;
+      if (this.wantsCrystal(src)) {
+        const cg = this.crystalGeometry(src);
+        if (!cg) {
+          later.push(o);
+          continue;
+        }
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        src.voxelMats ??= mats;
+        if (!o.userData.sharedGeo && !o.geometry.userData.crystal) o.geometry.dispose();
+        o.geometry = cg;
+        o.material = this.crystal.materialsFor(src.voxelMats);
+        src.crystal = true;
+        touched = true;
+        continue;
+      }
+      if (src.crystal) {
+        // Leaving the crystal age: voxel materials back, re-mesh below.
+        if (src.voxelMats) o.material = src.voxelMats;
+        src.crystal = false;
+        src.tier = 0 as MeshTier;
+      }
+      let geo: THREE.BufferGeometry | null;
+      if (src.shared) {
+        geo = this.sharedGeometry(src.shared, src.grid, src.family, src.center);
+        if ((geo.userData.tier as MeshTier | undefined) !== v.meshTier) geo = null;
+      } else {
+        const data = requestModelMesh(src.grid, src.family, {
+          center: src.center,
+          ...(src.materialOf ? { materialOf: src.materialOf } : {}),
+          tier: v.meshTier,
+        });
+        geo = data ? toGeometry(data) : null;
+      }
+      if (!geo) {
+        later.push(o);
+        continue;
+      }
+      src.tier = v.meshTier;
+      if (geo !== o.geometry) {
+        if (!o.userData.sharedGeo && !o.geometry.userData.crystal) o.geometry.dispose();
+        o.geometry = geo;
+        touched = true;
+      }
+    }
+    // Not ready yet: back to the front (asked for again after the rest).
+    if (later.length) v.remeshQueue.unshift(...later.reverse());
+    if (!v.remeshQueue.length || later.length === v.remeshQueue.length) {
+      let left = 0;
+      for (const f of v.fixedSrc) {
+        if (!this.needsRemesh(f, v.meshTier)) continue;
+        if (performance.now() - t0 >= budgetMs) {
+          left++;
+          continue;
+        }
+        if (this.wantsCrystal(f)) {
+          const cg = this.crystalGeometry({ grid: f.grid, center: true });
+          if (!cg) {
+            left++;
+            continue;
+          }
+          f.part.geometry = cg;
+          f.crystal = true;
+          touched = true;
+          continue;
+        }
+        const data = requestModelMesh(f.grid, f.family, { center: true, tier: v.meshTier });
+        if (!data) {
+          left++;
+          continue;
+        }
+        f.part.geometry = toGeometry(data);
+        f.tier = v.meshTier;
+        f.crystal = false;
+        touched = true;
+      }
+      if (v.remeshFixed && !left) v.batch.invalidate();
+      v.remeshFixed = left;
+    }
+    if (touched) {
+      v.staticDirty = true;
+      v.instancer.markDirty();
+    }
   }
 
   /** Remove a group's children and free their (unshared) geometry. */
@@ -1987,6 +2411,10 @@ export class LabEngine {
     const key = jadeLookKey(shown);
     if (key === this.playerLook) return;
     this.playerLook = key;
+    if (this.hero) {
+      this.recolorHero(shown);
+      return;
+    }
     const def = jadeLookRig(shown);
     const twin = new Map(this.xrayPairs);
     const family = familyFor(def, "character");
@@ -2034,6 +2462,38 @@ export class LabEngine {
     }
   }
 
+  /** Damien's real figure on the hero layer (veiled unless he has been found). */
+  private damienRig(veiled: boolean): DamienRig {
+    const rig = buildDamienRig(this.damienLayers!, { veiled });
+    rig.root.traverse((o) => {
+      if (o instanceof THREE.Mesh) {
+        o.layers.set(HERO_LAYER);
+        o.castShadow = false;
+      }
+    });
+    return rig;
+  }
+
+  /** Swap a floor's voxel echo of Damien for his real (veiled) figure. */
+  private upgradeDamienEcho(v: FloorView): void {
+    if (!this.damienLayers) return;
+    const npc = v.npcs.get("damien");
+    if (!npc || npc.hero || !npc.frames) return;
+    const hero = this.damienRig(!!npc.veiled);
+    for (const f of npc.frames) {
+      npc.group.remove(f.root);
+      f.root.traverse((o) => {
+        if (o instanceof THREE.Mesh && !o.userData.sharedGeo) o.geometry.dispose();
+      });
+    }
+    npc.group.add(hero.root);
+    const rig: CharacterRig = { root: hero.root, joints: hero.joints, rest: hero.rest };
+    npc.hero = hero;
+    npc.rig = rig;
+    npc.frames = [rig];
+    this.lightLayerCheck = 0;
+  }
+
   /**
    * Materialise Damien with his feet at `at` (scene coordinates): built up
    * from the feet over `build` seconds, gone after `hold`. He stays veiled
@@ -2048,6 +2508,32 @@ export class LabEngine {
   ): void {
     this.clearFigure();
     const veiled = !isDamienRevealed(this.getState());
+    if (this.damienLayers) {
+      const hero = this.damienRig(veiled);
+      const group = new THREE.Group();
+      group.position.set(at[0], at[1], at[2]);
+      group.add(hero.root);
+      hero.setStrength(0);
+      const glow = new VirtualLight(veiled ? "#00ffff" : "#fff4e0", 26, 9, 2);
+      glow.position.y = 3;
+      group.add(glow);
+      this.active.group.add(group);
+      this.active.lightsDirty = true;
+      this.figure = {
+        group,
+        hero,
+        frames: [{ root: hero.root, joints: hero.joints, rest: hero.rest }],
+        veiled,
+        parts: [],
+        height: 0,
+        age: 0,
+        build: Math.max(0.01, build),
+        hold: Math.max(0, hold),
+        track: poseTrack("idle", 0),
+        view: this.active,
+      };
+      return;
+    }
     const defs = damienFigureRigs(!veiled);
     const group = new THREE.Group();
     group.position.set(at[0], at[1], at[2]);
@@ -2093,6 +2579,7 @@ export class LabEngine {
     const f = this.figure;
     if (!f) return;
     this.figure = null;
+    f.hero?.dispose();
     this.clearGroup(f.group);
     f.group.removeFromParent();
     f.view.lightsDirty = true;
@@ -2107,9 +2594,16 @@ export class LabEngine {
       this.clearFigure();
       return;
     }
-    // From the feet up: a part appears once the build line passes its lowest voxel.
-    const line = Math.min(1, f.age / f.build) * (f.height + 0.2);
-    for (const p of f.parts) p.mesh.visible = p.bottom <= line;
+    if (f.hero) {
+      // The veil condenses out of the static, then dissolves at the end.
+      const fadeOut = Math.min(1, (f.build + f.hold - f.age) / 0.8);
+      f.hero.setStrength(Math.min(Math.min(1, f.age / f.build), Math.max(0, fadeOut)));
+      f.hero.tick(t);
+    } else {
+      // From the feet up: a part appears once the build line passes its lowest voxel.
+      const line = Math.min(1, f.age / f.build) * (f.height + 0.2);
+      for (const p of f.parts) p.mesh.visible = p.bottom <= line;
+    }
     const [px, , pz] = this.walker.position;
     const g = f.group;
     g.rotation.y = turnToward(
@@ -2244,7 +2738,8 @@ export class LabEngine {
     this.scene.add(group);
     const batch = new StaticBatcher(
       group,
-      MATERIAL_ORDER.map((c) => this.materials[c]),
+      // Crystal surface slots after the voxel classes (unused groups cost nothing).
+      this.crystal.materialsFor(MATERIAL_ORDER.map((c) => this.materials[c])),
       this.materials.solid,
       BATCH_TILE,
     );
@@ -2299,6 +2794,10 @@ export class LabEngine {
       lightsDirty: true,
       litRooms: new Set(),
       stations: [],
+      fixedSrc: [],
+      meshTier: this.meshTier,
+      remeshQueue: [],
+      remeshFixed: 0,
       batch,
       instancer,
       staticDirty: true,
@@ -2840,18 +3339,26 @@ export class LabEngine {
    */
   private buildInterior(view: FloorView): void {
     const geoByDecor = new Map<string, THREE.BufferGeometry | null>();
+    const decorTier = new Map<string, MeshTier>();
     const q = new THREE.Quaternion();
     const up = new THREE.Vector3(0, 1, 0);
     const pos = new THREE.Vector3();
     const scale = new THREE.Vector3();
+    const st = this.getState();
+    const clarity = Math.max(0, this.clarityNow);
     for (const p of interiorFor(view.floor)) {
-      let geo = geoByDecor.get(p.decor);
+      const look = lookFor(st, p.room, p.decor, clarity);
+      const lk = `${p.decor}|${lookKey(p.decor, look)}`;
+      let geo = geoByDecor.get(lk);
       if (geo === undefined) {
-        const grid = decorModel(p.decor).grid;
-        const data = refinedModelMesh(grid, decorFamily(decorScale(p.decor)), { center: true });
+        const grid = agedDecorModel(p.decor, look).grid;
+        const { data, tier } = this.modelMeshNow(grid, decorFamily(decorScale(p.decor)), {
+          center: true,
+        });
+        decorTier.set(lk, tier);
         // CPU-only source for merging (never uploaded itself).
         geo = data.quads === 0 ? null : toGeometry(data);
-        geoByDecor.set(p.decor, geo);
+        geoByDecor.set(lk, geo);
       }
       if (!geo) continue;
       const def = DECOR_BY_ID.get(p.decor);
@@ -2859,15 +3366,19 @@ export class LabEngine {
       scale.set(ds, ds, ds);
       q.setFromAxisAngle(up, (p.rot * Math.PI) / 2);
       pos.set(p.x + 0.5, 1 + decorElevation(p), p.z + 0.5);
-      view.batch.addFixed(
-        {
-          geometry: geo,
-          matrix: new THREE.Matrix4().compose(pos, q, scale),
-          castShadow: def?.solid ?? false,
-        },
-        pos.x,
-        pos.z,
-      );
+      const part = {
+        geometry: geo,
+        matrix: new THREE.Matrix4().compose(pos, q, scale),
+        castShadow: def?.solid ?? false,
+      };
+      view.batch.addFixed(part, pos.x, pos.z);
+      view.fixedSrc.push({
+        part,
+        grid: agedDecorModel(p.decor, look).grid,
+        family: decorFamily(decorScale(p.decor)),
+        tier: decorTier.get(lk) ?? this.meshTier,
+        age: { decor: p.decor, room: p.room, key: lk },
+      });
     }
     for (const p of interiorFor(view.floor)) {
       const def = DECOR_BY_ID.get(p.decor);
@@ -2928,21 +3439,26 @@ export class LabEngine {
       });
     }
     for (const p of animatedDecor(view.floor)) {
-      const visual = decorVisual(p.decor);
-      if (!visual) continue;
+      const raw = decorVisual(p.decor);
+      if (!raw) continue;
+      const look = lookFor(st, p.room, p.decor, clarity);
+      const key = lookKey(p.decor, look);
+      const visual = agedVisual(p.decor, raw, look);
       const g = new THREE.Group();
       g.position.set(p.x + 0.5, 1 + decorElevation(p), p.z + 0.5);
       g.rotation.y = (p.rot * Math.PI) / 2;
       view.group.add(g);
+      const family = decorFamily(visual.scale ?? decorScale(p.decor));
       view.decorRigs.push({
         room: p.room,
         rig: this.buildVisualRig(
           { ...visual, lights: [] },
           g,
           false,
-          `rig:${p.decor}`,
-          decorFamily(visual.scale ?? decorScale(p.decor)),
+          `rig:${p.decor}|${key}`,
+          family,
         ),
+        age: { decor: p.decor, key, group: g, family },
       });
     }
     for (const t of ROOM_TERMINALS) {
@@ -3732,6 +4248,9 @@ export class LabEngine {
     this.renderer.setSize(w, h);
     this.composer.setSize(w, h);
     this.bloom.resolution.set(w, h);
+    // GTAO at half resolution (the composer sized it to full).
+    const pr = this.renderer.getPixelRatio();
+    this.gtao.setSize(Math.max(1, (w * pr) >> 1), Math.max(1, (h * pr) >> 1));
   }
 
   // ── Frame ─────────────────────────────────────────────────────
@@ -3924,30 +4443,36 @@ export class LabEngine {
       dt,
       1.2,
     );
-    this.applyPose(
-      this.player,
-      animateCharacter({
-        track: this.track,
-        now: this.time,
-        gaitPhase: this.gaitPhase,
-        speed: this.speedS,
-        walkW: this.walkW,
-        idleFor: this.idleFor,
-        seed: 0,
-        look: { yaw: this.lookYawS, weight: this.lookW },
-        chill: this.chill,
-        load: this.rideLoad,
-        rattle: this.rideRattle,
-        accel: this.accelS,
-        turnRate: this.turnS,
-        ...(this.seat?.kind === "sit" ? { seat: this.seatSpec(this.seat.anchor) } : {}),
-      }),
-    );
+    const playerPose = animateCharacter({
+      track: this.track,
+      now: this.time,
+      gaitPhase: this.gaitPhase,
+      speed: this.speedS,
+      walkW: this.walkW,
+      idleFor: this.idleFor,
+      seed: 0,
+      look: { yaw: this.lookYawS, weight: this.lookW },
+      chill: this.chill,
+      load: this.rideLoad,
+      rattle: this.rideRattle,
+      accel: this.accelS,
+      turnRate: this.turnS,
+      ...(this.seat?.kind === "sit" ? { seat: this.seatSpec(this.seat.anchor) } : {}),
+    });
+    this.applyPose(this.player, playerPose);
+    if (this.hero) {
+      // The real Jade blinks with the rig's lids and her eyes lead the head turn.
+      this.hero.setBlink(heroBlinkFromLids(playerPose.lids?.pos));
+      this.hero.setGaze(this.lookYawS * this.lookW * 0.5);
+      this.hero.update(dt);
+    }
     const prop = activeProp(this.track, this.time);
     for (const [k, m] of this.handProps) m.visible = k === prop;
     this.syncXray();
     const root = this.player.root.position;
     this.lantern.position.set(root.x, py + 5, root.z);
+    this.heroLight.position.set(root.x + 2.5, py + 7, root.z + 3);
+    this.heroLight.intensity = this.lantern.intensity * 0.22 + 6;
 
     this.animateWorld(dt);
     this.fx.update(dt);
@@ -4035,7 +4560,7 @@ export class LabEngine {
     this.camera.lookAt(look);
     this.camera.updateProjectionMatrix();
 
-    this.active.renderer.sync(4);
+    this.active.renderer.sync(this.terrainTier >= 4 ? 1 : 4);
     this.updateLighting(dt);
     this.updateLightPool(dt);
     this.updateFlickers();
@@ -4059,6 +4584,7 @@ export class LabEngine {
       av.batch.update();
     }
     av.instancer.update();
+    this.stepClarity(dt);
     this.renderer.info.reset();
     this.composer.render();
     const info = this.renderer.info;
@@ -4220,7 +4746,255 @@ export class LabEngine {
     if (!powered) tint.multiply(this.tmpC.setRGB(1.05, 0.9, 0.9));
   }
 
+  // ── Clarity ────────────────────────────────────────────────────
+
+  /**
+   * Swap the voxel Jade for the real one (built off the main thread). She
+   * keeps her place, pose, hand props and X-ray silhouette; her meshes live
+   * on the hero layer (drawn sharp by HeroPass) and the shadow layer (she
+   * casts shadows into the pixel world).
+   */
+  private installHero(bundle: HeroBundle, head: HeroHead | null = null): void {
+    if (this.disposed || this.hero) return;
+    const hero = buildHeroRig(bundle.layers, {
+      colors: JADE_DEFAULT_COLORS(),
+      groom: bundle.groom,
+      head,
+      hairShare: 0.22,
+      hairCheap: true,
+    });
+    for (const m of Object.values(hero.materials))
+      Object.assign(m, {
+        stencilWrite: true,
+        stencilRef: 1,
+        stencilFunc: THREE.AlwaysStencilFunc,
+        stencilZPass: THREE.ReplaceStencilOp,
+      });
+    const twins: THREE.Object3D[] = [];
+    for (const m of hero.meshes) {
+      m.layers.set(HERO_LAYER);
+      if (m.castShadow) m.layers.enable(SHADOW_LAYER);
+      if (m instanceof THREE.SkinnedMesh) {
+        const x = new THREE.SkinnedMesh(m.geometry, this.xrayMat);
+        x.bind(m.skeleton, m.bindMatrix);
+        x.layers.set(HERO_LAYER);
+        x.renderOrder = 10;
+        x.frustumCulled = false;
+        x.castShadow = false;
+        twins.push(x);
+      }
+    }
+    for (const x of twins) hero.inner.add(x);
+    hero.root.position.copy(this.player.root.position);
+    hero.root.rotation.copy(this.player.root.rotation);
+    // Hand props move to the new forearms.
+    for (const [k, mesh] of this.handProps) hero.joints.get(handProp(k).joint)?.add(mesh);
+    this.scene.remove(this.player.root);
+    this.scene.remove(this.xray);
+    this.xrayPairs.length = 0;
+    this.player = { root: hero.root, joints: hero.joints, rest: hero.rest };
+    this.scene.add(hero.root);
+    this.heroLight.layers.set(HERO_LAYER);
+    this.scene.add(this.heroLight);
+    this.hero = hero;
+    this.lightLayerCheck = 0;
+    this.recolorHero(visibleLook(this.getState().wardrobe.look));
+  }
+
+  /**
+   * Wardrobe on the real Jade: recolour the materials from the look's tones
+   * and show the optional garments (coat, belt, watch) the look wears. Her
+   * X-ray twins share the geometry and follow the visibility.
+   */
+  private recolorHero(look: JadeLook): void {
+    const hero = this.hero;
+    if (!hero) return;
+    const c = heroColorsForLook(look);
+    setHeroColors(hero.materials, heroColorsFromHex(c.colors));
+    const show: Record<string, boolean> = {
+      coat: c.worn.coat,
+      coatSleeves: c.worn.coat,
+      belt: c.worn.belt,
+      watch: c.worn.watch,
+    };
+    const hidden = new Set<THREE.BufferGeometry>();
+    for (const m of hero.meshes) {
+      const on = show[m.name];
+      if (on === undefined) continue;
+      m.visible = on;
+      if (!on) hidden.add(m.geometry);
+    }
+    hero.inner.traverse((o) => {
+      if (o instanceof THREE.SkinnedMesh && !hero.meshes.includes(o))
+        o.visible = !hidden.has(o.geometry);
+    });
+  }
+
+  /** Model voxel divisions within the player's voxel-detail setting. */
+  private capMesh(t: MeshTier): MeshTier {
+    return Math.min(t, this.settings.graphics.voxelDetail) as MeshTier;
+  }
+
+  /** Terrain voxel divisions: the floors split to 4 only from voxel detail 6 up. */
+  private capTerrain(t: MeshTier): MeshTier {
+    return Math.min(t, this.settings.graphics.voxelDetail >= 6 ? 4 : 2) as MeshTier;
+  }
+
+  /** Ease the clarity level towards the goal and push it into the passes. */
+  private stepClarity(dt: number): void {
+    const goal = this.clarityPin ?? this.clarityGoal;
+    if (this.clarityNow < 0) this.clarityNow = goal;
+    // A new era: a ring of clarity spreads out from Jade (grade pass), the
+    // look (materials, light, voxel divisions) switches as it starts.
+    if (
+      !this.eraWave &&
+      this.clarityPin === null &&
+      Math.floor(goal + 1e-6) > Math.floor(this.clarityNow + 1e-6)
+    )
+      this.eraWave = { from: this.clarityNow, to: goal, t: 0 };
+    let p: ClarityParams;
+    const wave = this.eraWave;
+    if (wave) {
+      wave.t += dt;
+      const u = Math.min(1, wave.t / ERA_WAVE_SECONDS);
+      p = paramsAt(wave.to);
+      const size = this.renderer.getDrawingBufferSize(this.tmpV2);
+      this.tmpV.copy(this.player.root.position);
+      this.tmpV.y += 3.5;
+      this.tmpV.project(this.camera);
+      const cx = (this.tmpV.x * 0.5 + 0.5) * size.x;
+      const cy = (this.tmpV.y * 0.5 + 0.5) * size.y;
+      const reach = Math.hypot(Math.max(cx, size.x - cx), Math.max(cy, size.y - cy)) + 40;
+      const eased = 1 - Math.pow(1 - u, 2.2);
+      this.gradePass.setWave(cx, cy, eased * reach);
+      if (u >= 1) {
+        this.clarityNow = wave.to;
+        this.eraWave = null;
+        this.gradePass.setWave(0, 0, -1);
+      }
+    } else {
+      // Slow drift: an invention sharpens the world over a few seconds.
+      this.clarityNow = approach(this.clarityNow, goal, dt, 0.9);
+      if (Math.abs(this.clarityNow - goal) < 1e-4) this.clarityNow = goal;
+      p = paramsAt(this.clarityNow);
+    }
+    this.clarityLook = p;
+    this.scene.environmentIntensity = 0.25 * p.env;
+    VOXEL_CLARITY.uDetail.value = p.detail;
+    const mesh = this.capMesh(p.mesh);
+    const terrain = this.capTerrain(p.terrain);
+    // The crystal age starts with the era wave (the swap spreads out from Jade with it).
+    const crystal =
+      this.crystal.size > 0 &&
+      (this.crystalPin ??
+        crystalWanted(this.eraWave?.to ?? this.clarityNow, this.settings.graphics.crystal));
+    if (mesh !== this.meshTier || crystal !== this.crystalOn) {
+      this.meshTier = mesh;
+      this.crystalOn = crystal;
+      // Screen-space AO only for the real surfaces (and not on the lowest graphics).
+      this.gtao.enabled = crystal && this.settings.graphics.shadows !== "aus";
+      this.gradePass.setAO(this.gtao.enabled ? this.gtao.pdRenderTarget.texture : null, 0.8);
+      this.startRemesh(this.active);
+    }
+    if (terrain !== this.terrainTier) {
+      this.terrainTier = terrain;
+      this.active.renderer.setTier(terrain);
+    }
+    this.stepRemesh(6);
+    this.gradePass.setGrade(p.saturation, p.contrast);
+    this.crt.uniforms.uGrain.value = this.crtBase.grain * (0.3 + 0.7 * p.crt);
+    this.crt.uniforms.uScanBand.value = this.crtBase.scan * p.crt;
+    // Lights must reach the hero layer too (checked twice a second: floors add lights).
+    this.lightLayerCheck -= dt;
+    if (this.hero && this.lightLayerCheck <= 0) {
+      this.lightLayerCheck = 0.5;
+      this.scene.traverse((o) => {
+        if ((o as THREE.Light).isLight) o.layers.enable(HERO_LAYER);
+      });
+      this.lantern.layers.disable(HERO_LAYER);
+    }
+  }
+
+  /** Dev: pin the clarity level (0..41), or null to follow the game again. */
+  debugClarity(level: number | null): void {
+    this.clarityPin = level;
+    this.eraWave = null;
+    this.gradePass.setWave(0, 0, -1);
+    if (level !== null) this.clarityNow = level;
+  }
+
+  /** Dev: play the era wave from `from` to `to` (levels 0..41). */
+  debugEraWave(from: number, to: number): void {
+    this.clarityPin = null;
+    this.clarityNow = from;
+    this.clarityGoal = to;
+    this.eraWave = { from, to, t: 0 };
+  }
+
+  /** Dev: models / terrain chunks still being re-meshed to the current voxel divisions. */
+  remeshBusy(): number {
+    const v = this.active;
+    return (
+      v.remeshQueue.length +
+      v.remeshFixed +
+      pendingFineMeshes() +
+      v.renderer.dirtyChunks +
+      v.renderer.crystalPending +
+      this.crystal.pending
+    );
+  }
+
+  /** Dev: force the crystal age on / off (null = follow the story and the setting). */
+  debugCrystal(on: boolean | null): void {
+    this.crystalPin = on;
+  }
+
+  /** Dev: crystal age state — on?, models in the manifest, swapped on this floor, still loading. */
+  crystalStats(): {
+    on: boolean;
+    manifest: number;
+    crystal: number;
+    voxel: number;
+    loading: number;
+    terrain: { crystal: number; chunks: number };
+  } {
+    let crystal = 0;
+    let voxel = 0;
+    this.active.group.traverse((o) => {
+      const src = o instanceof THREE.Mesh ? VOXEL_SRC.get(o) : undefined;
+      if (!src) return;
+      if (src.crystal) crystal++;
+      else voxel++;
+    });
+    for (const f of this.active.fixedSrc) {
+      if (f.crystal) crystal++;
+      else voxel++;
+    }
+    return {
+      on: this.crystalOn,
+      manifest: this.crystal.size,
+      crystal,
+      voxel,
+      loading: this.crystal.pending,
+      terrain: {
+        crystal: this.active.renderer.crystalChunks,
+        chunks: this.active.renderer.chunkCount,
+      },
+    };
+  }
+
+  /** Current clarity look (for the HUD / debugging). */
+  clarity(): { level: number; goal: number; look: ClarityParams; hero: boolean } {
+    return {
+      level: this.clarityNow,
+      goal: this.clarityGoal,
+      look: this.clarityLook,
+      hero: !!this.hero,
+    };
+  }
+
   private syncXray(): void {
+    if (this.hero) return;
     this.xray.position.copy(this.player.root.position);
     this.xray.rotation.copy(this.player.root.rotation);
     for (const [src, dst] of this.xrayPairs) {
@@ -4386,6 +5160,7 @@ export class LabEngine {
         }
         npc.track = track;
         npc.wasNear = near;
+        npc.hero?.tick(t);
         // Flicker / veil the body only — hiding the group would stop this loop
         // from ever showing it again until the next sync.
         this.driveFigure(

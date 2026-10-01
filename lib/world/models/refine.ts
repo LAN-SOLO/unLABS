@@ -19,6 +19,7 @@
  * "hires": `refineModel` returns them unchanged and `refinedModelMesh` meshes
  * them as they are — they are never split a second time.
  */
+import { fineMesh } from "@/lib/voxel/fine-grid";
 import { VoxelGrid, type Vec3 } from "@/lib/voxel/grid";
 import { greedyMesh, type MaterialClass, type MeshData } from "@/lib/voxel/mesher";
 import { refineGrid, refineRegion, type RefineOptions, type RefineRules } from "@/lib/voxel/refine";
@@ -330,14 +331,50 @@ export interface RefinedMeshOptions {
   /** Centre x/z on the origin (y from 0) — the engine's `center` convention. */
   center?: boolean;
   materialOf?: (i: number) => MaterialClass;
+  /**
+   * Clarity voxel divisions (default 2): how many cubes one source voxel
+   * edge is drawn with — 1 = the source cubes, 2 = the refined 2× cubes,
+   * 4 / 6 / 8 = the refined grid split again into shaped sub-voxels
+   * (`lib/voxel/fine-grid.ts`), closer to the true form with every step.
+   */
+  tier?: MeshTier;
 }
 
+/** Voxel divisions per source voxel edge at a clarity level (see lib/world/clarity.ts). */
+export type MeshTier = 1 | 2 | 4 | 6 | 8;
+
+/** Every tier, coarse to fine. */
+export const MESH_TIERS: readonly MeshTier[] = [1, 2, 4, 6, 8];
+
 const CACHE_LIMIT = 900;
+/** Byte budget of the cache: fine meshes (4×–8× divisions) are big. */
+const CACHE_BYTES = 192 * 1024 * 1024;
 const meshCache = new Map<string, MeshData>();
+let cacheBytes = 0;
+
+function bytesOf(d: MeshData): number {
+  return d.positions.byteLength + d.normals.byteLength + d.colors.byteLength + d.indices.byteLength;
+}
+
+/** Insert (LRU order) and evict the oldest entries over the count / byte budget. */
+function cachePut(key: string, data: MeshData): void {
+  const old = meshCache.get(key);
+  if (old) {
+    cacheBytes -= bytesOf(old);
+    meshCache.delete(key);
+  }
+  meshCache.set(key, data);
+  cacheBytes += bytesOf(data);
+  while (meshCache.size > 1 && (meshCache.size > CACHE_LIMIT || cacheBytes > CACHE_BYTES)) {
+    const k = meshCache.keys().next().value!;
+    cacheBytes -= bytesOf(meshCache.get(k)!);
+    meshCache.delete(k);
+  }
+}
 /** Identity hint: grid → content hash (grids are not mutated once meshed). */
 const hashOf = new WeakMap<VoxelGrid, string>();
 
-function gridHash(grid: VoxelGrid): string {
+export function gridHash(grid: VoxelGrid): string {
   let h = hashOf.get(grid);
   if (h) return h;
   const d = grid.data;
@@ -367,9 +404,7 @@ export function refinedModelMesh(
   family: RefineFamily,
   opts: RefinedMeshOptions = {},
 ): MeshData {
-  const matKey =
-    opts.materialOf && opts.materialOf !== labMaterialOf ? materialKey(opts.materialOf) : "lab";
-  const key = `${family}|${opts.center ? 1 : 0}|${matKey}|${gridHash(grid)}`;
+  const key = modelMeshKey(grid, family, opts);
   const hit = meshCache.get(key);
   if (hit) {
     // LRU: move to the back.
@@ -377,16 +412,63 @@ export function refinedModelMesh(
     meshCache.set(key, hit);
     return hit;
   }
-  const fine = refineModel(grid, family, opts.materialOf);
-  const data = greedyMesh(fine, [0, 0, 0], [fine.sx, fine.sy, fine.sz], {
-    palette: LAB_PALETTE,
-    materialOf: opts.materialOf ?? labMaterialOf,
-    ...(opts.center ? { offset: [-fine.sx / 2, 0, -fine.sz / 2] as Vec3 } : {}),
-    scale: fine === grid ? 1 : 0.5,
-  });
-  meshCache.set(key, data);
-  if (meshCache.size > CACHE_LIMIT) meshCache.delete(meshCache.keys().next().value!);
+  const materialOf = opts.materialOf ?? labMaterialOf;
+  const tier = opts.tier ?? 2;
+  const centre = (g: VoxelGrid): Vec3 | undefined =>
+    opts.center ? [-g.sx / 2, 0, -g.sz / 2] : undefined;
+  let data: MeshData;
+  if (tier === 1) {
+    // First eras: the source cubes, no refinement detail ("hires" grids as authored).
+    data = greedyMesh(grid, [0, 0, 0], [grid.sx, grid.sy, grid.sz], {
+      palette: LAB_PALETTE,
+      materialOf,
+      ...(opts.center ? { offset: centre(grid)! } : {}),
+      scale: 1,
+    });
+  } else {
+    // Refined 2× grid ("hires" grids are already at that size), split again
+    // into tier / 2 shaped sub-voxels per refined voxel.
+    const fine = refineModel(grid, family, opts.materialOf);
+    data = fineMesh(fine, tier / 2, {
+      palette: LAB_PALETTE,
+      materialOf,
+      ...(opts.center ? { offset: centre(fine)! } : {}),
+      scale: fine === grid ? 1 : 0.5,
+    });
+  }
+  cachePut(key, data);
   return data;
+}
+
+/** Cache key of a model mesh (content, family, centring, tier, material mapping). */
+export function modelMeshKey(
+  grid: VoxelGrid,
+  family: RefineFamily,
+  opts: RefinedMeshOptions = {},
+): string {
+  return `${family}|${opts.center ? 1 : 0}|${opts.tier ?? 2}|${materialKeyOf(opts.materialOf)}|${gridHash(grid)}`;
+}
+
+/** A cached model mesh, if it was meshed already (here or in a worker). */
+export function peekModelMesh(key: string): MeshData | undefined {
+  return meshCache.get(key);
+}
+
+/** Store a mesh built elsewhere (the fine-mesh workers) under its `modelMeshKey`. */
+export function putModelMesh(key: string, data: MeshData): void {
+  cachePut(key, data);
+}
+
+/** Serialisable form of a material mapping ("lab" = the lab palette's own classes). */
+export function materialKeyOf(materialOf?: (i: number) => MaterialClass): string {
+  return materialOf && materialOf !== labMaterialOf ? materialKey(materialOf) : "lab";
+}
+
+/** The material mapping back from `materialKeyOf` (for workers). */
+export function materialFromKey(key: string): (i: number) => MaterialClass {
+  if (key === "lab") return labMaterialOf;
+  const byLetter: Record<string, MaterialClass> = { s: "solid", g: "glass", e: "emit", m: "metal" };
+  return (i) => byLetter[key[i - 1] ?? "s"] ?? "solid";
 }
 
 /** Stable key of a material mapping (the 255 classes it assigns). */
@@ -399,6 +481,7 @@ function materialKey(materialOf: (i: number) => MaterialClass): string {
 /** Drop cached meshes (tests / memory pressure). */
 export function clearRefineCache(): void {
   meshCache.clear();
+  cacheBytes = 0;
 }
 
 /** Decor family by model scale: DETAIL_SCALE pieces only get subdivision + a light bevel. */

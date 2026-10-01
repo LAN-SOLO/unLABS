@@ -22,6 +22,12 @@ import {
 } from "@/lib/world/audio/songs/styles";
 import { useCallback, useSyncExternalStore } from "react";
 import { DEFAULT_LOCALE, LOCALES, getLocale, tr, type Locale } from "@/lib/i18n";
+import {
+  CLARITY_MODES,
+  CRYSTAL_MODES,
+  type ClarityMode,
+  type CrystalMode,
+} from "@/lib/world/clarity-mode";
 
 export const SETTINGS_KEY = "unlabs.settings.v1";
 
@@ -29,6 +35,8 @@ export const SETTINGS_KEY = "unlabs.settings.v1";
 
 export const GRAPHICS_PRESETS = ["niedrig", "mittel", "hoch", "ultra"] as const;
 export type GraphicsPreset = (typeof GRAPHICS_PRESETS)[number];
+export const VOXEL_DETAILS = [4, 6, 8] as const;
+export type VoxelDetail = (typeof VOXEL_DETAILS)[number];
 /** "eigen" = the player tweaked a knob after picking a preset. */
 export type GraphicsPresetState = GraphicsPreset | "eigen";
 
@@ -95,10 +103,22 @@ export interface GraphicsSettings {
   bloomStrength: number;
   /** Particle density 0..1. */
   particles: number;
+  /**
+   * Finest voxel division the clarity eras may reach (cubes per source voxel
+   * edge: 4, 6 or 8). The story still sharpens the world, it just stops
+   * splitting the voxels here — fine voxels cost triangles.
+   */
+  voxelDetail: VoxelDetail;
   fpsLimit: FpsLimit;
   showFps: boolean;
   /** Live 3D diorama behind the title screen (off = flat 2D backdrop, saves GPU). */
   menuScene: boolean;
+  /** How clear the world looks: follow the story (sharpens as Jade invents), always clear or always big blocks. */
+  clarity: ClarityMode;
+  /** Crystal age: real surfaces after era 42 (story), always, or never (docs/CRYSTAL.md). */
+  crystal: CrystalMode;
+  /** Draw Jade as a real person (off = the voxel Jade, saves GPU / build time). */
+  realJade: boolean;
 }
 
 export interface CameraSettings {
@@ -173,7 +193,7 @@ export type DeepPartial<T> = {
 /** Knobs a graphics preset sets (fps cap, FPS counter and the menu scene stay the player's). */
 export type PresetGraphics = Omit<
   GraphicsSettings,
-  "preset" | "fpsLimit" | "showFps" | "menuScene"
+  "preset" | "fpsLimit" | "showFps" | "menuScene" | "clarity" | "crystal" | "realJade"
 >;
 
 export const PRESET_GRAPHICS: Record<GraphicsPreset, PresetGraphics> = {
@@ -183,6 +203,7 @@ export const PRESET_GRAPHICS: Record<GraphicsPreset, PresetGraphics> = {
     bloom: false,
     bloomStrength: 0,
     particles: 0.3,
+    voxelDetail: 4,
   },
   mittel: {
     pixelRatio: 1,
@@ -190,6 +211,7 @@ export const PRESET_GRAPHICS: Record<GraphicsPreset, PresetGraphics> = {
     bloom: true,
     bloomStrength: 0.3,
     particles: 0.6,
+    voxelDetail: 6,
   },
   hoch: {
     pixelRatio: 2,
@@ -197,6 +219,7 @@ export const PRESET_GRAPHICS: Record<GraphicsPreset, PresetGraphics> = {
     bloom: true,
     bloomStrength: 0.4,
     particles: 1,
+    voxelDetail: 8,
   },
   ultra: {
     pixelRatio: 2,
@@ -204,6 +227,7 @@ export const PRESET_GRAPHICS: Record<GraphicsPreset, PresetGraphics> = {
     bloom: true,
     bloomStrength: 0.7,
     particles: 1,
+    voxelDetail: 8,
   },
 };
 
@@ -273,6 +297,22 @@ export const PRESET_LABEL: Record<GraphicsPresetState, string> = {
   eigen: tr("custom"),
 };
 
+export const CLARITY_LABEL: Record<ClarityMode, string> = {
+  story: tr("story"),
+  clear: tr("always clear"),
+  pixel: tr("always blocky"),
+};
+
+export { CLARITY_MODES };
+
+export const CRYSTAL_LABEL: Record<CrystalMode, string> = {
+  story: tr("after era 42"),
+  always: tr("always"),
+  off: tr("never"),
+};
+
+export { CRYSTAL_MODES };
+
 export const SHADOW_LABEL: Record<ShadowQuality, string> = {
   aus: tr("off"),
   niedrig: tr("low"),
@@ -333,6 +373,9 @@ function buildDefaults(reduceMotion: boolean): Settings {
       fpsLimit: 60,
       showFps: false,
       menuScene: true,
+      clarity: "story",
+      crystal: "story",
+      realJade: true,
     },
     camera: { defaultZoom: 46, rotateSpeed: 1, followSmoothing: 0.5 },
     audio: {
@@ -401,6 +444,9 @@ const ENUMS: Record<string, readonly (string | number)[]> = {
   "graphics.preset": [...GRAPHICS_PRESETS, "eigen"],
   "graphics.shadows": SHADOW_QUALITIES,
   "graphics.fpsLimit": FPS_LIMITS,
+  "graphics.clarity": CLARITY_MODES,
+  "graphics.crystal": CRYSTAL_MODES,
+  "graphics.voxelDetail": VOXEL_DETAILS,
   "gameplay.textSpeed": TEXT_SPEEDS,
   "gameplay.autosaveSeconds": AUTOSAVE_INTERVALS,
   "gameplay.hud": HUD_MODES,
@@ -494,7 +540,8 @@ export function detectPreset(g: GraphicsSettings): GraphicsPresetState {
       b.shadows === g.shadows &&
       b.bloom === g.bloom &&
       b.bloomStrength === g.bloomStrength &&
-      b.particles === g.particles
+      b.particles === g.particles &&
+      b.voxelDetail === g.voxelDetail
     )
       return p;
   }

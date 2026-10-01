@@ -88,6 +88,7 @@ import type {
 import { dailyPriceModifier } from "@/lib/game/volatility";
 import { WEAR_BY_ID } from "@/lib/world/content/wardrobe";
 import { grantWear, initialWardrobe, isWearPickupItem, wearIdFromItem } from "@/lib/world/wardrobe";
+import { initialMatrix } from "@/lib/world/matrix/state";
 
 export const STARTER_DEVICES = ["MCP-000", "CLK-001", "VNT-001", "BTK-001", "UEC-001"] as const;
 
@@ -96,7 +97,7 @@ export const STARTER_DEVICES = ["MCP-000", "CLK-001", "VNT-001", "BTK-001", "UEC
  * Bump it together with a new migration step whenever the persisted shape
  * or the meaning of a field changes.
  */
-export const SAVE_VERSION = 7;
+export const SAVE_VERSION = 8;
 
 export function initialState(): WorldState {
   const s: WorldState = {
@@ -129,6 +130,7 @@ export function initialState(): WorldState {
     readouts: {},
     experiments: [],
     wardrobe: initialWardrobe(),
+    matrix: initialMatrix(),
   };
   for (const id of STARTER_DEVICES) s.discovered[id] = true;
   log(s, tr("Cold start. Residual charge 0.3 %. Something is humming somewhere."));

@@ -19,6 +19,11 @@ import {
   AUTOSAVE_INTERVALS,
   BIORHYTHM_LABEL,
   BIORHYTHM_MODES,
+  CLARITY_LABEL,
+  CLARITY_MODES,
+  CRYSTAL_LABEL,
+  CRYSTAL_MODES,
+  VOXEL_DETAILS,
   COLORBLIND_LABEL,
   COLORBLIND_MODES,
   CONTROL_ACTIONS,
@@ -417,11 +422,47 @@ function GraphicsTab({ s, update }: { s: Settings; update: Update }) {
         format={pct}
         onChange={(v) => update({ graphics: { particles: v } })}
       />
+      <Choice
+        label={tr("Voxel detail")}
+        hint={tr("How fine the voxels may get as the world clears up (finer = more GPU)")}
+        value={g.voxelDetail}
+        options={VOXEL_DETAILS}
+        format={(v) => tr("{n}× per voxel", { n: v })}
+        onChange={(v) => update({ graphics: { voxelDetail: v } })}
+      />
       <Toggle
         label={tr("Title screen diorama")}
         hint={tr("Live 3D lab behind the main menu (off = flat backdrop)")}
         value={g.menuScene}
         onChange={(v) => update({ graphics: { menuScene: v } })}
+      />
+      <Choice
+        label={tr("World clarity")}
+        hint={tr(
+          "Story: the voxels get finer with every invention. Always clear / always blocky fix the look.",
+        )}
+        value={g.clarity}
+        options={CLARITY_MODES}
+        format={(v) => CLARITY_LABEL[v]}
+        onChange={(v) => update({ graphics: { clarity: v } })}
+      />
+      <Choice
+        label={tr("Crystal age")}
+        hint={tr(
+          "When the voxels give way to real, rendered surfaces: after the last era, always, or never.",
+        )}
+        value={g.crystal}
+        options={CRYSTAL_MODES}
+        format={(v) => CRYSTAL_LABEL[v]}
+        onChange={(v) => update({ graphics: { crystal: v } })}
+      />
+      <Toggle
+        label={tr("Realistic Jade")}
+        hint={tr(
+          "Jade as a real person in the voxel world (off = voxel Jade; applies on the next load)",
+        )}
+        value={g.realJade}
+        onChange={(v) => update({ graphics: { realJade: v } })}
       />
       <Choice
         label={tr("Frame rate limit")}

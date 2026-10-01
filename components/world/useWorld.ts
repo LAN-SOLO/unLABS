@@ -1,6 +1,10 @@
 "use client";
 
+import { agingTick, roomLitFn } from "@/lib/world/aging";
+import { finishExtraction } from "@/lib/world/matrix/rules";
+import { RARITY_NAME, rarityOf, sliceCode, tokenById } from "@/lib/world/matrix/archive";
 import { tr } from "@/lib/i18n";
+import { CLARITY_ERAS, ERA_NAMES, noteClarityEra } from "@/lib/world/clarity";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { settle } from "@/lib/world/game";
 import { bioTick } from "@/lib/world/biorhythm";
@@ -63,6 +67,16 @@ export function useWorld() {
       const a = ACHIEVEMENT_BY_ID.get(id);
       if (a) toastRef.current?.(tr("★ Achievement: {title}", { title: a.title }), "good");
     }
+    const sharper = noteClarityEra(s);
+    if (sharper !== null)
+      toastRef.current?.(
+        tr("The world sharpens — era {n} of {total}: {name}", {
+          n: sharper + 1,
+          total: CLARITY_ERAS,
+          name: ERA_NAMES[sharper] ?? "",
+        }),
+        "insight",
+      );
     saveWorld(s);
     setVersion((v) => v + 1);
     listeners.current.forEach((l) => l());
@@ -102,6 +116,8 @@ export function useWorld() {
         setVersion((v) => v + 1);
         listeners.current.forEach((l) => l());
       }
+      // Aging: plants grow in lit, watered rooms; dust, rust and moss creep in.
+      if (agingTick(s, 1, roomLitFn(s))) listeners.current.forEach((l) => l());
       // Jade's wardrobe: the replicator finishes its job, reward pieces arrive.
       const wt = wardrobeTick(s);
       if (wt.job || wt.rewards.length || wt.looks.length) {
@@ -126,6 +142,21 @@ export function useWorld() {
           const a = ACHIEVEMENT_BY_ID.get(id);
           if (a) toastRef.current?.(tr("★ Achievement: {title}", { title: a.title }), "good");
         }
+        saveWorld(s);
+        setVersion((v) => v + 1);
+        listeners.current.forEach((l) => l());
+      }
+      // Matrix Chamber: an extraction finishes on wall-clock time (also after the game was closed).
+      const slice = finishExtraction(s, Date.now());
+      if (slice) {
+        const t = tokenById(slice.token);
+        toastRef.current?.(
+          tr("Matrix Chamber: a slice dissolved out of the matrix — {code} ({rarity}).", {
+            code: sliceCode(slice.token, slice.pos),
+            rarity: t ? RARITY_NAME[rarityOf(t)] : "?",
+          }),
+          "insight",
+        );
         saveWorld(s);
         setVersion((v) => v + 1);
         listeners.current.forEach((l) => l());

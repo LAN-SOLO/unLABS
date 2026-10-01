@@ -61,3 +61,13 @@ supabase/dumps/
 # merch render scratch
 /scripts/merch/.render.html
 /scripts/merch/.review.png
+
+# Crystal pipeline work dir (dumps, raw GLBs, previews)
+/.crystal/
+# Crystal build output (~180 MB GLB) — kept out of git until the distribution
+# (LFS / release asset / CDN) is decided; rebuild with `pnpm crystal:build`.
+/public/crystal/
+# Textures derived from the private reference portrait (never in the repo;
+# rebuild locally: node scripts/hero/face-texture.mjs, scripts/hero/blender/jade_mpfb.py)
+/public/hero/jade-face.webp
+/public/hero/jade-skin.jpg

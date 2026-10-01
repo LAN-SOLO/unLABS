@@ -31,6 +31,7 @@ const PROP_BASELINE: Record<string, [number, number, number, number]> = {
   lamp: [2, 6, 2, 24],
   barrel: [6, 8, 6, 208],
   sofa: [14, 7, 7, 525],
+  matrix: [20, 26, 25, 1940], // Matrix Chamber (post-game slice station)
 };
 
 const PICKUP_BASELINE: Record<string, [number, number, number, number]> = {

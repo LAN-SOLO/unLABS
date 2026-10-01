@@ -65,6 +65,7 @@ import {
 } from "@/lib/world/types";
 import { CORE } from "@/lib/world/content/floorplan";
 import { cloneLook, sanitizeWardrobe } from "@/lib/world/wardrobe";
+import { sanitizeMatrix } from "@/lib/world/matrix/state";
 import { DEFAULT_LOOK, LEGACY_DEFAULT_LOOK, WEAR_SLOTS } from "@/lib/world/content/wardrobe";
 
 type Raw = Record<string, unknown>;
@@ -150,6 +151,9 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
     w.looksWorn = isRecord(w.looksWorn) ? w.looksWorn : {};
     return { ...raw, wardrobe: w, version: 7 };
   },
+  // v7 → v8: the Matrix Chamber (slices, crystals, the running extraction).
+  // Old saves start with an empty chamber.
+  7: (raw) => ({ ...raw, matrix: isRecord(raw.matrix) ? raw.matrix : {}, version: 8 }),
 };
 
 /** A raw look equal to `LEGACY_DEFAULT_LOOK` in every slot (item and colourway). */
@@ -454,6 +458,7 @@ export function sanitizeSave(raw: Raw): SanitizeResult {
     ),
     experiments: sanitizeExperiments(raw.experiments),
     wardrobe: sanitizeWardrobe(raw.wardrobe),
+    matrix: sanitizeMatrix(raw.matrix),
   };
 
   // Position: a known, reachable floor and a spot inside one of its rooms.

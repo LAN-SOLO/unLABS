@@ -35,6 +35,7 @@ import {
   ROOM_PLAN,
 } from "@/lib/world/content/floorplan";
 import { SLICE_ITEM } from "@/lib/world/content/items";
+import { MATRIX_PROP } from "@/lib/world/matrix/state";
 import { REPLICATOR_POWER, REPLICATOR_PROP, WEAR_ITEM_PREFIX } from "@/lib/world/content/wardrobe";
 import { buildFloorGeom, geomRoomAt, roomShape, type FloorGeom } from "@/lib/world/floor-geom";
 import { shapeBounds, shapeContains } from "@/lib/world/room-shape";
@@ -3940,6 +3941,19 @@ const PLANNED_PROPS: readonly PropDef[] = [
     rot: 3,
     requires: { power: REPLICATOR_POWER },
     requiresHint: tr("The wardrobe replicator needs at least 50 W on the grid."),
+  },
+  // The Matrix Chamber (lib/world/matrix/): post-game station in the east
+  // half of the Control Room, console facing west towards Jade's start.
+  // Sleeps until every device is built; the panel explains the rest.
+  {
+    id: MATRIX_PROP,
+    floor: 0,
+    x: 100,
+    z: 35,
+    kind: "station",
+    label: tr("Matrix Chamber"),
+    model: "matrix",
+    rot: 3,
   },
 ];
 
