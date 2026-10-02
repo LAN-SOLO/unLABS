@@ -113,6 +113,7 @@ import {
   type VisualLight,
 } from "@/lib/world/models/anim";
 import { botVisual, deviceVisual } from "@/lib/world/models";
+import { requestDetail, type DetailedDevice } from "@/lib/world/render/detail-pool";
 import {
   activeProp,
   advanceGait,
@@ -489,6 +490,11 @@ interface DeviceView {
   assembleT: number;
   assembleStill: boolean;
   scan: THREE.Mesh | null;
+  /**
+   * The detailed device (models/detail.ts) once its worker finished; until
+   * then the authored visual is shown (detail-pool.ts).
+   */
+  detail: DetailedDevice | null;
 }
 
 /** A taken pickup flying to the player. */
@@ -1772,11 +1778,28 @@ export class LabEngine {
       if (!prev || prev.powered) dv.ramp = 1;
     }
     if (dv.group.visible) {
-      const grid = stagedBuildGrid(dv.model.grid, want.done / stages, want.powered);
-      dv.base = this.meshModel(grid, dv.visual.scale ?? MODEL_SCALE, true, "device");
+      // A finished detailed device shows its pre-meshed base (detail-pool.ts).
+      const grid =
+        dv.detail && want.done >= stages
+          ? want.powered
+            ? dv.detail.on
+            : dv.detail.off
+          : stagedBuildGrid(dv.model.grid, want.done / stages, want.powered);
+      dv.base = this.meshModel(
+        grid,
+        dv.visual.scale ?? MODEL_SCALE,
+        true,
+        familyFor(dv.visual, "device"),
+      );
       dv.group.add(dv.base);
       if (want.done >= stages) {
-        dv.rig = this.buildVisualRig(dv.visual, dv.group, want.powered);
+        dv.rig = this.buildVisualRig(
+          dv.visual,
+          dv.group,
+          want.powered,
+          undefined,
+          familyFor(dv.visual, "device"),
+        );
         dv.rig.ramp = dv.anim;
         dv.screenRefs = this.screens.attachVisual(
           dv.group,
@@ -1826,8 +1849,26 @@ export class LabEngine {
     base.material = MATERIAL_ORDER.map((c) => (c === "emit" ? mat : this.materials[c]));
   }
 
+  /**
+   * Swap in the detailed device once it is ready (finished devices only; a
+   * device mid-build keeps the authored stages and swaps when complete).
+   */
+  private swapDetail(v: FloorView, dv: DeviceView): void {
+    const want = dv.pending ?? dv.built;
+    if (!want) return;
+    const stages = DEVICES.find((d) => d.id === dv.id)!.stages.length;
+    if (want.done < stages || dv.assembleT >= 0) return;
+    const d = requestDetail(dv.id);
+    if (!d) return;
+    dv.detail = d;
+    dv.visual = d.visual;
+    dv.model = d.visual.base;
+    if (dv.built && !dv.pending) this.buildDevice(v, dv, dv.built);
+  }
+
   /** Per frame: advance the power ramp, rig clock and build flourish of one device. */
   private stepDevice(v: FloorView, dv: DeviceView, dt: number): void {
+    if (!dv.detail && v === this.active) this.swapDetail(v, dv);
     if (dv.ramp !== dv.rampTarget) {
       dv.ramp = stepRamp(dv.ramp, dv.rampTarget, dt);
       if (dv.ramp === dv.rampTarget) {
@@ -2897,6 +2938,7 @@ export class LabEngine {
     for (const d of DEVICES) {
       const room = ROOMS.find((r) => r.id === d.room)!;
       if (room.floor !== floor) continue;
+      // Authored first; the detailed device (same world space) swaps in when its worker is done.
       const visual = deviceVisual(d.id);
       const model = visual.base;
       const g = new THREE.Group();
@@ -2922,6 +2964,7 @@ export class LabEngine {
         assembleT: -1,
         assembleStill: false,
         scan: null,
+        detail: null,
         footprint: [
           d.x + 0.5 - hw,
           d.z + 0.5 - hd,

@@ -152,9 +152,11 @@ def cmd_beauty(a: argparse.Namespace) -> int:
     """Lit renders of every side + a voxel cutaway (the inside)."""
     only = a.only.split(",") if a.only else None
     for e in _inventory(only):
+        if a.kind and e["kind"] != a.kind:
+            continue
         _reset()
         beauty.setup(samples=a.samples, size=a.size)
-        out = VOX / "blender/beauty" / e["id"]
+        out = VOX / "blender/beauty" / (e["id"] if e["kind"] != "device-detail" else f"{e['id']}.detail")
         if e.get("scene"):
             parts = uvox.load(VOX / e["scene"])
             coll = bpy.data.collections.new(e["id"])
@@ -291,6 +293,7 @@ def main(argv: list[str]) -> int:
     b.add_argument("--only")
     b.add_argument("--samples", type=int, default=64)
     b.add_argument("--size", type=int, default=900)
+    b.add_argument("--kind", help="only this inventory kind (device, device-detail, door, airlock)")
     a = ap.parse_args(argv)
     return {"verify": cmd_verify, "selftest": cmd_selftest, "beauty": cmd_beauty, "uitest": cmd_uitest}[a.cmd](a)
 

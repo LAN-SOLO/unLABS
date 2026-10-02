@@ -46,7 +46,8 @@ before you change anything in `scripts/voxel`.
 | Script in Blender                      | `sys.path.insert(0, "scripts/voxel/blender")`, then `from voxelgod import uvox, build, ops, iso, beauty`                                                      |
 | Mount fine detail on a coarse body     | `ops.combine([body, detail], unit)`; the detail's `origin` must be on the `unit` lattice                                                                      |
 | New part from a shape                  | `ops.box`, `ops.cylinder` or `ops.sphere` at the target unit, or `ops.voxelize_object(mesh, unit, colour, palette)`                                           |
-| Higher detail for a device             | `ops.upsample(m, k)` (exact, same look), then carve / paint / combine new fine detail; prove the untouched parts are unchanged (combine at the old unit → same sha) |
+| Higher detail for a device (game)      | it is live: `lib/world/models/detail.ts` (components) — add a component there, prove with `tests/world/device-finestage.test.ts` + `pnpm voxel:export && pnpm voxel:verify` |
+| Higher detail for a device (Blender)   | `ops.upsample(m, k)` (exact, same look), then carve / paint / combine new fine detail; prove the untouched parts are unchanged (combine at the old unit → same sha) |
 | Into the game                          | `uvox.save(m, path)`, then `modelFromUvox(json)` gives `{ model, scale, fine }` for a visual with `fine: true`                                                 |
 
 ## Gotchas

@@ -10,6 +10,7 @@
  * Writes .voxel/ (gitignored):
  *   models/devices/<ID>.uvox.json         composed + refined, what the book shows
  *   models/devices/<ID>.source.uvox.json  composed, authoring resolution
+ *   models/device-details/<ID>.uvox.json   the detailed device the game draws (models/detail.ts)
  *   models/doors/<id>.scene.json          the engine's assembly (refined parts, placed)
  *   models/doors/<id>.uvox.json           the assembly snapped into one grid
  *   models/doors/frame.uvox.json          the book's door frame picture
@@ -38,6 +39,7 @@ import { DEVICES } from "@/lib/world/content/devices";
 import { DOORS } from "@/lib/world/content/map";
 import { AIRLOCKS } from "@/lib/world/doors/airlock";
 import { composeVisual } from "@/lib/world/models/compose";
+import { detailVisual } from "@/lib/world/models/detail";
 import { MODEL_SCALE } from "@/lib/world/models/core";
 import { DEVICE_VISUAL_IDS, deviceVisual } from "@/lib/world/models/devices";
 import { DOOR_SCALE, doorFrameModel } from "@/lib/world/models/doors";
@@ -68,7 +70,7 @@ const PALETTE: PaletteSource = {
 
 interface Entry {
   id: string;
-  kind: "device" | "door" | "airlock" | "frame";
+  kind: "device" | "device-detail" | "door" | "airlock" | "frame";
   uvox: string;
   source?: string;
   scene?: string;
@@ -139,10 +141,20 @@ for (const id of deviceIds) {
   const s = toUvox(`${id}.source`, src, PALETTE, { unit: unitSrc, meta });
   const uvox = writeJson(`models/devices/${id}.uvox.json`, m);
   const source = writeJson(`models/devices/${id}.source.uvox.json`, s);
+  // The book shows the detailed device since 0.4.2 (see device-detail below).
+  entry(id, "device", m, full, scaleFor(full, 300), { uvox, source });
+}
+
+// ── Detailed devices (what the game draws since 0.4.2, models/detail.ts) ──
+for (const id of deviceIds) {
+  if (!wanted(id)) continue;
+  const d = detailVisual(deviceVisual(id), id);
+  const g = composeVisual(d, 0, true);
+  const m = toUvox(id, g, PALETTE, { unit: d.scale!, meta: { kind: "device-detail" } });
+  const uvox = writeJson(`models/device-details/${id}.uvox.json`, m);
   const book = join(BOOK, `devices/${id}/rot-0.png`);
-  entry(id, "device", m, full, scaleFor(full, 300), {
+  entry(id, "device-detail", m, g, scaleFor(g, 300), {
     uvox,
-    source,
     ...(existsSync(book) ? { book } : {}),
   });
 }

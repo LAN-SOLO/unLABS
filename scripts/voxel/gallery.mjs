@@ -43,7 +43,7 @@ const cards = inv.map((e) => {
   ].filter(Boolean);
   return `<section id="${esc(e.id)}"><h2>${esc(e.id)} <span class="${ok ? "ok" : "bad"}">${ok ? "1:1" : "check"}</span> <small>${esc(e.kind)}</small></h2>
 <p>${facts.map(esc).join(" · ")}</p>
-<div class="row">${e.book ? img(e.book, "undevbook") : img(join(VOX, e.ref), "game reference")}${img(join(VOX, "blender/iso", `${e.kind}s`, `${e.id}.png`), "Blender clone (iso)")}${VIEWS.map((v) => img(join(VOX, "blender/beauty", e.id, `${v}.png`), v)).join("")}</div></section>`;
+<div class="row">${e.book ? img(e.book, "undevbook") : img(join(VOX, e.ref), "game reference")}${img(join(VOX, "blender/iso", `${e.kind}s`, `${e.id}.png`), "Blender clone (iso)")}${VIEWS.map((v) => img(join(VOX, "blender/beauty", e.kind === "device-detail" ? `${e.id}.detail` : e.id, `${v}.png`), v)).join("")}</div></section>`;
 });
 const s = ver.summary;
 writeFileSync(

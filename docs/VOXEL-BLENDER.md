@@ -20,6 +20,9 @@ It stays 100 % voxels throughout.
 - 683 / 683 assembly parts are exact.
 - The game references themselves are byte-identical to the undevbook's
   pictures (40 / 40 the book shows).
+- Since the device detail (0.4.2) there are 138 models, including the 39
+  detailed devices: 138 / 138 voxel- and pixel-exact, and the book's
+  pictures equal the clones (40 / 40, 0 px).
 
 ## Commands
 
@@ -146,6 +149,64 @@ const { model, scale, fine } = modelFromUvox(json); // fine: mesh as authored (f
 
 The loader checks every palette entry against the game palette and refuses
 on any mismatch.
+
+## Device detail (game, since 0.4.2)
+
+The game draws every device at a second, finer voxel level with real voxel
+components (`lib/world/models/detail.ts`). The user approved it on three
+devices (CDC-001, PWR-001, CPU-001) and then rolled it out to all 39 on
+2026-10-02.
+
+1. **Feinstufe.** The authored grid is refined 2× with the device rules (the
+   old look), then once more with `FINE_RULES`. A source voxel becomes 4×4×4
+   voxels: finer chamfers, plate seams, grooves, rivets, scanlines and LED
+   bezels. Visuals authored fine (`fine: true`) refine once.
+2. **Components.** `findPanels` finds maximal single-colour exposed
+   rectangles per face on the **authored** grid, largest first. On each
+   panel one component is stamped at the fine level:
+
+   | Component                      | Where                                                     |
+   | ------------------------------ | --------------------------------------------------------- |
+   | screen content                 | screen colours, in the style of the device's live screens |
+   | type plate with the device id  | the largest front panel                                   |
+   | access hatch                   | big panels: groove, grip, screws, vents on the sides      |
+   | vent slots with slotted screws | medium side and back panels                               |
+   | perforated grille              | the top                                                   |
+   | hazard or barcode stickers     | small panels                                              |
+   | rivet rows                     | everything else                                           |
+
+   Stamps only recolour or carve inwards, so **the silhouette never grows**
+   (tested). Panels under the engine's **live screens** stay untouched.
+
+3. **Same world space.** `assembleDetail` scales every voxel coordinate by
+   the factor and divides `scale` by it: part offsets, pivots, translational
+   amplitudes (bob, slide, orbit, piston, jitter), `rollRadius`, lights,
+   screens, footprint and height.
+   - Game logic (collision, footprints, sides, zones) keeps using `deviceVisual`.
+   - Only the renderer uses the detailed visual.
+4. **No hitches.** `lib/world/render/detail-pool.ts` runs the detail in
+   workers (`detail.worker.ts`).
+   - A worker returns the fine grids and the finished base in both power
+     states, already meshed. The meshes go into the model mesh cache.
+   - The engine shows the authored device and swaps the detailed one in once
+     the device is complete (`swapDetail` → `buildDevice`).
+   - Measured on L−3 (7 heavy devices): a floor change takes 0.7 s (it was
+     10 s with synchronous detail), frame time is 5–10 ms in headless Chrome,
+     and there are about 28 M voxels over all 39 devices.
+
+**Proof in Blender:** `pnpm voxel:export` also writes
+`models/device-details/<ID>`. `pnpm voxel:verify` clones them, so 138 / 138
+models are voxel- and pixel-exact. The library is `.voxel/blend/device-details.blend`.
+
+**Tests:** `tests/world/device-finestage.test.ts` covers world size and
+transforms, that the silhouette never grows, that live-screen panels stay,
+the amplitude scaling, determinism and the worker path.
+
+**Everywhere the same:** the title-screen diorama swaps its devices too
+(`TitleDiorama.swapDetails`, same worker pool). The undevbook bakes the
+detailed devices (its `sprites.ts`: finished device = detail, build stages =
+authored refined 2× and upsampled 2× onto the same lattice). Its device
+pictures are pixel-identical to Blender's clones (40 / 40, `vs_book`).
 
 ## Files
 

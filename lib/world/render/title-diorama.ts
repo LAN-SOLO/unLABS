@@ -43,6 +43,7 @@ import { botVisual } from "@/lib/world/models/characters";
 import { MODEL_SCALE, Model, stagedGrid } from "@/lib/world/models/core";
 import { decorModel, decorScale, decorVisual } from "@/lib/world/models/decor";
 import { deviceVisual } from "@/lib/world/models/devices";
+import { requestDetail } from "@/lib/world/render/detail-pool";
 import { DOOR_SCALE, doorFrameModel, doorLeafModel } from "@/lib/world/models/doors";
 import { applyExpression, applyGesture } from "@/lib/world/models/gestures";
 import {
@@ -596,6 +597,13 @@ export class TitleDiorama {
   private readonly textures: THREE.Texture[] = [];
   private readonly rigs: Rig[] = [];
   private readonly stations = new Map<StationId, StationView>();
+  /** Devices still showing the authored model; the detailed one swaps in when ready (detail-pool.ts). */
+  private readonly pendingDetail: {
+    id: string;
+    group: THREE.Group;
+    scan: THREE.Texture | null;
+    rig: Rig;
+  }[] = [];
   private readonly bots = new Map<string, BotView>();
   private readonly joints = new Map<RigPartName, { group: THREE.Group; rest: THREE.Vector3 }>();
   private readonly handProps = new Map<HandPropKind, THREE.Object3D>();
@@ -816,6 +824,7 @@ export class TitleDiorama {
       const visual = deviceVisual(p.id);
       rig = this.addVisual(group, visual, true, scan);
       height = visual.base.h * (visual.scale ?? MODEL_SCALE);
+      this.pendingDetail.push({ id: p.id, group, scan, rig });
     } else {
       const visual = decorVisual(p.id);
       const sc = decorScale(p.id);
@@ -1156,9 +1165,36 @@ export class TitleDiorama {
     this.camera.lookAt(target);
   }
 
+  /**
+   * Swap detailed devices in (same world space as the authored ones, like the
+   * game): the group is rebuilt from the detailed visual with its pre-meshed,
+   * powered base.
+   */
+  private swapDetails(): void {
+    for (let i = this.pendingDetail.length - 1; i >= 0; i--) {
+      const pd = this.pendingDetail[i]!;
+      const d = requestDetail(pd.id);
+      if (!d) continue;
+      this.pendingDetail.splice(i, 1);
+      for (const c of [...pd.group.children]) {
+        pd.group.remove(c);
+        c.traverse((o) => {
+          if (o instanceof THREE.Mesh) o.geometry.dispose();
+        });
+      }
+      const at = this.rigs.indexOf(pd.rig);
+      if (at >= 0) this.rigs.splice(at, 1);
+      const base = new Model(d.on.sx, d.on.sy, d.on.sz);
+      base.grid.data.set(d.on.data);
+      const rig = this.addVisual(pd.group, { ...d.visual, base }, true, pd.scan, "hires");
+      for (const st of this.stations.values()) if (st.rig === pd.rig) st.rig = rig;
+    }
+  }
+
   /** Advance the simulation and render one frame. */
   private draw(dt: number): void {
     if (this.disposed) return;
+    if (this.pendingDetail.length) this.swapDetails();
     this.time += dt;
     if (dt > 0 || !this.frame) {
       this.frame = this.life.step(Math.max(dt, 1e-3));
