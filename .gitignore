@@ -71,3 +71,5 @@ supabase/dumps/
 # rebuild locally: node scripts/hero/face-texture.mjs, scripts/hero/blender/jade_mpfb.py)
 /public/hero/jade-face.webp
 /public/hero/jade-skin.jpg
+# Blender-rendered unETH slice atlases (~76 MB; build: scripts/slices/blender/capture.py)
+/public/slices/

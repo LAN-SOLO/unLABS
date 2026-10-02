@@ -63,7 +63,8 @@ import {
 } from "@/lib/world/matrix/rules";
 import { MINT_NETWORKS, crystalMetadata, mintReadiness } from "@/lib/world/matrix/mint";
 import {
-  crystalGif,
+  crystalGifRendered,
+  onSliceAtlas,
   downloadBlob,
   drawFrame,
   sliceCanvas,
@@ -140,13 +141,16 @@ function useNow(active: boolean): number {
 /** A slice thumbnail drawn by the capture renderer. */
 function SliceThumb({ token, pos, size = 56 }: { token: number; pos: number; size?: number }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  // Redraw once the Blender-rendered atlas of this token arrives.
+  const [atlasTick, setAtlasTick] = useState(0);
+  useEffect(() => onSliceAtlas(() => setAtlasTick((n) => n + 1)), []);
   useEffect(() => {
     const c = ref.current;
     const ctx = c?.getContext("2d");
     if (!c || !ctx) return;
     ctx.clearRect(0, 0, size, size);
-    ctx.drawImage(sliceCanvas(token, pos, 128), 0, 0, size, size);
-  }, [token, pos, size]);
+    ctx.drawImage(sliceCanvas(token, pos, 256), 0, 0, size, size);
+  }, [token, pos, size, atlasTick]);
   return <canvas ref={ref} width={size} height={size} className="block bg-black" />;
 }
 
@@ -646,9 +650,8 @@ function ComposeTab({ api, s }: { api: WorldApi; s: WorldState }) {
           <CrtButton
             disabled={!frames.some(Boolean)}
             onClick={() =>
-              downloadBlob(
-                crystalGif(frames, 320),
-                `${(name || "crystal").replace(/[^\w-]+/g, "_")}.gif`,
+              void crystalGifRendered(frames, 320).then((gif) =>
+                downloadBlob(gif, `${(name || "crystal").replace(/[^\w-]+/g, "_")}.gif`),
               )
             }
           >

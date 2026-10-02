@@ -161,3 +161,44 @@ connects to it to list, buy and hand over slices and crystals.
 
 `__lab.matrix.open()` · `wake()` (build every device) · `feed()` (field-5
 materials) · `finishNow()` (end the running job).
+
+## Rendered captures (Blender, 2026-10-01)
+
+Every released capture (880 crystals × 30 slices = 26,400 frames) is
+re-rendered in Blender after the original frames of ID-0961
+(`research/_unSC_slices_TokenGIFS/Slices_sample`) and the trait overview
+film (`Overview_Capture_phase_pure.mp4`): `scripts/slices/blender/capture.py`.
+
+- **Sculpture:** the flattened Ethereum octahedron as neon tubes. It has an
+  apex, a bottom, an upper ring with wide side points and higher front/back
+  points, and the lower ring as the logo's open "V". Each sculpture is a
+  little crooked by hand: vertex jitter per token, light-painted strokes
+  with slow bends, occasional breaks, varying weight, and a fainter second
+  stroke. The upper faces are smoky glass. Frame f is the sculpture turned
+  6° · f (CW / CCW).
+- **Light:** the tube cores glow in the gas colour (white for white / mono).
+  The compositor adds a fog glow. The film pass adds the lamp glow at the
+  waist, which sits off-centre and swings with the turn, a side haze wing,
+  and the faint X beams at ±60° plus the horizontal flare.
+- **Traits:**
+  - tier: wobble, haze, sparks from T3, tears from T4
+  - state: I pulses; IO drops tubes per frame
+  - stasis: NOS shakes slightly
+  - era 32: 12-px blocks, 10 levels
+  - era 16: blurred, 32-px dim blocks, 6 levels
+  - mono: luminance only
+  - RGB: chromatic channel split
+- **Film:** scanlines on every other row (−13 %), dust specks, and the grey
+  bot badge in the corner, tinted with the colour line.
+- **Output:**
+  - masters: `.crystal/slices/<id>/01…30.webp` at 1024², local only
+  - game: one atlas per token, `public/slices/<id>.webp` with 6 × 5 tiles
+    of 256 px, ≈ 76 MB in total, gitignored like `public/crystal/`
+  - render time: ≈ 15 s per crystal with 2 Blender processes
+- **Game:** `lib/world/matrix/capture.ts` draws slices from the atlas once
+  loaded (`loadSliceAtlas`, `onSliceAtlas` → views redraw). Until then, or
+  without the file, the procedural renderer (`uneth-crystal.ts`) stands in.
+  The GIF export waits for the atlases (`crystalGifRendered`).
+- **undevbook:** `pnpm extract` copies the atlases to `public/slices/`.
+  `SliceView` uses them when the traits are exactly the released ones;
+  Remix combinations stay procedural.
