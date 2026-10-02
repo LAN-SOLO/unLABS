@@ -50,8 +50,11 @@ Every grid the engine meshes (see the call-site table in the file header):
 devices (complete, powered + dark, base + rig parts), lore bots (awake +
 dormant), MCP avatar, props (base, rig parts, variant decor), pickups,
 notes, all decor (+ animated decor parts), doors (frames, beacons, leaves
-per light / keypad / bolt, secret covers), elevators, room terminals, hand
-props — deduplicated by `gridHash` (≈ 860 grids, ≈ 1600 uses).
+per light / keypad / bolt, secret covers), the styled doors of
+`docs/DOORS.md` (frame, leaf pieces per light, mechanism parts, the six
+lock-interface states, airlock hardware — `scripts/crystal/door-parts.ts`,
+393 grids), elevators, room terminals, hand props — deduplicated by
+`gridHash`.
 
 **Not exported:** Jade (the hero — never voxels in the crystal age), Damien
 and his veil (spoiler; reserved arc), partial build stages (era 42 needs
@@ -214,6 +217,8 @@ micro relief — or triplanar library normal / roughness maps from
 | `pnpm crystal:textures` | export bound library maps → `public/crystal/textures/`                                      |
 | `pnpm crystal:blender`  | open Blender with the MCP bridge                                                            |
 | `pnpm crystal:mcp`      | run the MCP server by hand (normally started via `.mcp.json`)                               |
+| `pnpm crystal:assemble` | whole-figure crystal stills of every bot (`.crystal/assembled/`)                            |
+| `pnpm crystal:doors`    | every door through all 42 eras + crystal age in Blender (`.crystal/doors/`, docs/DOORS.md)  |
 
 `--previews` renders a Cycles still per model and writes a contact sheet
 to `.crystal/previews/index.html`.
@@ -276,8 +281,8 @@ release asset / CDN) — see open items.
 | -------- | ----------------------------------------------------------------------------------------------------------------------- |
 | Rules    | `lib/world/crystal.ts`, `lib/world/clarity-mode.ts` (`CRYSTAL_MODES`), `lib/world/settings.ts`                          |
 | Engine   | `lib/world/render/crystal.ts`, `lib/world/render/engine.ts`, `lib/world/render/world-renderer.ts`                       |
-| Pipeline | `scripts/crystal/{export,build}.ts`, `scripts/crystal/blender/**`, `scripts/crystal/config/*.json`                      |
+| Pipeline | `scripts/crystal/{export,build,door-parts,doors}.ts`, `scripts/crystal/blender/**`, `scripts/crystal/config/*.json`     |
 | Tools    | `scripts/crystal/mcp/{server,bridge}.py`, `scripts/crystal/library/scan.py`, `scripts/crystal/blender.mjs`, `.mcp.json` |
 | Output   | `public/crystal/{manifest.json,models/,textures/}`                                                                      |
-| Tests    | `tests/world/crystal.test.ts`                                                                                           |
+| Tests    | `tests/world/crystal.test.ts`, `tests/world/door-crystal.test.ts`                                                       |
 | Skill    | `.claude/skills/crystal/SKILL.md`                                                                                       |

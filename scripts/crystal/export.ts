@@ -8,8 +8,9 @@
  *
  * Covered: devices (complete, powered + unpowered, base + rig parts), lore
  * bots (awake + dormant + upgrade levels 1–3), the MCP avatar, props (base, rig parts, variant
- * decor), pickups, notes, all decor (+ animated decor parts), doors (frames,
- * beacons, leaves, secret covers), elevators, room terminals, hand props.
+ * decor), pickups, notes, all decor (+ animated decor parts), doors (styled
+ * frames, leaf pieces, mechanisms, lock interfaces, airlock hardware, beacons,
+ * secret covers), elevators, room terminals, hand props.
  *
  * Not covered on purpose: Jade (the hero — never voxels in the crystal age),
  * Damien and his veil (hidden until `isDamienRevealed()` — no revealed form
@@ -72,6 +73,7 @@ import { PICKUP_MODEL_KEYS, pickupModel, propModel, propVisual } from "@/lib/wor
 import { decorFamily, familyFor, gridHash, type RefineFamily } from "@/lib/world/models/refine";
 import { handProp, type HandPropKind } from "@/lib/world/models/rig";
 import { propGrid } from "@/lib/world/occupancy";
+import { allDoorGrids } from "./door-parts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "../..");
@@ -243,6 +245,9 @@ for (const d of DOORS) {
   add(`door-secret-${d.id}/left`, s.left.grid, "architecture", true);
   add(`door-secret-${d.id}/right`, s.right.grid, "architecture", true);
 }
+// Styled doors (docs/DOORS.md): frames, leaf pieces per light, mechanism
+// parts, lock interface states, airlock hardware — as the engine meshes them.
+for (const p of allDoorGrids()) add(p.use, p.grid, "architecture", true);
 add("elevator-pit", elevatorPitModel().grid, "architecture", true);
 add("elevator-platform", elevatorPlatformVisual().base.grid, "architecture", true);
 add("elevator-gate", gateBarModel().grid, "architecture", true);

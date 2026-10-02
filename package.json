@@ -23,6 +23,7 @@
     "crystal:export": "vite-node --config scripts/audio/vite.config.mjs scripts/crystal/export.ts",
     "crystal:build": "vite-node --config scripts/audio/vite.config.mjs scripts/crystal/build.ts",
     "crystal:assemble": "vite-node --config scripts/audio/vite.config.mjs scripts/crystal/assemble-bots.ts",
+    "crystal:doors": "vite-node --config scripts/audio/vite.config.mjs scripts/crystal/doors.ts",
     "crystal:library": "uv run --quiet --script scripts/crystal/library/scan.py",
     "crystal:textures": "node scripts/crystal/blender.mjs textures",
     "crystal:blender": "node scripts/crystal/blender.mjs gui",

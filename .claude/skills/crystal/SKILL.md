@@ -50,6 +50,8 @@ The full reference is `docs/CRYSTAL.md`. Read §2 (data flow) before changing co
 Use `model` arguments as use-id prefixes (`dev-CDC-001/base`, `bot-b4c0n`, `decor-lamp_desk`,
 `prop-workbench`, `terrain-f0-3.0.1-lit-up`) or grid keys.
 
+Era renders: `pnpm crystal:doors [ids] [--eras 0,18,41]` renders every door (engine voxel meshes per era tier + era look, then the crystal GLBs) — the pattern for any "show X through all 42 eras" request (`scripts/crystal/doors.ts`, `blender/doors.py`).
+
 Without the MCP server, use the CLI equivalents: `pnpm crystal:export`,
 `pnpm crystal:build [--only p,q] [--previews] [--force] [--adopt]`, `pnpm crystal:library`, and
 `blender -b --factory-startup -P scripts/crystal/blender/cli.py -- build --dump … --preview …
