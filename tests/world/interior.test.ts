@@ -226,7 +226,8 @@ describe("interior placements", () => {
       });
 
       it("stays within the per-floor instancing budget", () => {
-        expect(new Set(placements.map((p) => p.decor)).size).toBeLessThanOrEqual(90);
+        // 90 + the operations infrastructure (camera, service dock, vines, algae spill; docs/OPS.md).
+        expect(new Set(placements.map((p) => p.decor)).size).toBeLessThanOrEqual(94);
       });
 
       it("desk-top clutter stands on its host", () => {

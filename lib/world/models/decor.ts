@@ -50,6 +50,7 @@ import {
 import { FURNITURE } from "@/lib/world/models/decor-furniture";
 import { DETAIL_DECOR } from "@/lib/world/models/decor-detail";
 import { LORE_DECOR } from "@/lib/world/models/decor-lore";
+import { OPS_DECOR } from "@/lib/world/models/decor-ops";
 import { weatherModel } from "@/lib/world/models/decor-weather";
 import { CLUTTER_DECOR } from "@/lib/world/models/decor-clutter";
 import { DECOR_UPGRADES } from "@/lib/world/models/decor-upgrades";
@@ -1530,6 +1531,7 @@ const ALL: DecorDef[] = [
   ...FURNITURE,
   ...DETAIL_DECOR,
   ...LORE_DECOR,
+  ...OPS_DECOR,
   ...CLUTTER_DECOR,
   ...BIO_DECOR,
   ...QUARTERS_DECOR,

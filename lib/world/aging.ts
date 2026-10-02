@@ -17,6 +17,7 @@
  * reads `placementLook` for every decor piece and swaps the model when its
  * quantised look changes (lib/world/models/decor-aging.ts builds the grids).
  */
+import { CLEAN_ROOMS } from "@/lib/world/doors/airlock";
 import { ROOMS } from "@/lib/world/content/map";
 import { power } from "@/lib/world/game";
 import type { RoomDef, RoomTheme, WorldState } from "@/lib/world/types";
@@ -31,7 +32,30 @@ export const GROWING = new Set([
   "hanging_plant",
   "coffee_shrub",
   "mycel_wall",
+  "vine_wall",
+  "algae_spill",
 ]);
+
+/** Pieces that are not there at all at growth stage 0 (vines not yet arrived, no spill). */
+export const EMPTY_AT_ZERO = new Set(["vine_wall", "algae_spill"]);
+
+/**
+ * Climbing vines (docs/OPS.md): they start in the greenhouse and grow wall
+ * segment by wall segment through the green corridor into the living
+ * corridor and the canteen. One shared counter `vine` (seconds of a lit,
+ * watered greenhouse); a segment (room r, authored index i) starts at
+ * r · VINE_ROOM_SPAN + i · VINE_SEG_DELAY and is full after VINE_SEG_GROW.
+ */
+export const VINE_ROOMS = ["gewaechshaus", "gartengang", "wohnflur", "kantine"] as const;
+export const VINE_ROOM_SPAN = 1800;
+export const VINE_SEG_DELAY = 240;
+export const VINE_SEG_GROW = 600;
+export const VINE_MAX = VINE_ROOMS.length * VINE_ROOM_SPAN + VINE_SEG_GROW * 4;
+
+/** Algae tanks overflow (`algae:<room>`, seconds of light): 4 stages, the last spills over. */
+export const ALGAE_ROOMS = ["gewaechshaus"] as const;
+export const ALGAE_SECONDS = 2400;
+export const ALGAE_STAGES = 4;
 
 /** Decor that grows with the world's clarity. */
 export const CRYSTALS = new Set(["crystal_cluster", "crystal_small"]);
@@ -109,10 +133,16 @@ export function agingTick(
     const before = roomStages(s, id);
     const damp = isDamp(id);
     if (damp) s.counters[`damp:${id}`] = Math.min(DAMP_SECONDS, c(s, `damp:${id}`) + dt);
-    else s.counters[`dust:${id}`] = Math.min(DUST_SECONDS, c(s, `dust:${id}`) + dt);
+    // Behind an airlock (doors/airlock.ts) the steam and extraction keep the dust out.
+    else if (!CLEAN_ROOMS.includes(id))
+      s.counters[`dust:${id}`] = Math.min(DUST_SECONDS, c(s, `dust:${id}`) + dt);
     const watered = s.playTime - c(s, `water:${id}`) < WILT_AFTER || c(s, `water:${id}`) === 0;
     if (lit(id) && watered)
       s.counters[`grow:${id}`] = Math.min(GROW_SECONDS, c(s, `grow:${id}`) + dt);
+    if (lit(id) && (ALGAE_ROOMS as readonly string[]).includes(id))
+      s.counters[`algae:${id}`] = Math.min(ALGAE_SECONDS, c(s, `algae:${id}`) + dt);
+    if (lit(id) && watered && id === VINE_ROOMS[0])
+      s.counters.vine = Math.min(VINE_MAX, c(s, "vine") + dt);
     const after = roomStages(s, id);
     if (after !== before) changed = true;
   }
@@ -121,7 +151,32 @@ export function agingTick(
 
 function roomStages(s: WorldState, id: string): string {
   const l = lookFor(s, id, "plant_ficus", 0);
-  return `${l.grow}|${l.wilt}|${l.weather}`;
+  const vine = id === VINE_ROOMS[0] ? Math.floor(c(s, "vine") / VINE_SEG_DELAY) : 0;
+  return `${l.grow}|${l.wilt}|${l.weather}|${algaeStage(s, id)}|${vine}`;
+}
+
+/** Overflow stage of a room's algae tanks (0 calm … 3 spilling over). */
+export function algaeStage(s: WorldState, roomId: string): number {
+  return stage(c(s, `algae:${roomId}`) / ALGAE_SECONDS, ALGAE_STAGES);
+}
+
+/** Harvest a room's algae tanks: glow algae by overflow stage, the tanks start over. */
+export function harvestAlgae(s: WorldState, roomId: string): number {
+  const st = algaeStage(s, roomId);
+  if (st < 1) return 0;
+  const n = 1 + st * 2;
+  s.inventory.leuchtalgen = (s.inventory.leuchtalgen ?? 0) + n;
+  s.counters[`algae:${roomId}`] = 0;
+  return n;
+}
+
+/** Growth stage (0 = not there yet) of the vine segment with this placement id. */
+export function vineStage(s: WorldState, roomId: string, placementId = ""): number {
+  const r = Math.max(0, (VINE_ROOMS as readonly string[]).indexOf(roomId));
+  const i = Number(/:v(\d+)$/.exec(placementId)?.[1] ?? 0);
+  const g = (c(s, "vine") - (r * VINE_ROOM_SPAN + i * VINE_SEG_DELAY)) / VINE_SEG_GROW;
+  if (g <= 0) return 0;
+  return Math.min(GROW_STAGES - 1, 1 + Math.floor(g * (GROW_STAGES - 1)));
 }
 
 /** Lamps on per room, the engine's rule (enough generation and the room's light device online). */
@@ -148,9 +203,26 @@ export function tidyRoom(s: WorldState, roomId: string): void {
  * The look of a decor piece in a room. `clarity` = the world's clarity
  * level 0..41 (crystals grow with it).
  */
-export function lookFor(s: WorldState, roomId: string, decorId: string, clarity: number): AgeLook {
+export function lookFor(
+  s: WorldState,
+  roomId: string,
+  decorId: string,
+  clarity: number,
+  placementId?: string,
+): AgeLook {
   const damp = isDamp(roomId);
   const growing = GROWING.has(decorId);
+  if (decorId === "vine_wall" || decorId === "algae_spill") {
+    const grow =
+      decorId === "vine_wall"
+        ? vineStage(s, roomId, placementId)
+        : ([0, 0, 2, 4][algaeStage(s, roomId)] ?? 0);
+    const lastWater = c(s, `water:${VINE_ROOMS[0]}`);
+    const dry = lastWater === 0 ? s.playTime : s.playTime - lastWater;
+    const wilt =
+      decorId === "vine_wall" ? stage(Math.max(0, dry - WILT_AFTER) / WILT_SPAN, WILT_STAGES) : 0;
+    return { grow, wilt, weather: 0, damp, crystal: CRYSTAL_STAGES - 1 };
+  }
   // Plants: a fresh game starts with grown plants that only wilt if neglected;
   // plants keep growing (new fronds) from the second stage on.
   const grow = growing

@@ -223,6 +223,24 @@ export function doorStand(d: DoorDef): StandTarget {
   };
 }
 
+/** Stand spots in front of a door's lock interface (both wall faces), docs/DOORS.md. */
+export function doorPanelStand(d: DoorDef, at: { x: number; z: number }): StandTarget {
+  const alongX = d.axis === "x";
+  return {
+    fp: boxFootprint(alongX ? 1 : 1, 1, 1, at.x, at.z, 0),
+    sides: alongX
+      ? [
+          { dir: "+z", slide: false },
+          { dir: "-z", slide: false },
+        ]
+      : [
+          { dir: "+x", slide: false },
+          { dir: "-x", slide: false },
+        ],
+    gap: STAND_GAP + 0.4,
+  };
+}
+
 // ── Occupants ────────────────────────────────────────────────────
 
 /** The old footprint rectangle rasterised to whole voxels (clip for the fine cells). */

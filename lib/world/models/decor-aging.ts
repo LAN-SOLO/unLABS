@@ -18,6 +18,7 @@
 import type { AgeLook } from "@/lib/world/aging";
 import {
   CRYSTALS,
+  EMPTY_AT_ZERO,
   GROWING,
   GROW_STAGES,
   WILT_STAGES,
@@ -37,6 +38,16 @@ const LEAVES = new Set<number>([
   C.flower_red,
   C.flower_yellow,
 ]);
+/** The algae spill's "foliage": the slick and its clumps grow outwards like leaves. */
+const SPILL = new Set<number>([C.liquid_green, C.leaf_dark, C.lime]);
+const VINE = new Set<number>([
+  C.plant_green,
+  C.leaf_dark,
+  C.leaf_light,
+  C.leaf_yellow,
+  C.wood_dark,
+]);
+
 const STONE_WOOD = new Set<number>([
   C.concrete,
   C.concrete_dark,
@@ -104,20 +115,26 @@ export function ageModel(base: Model, cacheId: string, decorId: string, look: Ag
   const cz = (m.d - 1) / 2;
   const salt = cacheId.length * 131 + cacheId.charCodeAt(cacheId.length - 1);
 
+  if (EMPTY_AT_ZERO.has(decorId) && look.grow === 0) {
+    g.data.fill(0);
+    cache.set(key, m);
+    return m;
+  }
+  const LEAVES_OF = decorId === "algae_spill" ? SPILL : decorId === "vine_wall" ? VINE : LEAVES;
   if (growing) {
     // Growth front: height above the lowest leaf + distance from the stem axis.
     let y0 = h;
     g.forEach((_x, y, _z, v) => {
-      if (LEAVES.has(v)) y0 = Math.min(y0, y);
+      if (LEAVES_OF.has(v)) y0 = Math.min(y0, y);
     });
     let reach = 1;
     g.forEach((x, y, z, v) => {
-      if (LEAVES.has(v)) reach = Math.max(reach, y - y0 + Math.hypot(x - cx, z - cz) * 0.8);
+      if (LEAVES_OF.has(v)) reach = Math.max(reach, y - y0 + Math.hypot(x - cx, z - cz) * 0.8);
     });
     const f = (look.grow + 1) / GROW_STAGES;
     const wf = look.wilt / Math.max(1, WILT_STAGES - 1);
     g.forEach((x, y, z, v) => {
-      if (!LEAVES.has(v)) return;
+      if (!LEAVES_OF.has(v)) return;
       const t = (y - y0 + Math.hypot(x - cx, z - cz) * 0.8) / reach;
       const r = hash(x, y, z, salt);
       if (t > f + 0.08 * (r - 0.5)) {

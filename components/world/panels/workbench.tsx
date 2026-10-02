@@ -47,6 +47,7 @@ import { DEVICE_BY_ID } from "@/lib/world/content/devices";
 import { doCombine, isProtected, itemDef, maxCombineInputs } from "@/lib/world/game";
 import { SPECTRUM_HEX } from "@/lib/world/traits";
 import type { ItemDef } from "@/lib/world/types";
+import { trackAction } from "@/components/world/ops/track";
 
 /** MIME type used for workbench drag & drop. */
 export const DRAG_MIME = "application/x-unlabs-item";
@@ -216,6 +217,7 @@ function WorkbenchPanelImpl({ api, onClose }: { api: WorldApi; onClose: () => vo
     const inputDefs = slots.map((id) => itemDef(s, id)).filter((x): x is ItemDef => !!x);
     const r = api.act((st) => doCombine(st, preview.inputs));
     if (!r.ok || !r.output) return api.toast(r.message, "warn");
+    trackAction(api, { kind: "craft", id: comboKey(preview.inputs) });
     if (r.kind === "recipe" || r.kind === "prototype" || r.kind === "explosion")
       api.workbenchFx?.(r.kind);
     const inputsText = Object.entries(preview.inputs)

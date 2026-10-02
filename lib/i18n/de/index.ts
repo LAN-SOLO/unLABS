@@ -16,6 +16,8 @@ import { DE_TITLE } from "@/lib/i18n/de/title";
 import { DE_MENU } from "@/lib/i18n/de/menu";
 import { DE_CLARITY } from "@/lib/i18n/de/clarity";
 import { DE_MATRIX } from "@/lib/i18n/de/matrix";
+import { DE_OPS } from "@/lib/i18n/de/ops";
+import { DE_DOORS } from "@/lib/i18n/de/doors";
 import { DE_NATIVE } from "@/lib/i18n/de/native";
 import { DE_MERCH } from "@/lib/i18n/de/merch";
 import { DE_PUZZLES } from "@/lib/i18n/de/puzzles";
@@ -92,6 +94,8 @@ export const DE_AREAS: Readonly<Record<string, Readonly<Record<string, string>>>
   menu: DE_MENU,
   clarity: DE_CLARITY,
   matrix: DE_MATRIX,
+  ops: DE_OPS,
+  doors: DE_DOORS,
   native: DE_NATIVE,
   floorplan: DE_FLOORPLAN,
   title: DE_TITLE,

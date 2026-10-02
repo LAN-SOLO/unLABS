@@ -469,3 +469,12 @@ const TURN: Record<NpcMode, readonly [number, number]> = {
   work: [3, 1.6],
   watch: [4, 2.4],
 };
+
+/** Send a bot to a station now (an errand: its service dock, docs/OPS.md); it works there on arrival. */
+export function sendTo(b: NpcBrain, s: Station): void {
+  b.station = s;
+  b.goalX = s.sx;
+  b.goalZ = s.sz;
+  b.mode = "walk";
+  b.stuck = 0;
+}

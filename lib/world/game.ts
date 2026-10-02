@@ -7,6 +7,7 @@
  * layer calls these and re-renders; the 3D layer only reads the state.
  * Functions mutate the passed state in place and return a small report.
  */
+import { initialOps } from "@/lib/world/ops/state";
 import {
   FIRMWARE,
   FW_TUNING,
@@ -97,7 +98,7 @@ export const STARTER_DEVICES = ["MCP-000", "CLK-001", "VNT-001", "BTK-001", "UEC
  * Bump it together with a new migration step whenever the persisted shape
  * or the meaning of a field changes.
  */
-export const SAVE_VERSION = 8;
+export const SAVE_VERSION = 9;
 
 export function initialState(): WorldState {
   const s: WorldState = {
@@ -131,6 +132,7 @@ export function initialState(): WorldState {
     experiments: [],
     wardrobe: initialWardrobe(),
     matrix: initialMatrix(),
+    ops: initialOps(),
   };
   for (const id of STARTER_DEVICES) s.discovered[id] = true;
   log(s, tr("Cold start. Residual charge 0.3 %. Something is humming somewhere."));

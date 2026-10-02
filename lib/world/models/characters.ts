@@ -233,8 +233,141 @@ export const BOT_IDS: readonly string[] = Object.keys(BOT_DESIGNS);
  * doc): build its rig with `powered = false` and swap to the awake visual
  * once `bot_<id>_awake` is set.
  */
-export function botVisual(id: string, awake = true): DeviceVisual {
-  return finish((BOT_DESIGNS[id] ?? genericBot)(), awake);
+export function botVisual(id: string, awake = true, level = 0): DeviceVisual {
+  const v = finish((BOT_DESIGNS[id] ?? genericBot)(), awake);
+  return level > 0 ? withUpgrades(v, level, awake) : v;
+}
+
+/**
+ * Upgrade kit (docs/OPS.md, lib/world/ops/bots.ts `upgradeBot`): the bot's
+ * own model stays, each level adds a small visible element —
+ * L1 a whip antenna with a tally LED, L2 a glowing teal band around the
+ * body, L3 a brass badge on the front and a spinning sensor puck on top.
+ */
+export function withUpgrades(v: DeviceVisual, level: number, awake = true): DeviceVisual {
+  const g = v.base.grid;
+  const { w, h, d } = v.base;
+  /** Highest solid voxel of column (x, z), −1 when empty. */
+  const colTop = (x: number, z: number): number => {
+    for (let y = h - 1; y >= 0; y--) if (g.get(x, y, z)) return y;
+    return -1;
+  };
+  let top = 0;
+  for (let z = 0; z < d; z++) for (let x = 0; x < w; x++) top = Math.max(top, colTop(x, z));
+  const parts: AnimPart[] = [...v.parts];
+  const lights: VisualLight[] = [...v.lights];
+  // L1: antenna on the body's highest point of its back-right quarter (it
+  // stands on the shell, never in the air), with a small mount plate.
+  let ax = -1;
+  let az = -1;
+  let ay = -1;
+  for (let z = 0; z < d; z++)
+    for (let x = 0; x < w; x++) {
+      const back = x >= w * 0.5 && z <= d * 0.5;
+      const y = colTop(x, z);
+      if (y < 0) continue;
+      const score = y + (back ? 1000 : 0);
+      const best = ay + (ax >= w * 0.5 && az <= d * 0.5 ? 1000 : 0);
+      if (ax < 0 || score > best || (score === best && x > ax)) {
+        ax = x;
+        az = z;
+        ay = y;
+      }
+    }
+  const ant = new Model(3, 9, 3);
+  ant.box(0, 0, 0, 2, 0, 2, C.metal_dark); // mount plate
+  ant.box(1, 1, 1, 1, 7, 1, C.steel);
+  ant.set(1, 8, 1, C.led_green);
+  parts.push({
+    name: "upgrade_antenna",
+    model: ant,
+    offset: [ax - 1, ay + 1, az - 1],
+    pivot: [1.5, 1, 1.5],
+    kind: "sway",
+    axis: "z",
+    speed: 0.9,
+    amplitude: 0.12,
+    requiresPower: true,
+  });
+  if (level >= 2) {
+    // L2: a glowing teal band (two rows) around the body at a third of its height.
+    const y0 = Math.max(1, Math.round(top * 0.35));
+    for (const y of [y0, y0 + 1])
+      for (let z = 0; z < d; z++)
+        for (let x = 0; x < w; x++) {
+          if (!g.get(x, y, z)) continue;
+          const edge =
+            !g.get(x - 1, y, z) ||
+            !g.get(x + 1, y, z) ||
+            !g.get(x, y, z - 1) ||
+            !g.get(x, y, z + 1);
+          if (edge) g.set(x, y, z, awake ? (y === y0 ? C.teal_lt : C.plasma_blue) : C.teal_dk);
+        }
+    if (awake)
+      lights.push({
+        pos: [w / 2, y0, d / 2],
+        color: "#3fe0d0",
+        intensity: 0.5,
+        distance: 2.5,
+        requiresPower: true,
+      });
+  }
+  if (level >= 3) {
+    // L3: brass badge (3 × 3, gold rim, red stone) on the front (+z) face at
+    // mid height, and a spinning sensor puck seated on the top of the shell.
+    const by = Math.round(top * 0.55);
+    const cx = Math.floor(w / 2);
+    for (let du = -1; du <= 1; du++)
+      for (let dv = -1; dv <= 1; dv++) {
+        const x = cx + du;
+        const y = by + dv;
+        for (let z = d - 1; z >= 0; z--)
+          if (g.get(x, y, z)) {
+            g.set(
+              x,
+              y,
+              z,
+              du === 0 && dv === 0 ? C.safety_red : du === 0 || dv === 0 ? C.brass : C.gold,
+            );
+            break;
+          }
+      }
+    // Seat: the highest centre column near the middle; the stem stands on it
+    // and lifts the disc clear of everything under its 3 × 3 footprint.
+    const mz = Math.floor(d / 2);
+    let sx = cx;
+    let sz = mz;
+    let seat = -1;
+    for (let oz = -3; oz <= 3; oz++)
+      for (let ox = -3; ox <= 3; ox++) {
+        const y = colTop(cx + ox, mz + oz);
+        const nearer = Math.abs(ox) + Math.abs(oz) < Math.abs(sx - cx) + Math.abs(sz - mz);
+        if (y > seat || (y === seat && nearer)) {
+          seat = y;
+          sx = cx + ox;
+          sz = mz + oz;
+        }
+      }
+    let foot = seat;
+    for (let k = 0; k < 9; k++)
+      foot = Math.max(foot, colTop(sx - 1 + (k % 3), sz - 1 + Math.floor(k / 3)));
+    const lift = foot - seat;
+    const puck = new Model(3, lift + 2, 3);
+    puck.box(1, 0, 1, 1, lift, 1, C.metal_dark); // stem
+    puck.box(0, lift + 1, 0, 2, lift + 1, 2, C.chrome).set(1, lift + 1, 1, C.led_blue);
+    const px = sx - 1;
+    const pz = sz - 1;
+    parts.push({
+      name: "upgrade_sensor",
+      model: puck,
+      offset: [px, seat + 1, pz],
+      pivot: [1.5, 0, 1.5],
+      kind: "spin",
+      speed: 2.4,
+      requiresPower: true,
+    });
+  }
+  return { ...v, parts, lights, height: Math.max(v.height ?? h, top + 10) };
 }
 
 /**

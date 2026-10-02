@@ -502,6 +502,9 @@ export const PLAN_DOORS: readonly DoorDef[] = [
   door("d_batt_kuehlgang", 1, 107, 30, "z"),
   door("d_strahlengang", 2, 56, 39, "z"),
   door("d_gartengang", 4, 38, 107, "x"),
+  // Airlock into the data center (docs/DOORS.md): outer door of the steam /
+  // extraction chamber; d_rechen is the inner door, the chamber is z 100…103.
+  { ...door("d_rechen_schleuse", 1, 32, 99, "x"), airlock: "schleuse_rechen" },
   {
     ...door("d_studio", 2, 122, 76, "z"),
     secret: true,

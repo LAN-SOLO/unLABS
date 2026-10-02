@@ -79,6 +79,8 @@ export interface DecorActionDef {
   requiresHint?: string;
   /** Shown when no outcome is eligible (everything cooling down). */
   idle?: string;
+  /** Overgrowth Jade can harvest here (lib/world/aging.ts); runs before the outcomes when ripe. */
+  harvest?: "algae";
   outcomes: DecorOutcome[];
 }
 
@@ -96,6 +98,8 @@ export const BUFF_DEFAULT_FACTOR: Record<BuffKind, number> = {
  * uses the same table for the model (`render/engine.ts`).
  */
 export const PROP_VARIANT_DECOR: Readonly<Record<string, string>> = {
+  // Surveillance station (docs/OPS.md); opens the operations panel.
+  surveillance: "surveillance_station",
   antenna: "antenna_mast",
   bed: "bunk_bed",
   bookshelf: "bookshelf",
@@ -1349,6 +1353,7 @@ export const DECOR_ACTIONS: readonly DecorActionDef[] = [
     decor: "algae_tank",
     label: tr("Algae tank"),
     verb: "ansehen",
+    harvest: "algae",
     idle: tr("The algae need peace and quiet to grow back."),
     outcomes: [
       {

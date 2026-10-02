@@ -74,6 +74,12 @@ export const SFX_NAMES = [
   "typing",
   "elevator_cable",
   "door_hiss",
+  // ── doors round: locking mechanisms + airlock (docs/DOORS.md) ──
+  "latch_bolt",
+  "latch_wheel",
+  "latch_magnet",
+  "airlock_steam",
+  "airlock_extract",
   "brownout_crackle",
   // ── round 6: overhaul + studio ──
   "secret",
@@ -854,6 +860,84 @@ const ROUND5_SFX = {
         q: 4,
       });
     }
+  },
+  latch_bolt: (t) => {
+    // Steel bolts / pins / clamps: a short slide, then a heavy seat.
+    const v = variant(t, 3);
+    t.noise({
+      dur: 0.09,
+      gain: 0.08,
+      filter: "bandpass",
+      freq: vary(t, [2600, 1900, 3200][v]!, 0.1),
+      q: 1.2,
+    });
+    clunk(t, 0.08, [0.9, 1.2, 0.7][v]!);
+    t.tone({
+      wave: "square",
+      freq: vary(t, 140, 0.1),
+      at: 0.08,
+      dur: 0.05,
+      gain: 0.03,
+      release: 0.06,
+    });
+  },
+  latch_wheel: (t) => {
+    // Vault wheel / cam: a ratchet of ticks, the lugs seating at the end.
+    const n = 4 + variant(t, 3);
+    for (let i = 0; i < n; i++)
+      t.noise({
+        at: i * 0.045,
+        dur: 0.012,
+        gain: 0.07,
+        filter: "highpass",
+        freq: vary(t, 4200, 0.15),
+      });
+    clunk(t, n * 0.045 + 0.02, 0.6);
+  },
+  latch_magnet: (t) => {
+    // Electromagnet: a hum swells or dies, a soft contact click.
+    t.tone({ wave: "sine", freq: 100, at: 0, dur: 0.25, gain: 0.05, attack: 0.04, release: 0.12 });
+    t.tone({ wave: "sine", freq: 200, at: 0, dur: 0.22, gain: 0.025, attack: 0.04, release: 0.1 });
+    t.noise({ at: 0.2, dur: 0.015, gain: 0.07, filter: "highpass", freq: 3000 });
+  },
+  airlock_steam: (t) => {
+    // Nozzles: a burst of hot steam that hisses on.
+    t.noise({ dur: 0.04, gain: 0.14, filter: "lowpass", freq: 700 });
+    t.noise({
+      at: 0.03,
+      dur: 1.6,
+      gain: 0.13,
+      filter: "highpass",
+      freq: vary(t, 3200, 0.1),
+      freqEnd: 2000,
+      attack: 0.05,
+      release: 0.5,
+    });
+    t.noise({
+      at: 0.05,
+      dur: 1.4,
+      gain: 0.05,
+      filter: "bandpass",
+      freq: 900,
+      q: 0.6,
+      attack: 0.1,
+      release: 0.4,
+    });
+  },
+  airlock_extract: (t) => {
+    // Extraction: a fan spins up and pulls the air through the floor grate.
+    whirr(t, 0, 1.4, 60, 140);
+    t.noise({
+      dur: 1.4,
+      gain: 0.08,
+      filter: "bandpass",
+      freq: 500,
+      freqEnd: 1400,
+      q: 0.7,
+      attack: 0.3,
+      release: 0.4,
+    });
+    clunk(t, 1.45, 0.5);
   },
   door_hiss: (t) => {
     // Pneumatic door: seal pop, pressure hiss of varying length, latch tick.

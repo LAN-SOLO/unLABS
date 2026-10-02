@@ -146,6 +146,12 @@ export interface DoorDef {
   keypad?: string;
   /** Hidden door: looks like plain wall until its lock condition holds (MSC scan / LCT cut). */
   secret?: boolean;
+  /**
+   * Door of an airlock (lib/world/doors/airlock.ts): the pair never opens at
+   * the same time. The outer door's sides may both belong to the passage's
+   * room (the chamber is part of the passage).
+   */
+  airlock?: string;
 }
 
 /** Declarative condition — evaluated against the game state. */
@@ -508,6 +514,104 @@ export interface WorldState {
   wardrobe: WardrobeState;
   /** The Matrix Chamber: extraction job, extracted slices, composed crystals (lib/world/matrix/). */
   matrix: MatrixState;
+  /** Operations: Jade's routines, the task schedule, bot duties / upgrades, idle life (lib/world/ops/). */
+  ops: OpsState;
+}
+
+// ── Operations (lib/world/ops/, docs/OPS.md) ─────────────────────
+
+/** One replayable action — the vocabulary of the undevbook walkthrough. */
+export type OpsStepKind =
+  | "pickup"
+  | "note"
+  | "puzzle"
+  | "craft"
+  | "build"
+  | "use"
+  | "toggle"
+  | "drone"
+  | "research"
+  | "link"
+  | "unlink"
+  | "decor";
+
+export interface OpsStep {
+  kind: OpsStepKind;
+  /** Pickup / note / puzzle / device id, comboKey (craft), hub (link), placement id (decor). */
+  id: string;
+  /** Second operand: link target, decor id. */
+  arg?: string;
+  /** Third operand: decor room. */
+  room?: string;
+}
+
+/** A routine step: an action, or another routine (combined routines). */
+export type RoutineItem = OpsStep | { kind: "routine"; id: string };
+
+export interface Routine {
+  id: string;
+  name: string;
+  items: RoutineItem[];
+  /** How Jade learned it: recorded by the player, learned from repetition, combined from routines. */
+  source: "recorded" | "learned" | "combined";
+  /** Times it ran (by hand or automatically). */
+  uses: number;
+  /** Jade applies it on her own when it fits (learned habits). */
+  auto: boolean;
+  /** Play time it was memorised. */
+  at: number;
+}
+
+/** Who carries out a task. */
+export type OpsAgent = "jade" | string;
+
+export interface OpsTask {
+  id: string;
+  who: OpsAgent;
+  /** A routine of Jade's, or a bot duty (content/bot-duties.ts). */
+  what: { kind: "routine"; id: string } | { kind: "duty"; id: string };
+  /** Play time it is due next. */
+  at: number;
+  /** Repeat every n seconds of play time (0 = once). */
+  every: number;
+  /** Higher runs first. */
+  priority: number;
+  /** Duty parameter (R3-TR0's macro: the routine it runs for Jade). */
+  arg?: string;
+  /** Paused by the player. */
+  off?: boolean;
+  lastRun?: number;
+  lastResult?: string;
+}
+
+export interface BotOps {
+  /** Upgrade level 0…3: faster duties, small visual additions. */
+  level: number;
+  /** Wear 0…100: duties wear the bot, the service station resets it. */
+  wear: number;
+  /** Duty runs done. */
+  runs: number;
+  /** Play time of the last service. */
+  serviced: number;
+}
+
+/** What Jade does when the game has been paused for long. */
+export type JadeIdle = "read" | "exercise" | "sleep";
+
+export interface OpsState {
+  /** Recent actions (newest last, capped) — the material habits are learned from. */
+  log: OpsStep[];
+  /** Times each action sequence (key) was seen in the log. */
+  seen: Record<string, number>;
+  routines: Routine[];
+  tasks: OpsTask[];
+  bots: Record<string, BotOps>;
+  /** Recording a routine: the steps so far, or null. */
+  recording: OpsStep[] | null;
+  /** Long-pause life: what Jade is doing, since when (epoch ms). */
+  idle: { kind: JadeIdle; since: number } | null;
+  /** Running id counter for routines and tasks. */
+  next: number;
 }
 
 /** Field strength of a Matrix extraction (energy level 1…5). */

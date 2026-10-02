@@ -540,6 +540,7 @@ export const SCREEN_COLOR: Record<ScreenContent, string> = {
   boot: "#33FF33",
   noise: "#CFD8DC",
   notes: "#F4E9C8",
+  cams: "#9FD8FF",
 };
 
 // ── Noise ────────────────────────────────────────────────────────
@@ -1118,6 +1119,57 @@ function drawMap(f: Frame): void {
   if (info.player.floor === info.floor && blink(t, 2, 0.7)) {
     rect(f, mx(info.player.x) - 1, mz(info.player.z) - 1, 3, 3, pal.hot);
   }
+}
+
+/**
+ * Surveillance station: one room camera per screen, cycling through every
+ * room of the lab (each screen offset so the three show different rooms).
+ * The sweep follows the pan of the camera head in the room (same curve as
+ * the `security_cam` part: sway, amplitude 0.75 rad, 0.07 Hz).
+ */
+export function camPan(t: number): number {
+  return 0.75 * Math.sin(t * 0.07 * Math.PI * 2);
+}
+
+const CAM_DWELL = 5;
+
+function drawCams(f: Frame): void {
+  const { w, h, t, pal, spec } = f;
+  const rooms = ROOMS.filter((r) => !r.id.startsWith("aufzug"));
+  if (!rooms.length) return drawNoise(f);
+  const lane = Math.round((spec.center[0] ?? 0) * 7) % 3;
+  const k = (Math.floor(t / CAM_DWELL) * 3 + lane) % rooms.length;
+  const r = rooms[k]!;
+  const top = header(f, `CAM ${String(k + 1).padStart(2, "0")}`, FLOOR_BY_ID[r.floor]?.short ?? "");
+  // Room outline in the remaining area, the camera in the top-left corner.
+  const s = Math.min((w - 4) / r.w, (h - top - 3) / r.d);
+  const ox = (w - r.w * s) / 2;
+  const oz = top + 1 + (h - top - 3 - r.d * s) / 2;
+  rect(f, ox, oz, r.w * s, r.d * s, pal.faint);
+  line(f, ox, oz, ox + r.w * s, oz, pal.dim);
+  line(f, ox, oz + r.d * s, ox + r.w * s, oz + r.d * s, pal.dim);
+  line(f, ox, oz, ox, oz + r.d * s, pal.dim);
+  line(f, ox + r.w * s, oz, ox + r.w * s, oz + r.d * s, pal.dim);
+  const cx = ox + 1;
+  const cz = oz + 1;
+  const yaw = Math.PI / 4 + camPan(t);
+  const len = Math.hypot(r.w, r.d) * s;
+  for (const a of [-0.35, 0, 0.35])
+    line(
+      f,
+      cx,
+      cz,
+      cx + Math.cos(yaw + a) * len,
+      cz + Math.sin(yaw + a) * len,
+      a ? pal.dim : pal.fg,
+    );
+  // Scan noise and REC.
+  for (let i = 0; i < 6; i++) {
+    const n = hash3(i, Math.floor(t * 8), k);
+    rect(f, ox + n * r.w * s, oz + ((n * 7.3) % 1) * r.d * s, 1, 1, pal.dim);
+  }
+  if (blink(t, 1, 0.6)) rect(f, w - 4, top + 1, 2, 2, "#ff3a2a");
+  textAt(f, r.name.slice(0, Math.max(4, f.cols - 1)), 0, h - 2, pal.fg);
 }
 
 function drawTextContent(f: Frame): void {
@@ -1731,6 +1783,7 @@ const RENDERERS: Record<ScreenContent, (f: Frame) => void> = {
   boot: drawBoot,
   noise: drawNoise,
   notes: drawNotes,
+  cams: drawCams,
 };
 
 /** Content kinds that already show the terminal feed themselves. */

@@ -155,7 +155,8 @@ describe("lab world content", () => {
     for (const d of DOORS) {
       const sides = doorSides(d);
       expect(sides, `door ${d.id}`).toHaveLength(2);
-      expect(sides[0], `door ${d.id}`).not.toBe(sides[1]);
+      // An airlock's outer door closes the chamber inside one passage.
+      if (!d.airlock) expect(sides[0], `door ${d.id}`).not.toBe(sides[1]);
     }
   });
 

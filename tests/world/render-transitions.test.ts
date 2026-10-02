@@ -259,10 +259,14 @@ describe("door unlock", () => {
     expect(calm.has("off")).toBe(false);
   });
 
-  it("DoorSystem: unlocking a locked door chirps once and opens after the bolts", () => {
+  it("DoorSystem: unlocking a locked door chirps once and opens after its mechanism released", () => {
     const door = DOORS.find((d) => d.lock && !d.keypad && !d.secret) ?? DOORS[0]!;
     const chirps: string[] = [];
-    const sys = new DoorSystem({ onUnlock: (id) => chirps.push(id) });
+    const mech: boolean[] = [];
+    const sys = new DoorSystem({
+      onUnlock: (id) => chirps.push(id),
+      onMech: (_id, engage) => mech.push(engage),
+    });
     const g = new THREE.Group();
     sys.addDoor(door, g, mesher);
     sys.setState(door.id, false, "locked");
@@ -270,30 +274,30 @@ describe("door unlock", () => {
     const before = countMeshes(root);
     sys.setState(door.id, true, "locked");
     expect(sys.isUnlocking(door.id)).toBe(true);
-    expect(countMeshes(root)).toBe(before + 2); // two transient bolts
+    // The door's own mechanism does the unlocking — no transient parts.
+    expect(countMeshes(root)).toBe(before);
+    expect(sys.lockAmount(door.id)).toBe(1);
     const near: [number, number, number] = [door.x + 3, 1, door.z];
     sys.update(UNLOCK_HOLD * 0.5, near);
-    expect(sys.openAmount(door.id)).toBe(0); // held shut while the bolts move
-    for (let i = 0; i < 60; i++) sys.update(1 / 60, near);
+    expect(sys.openAmount(door.id)).toBe(0); // held shut while the strobe runs
+    for (let i = 0; i < 90; i++) sys.update(1 / 60, near);
     expect(chirps).toEqual([door.id]);
     expect(sys.isUnlocking(door.id)).toBe(false);
-    expect(countMeshes(root)).toBe(before);
+    expect(sys.lockAmount(door.id)).toBe(0);
+    expect(mech[0]).toBe(false); // released before the leaves moved
     expect(sys.openAmount(door.id)).toBeGreaterThan(0);
   });
 
-  it("keypad doors add a flash plate; a snap cancels the sequence", () => {
+  it("a snap cancels the unlock sequence of a keypad door", () => {
     const door = DOORS.find((d) => d.keypad) ?? DOORS[0]!;
     const sys = new DoorSystem();
     const g = new THREE.Group();
     sys.addDoor(door, g, mesher);
     sys.setState(door.id, false, "keypad");
-    const root = g.children[0]!;
-    const before = countMeshes(root);
     sys.setState(door.id, true, "keypad");
-    expect(countMeshes(root)).toBe(before + 3);
+    expect(sys.isUnlocking(door.id)).toBe(true);
     sys.snap([door.x, 1, door.z]);
     expect(sys.isUnlocking(door.id)).toBe(false);
-    expect(countMeshes(root)).toBe(before);
   });
 
   it("first state and normal doors never play the unlock", () => {

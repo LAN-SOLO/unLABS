@@ -5,6 +5,7 @@ import { tr } from "@/lib/i18n";
 import { CrtButton, FOCUS_RING, INPUT_CLASS, Panel, SectionTitle, UI } from "@/components/world/ui";
 import { announce, memoPanel, type WorldApi } from "@/components/world/panels/shared";
 import { RememberButton } from "@/components/world/knowledge/Remember";
+import { trackAction } from "@/components/world/ops/track";
 import { WidgetView, useUiClock, type WidgetHost } from "@/components/world/device-ui/widgets";
 import { deviceUi, type UiAction, type UiCtx } from "@/lib/world/device-ui";
 import { DEVICE_BY_ID } from "@/lib/world/content/devices";
@@ -116,6 +117,7 @@ function DeviceInterfaceImpl({
         const r = api.act((st) => operateDevice(st, id));
         setOutput(r.lines.length ? r.lines : [tr("No new data.")]);
         announce(api, r);
+        trackAction(api, { kind: "use", id });
         setPage("info");
         return;
       }
@@ -130,6 +132,7 @@ function DeviceInterfaceImpl({
         if (r.ok) api.sound?.("drone_fly");
         api.toast(r.message, r.ok ? "good" : "warn");
         announce(api, { insights: r.insights });
+        if (r.ok) trackAction(api, { kind: "drone", id: "drone" });
         return;
       }
       case "power":
@@ -195,7 +198,10 @@ function DeviceInterfaceImpl({
             {id !== "MCP-000" && (
               <CrtButton
                 tone={switched ? "red" : "green"}
-                onClick={() => api.act((st) => toggleDevice(st, id))}
+                onClick={() => {
+                  if (api.act((st) => toggleDevice(st, id)))
+                    trackAction(api, { kind: "toggle", id });
+                }}
               >
                 {switched ? tr("Switch off") : tr("Switch on")}
               </CrtButton>
@@ -280,6 +286,7 @@ function LinksPage({ id, api, accent }: { id: string; api: WorldApi; accent: str
   const run = (fn: (st: WorldState) => { ok: boolean; message: string }) => {
     const r = api.act(fn);
     if (r.message) api.toast(r.message, r.ok ? "good" : "warn");
+    return r.ok;
   };
   const probe = pick ? canLink(s, id, pick) : null;
   return (
@@ -323,7 +330,13 @@ function LinksPage({ id, api, accent }: { id: string; api: WorldApi; accent: str
                         {tr("Flash {version}", { version: manifestOf(x)!.update!.version })}
                       </CrtButton>
                     )}
-                  <CrtButton tone="red" onClick={() => run((st) => unlinkDevice(st, id, x))}>
+                  <CrtButton
+                    tone="red"
+                    onClick={() => {
+                      if (run((st) => unlinkDevice(st, id, x)))
+                        trackAction(api, { kind: "unlink", id, arg: x });
+                    }}
+                  >
                     {tr("Unlink")}
                   </CrtButton>
                 </span>
@@ -350,7 +363,8 @@ function LinksPage({ id, api, accent }: { id: string; api: WorldApi; accent: str
           tone="green"
           disabled={!pick || !probe?.ok}
           onClick={() => {
-            run((st) => linkDevice(st, id, pick));
+            if (run((st) => linkDevice(st, id, pick)))
+              trackAction(api, { kind: "link", id, arg: pick });
             setPick("");
           }}
         >

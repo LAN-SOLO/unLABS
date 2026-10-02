@@ -120,7 +120,9 @@ export type ScreenContent =
   | "boot"
   | "noise"
   /** A live pinboard: the memos pinned to that decor placement (ScreenInfo.pinned). */
-  | "notes";
+  | "notes"
+  /** Surveillance station: a grid of room camera feeds (docs/OPS.md). */
+  | "cams";
 
 /**
  * A flat live screen on a model. `center` is in the model's voxel coords

@@ -1,6 +1,7 @@
 "use client";
 
 import { tr } from "@/lib/i18n";
+import { trackAction } from "@/components/world/ops/track";
 
 /** Locale-aware watts: "1,5" in German, whole numbers without decimals. */
 const watts = (w: number): string => fmtNum(w, Number.isInteger(w) ? 0 : 1);
@@ -178,12 +179,14 @@ function DevicePanelImpl({
     api.toast(r.finished ? `MCP: ${r.message}` : r.message, r.finished ? "good" : "info");
     setViewStage(null);
     announce(api, r);
+    trackAction(api, { kind: "build", id });
   };
 
   const use = () => {
     const r = api.act((st) => operateDevice(st, id));
     setOutput(r.lines.length ? r.lines : [tr("No new data.")]);
     announce(api, r);
+    trackAction(api, { kind: "use", id });
   };
 
   const pick = (i: number, req: Requirement, itemId: string) => {
@@ -452,7 +455,10 @@ function DevicePanelImpl({
               <div className="flex flex-wrap gap-2">
                 <CrtButton
                   tone={switched ? "red" : "green"}
-                  onClick={() => api.act((st) => toggleDevice(st, id))}
+                  onClick={() => {
+                    if (api.act((st) => toggleDevice(st, id)))
+                      trackAction(api, { kind: "toggle", id });
+                  }}
                 >
                   {switched ? tr("Switch off") : tr("Switch on")}
                 </CrtButton>
@@ -485,7 +491,10 @@ function DevicePanelImpl({
                     disabled={!droneReady(s)}
                     onClick={() => {
                       const r = api.act((st) => flyDrone(st));
-                      if (r.ok) api.sound?.("drone_fly");
+                      if (r.ok) {
+                        api.sound?.("drone_fly");
+                        trackAction(api, { kind: "drone", id: "drone" });
+                      }
                       api.toast(r.message, r.ok ? "good" : "warn");
                       announce(api, { insights: r.insights });
                     }}

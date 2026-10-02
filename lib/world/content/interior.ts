@@ -49,6 +49,7 @@ import {
 import type { ScreenSpec } from "@/lib/world/models/anim";
 import { propModel } from "@/lib/world/models/props";
 import { NPCS } from "@/lib/world/content/story";
+import { BOT_DUTIES } from "@/lib/world/content/bot-duties";
 import {
   ROOM_TERMINALS,
   ROOM_TERMINAL_SCALE,
@@ -1807,6 +1808,91 @@ function commit(ctx: Ctx, batch: Placed[]): Placed[] {
   return kept;
 }
 
+/** Rooms with a camera: all but the elevator shafts. */
+export function hasCamera(roomId: string): boolean {
+  return !roomId.startsWith("aufzug");
+}
+
+const VINE_PER_ROOM = 6;
+/** Rooms with climbing vines / algae tanks (mirror of lib/world/aging.ts VINE_ROOMS / ALGAE_ROOMS). */
+const VINE_ROOMS = ["gewaechshaus", "gartengang", "wohnflur", "kantine"] as const;
+const ALGAE_ROOMS = ["gewaechshaus"] as const;
+const BOT_DOCK_IDS: ReadonlySet<string> = new Set(BOT_DUTIES.map((d) => d.bot));
+
+function infrastructure(ctx: Ctx, r: RoomDef, batch: readonly Placed[]): Placed[] {
+  const out: Placed[] = [];
+  const put = (spec: Spec, id: string) => {
+    const v = tryPlace(ctx, r, spec, id, true);
+    if (v) {
+      out.push(v);
+      ctx.placed.push(v);
+    }
+    return v;
+  };
+  // Camera high in a corner (tries the corners of each wall in turn).
+  if (hasCamera(r.id))
+    for (const side of ["n", "w", "e", "s"] as const) {
+      const t = side === "n" || side === "s" ? r.x + 2 : r.z + 2;
+      const v = put(wallSpec(r, side, t, "security_cam"), `decor:${r.id}:cam`);
+      if (v) break;
+    }
+  // Bot docks: one per lore bot, beside its home.
+  for (const npc of NPCS) {
+    if (npc.floor !== ctx.floor || !BOT_DOCK_IDS.has(npc.id)) continue;
+    if (npc.x < r.x || npc.x >= r.x + r.w || npc.z < r.z || npc.z >= r.z + r.d) continue;
+    // Rings around the home first, then anywhere in the room: the first free spot wins.
+    const tries: [number, number][] = [];
+    for (let rad = 2; rad <= 12; rad++)
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2;
+        tries.push([Math.round(npc.x + Math.cos(a) * rad), Math.round(npc.z + Math.sin(a) * rad)]);
+      }
+    for (let z = r.z + 2; z < r.z + r.d - 2; z += 2)
+      for (let x = r.x + 2; x < r.x + r.w - 2; x += 2) tries.push([x, z]);
+    for (const [x, z] of tries) {
+      if (x < r.x + 1 || x >= r.x + r.w - 1 || z < r.z + 1 || z >= r.z + r.d - 1) continue;
+      const v = tryPlace(
+        ctx,
+        r,
+        { decor: "service_dock", x, z, rot: 0 },
+        `decor:${r.id}:dock:${npc.id}`,
+        true,
+      );
+      if (v) {
+        out.push(v);
+        ctx.placed.push(v);
+        break;
+      }
+    }
+  }
+  // Climbing vines along the long walls (they grow in over time, lib/world/aging.ts).
+  if ((VINE_ROOMS as readonly string[]).includes(r.id)) {
+    let i = 0;
+    const sides: Side[] = r.w >= r.d ? ["n", "s", "w", "e"] : ["w", "e", "n", "s"];
+    for (const side of sides) {
+      const [a, b] = sideSpan(r, side);
+      for (let t = a + 3; t < b - 3 && i < VINE_PER_ROOM; t += 5) {
+        if (put(wallSpec(r, side, t, "vine_wall"), `decor:${r.id}:v${i}`)) i++;
+      }
+    }
+  }
+  // Algae spills next to the tanks (empty until they overflow).
+  if ((ALGAE_ROOMS as readonly string[]).includes(r.id)) {
+    let i = 0;
+    for (const tank of batch.filter((b) => b.p.decor === "algae_tank")) {
+      const cx = r.x + r.w / 2;
+      const cz = r.z + r.d / 2;
+      const dx = Math.sign(cx - tank.p.x) * 3;
+      const dz = Math.sign(cz - tank.p.z) * 3;
+      put(
+        { decor: "algae_spill", x: tank.p.x + dx, z: tank.p.z + dz, rot: 0 },
+        `decor:${r.id}:spill${i++}`,
+      );
+    }
+  }
+  return out;
+}
+
 function sideSpan(r: RoomDef, side: Side): [number, number] {
   return side === "n" || side === "s" ? [r.x + 1, r.x + r.w] : [r.z + 1, r.z + r.d];
 }
@@ -1957,6 +2043,10 @@ function generate(floor: FloorId): FloorInterior {
       });
     }
     fillRoom(ctx, r, !!author, batch);
+    // Infrastructure (docs/OPS.md): a moving camera in every room, a dock beside
+    // every lore bot, climbing vines and algae overflow in the green rooms.
+    // After the fill, so the generated decor keeps its ids (archive, saves).
+    for (const v of infrastructure(ctx, r, batch)) batch.push(v);
     const kept = commit(ctx, batch);
     const keptSet = new Set(kept);
     ctx.placed = ctx.placed.filter((pl) => !batch.includes(pl) || keptSet.has(pl));

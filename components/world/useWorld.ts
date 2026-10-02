@@ -15,6 +15,8 @@ import { ITEM_BY_ID } from "@/lib/world/content/items";
 import { REFINE_RECIPES, WEAR_BY_ID, WEAR_ITEM_PREFIX } from "@/lib/world/content/wardrobe";
 import { LOOK_BY_ID } from "@/lib/world/content/looks";
 import { wardrobeTick, type JobResult } from "@/lib/world/wardrobe";
+import { opsTick, type OpsEvent } from "@/lib/world/ops/schedule";
+import { idleTick } from "@/lib/world/ops/idle";
 import type { WorldState } from "@/lib/world/types";
 
 export interface Toast {
@@ -100,10 +102,55 @@ export function useWorld() {
   // Play clock: advances respawn timers; saves every 10 s.
   useEffect(() => {
     let n = 0;
+    // Jade's idle life (docs/OPS.md): real time the game has been paused,
+    // hidden or closed. `ops_seen_ms` is the last wall-clock second played.
+    let pausedSince: number | null = null;
+    {
+      const s = ref.current;
+      const seen = s?.counters.ops_seen_ms ?? 0;
+      if (s && seen > 0 && Date.now() - seen > 0) pausedSince = seen;
+    }
+    const opsToasts = (events: OpsEvent[]) => {
+      for (const e of events.slice(0, 3))
+        toastRef.current?.(
+          e.who === "jade" ? tr("Jade: {text}", { text: e.text }) : e.text,
+          e.ok ? "info" : "warn",
+        );
+    };
     const id = window.setInterval(() => {
       const s = ref.current;
-      if (!s || document.hidden || paused.current) return;
+      if (!s) return;
+      if (document.hidden || paused.current) {
+        pausedSince ??= Date.now();
+        const before = s.ops.idle?.kind;
+        const ev = idleTick(s, Date.now() - pausedSince, Date.now());
+        if (ev.length || s.ops.idle?.kind !== before) {
+          opsToasts(ev);
+          saveWorld(s);
+          setVersion((v) => v + 1);
+          listeners.current.forEach((l) => l());
+        }
+        return;
+      }
+      if (pausedSince !== null) {
+        // Coming back from a long pause (also a closed game): the same rules, once.
+        const before = s.ops.idle?.kind;
+        const ev = idleTick(s, Date.now() - pausedSince, Date.now());
+        pausedSince = null;
+        if (ev.length || s.ops.idle?.kind !== before) {
+          opsToasts(ev);
+          listeners.current.forEach((l) => l());
+        }
+      }
+      s.counters.ops_seen_ms = Date.now();
       s.playTime += 1;
+      // Operations: bot timetables, Jade's scheduled routines, auto service.
+      const ops = opsTick(s);
+      if (ops.length) {
+        opsToasts(ops.filter((e) => !e.ok || e.who === "jade"));
+        setVersion((v) => v + 1);
+        listeners.current.forEach((l) => l());
+      }
       // Biorhythm: slow decay; starts on the first visit to Level +1.
       if (bioTick(s, 1, getSettings().gameplay.biorhythm).activated) {
         toastRef.current?.(

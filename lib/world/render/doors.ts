@@ -34,7 +34,6 @@ import {
   DOOR_SCALE,
   DOOR_VPU,
   GATE_BARS,
-  LEAF_D,
   LEAF_W,
   OPENING_W,
   PIT_H,
@@ -43,10 +42,11 @@ import {
   SHEAVE_AT,
   SHEAVE_R,
   WINCH_Y,
+  HEADER_Y,
+  OPENING_H,
   cableModel,
   doorBeaconModel,
   doorFrameModel,
-  doorLeafModel,
   doorLight,
   elevatorPitModel,
   elevatorPlatformVisual,
@@ -59,15 +59,26 @@ import {
   type DoorVariant,
   type LeafSide,
 } from "@/lib/world/models/doors";
-import { block, partPivotInBase, type DeviceVisual } from "@/lib/world/models/anim";
-import { C } from "@/lib/world/content/palette";
-import { markInstanced, markStatic } from "@/lib/world/render/batching";
 import {
-  UNLOCK_CHIRP_AT,
-  easeInOut as easeUnlock,
-  shaftBandY,
-  unlockPose,
-} from "@/lib/world/render/transitions";
+  IFACE_AT,
+  SLAT_H,
+  doorPieces,
+  lockPanelModel,
+  mechParts,
+  styledFrameModel,
+  type DoorPiece,
+  type MechPart,
+  type PanelState,
+  type PieceRole,
+} from "@/lib/world/models/door-styles";
+import { doorStyle, type DoorStyle } from "@/lib/world/doors/style";
+import type { DoorMode } from "@/lib/world/doors/lock";
+import { gridHash } from "@/lib/world/models/refine";
+
+const PANEL_STATES: readonly PanelState[] = ["auto", "hold", "sealed", "locked", "keypad", "cycle"];
+import { partPivotInBase, type DeviceVisual } from "@/lib/world/models/anim";
+import { markInstanced, markStatic } from "@/lib/world/render/batching";
+import { UNLOCK_CHIRP_AT, shaftBandY, unlockPose } from "@/lib/world/render/transitions";
 import type { Model } from "@/lib/world/models/core";
 import type { DoorDef, ElevatorDef, FloorId } from "@/lib/world/types";
 import type { VoxelGrid } from "@/lib/voxel/grid";
@@ -129,6 +140,15 @@ export const DOOR_PASSABLE_AT = 0.6;
 
 type XZ2 = readonly [number, number];
 
+/** The walker's box touches the doorway (a door never closes on it). */
+export function inDoorway(def: Pick<DoorDef, "x" | "z" | "axis" | "width">, pos: XZ2): boolean {
+  const dx = pos[0] - (def.x + 0.5);
+  const dz = pos[1] - (def.z + 0.5);
+  const along = def.axis === "x" ? Math.abs(dx) : Math.abs(dz);
+  const across = def.axis === "x" ? Math.abs(dz) : Math.abs(dx);
+  return along < def.width / 2 + PLAYER_HALF && across < 0.5 + PLAYER_HALF;
+}
+
 /**
  * Proximity part of a door's wish to open: the walker (or where it will be
  * after DOOR_LOOKAHEAD at velocity `vel`) is within DOOR_OPEN_RADIUS, or
@@ -145,9 +165,7 @@ export function doorWantsOpen(
   const cz = def.z + 0.5;
   const dx = pos[0] - cx;
   const dz = pos[1] - cz;
-  const along = def.axis === "x" ? Math.abs(dx) : Math.abs(dz);
-  const across = def.axis === "x" ? Math.abs(dz) : Math.abs(dx);
-  if (along < def.width / 2 + PLAYER_HALF && across < 0.5 + PLAYER_HALF) return true;
+  if (inDoorway(def, pos)) return true;
   const now = Math.hypot(dx, dz);
   const ahead = Math.hypot(dx + vel[0] * DOOR_LOOKAHEAD, dz + vel[1] * DOOR_LOOKAHEAD);
   const dist = Math.min(now, ahead);
@@ -203,14 +221,58 @@ export function doorAssist(
   return [(mx / n) * len, (mz / n) * len];
 }
 
+/** Seconds a locking mechanism takes to release (before the leaves move) or engage (after they close). */
+export const MECH_TIME = 0.28;
+/** Shutter curtain rise (world units) at full opening and its speed-up (clear head height early). */
+const SHUTTER_RISE = OPENING_H;
+const SHUTTER_GAIN = 1.4;
+/** Stagger: upper segments start this much later (fraction of the opening). */
+const STAGGER_LAG = 0.2;
+
+/** Opening amount of one moving piece of a style for the door's eased opening k. */
+export function pieceOpen(style: Pick<DoorStyle, "motion">, role: PieceRole, k: number): number {
+  const c = (x: number) => Math.max(0, Math.min(1, x));
+  if (style.motion === "stagger") {
+    const upper = role === "leftUpper" || role === "rightUpper";
+    return upper ? c((k * (1 + STAGGER_LAG) - STAGGER_LAG) / 1) : c(k * (1 + STAGGER_LAG));
+  }
+  if (style.motion === "shutter") return c(k * SHUTTER_GAIN);
+  return k;
+}
+
+/** Swing pairs open towards +z or −z (door-local), fixed per door. */
+export function swingDir(id: string): 1 | -1 {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return h & 1 ? 1 : -1;
+}
+
+interface PieceView {
+  role: PieceRole;
+  group: THREE.Group;
+  /** Closed position of the piece's model origin (door-local). */
+  at: [number, number, number];
+  /** Group origin (door-local): the hinge for swing leaves, else the door origin. */
+  origin: [number, number, number];
+}
+
+interface PartView {
+  def: MechPart;
+  holder: THREE.Group;
+}
+
 interface DoorView {
   def: DoorDef;
+  style: DoorStyle;
   root: THREE.Group;
-  left: THREE.Group;
-  right: THREE.Group;
   frame: THREE.Mesh;
   cover: THREE.Mesh | null;
   beacons: Map<DoorLight, THREE.Mesh>;
+  /** The lock interface (one mesh per screen state). */
+  iface: Map<PanelState, THREE.Mesh>;
+  panel: PanelState;
+  pieces: PieceView[];
+  parts: PartView[];
   mesher: MeshModel;
   unlocked: boolean;
   variant: DoorVariant;
@@ -223,27 +285,22 @@ interface DoorView {
   blink: number;
   /** Seconds into the unlock sequence (−1 = none running). */
   unlockT: number;
-  /** Beacon colour before the unlock (strobes while the bolts retract). */
+  /** Beacon colour before the unlock (strobes while the mechanism releases). */
   unlockFrom: DoorLight;
-  /** Transient bolt blocks (left, right) and keypad flash plate of a running unlock. */
-  unlockMeshes: THREE.Mesh[];
+  /** Locking mechanism engaged: 1 = locked, 0 = released. */
+  lockE: number;
+  /** Interface mode (lib/world/doors/lock.ts). */
+  mode: DoorMode;
+  /** External gate (airlock interlock): false keeps the door shut. */
+  gate: boolean;
 }
-
-/** Bolt block on the LEFT leaf (voxels): x 6..9, y 9..13 — see models/doors leftLeaf. */
-const BOLT_W = 4;
-const BOLT_H = 5;
-const BOLT_X = (LEAF_W - BOLT_W / 2 - LEAF_W / 2) * DOOR_SCALE;
-const BOLT_Y = 9 * DOOR_SCALE;
-/** Keypad plate on the RIGHT leaf (voxels): x 3..8, y 6..10. */
-const PAD_W = 6;
-const PAD_H = 5;
-const PAD_X = (3 + PAD_W / 2 - LEAF_W / 2) * DOOR_SCALE;
-const PAD_Y = 6 * DOOR_SCALE;
 
 export interface DoorSystemOpts {
   onMove?: (id: string, opening: boolean) => void;
   /** A locked / keypad door just unlocked: its beacon turns green now (play a chirp). */
   onUnlock?: (id: string, variant: DoorVariant) => void;
+  /** A door's locking mechanism starts to release (false) or engage (true) — for its sound. */
+  onMech?: (id: string, engage: boolean) => void;
   /** Proximity-driven doors (default true). */
   autoOpen?: boolean;
 }
@@ -258,6 +315,7 @@ export class DoorSystem {
   private readonly meshCache = new Map<string, THREE.Mesh>();
   private readonly onMove: ((id: string, opening: boolean) => void) | undefined;
   private readonly onUnlock: ((id: string, variant: DoorVariant) => void) | undefined;
+  private readonly onMech: ((id: string, engage: boolean) => void) | undefined;
   private readonly autoOpen: boolean;
   private cut = Infinity;
   private still = false;
@@ -268,10 +326,11 @@ export class DoorSystem {
   constructor(opts: DoorSystemOpts = {}) {
     this.onMove = opts.onMove;
     this.onUnlock = opts.onUnlock;
+    this.onMech = opts.onMech;
     this.autoOpen = opts.autoOpen ?? true;
   }
 
-  /** Accessibility: `still` = reduce motion (bolts vanish, no slide), `calm` = reduce flicker (no strobe). */
+  /** Accessibility: `still` = reduce motion (mechanisms snap), `calm` = reduce flicker (no strobe). */
   setCalm(still: boolean, calm: boolean): void {
     this.still = still;
     this.calm = calm;
@@ -283,7 +342,7 @@ export class DoorSystem {
     return !!v && v.unlockT >= 0;
   }
 
-  /** Shared-geometry mesh for a cached model key. */
+  /** Shared-geometry mesh for a model (cached by key; identical grids share one geometry). */
   private cached(key: string, mesher: MeshModel, build: () => Model): THREE.Mesh {
     let m = this.meshCache.get(key);
     if (!m) {
@@ -294,7 +353,13 @@ export class DoorSystem {
     return m.clone();
   }
 
+  /** Mesh a model by content (same voxels → same template, so parts instance across doors). */
+  private byContent(model: Model, mesher: MeshModel): THREE.Mesh {
+    return this.cached(`grid:${gridHash(model.grid)}`, mesher, () => model);
+  }
+
   addDoor(door: DoorDef, group: THREE.Object3D, mesher: MeshModel): void {
+    const style = doorStyle(door.id);
     const root = new THREE.Group();
     root.name = `door:${door.id}`;
     root.position.set(door.x + 0.5, 1, door.z + 0.5);
@@ -303,7 +368,7 @@ export class DoorSystem {
     const frame = markStatic(
       door.secret
         ? this.cached("frame:secret", mesher, () => doorFrameModel({ secret: true }))
-        : this.cached("frame", mesher, () => doorFrameModel()),
+        : this.byContent(styledFrameModel(style), mesher),
     );
     root.add(frame);
     const beacons = new Map<DoorLight, THREE.Mesh>();
@@ -320,9 +385,15 @@ export class DoorSystem {
       cover.scale.z *= 1.02; // a hair proud of the voxel frame cells it encloses
       root.add(cover);
     }
-    const left = new THREE.Group();
-    const right = new THREE.Group();
-    root.add(left, right);
+    // Lock interface on the right jamb (both faces): one mesh per screen state.
+    const iface = new Map<PanelState, THREE.Mesh>();
+    for (const st of PANEL_STATES) {
+      const m = markInstanced(this.cached(`iface:${st}`, mesher, () => lockPanelModel(st)));
+      m.position.set(IFACE_AT[0], IFACE_AT[1], 0);
+      m.visible = false;
+      root.add(m);
+      iface.set(st, m);
+    }
     group.add(root);
     const cellKeys: number[] = [];
     const half = Math.floor(door.width / 2);
@@ -333,12 +404,15 @@ export class DoorSystem {
     });
     const view: DoorView = {
       def: door,
+      style,
       root,
-      left,
-      right,
       frame,
       cover,
       beacons,
+      iface,
+      panel: "auto",
+      pieces: [],
+      parts: [],
       mesher,
       unlocked: false,
       variant: door.secret ? "secret" : door.keypad ? "keypad" : door.lock ? "locked" : "normal",
@@ -350,7 +424,9 @@ export class DoorSystem {
       blink: 0,
       unlockT: -1,
       unlockFrom: "red",
-      unlockMeshes: [],
+      lockE: 1,
+      mode: "auto",
+      gate: true,
     };
     this.doors.set(door.id, view);
     this.applyLook(view);
@@ -377,11 +453,31 @@ export class DoorSystem {
     if (!v.initialised) {
       v.initialised = true;
       v.t = v.target;
+      v.lockE = v.t > 0 ? 0 : 1;
     }
     if (changed) this.applyLook(v);
-    // After applyLook: swapping the leaf meshes clears the leaf groups.
     if (unlocking) this.startUnlock(v, variant);
     this.applyPose(v);
+  }
+
+  /** Interface mode (auto / hold / sealed) from the lock system. */
+  setMode(id: string, mode: DoorMode): void {
+    const v = this.doors.get(id);
+    if (v) v.mode = mode;
+  }
+
+  /** Airlock interlock: while false the door stays (or goes) shut. */
+  setGate(id: string, allowed: boolean): void {
+    const v = this.doors.get(id);
+    if (v) v.gate = allowed;
+  }
+
+  /** What the lock interface shows. */
+  setPanel(id: string, state: PanelState): void {
+    const v = this.doors.get(id);
+    if (!v || v.panel === state) return;
+    v.panel = state;
+    this.applyPanel(v);
   }
 
   /** Jump every door to its resting state for this player position (after a floor switch). */
@@ -390,6 +486,7 @@ export class DoorSystem {
       if (v.unlockT >= 0) this.endUnlock(v);
       this.setTarget(v, this.wanted(v, playerPos), false);
       v.t = v.target;
+      v.lockE = v.t > 0 ? 0 : 1;
       this.applyLook(v);
       this.applyPose(v);
     }
@@ -400,14 +497,26 @@ export class DoorSystem {
     for (const v of this.doors.values()) {
       if (v.unlockT >= 0) this.stepUnlock(v, dt);
       this.setTarget(v, this.wanted(v, playerPos), true);
-      const moving = v.t !== v.target;
-      if (moving) {
-        const step = dt / DOOR_ANIM_TIME;
-        v.t = v.target === 1 ? Math.min(1, v.t + step) : Math.max(0, v.t - step);
-        v.blink += dt;
-        this.applyPose(v);
+      let moved = false;
+      // Mechanism first: it releases before the leaves move and engages after they closed.
+      const wantE = v.target === 1 || v.t > 0 ? 0 : 1;
+      if (v.lockE !== wantE) {
+        const from = v.lockE;
+        const step = this.still ? 1 : dt / MECH_TIME;
+        v.lockE = wantE > v.lockE ? Math.min(1, v.lockE + step) : Math.max(0, v.lockE - step);
+        if (from === (wantE ? 0 : 1)) this.onMech?.(v.def.id, wantE === 1);
+        moved = true;
       }
-      this.applyBeacon(v, moving);
+      const leavesFree = v.lockE <= 0;
+      const goal = v.target === 1 && leavesFree ? 1 : 0;
+      if (v.t !== goal) {
+        const step = dt / DOOR_ANIM_TIME;
+        v.t = goal === 1 ? Math.min(1, v.t + step) : Math.max(0, v.t - step);
+        v.blink += dt;
+        moved = true;
+      }
+      if (moved) this.applyPose(v);
+      this.applyBeacon(v, v.t !== v.target || (v.lockE > 0 && v.lockE < 1));
     }
   }
 
@@ -422,6 +531,11 @@ export class DoorSystem {
     return v ? easeInOut(v.t) : 0;
   }
 
+  /** Locking mechanism engaged amount (1 = locked). */
+  lockAmount(id: string): number {
+    return this.doors.get(id)?.lockE ?? 1;
+  }
+
   /** Door "magnetism" for a walker at `pos` moving `move` (see `doorAssist`). */
   assist(pos: Vec3, move: XZ2): [number, number] {
     const list = [...this.doors.values()];
@@ -429,7 +543,7 @@ export class DoorSystem {
       list.map((v) => v.def),
       [pos[0], pos[2]],
       move,
-      (i) => list[i]!.unlocked,
+      (i) => list[i]!.unlocked && list[i]!.mode !== "sealed",
     );
   }
 
@@ -442,10 +556,12 @@ export class DoorSystem {
     return doorCellCovered(c.o, easeInOut(v.t));
   }
 
-  /** Door cells that block even when the door would auto-open (locked doors) — for pathing. */
+  /** Door cells that block even when the door would auto-open (locked or sealed doors) — for pathing. */
   lockedAt(x: number, z: number): boolean {
     const c = this.cells.get(cellKey(x, z));
-    return !!c && !this.doors.get(c.id)!.unlocked;
+    if (!c) return false;
+    const v = this.doors.get(c.id)!;
+    return !v.unlocked || v.mode === "sealed";
   }
 
   /** Match the wall cutaway (voxels above `cut` hidden): squash the doors to that height. */
@@ -462,9 +578,11 @@ export class DoorSystem {
 
   private wanted(v: DoorView, p: Vec3): 0 | 1 {
     if (!v.unlocked) return 0;
-    // Bolts first: an unlocking door holds still until they are back in the leaf.
+    // Sealed or held by an interlock: shut — but never onto the player standing in the doorway.
+    if (v.mode === "sealed" || !v.gate) return v.t > 0 && inDoorway(v.def, [p[0], p[2]]) ? 1 : 0;
+    // An unlocking door holds still until its mechanism has released.
     if (v.unlockT >= 0 && !unlockPose(v.unlockT).release) return 0;
-    if (!this.autoOpen) return 1;
+    if (!this.autoOpen || v.mode === "hold") return 1;
     // Never close on the player; open ahead of where they are heading.
     return doorWantsOpen(v.def, [p[0], p[2]], this.vel, v.target === 1) ? 1 : 0;
   }
@@ -476,41 +594,76 @@ export class DoorSystem {
     if (notify && v.t !== target) this.onMove?.(v.def.id, target === 1);
   }
 
-  private leafModels(v: DoorView): { key: string; left: () => Model; right: () => Model } {
+  private leafPieces(v: DoorView): { key: string; build: () => DoorPiece[] } {
     if (v.variant === "secret") {
-      const models = () => secretDoorModels(secretSkinFor(v.def));
-      return { key: `secret:${v.def.id}`, left: () => models().left, right: () => models().right };
+      const build = (): DoorPiece[] => {
+        const m = secretDoorModels(secretSkinFor(v.def));
+        return [
+          { role: "left", model: m.left, at: [leafCenterX("left", 0), 0, 0] },
+          { role: "right", model: m.right, at: [leafCenterX("right", 0), 0, 0] },
+        ];
+      };
+      return { key: `secret:${v.def.id}`, build };
     }
     const light = doorLight(v.variant, v.unlocked);
-    const keypad = v.variant === "keypad";
-    const bolt = v.variant === "locked" && !v.unlocked;
-    const key = `leaf:${light}:${keypad ? 1 : 0}:${bolt ? 1 : 0}`;
-    return {
-      key,
-      left: () => doorLeafModel("left", { light, bolt }),
-      right: () => doorLeafModel("right", { light, keypad, bolt }),
-    };
+    return { key: `style:${v.def.id}:${light}`, build: () => doorPieces(v.style, light) };
   }
 
   private applyLook(v: DoorView): void {
-    const lm = this.leafModels(v);
-    if (lm.key !== v.leafKey) {
-      v.leafKey = lm.key;
-      for (const [g, side, build] of [
-        [v.left, "left", lm.left],
-        [v.right, "right", lm.right],
-      ] as const) {
-        for (const c of [...g.children]) if (!v.unlockMeshes.some((m) => m === c)) g.remove(c);
-        const mesh = markInstanced(this.cached(`${lm.key}:${side}`, v.mesher, build));
+    const lp = this.leafPieces(v);
+    if (lp.key !== v.leafKey) {
+      v.leafKey = lp.key;
+      for (const p of v.pieces) v.root.remove(p.group);
+      for (const p of v.parts) p.holder.parent?.remove(p.holder);
+      v.pieces = [];
+      v.parts = [];
+      const swing = v.style.motion === "swing" && v.variant !== "secret";
+      for (const piece of lp.build()) {
+        const group = new THREE.Group();
+        const isLeft = piece.role === "left" || piece.role === "leftUpper";
+        const origin: [number, number, number] = swing
+          ? [isLeft ? -OPENING_W / 2 : OPENING_W / 2, 0, 0]
+          : [0, 0, 0];
+        group.position.set(origin[0], origin[1], origin[2]);
+        const mesh = markInstanced(
+          this.cached(`${lp.key}:${piece.role}`, v.mesher, () => piece.model),
+        );
+        mesh.position.set(
+          piece.at[0] - origin[0],
+          piece.at[1] - origin[1],
+          piece.at[2] - origin[2],
+        );
         // Secret leaves are wall-thick: pull them a hair inside the wall faces.
-        mesh.scale.z = DOOR_SCALE * (v.variant === "secret" ? 0.98 : 1);
-        g.add(mesh);
+        if (v.variant === "secret") mesh.scale.z = DOOR_SCALE * 0.98;
+        group.add(mesh);
+        v.root.add(group);
+        v.pieces.push({ role: piece.role, group, at: piece.at, origin });
       }
+      // The locking mechanism (secret doors: flush magnets nobody sees).
+      if (v.variant !== "secret")
+        for (const def of mechParts(v.style)) {
+          const holder = new THREE.Group();
+          const pivot = def.release.type === "rotate" ? def.release.pivot : def.at;
+          const host = def.on === "root" ? null : v.pieces.find((p) => p.role === def.on);
+          const base = host ? host.origin : ([0, 0, 0] as const);
+          holder.position.set(pivot[0] - base[0], pivot[1] - base[1], pivot[2] - base[2]);
+          const mesh = markInstanced(this.byContent(def.model, v.mesher));
+          mesh.position.set(def.at[0] - pivot[0], def.at[1] - pivot[1], def.at[2] - pivot[2]);
+          holder.add(mesh);
+          (host ? host.group : v.root).add(holder);
+          v.parts.push({ def, holder });
+        }
     }
     const disguised = v.variant === "secret" && !v.unlocked;
     v.frame.visible = !disguised;
     if (v.cover) v.cover.visible = disguised;
+    this.applyPanel(v);
     this.applyBeacon(v, v.t !== v.target);
+  }
+
+  private applyPanel(v: DoorView): void {
+    const disguised = v.variant === "secret" && !v.unlocked;
+    for (const [st, m] of v.iface) m.visible = !disguised && st === v.panel;
   }
 
   private applyBeacon(v: DoorView, moving: boolean): void {
@@ -528,39 +681,11 @@ export class DoorSystem {
     for (const [l, b] of v.beacons) b.visible = on && l === lit;
   }
 
-  /** Throw transient bolts (and a keypad flash plate) onto the leaves and start the sequence. */
+  /** Start the unlock sequence: the beacon strobes, the mechanism releases once, then the door may open. */
   private startUnlock(v: DoorView, variant: DoorVariant): void {
     this.endUnlock(v);
     v.unlockT = 0;
     v.unlockFrom = doorLight(variant, false);
-    const bolt = (side: "left" | "right"): THREE.Mesh => {
-      const m = this.cached("unlock:bolt", v.mesher, () => {
-        const b = block(BOLT_W, BOLT_H, LEAF_D, C.steel);
-        for (const z of [0, LEAF_D - 1]) {
-          b.set(1, 2, z, C.safety_red);
-          b.set(2, 2, z, C.safety_red);
-        }
-        return b;
-      });
-      m.scale.z = DOOR_SCALE * 1.12;
-      m.position.set(side === "left" ? BOLT_X : -BOLT_X, BOLT_Y, 0);
-      return m;
-    };
-    const l = bolt("left");
-    const r = bolt("right");
-    v.left.add(l);
-    v.right.add(r);
-    v.unlockMeshes.push(l, r);
-    if (variant === "keypad") {
-      const pad = this.cached("unlock:pad", v.mesher, () =>
-        block(PAD_W, PAD_H, LEAF_D, C.led_green),
-      );
-      pad.scale.z = DOOR_SCALE * 1.1;
-      pad.position.set(PAD_X, PAD_Y, 0);
-      v.right.add(pad);
-      v.unlockMeshes.push(pad);
-    }
-    this.poseUnlock(v);
   }
 
   private stepUnlock(v: DoorView, dt: number): void {
@@ -568,40 +693,52 @@ export class DoorSystem {
     v.unlockT += dt;
     if (t0 < UNLOCK_CHIRP_AT && v.unlockT >= UNLOCK_CHIRP_AT) this.onUnlock?.(v.def.id, v.variant);
     if (unlockPose(v.unlockT).done) this.endUnlock(v);
-    else this.poseUnlock(v);
-  }
-
-  private poseUnlock(v: DoorView): void {
-    const pose = unlockPose(v.unlockT, this.calm);
-    const [l, r, pad] = v.unlockMeshes;
-    const k = easeUnlock(pose.bolt);
-    if (l && r) {
-      // Slide back into the leaf (away from the meeting edge), shrinking as it goes.
-      const slide = this.still ? 0 : k * BOLT_W * DOOR_SCALE * 0.9;
-      const sx = this.still ? 1 : 1 - 0.8 * k;
-      const gone = pose.bolt >= 1;
-      l.position.x = BOLT_X - slide;
-      r.position.x = -BOLT_X + slide;
-      l.scale.x = r.scale.x = DOOR_SCALE * sx;
-      l.visible = r.visible = !gone;
-    }
-    if (pad) pad.visible = pose.keyFlash;
   }
 
   private endUnlock(v: DoorView): void {
-    for (const m of v.unlockMeshes) m.parent?.remove(m);
-    v.unlockMeshes.length = 0;
     v.unlockT = -1;
   }
 
   private applyPose(v: DoorView): void {
     const k = easeInOut(v.t);
-    v.left.position.x = leafCenterX("left", k);
-    v.right.position.x = leafCenterX("right", k);
-    // Fully open leaves sit inside the wall: hide them (cutaway / glass walls can't reveal them).
-    const hidden = k >= 1;
-    v.left.visible = !hidden;
-    v.right.visible = !hidden;
+    const st = v.variant === "secret" ? { motion: "split" as const } : v.style;
+    const dir = swingDir(v.def.id);
+    for (const p of v.pieces) {
+      const o = pieceOpen(st, p.role, k);
+      const isLeft = p.role === "left" || p.role === "leftUpper";
+      if (st.motion === "swing") {
+        p.group.rotation.y = (isLeft ? 1 : -1) * dir * o * (Math.PI / 2);
+        p.group.visible = true;
+      } else if (st.motion === "shutter") {
+        const rise = o * SHUTTER_RISE;
+        p.group.position.y = rise;
+        // Slats roll onto the drum in the header: gone once they pass under it.
+        p.group.visible = p.at[1] + rise + SLAT_H * DOOR_SCALE <= HEADER_Y * DOOR_SCALE + 0.05;
+      } else {
+        p.group.position.x = (isLeft ? -1 : 1) * o * (OPENING_W / 2);
+        // Fully open leaves sit inside the wall: hide them (cutaway / glass walls can't reveal them).
+        p.group.visible = o < 1;
+      }
+    }
+    const e = easeInOut(v.lockE);
+    for (const { def, holder } of v.parts) {
+      const r = def.release;
+      const free = 1 - e;
+      holder.position.set(...this.partBase(v, def));
+      holder.rotation.set(0, 0, 0);
+      holder.visible = true;
+      if (r.type === "slide") holder.position[r.axis] += r.by * free;
+      else if (r.type === "rotate") holder.rotation[r.axis] = r.by * free;
+      else holder.visible = e > 0.5;
+    }
+  }
+
+  /** Holder position of a mechanism part in its host's frame. */
+  private partBase(v: DoorView, def: MechPart): [number, number, number] {
+    const pivot = def.release.type === "rotate" ? def.release.pivot : def.at;
+    const host = def.on === "root" ? null : v.pieces.find((p) => p.role === def.on);
+    const b = host ? host.origin : [0, 0, 0];
+    return [pivot[0] - b[0]!, pivot[1] - b[1]!, pivot[2] - b[2]!];
   }
 
   private applyCut(v: DoorView): void {

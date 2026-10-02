@@ -72,6 +72,7 @@ import {
 import {
   decorStand,
   deviceStand,
+  doorPanelStand,
   doorStand,
   fillCollision,
   floorOccupants,
@@ -181,6 +182,7 @@ import {
 import {
   createBrain,
   findFreeSpot,
+  sendTo,
   stepBrain,
   type NpcBrain,
   type NpcBrainConfig,
@@ -199,7 +201,20 @@ import { mcpAvatarVisual } from "@/lib/world/models/characters";
 import { damienFigureRigs } from "@/lib/world/models/veil";
 import { isDamienRevealed } from "@/lib/world/damien";
 import { ScreenSystem, type ScreenRef } from "@/lib/world/render/screens";
-import { screenInfo } from "@/lib/world/screen-content";
+import { camPan, screenInfo } from "@/lib/world/screen-content";
+import {
+  AIRLOCKS,
+  initialAirlock,
+  stepAirlock,
+  type AirlockDef,
+  type AirlockEvent,
+  type AirlockPhase,
+  type AirlockState,
+} from "@/lib/world/doors/airlock";
+import { doorMode, doorPanelPoint, doorPanelState } from "@/lib/world/doors/lock";
+import { doorStyle, type MechKind } from "@/lib/world/doors/style";
+import { airlockFixtures, steamPoints } from "@/lib/world/models/airlock";
+import { DOOR_SCALE } from "@/lib/world/models/doors";
 import {
   ROOM_TERMINALS,
   ROOM_TERMINAL_SCALE,
@@ -319,6 +334,8 @@ export type Target =
   | { kind: "note"; id: string }
   | { kind: "prop"; id: string }
   | { kind: "door"; id: string }
+  /** A door's lock interface on its jamb (docs/DOORS.md). */
+  | { kind: "doorpanel"; id: string }
   | { kind: "npc"; id: string }
   | { kind: "terminal"; id: string }
   | { kind: "decor"; id: string };
@@ -333,6 +350,10 @@ export interface EngineCallbacks {
   onDoorMove?(id: string, opening: boolean): void;
   /** A locked / keypad door just unlocked (beacon turns green) — play a chirp. */
   onDoorUnlock?(id: string): void;
+  /** A door's locking mechanism starts to release / engage (docs/DOORS.md) — play its sound. */
+  onDoorMech?(id: string, mech: MechKind, engage: boolean): void;
+  /** An airlock cycle event on the active floor (seal, steam, extract, release, cleared). */
+  onAirlock?(id: string, event: AirlockEvent): void;
   /**
    * A click-to-move target cannot be reached: `locked` = only a locked /
    * closed secret door is in the way, `unreachable` = no way at all. Lawrence
@@ -358,6 +379,8 @@ interface Interactable {
   active: boolean;
   /** Closed secret door: only targetable while a prototype can open it. */
   secretDoor?: DoorDef;
+  /** Lock interface of a secret door: only usable once the door is revealed. */
+  secretPanel?: DoorDef;
   /** Where Jade stands to use it (active sides, seat); NPCs compute theirs live. */
   stand?: StandTarget;
 }
@@ -520,6 +543,10 @@ interface NpcView {
   blob: number;
   /** Lore bots: awake (bot_<id>_awake) or slumped and dark. */
   awake?: boolean;
+  /** Lore bots: upgrade level (ops, docs/OPS.md) the body was built with. */
+  level?: number;
+  /** Lore bots: play time of the last service seen (a new one sends it to its dock). */
+  serviced?: number;
   /** Lore bots: the rebuildable body (base mesh, rig, screens). */
   body?: THREE.Group;
   bodyScreens?: ScreenRef[];
@@ -621,6 +648,14 @@ interface FloorView {
   rift?: THREE.Mesh;
   /** Animated sliding doors (collision per leaf cell). */
   doors: DoorSystem;
+  /** Airlock controllers on this floor (doors/airlock.ts). */
+  airlocks: {
+    def: AirlockDef;
+    outer: DoorDef;
+    inner: DoorDef;
+    state: AirlockState;
+    puff: number;
+  }[];
   /** Terrain + footprints + closed door leaves + elevator deck. */
   collider: VoxelSource;
   lampKeys: Map<string, boolean>;
@@ -665,7 +700,7 @@ interface FloorView {
     tier: MeshTier;
     crystal?: boolean;
     /** Aging (lib/world/aging.ts): the placement and the look its grid was built for. */
-    age?: { decor: string; room: string; key: string };
+    age?: { decor: string; room: string; key: string; pid: string };
   }[];
   /** Voxel divisions this floor was built / is being re-meshed with (clarity). */
   meshTier: MeshTier;
@@ -1477,6 +1512,11 @@ export class LabEngine {
             ? "locked"
             : "normal";
       v.doors.setState(d.id, doorIsOpen(s, d), variant);
+      // Lock interface: mode (auto / hold / sealed) and what its screen shows.
+      v.doors.setMode(d.id, doorMode(s, d.id));
+      const al = v.airlocks.find((a) => a.outer.id === d.id || a.inner.id === d.id);
+      const cycling = !!al && (al.state.phase === "steam" || al.state.phase === "extract");
+      v.doors.setPanel(d.id, doorPanelState(s, d, cycling));
     }
     // Room lights.
     for (const r of ROOMS) {
@@ -1527,7 +1567,9 @@ export class LabEngine {
     for (const it of v.interactables)
       it.active = it.secretDoor
         ? !doorIsOpen(s, it.secretDoor) && prototypeUseOptions(s, it.secretDoor.id).length > 0
-        : it.object.visible && it.object.userData.leaving !== true;
+        : it.secretPanel
+          ? doorIsOpen(s, it.secretPanel)
+          : it.object.visible && it.object.userData.leaving !== true;
     v.staticDirty = true;
     v.instancer.markDirty();
     this.updateFocus(true);
@@ -1624,6 +1666,67 @@ export class LabEngine {
   /** Decor placement behind a `{ kind: "decor" }` target. */
   decorPlacement(id: string): DecorPlacement | undefined {
     return this.decorById.get(id);
+  }
+
+  private feedCam: THREE.PerspectiveCamera | null = null;
+  private feedTarget: THREE.WebGLRenderTarget | null = null;
+  private feedPixels: Uint8Array | null = null;
+
+  /**
+   * Surveillance feed (docs/OPS.md): render a room from its wall camera
+   * (`decor:<room>:cam`, same pan curve as the camera head) into a small
+   * canvas. Works for every floor the engine has built (visited floors);
+   * returns false when there is no signal.
+   */
+  camFeed(roomId: string, canvas: HTMLCanvasElement): boolean {
+    const room = ROOMS.find((r) => r.id === roomId);
+    const view = room && this.floors.get(room.floor);
+    if (!room || !view) return false;
+    const w = canvas.width;
+    const h = canvas.height;
+    const cam = (this.feedCam ??= new THREE.PerspectiveCamera(72, w / h, 0.2, 160));
+    cam.aspect = w / h;
+    cam.updateProjectionMatrix();
+    if (!this.feedTarget || this.feedTarget.width !== w || this.feedTarget.height !== h) {
+      this.feedTarget?.dispose();
+      this.feedTarget = new THREE.WebGLRenderTarget(w, h);
+      this.feedPixels = new Uint8Array(w * h * 4);
+    }
+    const mount = this.decorById.get(`decor:${roomId}:cam`);
+    const cx = room.x + room.w / 2;
+    const cz = room.z + room.d / 2;
+    const px = mount ? mount.x + 0.5 : room.x + 1.5;
+    const pz = mount ? mount.z + 0.5 : room.z + 1.5;
+    cam.position.set(
+      px + Math.sign(cx - px) * 0.6,
+      WALL_HEIGHT - 1.2,
+      pz + Math.sign(cz - pz) * 0.6,
+    );
+    const yaw = Math.atan2(cz - pz, cx - px) + camPan(this.time) * 0.6;
+    const reach = Math.hypot(room.w, room.d) * 0.5;
+    cam.lookAt(px + Math.cos(yaw) * reach, 0.8, pz + Math.sin(yaw) * reach);
+    // Show the room's floor for one off-screen render, then restore.
+    const active = this.active;
+    if (active && active !== view) active.group.visible = false;
+    view.group.visible = true;
+    const prevTarget = this.renderer.getRenderTarget();
+    this.renderer.setRenderTarget(this.feedTarget);
+    this.renderer.render(this.scene, cam);
+    this.renderer.setRenderTarget(prevTarget);
+    if (active && active !== view) {
+      view.group.visible = false;
+      active.group.visible = true;
+    }
+    const px8 = this.feedPixels!;
+    this.renderer.readRenderTargetPixels(this.feedTarget, 0, 0, w, h, px8);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return false;
+    const img = ctx.createImageData(w, h);
+    // Flip rows (GL origin bottom-left).
+    for (let y = 0; y < h; y++)
+      img.data.set(px8.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
+    ctx.putImageData(img, 0, 0);
+    return true;
   }
 
   /** Emit a visual effect at a world position (for UI-driven events). */
@@ -1947,6 +2050,63 @@ export class LabEngine {
     this.fx.emit("unlock", this.tmpV.set(d.x + 0.5, 7, d.z + 0.5), { scale: 0.8 });
   }
 
+  /**
+   * Airlocks on the active floor: interlock gates, the steam / extraction
+   * cycle (fx + callbacks), the interface screens (docs/DOORS.md).
+   */
+  private stepAirlocks(dt: number): void {
+    const v = this.active;
+    if (!v) return;
+    const [px, , pz] = this.walker.position;
+    for (const al of v.airlocks) {
+      const out = stepAirlock(
+        al.state,
+        al.def,
+        al.outer,
+        al.inner,
+        {
+          x: px,
+          z: pz,
+          outerOpen: v.doors.openAmount(al.outer.id),
+          innerOpen: v.doors.openAmount(al.inner.id),
+        },
+        dt,
+      );
+      v.doors.setGate(al.outer.id, out.allowOuter);
+      v.doors.setGate(al.inner.id, out.allowInner);
+      const cycling = al.state.phase === "steam" || al.state.phase === "extract";
+      if (cycling) {
+        v.doors.setPanel(al.outer.id, "cycle");
+        v.doors.setPanel(al.inner.id, "cycle");
+      } else if (out.events.includes("release")) this.sync();
+      for (const e of out.events) this.cb.onAirlock?.(al.def.id, e);
+      // Steam from the nozzles, then the extraction pulls it (and the dust) down.
+      al.puff -= dt;
+      if (cycling && al.puff <= 0 && !this.settings.accessibility.reduceMotion) {
+        al.puff = al.state.phase === "steam" ? 0.18 : 0.3;
+        const pts = steamPoints(al.def, al.outer.axis);
+        if (al.state.phase === "steam") {
+          const p = pts[Math.floor(Math.random() * pts.length)]!;
+          this.fx.emit("steam", this.tmpV.set(p[0], p[1], p[2]), { scale: 0.7 });
+        } else {
+          const c = al.def.chamber;
+          this.fx.emit("dust", this.tmpV.set((c.x0 + c.x1 + 1) / 2, 1.1, (c.z0 + c.z1 + 1) / 2), {
+            scale: 0.6,
+            color: "#dfe6ea",
+          });
+        }
+      }
+    }
+  }
+
+  /** Airlock phase for the interface (null = no airlock with that id on a built floor). */
+  airlockPhase(id: string): { phase: AirlockPhase; cycles: number } | null {
+    for (const v of this.floors.values())
+      for (const al of v.airlocks)
+        if (al.def.id === id) return { phase: al.state.phase, cycles: al.state.cycles };
+    return null;
+  }
+
   // ── Building the scene ────────────────────────────────────────
 
   /**
@@ -2108,7 +2268,7 @@ export class LabEngine {
     let queued = 0;
     for (const f of v.fixedSrc) {
       if (!f.age) continue;
-      const look = lookFor(st, f.age.room, f.age.decor, clarity);
+      const look = lookFor(st, f.age.room, f.age.decor, clarity, f.age.pid);
       const key = `${f.age.decor}|${lookKey(f.age.decor, look)}`;
       if (key === f.age.key) continue;
       f.age.key = key;
@@ -2682,7 +2842,7 @@ export class LabEngine {
     z: number,
     awake: boolean,
   ): { rig: VisualRig; screens: ScreenRef[] } {
-    const visual = botVisual(id, awake);
+    const visual = botVisual(id, awake, this.getState().ops.bots[id]?.level ?? 0);
     const family = familyFor(visual, "character");
     body.add(this.meshModel(visual.base.grid, visual.scale ?? MODEL_SCALE, true, family));
     const rig = this.buildVisualRig(visual, body, awake, undefined, family);
@@ -2701,8 +2861,23 @@ export class LabEngine {
     for (const npc of v.npcs.values()) {
       if (npc.awake === undefined || !npc.body) continue;
       const awake = !!s.flags[`bot_${npc.id}_awake`];
-      if (awake === npc.awake) continue;
+      const level = s.ops.bots[npc.id]?.level ?? 0;
+      // A fresh service: the bot walks to its dock and works there for a moment.
+      const serviced = s.ops.bots[npc.id]?.serviced ?? 0;
+      if (npc.serviced === undefined) npc.serviced = serviced;
+      else if (serviced !== npc.serviced) {
+        npc.serviced = serviced;
+        const dock = [...this.decorById.values()].find((p) => p.id.endsWith(`:dock:${npc.id}`));
+        if (dock && npc.brain && awake) {
+          const cx = dock.x + 1.5;
+          const cz = dock.z + 1.5;
+          const spot = findFreeSpot((x, z) => this.walkBlocked(v, x, z), cx, cz, 2, 0.8);
+          if (spot) sendTo(npc.brain, { x: cx, z: cz, sx: spot.x, sz: spot.z });
+        }
+      }
+      if (awake === npc.awake && level === (npc.level ?? 0)) continue;
       npc.awake = awake;
+      npc.level = level;
       for (const ref of npc.bodyScreens ?? []) this.screens.detach(ref);
       this.clearGroup(npc.body);
       const built = this.buildBotBody(npc.body, npc.id, v.floor, npc.home[0], npc.home[1], awake);
@@ -2749,12 +2924,24 @@ export class LabEngine {
     const doors = new DoorSystem({
       onMove: (id, opening) => this.cb.onDoorMove?.(id, opening),
       onUnlock: (id) => this.doorUnlocked(id),
+      onMech: (id, engage) => this.cb.onDoorMech?.(id, doorStyle(id).mech, engage),
     });
     doors.setCalm(
       this.settings.accessibility.reduceMotion,
       this.settings.accessibility.reduceFlicker,
     );
     for (const d of DOORS) if (d.floor === floor) doors.addDoor(d, group, mesh);
+    // Airlock hardware: nozzle rails, extraction grate, ducts, lamps (static).
+    for (const a of AIRLOCKS) {
+      if (a.floor !== floor) continue;
+      const axis = DOORS.find((d) => d.id === a.outer)?.axis ?? "x";
+      for (const f of airlockFixtures(a, axis)) {
+        const m = markStatic(this.meshModel(f.model.grid, DOOR_SCALE, true, "architecture"));
+        m.position.set(f.at[0], f.at[1], f.at[2]);
+        m.rotation.y = f.rotY;
+        group.add(m);
+      }
+    }
     this.elevators.addFloor(floor, group, shaft);
     const collider: VoxelSource = {
       get: (x, y, z) =>
@@ -2773,6 +2960,13 @@ export class LabEngine {
       fineCollider,
       occupants: null,
       doors,
+      airlocks: AIRLOCKS.filter((a) => a.floor === floor).map((a) => ({
+        def: a,
+        outer: DOORS.find((d) => d.id === a.outer)!,
+        inner: DOORS.find((d) => d.id === a.inner)!,
+        state: initialAirlock(),
+        puff: 0,
+      })),
       collider,
       devices: new Map(),
       pickups: new Map(),
@@ -2989,6 +3183,24 @@ export class LabEngine {
         stand: doorStand(d),
       });
     }
+    // Lock interfaces (every door, both faces of its right jamb).
+    for (const d of DOORS) {
+      if (d.floor !== floor) continue;
+      const at = doorPanelPoint(d);
+      const marker = new THREE.Object3D();
+      marker.position.set(at.x, 1, at.z);
+      marker.add(this.pickProxy(0.9, 2.2, 0.9).translateY(2.0));
+      view.interactables.push({
+        target: { kind: "doorpanel", id: d.id },
+        x: Math.floor(at.x),
+        z: Math.floor(at.z),
+        radius: 1.6,
+        object: marker,
+        active: !d.secret,
+        ...(d.secret ? { secretPanel: d } : {}),
+        stand: doorPanelStand(d, at),
+      });
+    }
     for (const npc of NPCS) {
       if (npc.floor !== floor || npc.id === "mcp") continue;
       const g = new THREE.Group();
@@ -3052,6 +3264,7 @@ export class LabEngine {
       if (botRig) {
         nv.visual = botRig;
         nv.awake = botAwake;
+        nv.level = this.getState().ops.bots[npc.id]?.level ?? 0;
         if (botBody) nv.body = botBody;
         nv.bodyScreens = botScreens;
         const v = botVisual(npc.id, botAwake);
@@ -3347,7 +3560,7 @@ export class LabEngine {
     const st = this.getState();
     const clarity = Math.max(0, this.clarityNow);
     for (const p of interiorFor(view.floor)) {
-      const look = lookFor(st, p.room, p.decor, clarity);
+      const look = lookFor(st, p.room, p.decor, clarity, p.id);
       const lk = `${p.decor}|${lookKey(p.decor, look)}`;
       let geo = geoByDecor.get(lk);
       if (geo === undefined) {
@@ -3377,7 +3590,7 @@ export class LabEngine {
         grid: agedDecorModel(p.decor, look).grid,
         family: decorFamily(decorScale(p.decor)),
         tier: decorTier.get(lk) ?? this.meshTier,
-        age: { decor: p.decor, room: p.room, key: lk },
+        age: { decor: p.decor, room: p.room, key: lk, pid: p.id },
       });
     }
     for (const p of interiorFor(view.floor)) {
@@ -4098,6 +4311,35 @@ export class LabEngine {
     return len / WALKER.speed + 0.4 + LIE_ENTER_DURATION;
   }
 
+  /**
+   * Jade's idle life after a long pause (docs/OPS.md, lib/world/ops/idle.ts):
+   * she is found at the ergometer (training), with a book next to her bed
+   * (reading) or asleep in it. Call on her quarters' floor; the player's
+   * first move ends it like any pose.
+   */
+  idleActivity(kind: "read" | "exercise" | "sleep"): void {
+    const id = kind === "exercise" ? "ergometer" : "jades_bett";
+    const prop = PROPS.find((p) => p.id === id);
+    if (!prop || prop.floor !== this.active.floor) return;
+    this.clearSeat();
+    this.stopWalk();
+    const nav = this.navFor(this.active);
+    // The nearest free spot next to the prop (rings outward).
+    let spot: [number, number] | null = null;
+    for (let r = 2; r <= 6 && !spot; r++)
+      for (let a = 0; a < 16 && !spot; a++) {
+        const x = prop.x + 0.5 + Math.cos((a / 16) * Math.PI * 2) * r;
+        const z = prop.z + 0.5 + Math.sin((a / 16) * Math.PI * 2) * r;
+        if (boxFree(nav, x, z, WALKER.radius)) spot = [x, z];
+      }
+    if (!spot) return;
+    this.walker.teleport([spot[0], 1, spot[1]]);
+    this.target.set(spot[0], 3, spot[1]);
+    this.faceGoal = headingOf(prop.x + 0.5 - spot[0], prop.z + 0.5 - spot[1]);
+    if (kind === "sleep") this.restIn({ kind: "prop", id });
+    else this.track = switchPose(this.track, kind === "read" ? "read" : "work", this.time);
+  }
+
   /** Jade is sitting or lying (or getting there / up). */
   get seated(): "sit" | "lie" | null {
     return this.seat?.kind ?? null;
@@ -4357,6 +4599,7 @@ export class LabEngine {
     if (!this.seat && !this.ride)
       [mx, mz] = this.active.doors.assist(this.walker.position, [mx, mz]);
     const vel = WALKER.speed * walkBoost;
+    this.stepAirlocks(dt);
     this.active.doors.update(dt, this.walker.position, [mx * vel, mz * vel]);
     this.elevators.update(dt);
     if (!this.seat && !this.ride) this.unstick();

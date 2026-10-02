@@ -1,6 +1,7 @@
 "use client";
 
 import { fmtNum } from "@/components/world/format";
+import { trackAction } from "@/components/world/ops/track";
 
 import { tr } from "@/lib/i18n";
 import { useEffect, useMemo, useState } from "react";
@@ -297,7 +298,10 @@ function PowerPanelImpl({ api, onClose }: { api: WorldApi; onClose: () => void }
                         ? tr("Switch off {name}", { name: d.name })
                         : tr("Switch on {name}", { name: d.name })
                     }
-                    onClick={() => api.act((w) => toggleDevice(w, d.id))}
+                    onClick={() => {
+                      if (api.act((w) => toggleDevice(w, d.id)))
+                        trackAction(api, { kind: "toggle", id: d.id });
+                    }}
                   >
                     {r.switchedOn ? tr("on") : tr("off")}
                   </CrtButton>

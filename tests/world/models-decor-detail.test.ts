@@ -1,4 +1,5 @@
 import { PLAN_ROOMS } from "@/lib/world/content/floorplan";
+import { NOT_YET_CRYSTAL } from "@/lib/world/models/decor-ops";
 import { describe, expect, it } from "vitest";
 import { C } from "@/lib/world/content/palette";
 import { FLOORS, ROOMS } from "@/lib/world/content/map";
@@ -98,6 +99,8 @@ describe("performance budget", () => {
   // Measured before the J2 detail pass: 83 375 library voxels, 167 164 placed.
   const LIB_BEFORE = 83_375;
   const PLACED_BEFORE = 167_164;
+  // Measured 2026-10-01: 7 957 voxels.
+  const OPS_CAP = 12_000;
 
   it("library and placed decor voxels stay within +40 %", () => {
     const lib = DECOR.reduce((a, d) => a + voxels(d.id), 0);
@@ -108,13 +111,17 @@ describe("performance budget", () => {
     ]);
     let placed = 0;
     let added = 0;
+    // Operations infrastructure (docs/OPS.md: cameras, docks, vines, spills) has its own cap.
+    let ops = 0;
     for (const f of FLOORS)
       for (const p of interiorFor(f.id)) {
-        if (fresh.has(p.room)) added += voxels(p.decor);
+        if (NOT_YET_CRYSTAL.has(p.decor)) ops += voxels(p.decor);
+        else if (fresh.has(p.room)) added += voxels(p.decor);
         else placed += voxels(p.decor);
       }
     expect(lib).toBeLessThanOrEqual(LIB_BEFORE * 1.4);
     expect(placed).toBeLessThanOrEqual(PLACED_BEFORE * 1.4);
     expect(added).toBeLessThanOrEqual(50_000);
+    expect(ops).toBeLessThanOrEqual(OPS_CAP);
   });
 });

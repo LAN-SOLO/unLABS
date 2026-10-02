@@ -7,7 +7,7 @@
  *   pnpm crystal:export dev-,bot-  (only ids starting with one of the prefixes)
  *
  * Covered: devices (complete, powered + unpowered, base + rig parts), lore
- * bots (awake + dormant), the MCP avatar, props (base, rig parts, variant
+ * bots (awake + dormant + upgrade levels 1–3), the MCP avatar, props (base, rig parts, variant
  * decor), pickups, notes, all decor (+ animated decor parts), doors (frames,
  * beacons, leaves, secret covers), elevators, room terminals, hand props.
  *
@@ -49,8 +49,10 @@ import { C, LAB_PALETTE, labMaterialOf } from "@/lib/world/content/palette";
 import { roomTerminalModel } from "@/lib/world/content/terminals";
 import { stagedBuildGrid, type DeviceVisual } from "@/lib/world/models/anim";
 import { BOT_IDS, botVisual, mcpAvatarVisual } from "@/lib/world/models/characters";
+import { MAX_LEVEL } from "@/lib/world/ops/state";
 import { stagedGrid } from "@/lib/world/models/core";
-import { DECOR, decorModel, decorScale, decorVisual } from "@/lib/world/models/decor";
+import { DECOR as ALL_DECOR, decorModel, decorScale, decorVisual } from "@/lib/world/models/decor";
+import { NOT_YET_CRYSTAL } from "@/lib/world/models/decor-ops";
 import { agedVisual, allAgedVariants } from "@/lib/world/models/decor-aging";
 import { DEVICE_VISUAL_IDS, deviceVisual } from "@/lib/world/models/devices";
 import {
@@ -139,11 +141,16 @@ for (const id of deviceIds) {
   }
 }
 
-// ── Bots, MCP avatar ─────────────────────────────────────────────
+// ── Bots (dormant, awake, upgrade levels 1–3), MCP avatar ────────
 for (const b of BOT_IDS) {
   for (const awake of [true, false]) {
     const v = botVisual(b, awake);
     addVisual(`bot-${b}${awake ? "" : "-dormant"}`, v, familyFor(v, "character"), awake);
+  }
+  // Upgrades (docs/OPS.md): antenna, light band, badge + sensor puck change the grids.
+  for (let level = 1; level <= MAX_LEVEL; level++) {
+    const v = botVisual(b, true, level);
+    addVisual(`bot-${b}-l${level}`, v, familyFor(v, "character"), true);
   }
 }
 {
@@ -151,10 +158,14 @@ for (const b of BOT_IDS) {
   addVisual("mcp-avatar", v, familyFor(v, "device"), true);
 }
 
+// The operations decor stays voxel for now (decor-ops.ts NOT_YET_CRYSTAL).
+const DECOR = ALL_DECOR.filter((d) => !NOT_YET_CRYSTAL.has(d.id));
+
 // ── Props, variant decor, prop rigs ──────────────────────────────
 for (const p of PROPS) {
   if (p.model === "elevator") continue;
   const variantDecor = p.variant ? PROP_VARIANT_DECOR[p.variant] : undefined;
+  if (variantDecor && NOT_YET_CRYSTAL.has(variantDecor)) continue;
   const pv = variantDecor ? undefined : propVisual(p.model);
   add(`prop-${variantDecor ?? p.model}/base`, (pv?.base ?? propGrid(p)).grid, "prop", true);
   const vv = variantDecor ? decorVisual(variantDecor) : pv;
@@ -175,6 +186,7 @@ for (const d of DECOR)
   add(`decor-${d.id}`, decorModel(d.id).grid, decorFamily(decorScale(d.id)), true);
 for (const f of interiorFloors()) {
   for (const p of animatedDecor(f)) {
+    if (NOT_YET_CRYSTAL.has(p.decor)) continue;
     const v = decorVisual(p.decor);
     if (v)
       addVisual(`decor-${p.decor}`, v, decorFamily(v.scale ?? decorScale(p.decor)), false, false);
@@ -188,6 +200,7 @@ for (const d of DECOR) {
 }
 for (const f of interiorFloors()) {
   for (const p of animatedDecor(f)) {
+    if (NOT_YET_CRYSTAL.has(p.decor)) continue;
     const raw = decorVisual(p.decor);
     if (!raw) continue;
     for (const v of allAgedVariants(p.decor))

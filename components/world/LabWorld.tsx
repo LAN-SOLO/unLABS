@@ -1,4 +1,5 @@
 "use client";
+import { trackAction } from "@/components/world/ops/track";
 
 import { agingTick, waterRoom } from "@/lib/world/aging";
 import { tr } from "@/lib/i18n";
@@ -55,6 +56,27 @@ import { PC_PROP } from "@/lib/world/content/quarters";
 import { STUDIO_PROP } from "@/lib/world/content/studio";
 import { StudioPanel } from "@/components/world/studio/StudioPanel";
 import { MatrixPanel } from "@/components/world/matrix/MatrixPanel";
+import { OpsPanel } from "@/components/world/ops/OpsPanel";
+import { DoorPanel } from "@/components/world/doors/DoorPanel";
+import { doorMode, noteDoorOpened } from "@/lib/world/doors/lock";
+import type { MechKind } from "@/lib/world/doors/style";
+import { SURVEILLANCE_PROP } from "@/lib/world/ops/state";
+import { endIdle } from "@/lib/world/ops/idle";
+
+/** Sound of each door's locking mechanism (docs/DOORS.md). */
+const MECH_SOUND: Record<MechKind, SfxName> = {
+  bolts: "latch_bolt",
+  pins: "latch_bolt",
+  clamps: "latch_bolt",
+  crossbar: "latch_bolt",
+  wheel: "latch_wheel",
+  cam: "latch_wheel",
+  magnet: "latch_magnet",
+  pistons: "door_hiss",
+};
+
+/** Jade's quarters (bed, ergometer) are on Level +1 (FloorId 4). */
+const JADE_FLOOR = 4 as const;
 import { MATRIX_PROP, debugFeed, debugFinishNow, debugWake } from "@/lib/world/matrix/rules";
 import { CharacterMenu, type CharacterTab } from "@/components/world/wardrobe/CharacterMenu";
 import { WearIcon } from "@/components/world/wardrobe/WearIcon";
@@ -184,6 +206,8 @@ type Overlay =
   /** Damien's Sound Studio: the mixing desk (prop `studio_console`, Level −2). */
   | { kind: "studio" }
   | { kind: "matrix" }
+  | { kind: "ops" }
+  | { kind: "doorlock"; id: string }
   /**
    * Jade's character menu (O, pause menu, inventory; the wardrobe and the
    * replicator “Needle's Eye” in her quarters open it with `atWardrobe`).
@@ -317,6 +341,20 @@ function targetLabel(
       return {
         title: d.keypad ? tr("Keypad") : tr("Locked door"),
         sub: doorIsOpen(s, d) ? tr("open") : d.keypad ? tr("enter code") : tr("locked"),
+      };
+    }
+    case "doorpanel": {
+      const d = DOORS.find((x) => x.id === t.id)!;
+      const mode = doorMode(s, d.id);
+      return {
+        title: tr("Lock interface"),
+        sub: !doorIsOpen(s, d)
+          ? tr("locked")
+          : mode === "sealed"
+            ? tr("sealed")
+            : mode === "hold"
+              ? tr("held open")
+              : tr("automatic"),
       };
     }
     case "npc": {
@@ -532,7 +570,10 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
             open({ kind: "character", atWardrobe: true });
             return;
           }
-          showDecor(a.act((st) => runDecorAction(st, t.id, pl.decor, pl.room, st.playTime)));
+          const dr = a.act((st) => runDecorAction(st, t.id, pl.decor, pl.room, st.playTime));
+          showDecor(dr);
+          if (dr.ok && !dr.resting)
+            trackAction(a, { kind: "decor", id: t.id, arg: pl.decor, room: pl.room });
           return;
         }
         case "terminal":
@@ -546,6 +587,7 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
           if (note && !s.read[note.id]) barkRef.current?.("note_read", { author: note.author });
           const fresh = a.act((st) => readNote(st, t.id));
           announce(a, { insights: fresh });
+          trackAction(a, { kind: "note", id: t.id });
           archiveVisit({ note: t.id });
           open({ kind: "note", id: t.id });
           return;
@@ -572,17 +614,22 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
             });
             if (rare) barkRef.current?.("pickup_rare");
           }
-          if (r.ok)
+          if (r.ok) {
             world.toast(
               tr("{label}: {text}", { label: p.label, text: r.message }),
               "good",
               r.items[0]?.item,
             );
-          else if (prototypeUseOptions(a.get(), p.id).length)
+            trackAction(a, { kind: "pickup", id: t.id });
+          } else if (prototypeUseOptions(a.get(), p.id).length)
             open({ kind: "proto", target: p.id, title: p.label, text: r.message });
           else a.toast(r.message, "warn");
           return;
         }
+        case "doorpanel":
+          soundRef.current?.("keypad_beep");
+          open({ kind: "doorlock", id: t.id });
+          return;
         case "door": {
           const d = DOORS.find((x) => x.id === t.id)!;
           if (doorIsOpen(s, d)) return;
@@ -620,6 +667,12 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
           // The Matrix Chamber (post-game slices, lib/world/matrix/).
           if (p.id === MATRIX_PROP) {
             open({ kind: "matrix" });
+            return;
+          }
+          // Surveillance station: cameras, routines, schedule, bots (docs/OPS.md).
+          if (p.id === SURVEILLANCE_PROP) {
+            soundRef.current?.("ui_open");
+            open({ kind: "ops" });
             return;
           }
           // Jade's wardrobe replicator “Needle's Eye” (stands at the wardrobe, mirror included).
@@ -710,7 +763,32 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
           },
           onWallMode: (label) => world.toast(label, "info"),
           onFootstep: (x, z, surface) => footstepRef.current?.(surface, [x, z]),
-          onDoorMove: (_id, opening) => soundRef.current?.(opening ? "door_slide" : "door_close"),
+          onDoorMove: (id, opening) => {
+            soundRef.current?.(opening ? "door_slide" : "door_close");
+            // Access log (lock interface); saved with the next autosave.
+            if (opening) noteDoorOpened(world.get(), id);
+          },
+          onDoorMech: (_id, mech) => soundRef.current?.(MECH_SOUND[mech]),
+          onAirlock: (_id, e) => {
+            if (e === "seal") soundRef.current?.("door_hiss");
+            if (e === "steam") soundRef.current?.("airlock_steam");
+            if (e === "extract") soundRef.current?.("airlock_extract");
+            if (e === "release") {
+              soundRef.current?.("pa_chime");
+              const first = !world.get().flags.airlock_cycled;
+              world.act((st) => {
+                st.flags.airlock_cycled = true;
+                st.counters.airlock_cycles = (st.counters.airlock_cycles ?? 0) + 1;
+              });
+              if (first)
+                world.toast(
+                  tr(
+                    "MCP: Decontamination complete. The data center stays clean — dust has no business in there.",
+                  ),
+                  "info",
+                );
+            }
+          },
           onDoorUnlock: () => soundRef.current?.("door_open"),
           onPathBlocked: (reason) => {
             if (reason === "locked") {
@@ -742,6 +820,8 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
               engine,
               world,
               /** Matrix Chamber dev helpers: finish the running extraction now, feed field-5 materials. */
+              /** Surveillance station / operations (docs/OPS.md). */
+              ops: { open: () => open({ kind: "ops" }) },
               matrix: {
                 finishNow: () => world.act((st) => debugFinishNow(st, Date.now())),
                 feed: () => world.act((st) => debugFeed(st)),
@@ -986,6 +1066,65 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
     return () => window.clearInterval(id);
   }, [settings.graphics.showFps]);
 
+  // Jade's idle life (docs/OPS.md): after a long pause she is found in her
+  // quarters reading, training or asleep; the player's first input ends it.
+  const { onChange: onWorldChange, get: getIdleWorld, act: actWorld, toast: toastWorld } = world;
+  const idleShown = useRef<string | null>(null);
+  useEffect(() => {
+    let off: (() => void) | null = null;
+    const end = () => {
+      off?.();
+      off = null;
+      idleShown.current = null;
+      actWorld((st) => endIdle(st));
+    };
+    const apply = () => {
+      const idle = getIdleWorld().ops.idle;
+      const key = idle ? `${idle.kind}@${idle.since}` : null;
+      if (!idle || key === idleShown.current || document.hidden) return;
+      const eng = engineRef.current;
+      if (!eng) return;
+      idleShown.current = key;
+      if (getIdleWorld().floor !== JADE_FLOOR) {
+        const bed = PROPS.find((p) => p.id === "jades_bett")!;
+        eng.setFloor(JADE_FLOOR, [bed.x - 1.5, 1, bed.z + 0.5]);
+        actWorld((st) => {
+          st.floor = JADE_FLOOR;
+        });
+      }
+      eng.idleActivity(idle.kind);
+      toastWorld(
+        idle.kind === "sleep"
+          ? tr("You were away for hours — Jade went to bed.")
+          : idle.kind === "exercise"
+            ? tr("While you were away Jade went to her quarters to train.")
+            : tr("While you were away Jade went to her quarters to read."),
+        "info",
+      );
+      // The first key or click after the pause ends her idle life (once overlays are gone).
+      if (!off) {
+        const onInput = () => end();
+        const t = window.setTimeout(() => {
+          window.addEventListener("keydown", onInput, { once: true });
+          window.addEventListener("pointerdown", onInput, { once: true });
+        }, 400);
+        off = () => {
+          window.clearTimeout(t);
+          window.removeEventListener("keydown", onInput);
+          window.removeEventListener("pointerdown", onInput);
+        };
+      }
+    };
+    const unsub = onWorldChange(apply);
+    document.addEventListener("visibilitychange", apply);
+    apply();
+    return () => {
+      unsub();
+      document.removeEventListener("visibilitychange", apply);
+      off?.();
+    };
+  }, [onWorldChange, getIdleWorld, actWorld, toastWorld]);
+
   const close = useCallback(() => open(null), [open]);
   /** Open the big terminal in-game (the world stays loaded and paused underneath). */
   const openConsole = useCallback(
@@ -1222,6 +1361,7 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
     if (pz) world.toast(`MCP: ${pz.mcpSolved}`, "good");
     if (r.items.length) world.toast(tr("Received: {items}", { items: r.items.join(", ") }), "good");
     announce(api, r);
+    trackAction(world, { kind: "puzzle", id });
     // A solve flushed while the host already switched away (PuzzleView
     // unmounted mid-animation) must not reopen the panel it came from.
     const cur = overlayRef.current;
@@ -1542,6 +1682,22 @@ function LabGame({ onMainMenu, onReload }: { onMainMenu: () => void; onReload: (
         )}
         {overlay?.kind === "studio" && <StudioPanel getAudio={director.getAudio} onClose={close} />}
         {overlay?.kind === "matrix" && <MatrixPanel api={api} onClose={close} />}
+        {overlay?.kind === "doorlock" && (
+          <DoorPanel
+            api={api}
+            id={overlay.id}
+            onClose={close}
+            onKeypad={(pz) => openPuzzle(pz)}
+            airlock={(aid) => engineRef.current?.airlockPhase(aid) ?? null}
+          />
+        )}
+        {overlay?.kind === "ops" && (
+          <OpsPanel
+            api={api}
+            onClose={close}
+            camFeed={(room, canvas) => engineRef.current?.camFeed(room, canvas) ?? false}
+          />
+        )}
         {overlay?.kind === "deviceui" && (
           <DeviceInterface
             key={overlay.id}

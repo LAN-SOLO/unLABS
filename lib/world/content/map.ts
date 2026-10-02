@@ -36,6 +36,7 @@ import {
 } from "@/lib/world/content/floorplan";
 import { SLICE_ITEM } from "@/lib/world/content/items";
 import { MATRIX_PROP } from "@/lib/world/matrix/state";
+import { SURVEILLANCE_PROP } from "@/lib/world/ops/state";
 import { REPLICATOR_POWER, REPLICATOR_PROP, WEAR_ITEM_PREFIX } from "@/lib/world/content/wardrobe";
 import { buildFloorGeom, geomRoomAt, roomShape, type FloorGeom } from "@/lib/world/floor-geom";
 import { shapeBounds, shapeContains } from "@/lib/world/room-shape";
@@ -998,6 +999,7 @@ const RAW_DOORS: readonly DoorDef[] = [
   door("d_batterie", 1, 66, 52, "x"),
   door("d_geo", 1, 48, 34, "z"),
   door("d_rechen", 1, 30, 60, "x", {
+    airlock: "schleuse_rechen",
     lock: { any: [{ power: 50 }, { device: "BTK-001", state: "built" }] },
     lockHint: tr("Server room door, electrically locked. Power or a pry tool."),
   }),
@@ -3954,6 +3956,19 @@ const PLANNED_PROPS: readonly PropDef[] = [
     label: tr("Matrix Chamber"),
     model: "matrix",
     rot: 3,
+  },
+  // Surveillance station (docs/OPS.md): the one console that sees every room
+  // of the lab through the moving room cameras. North wall of the Control Room.
+  {
+    id: SURVEILLANCE_PROP,
+    floor: 0,
+    x: 76,
+    z: 15,
+    kind: "station",
+    label: tr("Surveillance Station"),
+    model: "console",
+    variant: "surveillance",
+    rot: 0,
   },
 ];
 

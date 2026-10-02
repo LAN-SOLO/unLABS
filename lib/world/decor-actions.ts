@@ -32,7 +32,7 @@ import {
 } from "@/lib/world/content/decor-actions";
 import { addItem, bump, evalCond, grant } from "@/lib/world/game";
 import { buffKey, type ActiveBuff } from "@/lib/world/buffs";
-import { tidyRoom, waterRoom } from "@/lib/world/aging";
+import { algaeStage, harvestAlgae, tidyRoom, waterRoom } from "@/lib/world/aging";
 import { roomAt } from "@/lib/world/content/map";
 import { DECOR_BY_ID, decorSize } from "@/lib/world/models/decor";
 import { SEATS } from "@/lib/world/stand-spots";
@@ -269,6 +269,22 @@ export function runDecorAction(
       resting: false,
       cooldownLeft: 0,
       pose: null,
+    };
+  }
+  // An overgrown algae tank: Jade harvests it (the bots' crawler does the same on its rounds).
+  if (action.harvest === "algae" && algaeStage(state, room) >= 2) {
+    const n = harvestAlgae(state, room);
+    tidyRoom(state, room);
+    return {
+      ...head,
+      ok: true,
+      items: [{ item: "leuchtalgen", count: n }],
+      text: tr(
+        "The tank had overgrown — the algae spilled over the rim. I harvest {n} glow algae.",
+        { n },
+      ),
+      resting: false,
+      cooldownLeft: 0,
     };
   }
   const i = pickOutcome(state, action, now);
