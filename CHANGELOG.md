@@ -95,6 +95,35 @@
   invalid enum values (breaking the crystal-mint burn); `credit_balance`
   was missing its auth guard. All repaired in migration 20260808000001.
 
+## 0.4.0-beta — 2026-10-02
+
+### Added
+
+- **Clarity engine.** The lab starts as big source blocks and its voxels
+  split finer over 42 eras (models 1→2→4→6→8 cubes per voxel edge, terrain
+  1→2→4), driven by 17 weighted progress categories; colours, materials and
+  reflections deepen with every era (`docs/CLARITY.md`).
+- **Crystal age.** After era 42 every voxel model and terrain chunk turns
+  into a Blender-built real surface (setting `graphics.crystal`), with an
+  MCP server and skill for look-dev (`docs/CRYSTAL.md`). Assembled crystal
+  stills of every bot for the undevbook.
+- **Realistic Jade.** SDF-sculpted body skinned to the rig, strand hair and
+  an MPFB head with a baked skin (`docs/HERO.md`).
+- **Living lab.** Plants grow and wilt, dust settles, rust and moss creep,
+  crystals grow with clarity.
+- **Matrix Chamber.** Post-game slice extraction from the real ETH ledger
+  and the unETH archive, a composer and GIF export; every released capture
+  re-rendered in Blender (`docs/SLICES.md`).
+- **Lab operations.** Surveillance station with a camera per room, Jade's
+  routines that become habits, a task schedule, bot duties, wear, upgrades
+  and idle life (`docs/OPS.md`, save format v9).
+- **One-of-a-kind doors.** Every door has its own shape and locking
+  mechanism, a lock interface (auto / hold open / seal) and a Doors tab in
+  the surveillance station; the data center sits behind a steam-and-
+  extraction airlock (`docs/DOORS.md`).
+- **Native builds.** Desktop-only gate, GPU switches, Linux as Flatpak and
+  AppImage (`docs/NATIVE.md`).
+
 ## 0.3.1-beta — 2026-09-30
 
 ### Changed
