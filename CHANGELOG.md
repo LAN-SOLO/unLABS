@@ -95,6 +95,18 @@
   invalid enum values (breaking the crystal-mint burn); `credit_balance`
   was missing its auth guard. All repaired in migration 20260808000001.
 
+## 0.4.2-beta — 2026-10-02
+
+### Added
+
+- **Device detail.** Every device is now drawn 4× finer, with voxel parts
+  that fit its job: screen contents, a type plate with the device id, access
+  hatches with grip and screws, vent slots, grilles, hazard and barcode
+  stickers, and rivet rows. Silhouettes, collision and live screens are
+  unchanged. The detail is built in background workers, so floor changes
+  stay fast (0.7 s). The main-menu diorama and the undevbook show the same
+  devices; the book's pictures are pixel-identical to the Blender clones.
+
 ## 0.4.1-beta — 2026-10-02
 
 ### Changed
