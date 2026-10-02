@@ -95,6 +95,29 @@
   invalid enum values (breaking the crystal-mint burn); `credit_balance`
   was missing its auth guard. All repaired in migration 20260808000001.
 
+## 0.4.1-beta — 2026-10-02
+
+### Changed
+
+- **Voxels only.** The lab looks like the title diorama again: every model
+  and the terrain refined 2×, neutral colour grade, no surface noise. The
+  crystal age (Blender-built smooth surfaces) and the era look were removed
+  together with their settings and pipeline. Jade stays the one realistic
+  figure (`docs/CLARITY.md`).
+
+### Added
+
+- **Voxel God** (`docs/VOXEL-BLENDER.md`): exact 1:1 Blender clones of every
+  device and door, inside included. Proven against the undevbook: 99 / 99
+  models voxel-exact and pixel-exact, 683 / 683 door parts exact. Also
+  included:
+  - uvox, a lossless interchange format
+  - exact operations at any voxel size, with exact combining of sizes
+  - primitives, voxelize, paint and a Blender UI
+  - lit renders with cutaways
+  - `modelFromUvox` to bring models back into the game
+  - `pnpm voxel:*` commands
+
 ## 0.4.0-beta — 2026-10-02
 
 ### Added
