@@ -1,5 +1,5 @@
 import { PLAN_ROOMS } from "@/lib/world/content/floorplan";
-import { NOT_YET_CRYSTAL } from "@/lib/world/models/decor-ops";
+import { OPS_INFRA } from "@/lib/world/models/decor-ops";
 import { describe, expect, it } from "vitest";
 import { C } from "@/lib/world/content/palette";
 import { FLOORS, ROOMS } from "@/lib/world/content/map";
@@ -115,7 +115,7 @@ describe("performance budget", () => {
     let ops = 0;
     for (const f of FLOORS)
       for (const p of interiorFor(f.id)) {
-        if (NOT_YET_CRYSTAL.has(p.decor)) ops += voxels(p.decor);
+        if (OPS_INFRA.has(p.decor)) ops += voxels(p.decor);
         else if (fresh.has(p.room)) added += voxels(p.decor);
         else placed += voxels(p.decor);
       }

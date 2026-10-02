@@ -9,11 +9,9 @@ Every door in the lab is a one-off. Each has:
 The data center (Level −1) is reached through an airlock that keeps the dust
 out with steam and extraction.
 
-> **Crystal age (2026-10-02):** the styled doors are in the Blender crystal
-> export too (the earlier "voxels only" decision is lifted). After era 42
-> every frame, leaf piece, locking part, lock interface and the airlock
-> hardware swaps to its real surface like every other model. See
-> [Blender renders](#blender-renders-all-42-eras--crystal-age).
+> **Voxels only:** doors are voxel models like everything in the lab (see
+> `docs/CLARITY.md`). The Blender renders and crystal export tried on
+> 2026-10-02 were removed the same day.
 
 ## Files
 
@@ -27,8 +25,7 @@ out with steam and extraction.
 | UI                           | `components/world/doors/DoorPanel.tsx` (interface), Doors tab in `components/world/ops/OpsPanel.tsx`                                                                                                    |
 | Sounds                       | `latch_bolt`, `latch_wheel`, `latch_magnet`, `airlock_steam`, `airlock_extract` (`lib/world/audio/sfx.ts`); pistons use `door_hiss`                                                                     |
 | German                       | `lib/i18n/de/doors.ts`                                                                                                                                                                                  |
-| Tests                        | `tests/world/door-styles.test.ts`; unlock flow in `render-transitions.test.ts`; crystal coverage `tests/world/door-crystal.test.ts`                                                                     |
-| Crystal + era renders        | `scripts/crystal/door-parts.ts` (the engine's door assembly), `scripts/crystal/doors.ts` + `scripts/crystal/blender/doors.py` (`pnpm crystal:doors`)                                                    |
+| Tests                        | `tests/world/door-styles.test.ts`; unlock flow in `render-transitions.test.ts`                                                                                                                          |
 
 ## Styles
 
@@ -175,71 +172,3 @@ extraction grate.
     before the seal, the dust-free data center
 - **`content.test.ts`:** airlock doors may share a room on both sides (the
   chamber is part of the passage).
-
-## Blender renders: all 42 eras + crystal age
-
-`pnpm crystal:doors` renders every door (and the data-center airlock as a
-whole) in Blender/Cycles through every clarity era and then in the crystal
-age. Prerequisite: `pnpm crystal:export` and `pnpm crystal:build`.
-
-**What one door goes through:**
-
-- **Eras 1–42:** the engine's own voxel meshes
-  (`refinedModelMesh(grid, "architecture", { tier })`) at the era's model
-  tier: 1× in chapter 1, 2× from era 7, 4× from 19, 6× from 31, 8× from
-  37 (`MESH_TIER_ERAS`). The meshes are exported once per grid and tier as
-  binary files (`.crystal/doors/mesh/`, deduplicated by `gridHash`).
-- **Era look** (`paramsAt(era)`), mirrored in Blender:
-  - the four voxel material classes of `voxel-mesh.ts`: solid (roughness
-    0.9), metal (0.35 / metallic 0.8), glass (alpha 0.45), emit (vertex
-    colour × 2.4)
-  - `detail` drives the same colour mottle (± 7 %), roughness noise
-    (± 0.16 × relief) and fine relief (0.012 × relief) as the shader's
-    `uDetail`, in world space
-  - `env` scales the studio reflections (like `environmentIntensity`)
-  - the compositor applies `ClarityGradePass.grade()` exactly: saturation
-    around Rec.709 luma, contrast around 0.18, plus a soft bloom
-  - the CRT pass is not rendered: its base grain and scan band are 0 in
-    the game
-- **Crystal age:** the crystal GLBs of every part with the last era's grade.
-  Emissive crystal surfaces glow in their vertex colour × 2.4, because the
-  engine reuses the voxel `emit` material for them (the GLB's own emission
-  is white).
-
-**Assembly:** `doorAssembly(def)` in `scripts/crystal/door-parts.ts` places
-every part as `DoorSystem.addDoor` / `applyLook` does: frame, beacon, leaf
-pieces at `piece.at`, mechanism parts at `part.at` (locked, `lockE = 1`),
-the lock interface at `IFACE_AT`, all centred and scaled by `DOOR_SCALE`.
-The door is shown closed in its default state: normal doors green, locked
-red, keypad amber, airlock doors with the amber cycle screen. Secret doors
-are shown revealed. `airlockAssembly` adds the chamber hardware and the
-inner door in the outer door's frame of reference. **If the engine's door
-assembly changes, change `door-parts.ts` with it.**
-`tests/world/door-crystal.test.ts` checks that every part is exported in
-every light and that the airlock is laid out correctly.
-
-**Output** per subject in `.crystal/doors/<id>/` (local, not committed):
-
-| File                                | Content                                                     |
-| ----------------------------------- | ----------------------------------------------------------- |
-| `era-00.png` … `era-41.png`         | the door in every era (same camera, 720², Cycles 48 spp)    |
-| `crystal-front.png`, `crystal-back` | crystal age, front and back (96 spp)                        |
-| `mech-era41.png`, `mech-crystal`    | close-up of the first locking part (nearly frontal)         |
-| `iface-era41.png`, `iface-crystal`  | close-up of the lock interface on the jamb                  |
-| `sheet.png`                         | one chapter (6 eras) per row, crystal views in the last row |
-
-Plus `.crystal/doors/index.html` (gallery: style, mechanism text, views,
-every era with its name and tier) and `doors.json` (styles and era
-parameters).
-
-**Options:** door id prefixes (`pnpm crystal:doors d_mcp,airlock-`),
-`--eras 0,18,41` (look-dev, no sheet), `--workers`, `--samples`, `--size`,
-`--plan` (meshes + `doors.json` only), `--gallery` (rewrite the gallery).
-Finished era stills are skipped on a rerun; delete them to re-render.
-The airlock overview has no close-ups (the chamber hardware blocks the
-camera); its two doors have their own.
-
-**First full run (2026-10-02, M1 Max, 3 Blender workers, Metal):** 59
-subjects (58 doors + the airlock), 2,820 stills, ≈ 1 h 45 min, ≈ 2.2 GB in
-`.crystal/doors/`. Before that, `pnpm crystal:build --only
-door-style-,door-iface-,airlock-` built the 393 door grids in 172 s.

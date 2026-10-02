@@ -4,7 +4,7 @@
 > Damien Fridge is real too — but nobody may see him yet: until he has been
 > found, he exists only as a silhouette dissolving in static.
 
-Related: [`CLARITY.md`](CLARITY.md) (how the world around them sharpens).
+Related: [`CLARITY.md`](CLARITY.md) (the voxel world around them — Jade is its one real figure).
 
 ---
 

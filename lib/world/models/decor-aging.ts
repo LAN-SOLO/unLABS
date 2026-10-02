@@ -191,7 +191,7 @@ export function ageModel(base: Model, cacheId: string, decorId: string, look: Ag
   return m;
 }
 
-/** Every variant a decor piece can take (for the crystal export and tests). */
+/** Every variant a decor piece can take (tests). */
 export function allAgedVariants(decorId: string): { key: string; model: Model; look: AgeLook }[] {
   const out: { key: string; model: Model; look: AgeLook }[] = [];
   const seen = new Set<string>();

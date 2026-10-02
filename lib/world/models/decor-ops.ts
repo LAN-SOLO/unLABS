@@ -1,8 +1,7 @@
 /**
  * Operations decor (docs/OPS.md): the surveillance station, the moving room
  * cameras, the bot docks (service / maintenance stations), climbing vines
- * and the algae that overflow the greenhouse tanks. Voxel models only (no
- * crystal render yet — the crystal age keeps them as voxels until built).
+ * and the algae that overflow the greenhouse tanks. Voxel models.
  */
 import { C } from "@/lib/world/content/palette";
 import { fnv1a } from "@/lib/world/traits";
@@ -57,13 +56,8 @@ const CAM_SCREENS = (w: number): ScreenSpec[] =>
     requiresPower: true,
   }));
 
-/**
- * Not part of the crystal age yet (user call 2026-10-01: integrate and
- * document, no Blender render): scripts/crystal/export.ts skips these, so
- * they stay voxels after era 42. The service docks are rendered (user call
- * 2026-10-01, together with the bot upgrades).
- */
-export const NOT_YET_CRYSTAL: ReadonlySet<string> = new Set([
+/** Operations infrastructure placed across the lab (rooms' decor budgets count it separately). */
+export const OPS_INFRA: ReadonlySet<string> = new Set([
   "security_cam",
   "surveillance_station",
   "vine_wall",

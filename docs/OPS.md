@@ -8,19 +8,6 @@ grows and overflows, and when the player is away Jade lives her own life.
 All rules are pure (`lib/world/ops/`, no React, no three). The UI is
 `components/world/ops/`. State lives in `WorldState.ops` (save v9).
 
-> **Crystal age:** the bots, including every upgrade level, and the service
-> docks are rendered in Blender (2026-10-01). `scripts/crystal/export.ts`
-> exports `bot-<id>-l<level>`, and `pnpm crystal:assemble` renders whole-figure
-> stills for the undevbook. The cameras, the station, the vines and the algae
-> spill are still voxels after era 42: they are listed in `NOT_YET_CRYSTAL`
-> (`lib/world/models/decor-ops.ts`). To add one later, remove it from that set
-> and run the crystal pipeline (docs/CRYSTAL.md).
->
-> **All 42 eras:** the undevbook's bot pages show every bot at each upgrade
-> level for every voxel division (eras 1–6, 7–18, 19–30, 31–36, 37–42) plus
-> the crystal age. The sheets are baked by the same split as the engine
-> (`unlabsundevbook/scripts/extract/sprites.ts`).
-
 ## Files
 
 | Area                                | File                                                                                                                                        |

@@ -4,7 +4,7 @@ import { agingTick, roomLitFn } from "@/lib/world/aging";
 import { finishExtraction } from "@/lib/world/matrix/rules";
 import { RARITY_NAME, rarityOf, sliceCode, tokenById } from "@/lib/world/matrix/archive";
 import { tr } from "@/lib/i18n";
-import { CLARITY_ERAS, ERA_NAMES, noteClarityEra } from "@/lib/world/clarity";
+import { noteClarityEra } from "@/lib/world/clarity";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { settle } from "@/lib/world/game";
 import { bioTick } from "@/lib/world/biorhythm";
@@ -69,16 +69,8 @@ export function useWorld() {
       const a = ACHIEVEMENT_BY_ID.get(id);
       if (a) toastRef.current?.(tr("★ Achievement: {title}", { title: a.title }), "good");
     }
-    const sharper = noteClarityEra(s);
-    if (sharper !== null)
-      toastRef.current?.(
-        tr("The world sharpens — era {n} of {total}: {name}", {
-          n: sharper + 1,
-          total: CLARITY_ERAS,
-          name: ERA_NAMES[sharper] ?? "",
-        }),
-        "insight",
-      );
+    // Clarity counters only (the look stays voxels, docs/CLARITY.md).
+    noteClarityEra(s);
     saveWorld(s);
     setVersion((v) => v + 1);
     listeners.current.forEach((l) => l());
