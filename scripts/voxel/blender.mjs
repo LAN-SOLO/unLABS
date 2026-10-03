@@ -1,5 +1,5 @@
 // Run the voxelgod Blender CLI (headless) or open Blender with the add-on.
-//   node scripts/voxel/blender.mjs verify|selftest|uitest|beauty [args…]
+//   node scripts/voxel/blender.mjs verify|selftest|uitest|beauty|hero [args…]
 //   node scripts/voxel/blender.mjs gui [devices|doors|airlocks|frames]
 // Blender: $BLENDER or /Applications/Blender.app (5.1+).
 import { spawnSync } from "node:child_process";
@@ -21,5 +21,6 @@ const args =
 const r = spawnSync(blender, args, { stdio: ["inherit", "pipe", "inherit"], encoding: "utf8" });
 // Only the pipeline's own lines (Blender is chatty).
 for (const line of (r.stdout ?? "").split("\n"))
-  if (/^\[(verify|selftest|uitest|beauty|voxelgod)\]|Traceback|Error/.test(line)) console.log(line);
+  if (/^\[(verify|selftest|uitest|beauty|hero|voxelgod)\]|Traceback|Error/.test(line))
+    console.log(line);
 process.exit(r.status ?? 1);

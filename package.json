@@ -21,6 +21,7 @@
     "test:e2e": "playwright test",
     "merch:render": "node scripts/merch/render.ts",
     "voxel:export": "vite-node --config scripts/audio/vite.config.mjs scripts/voxel/export.ts",
+    "voxel:hero": "node scripts/voxel/blender.mjs hero",
     "voxel:verify": "node scripts/voxel/blender.mjs verify --blend",
     "voxel:selftest": "node scripts/voxel/blender.mjs selftest && node scripts/voxel/blender.mjs uitest",
     "voxel:beauty": "node scripts/voxel/blender.mjs beauty",

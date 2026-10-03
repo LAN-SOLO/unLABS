@@ -28,7 +28,7 @@ import bpy
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from voxelgod import beauty, build, iso, ops, uvox  # noqa: E402
+from voxelgod import beauty, build, hero, iso, ops, uvox  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[3]
 VOX = ROOT / ".voxel"
@@ -174,6 +174,26 @@ def cmd_beauty(a: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_hero(a: argparse.Namespace) -> int:
+    """Product-shot renders (hero.py) of the detailed devices → .voxel/blender/hero/<id>/."""
+    only = a.only.split(",") if a.only else None
+    shots = {k: v for k, v in hero.SHOTS.items() if not a.shots or k in a.shots.split(",")}
+    for e in _inventory(only):
+        if e["kind"] != a.kind:
+            continue
+        out = VOX / "blender/hero" / e["id"]
+        if a.skip_done and all((out / f"{k}.png").exists() for k in shots):
+            continue
+        t0 = time.time()
+        _reset()
+        hero.setup(samples=a.samples)
+        if a.scale != 100:
+            bpy.context.scene.render.resolution_percentage = a.scale
+        files = hero.render_model(uvox.load(VOX / e["uvox"]), out, shots)
+        print(f"[hero] {e['id']}: {len(files)} shots in {time.time() - t0:.0f} s", flush=True)
+    return 0
+
+
 def cmd_uitest(_a: argparse.Namespace) -> int:
     """Drive every Voxel God operator headless and check the results are voxel-exact."""
     import numpy as np
@@ -294,8 +314,15 @@ def main(argv: list[str]) -> int:
     b.add_argument("--samples", type=int, default=64)
     b.add_argument("--size", type=int, default=900)
     b.add_argument("--kind", help="only this inventory kind (device, device-detail, door, airlock)")
+    hr = sub.add_parser("hero")
+    hr.add_argument("--only")
+    hr.add_argument("--shots", help="comma list of hero.SHOTS names")
+    hr.add_argument("--samples", type=int, default=384)
+    hr.add_argument("--scale", type=int, default=100, help="resolution % (previews)")
+    hr.add_argument("--kind", default="device-detail")
+    hr.add_argument("--skip-done", action="store_true")
     a = ap.parse_args(argv)
-    return {"verify": cmd_verify, "selftest": cmd_selftest, "beauty": cmd_beauty, "uitest": cmd_uitest}[a.cmd](a)
+    return {"verify": cmd_verify, "selftest": cmd_selftest, "beauty": cmd_beauty, "hero": cmd_hero, "uitest": cmd_uitest}[a.cmd](a)
 
 
 if __name__ == "__main__":

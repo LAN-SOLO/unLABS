@@ -26,18 +26,27 @@ It stays 100 % voxels throughout.
 
 ## Commands
 
-| Command               | What it does                                                                              |
-| --------------------- | ----------------------------------------------------------------------------------------- |
-| `pnpm voxel:export`   | game → `.voxel/` (uvox files, references, palette, cross-language fixtures)               |
-| `pnpm voxel:verify`   | clone every model, read it back, render the iso and compare; saves `.voxel/blend/*.blend` |
-| `pnpm voxel:selftest` | Python ops vs TypeScript (bit-identical) plus every UI operator driven headless           |
-| `pnpm voxel:beauty`   | lit Cycles views from 7 sides plus a voxel cutaway → `.voxel/blender/beauty/<id>/`        |
-| `pnpm voxel:gallery`  | `.voxel/index.html`: book, clone, views and numbers per model                             |
-| `pnpm voxel:blender`  | open Blender with the add-on (`pnpm voxel:blender devices` loads the device library)      |
+| Command               | What it does                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| `pnpm voxel:export`   | game → `.voxel/` (uvox files, references, palette, cross-language fixtures)                     |
+| `pnpm voxel:verify`   | clone every model, read it back, render the iso and compare; saves `.voxel/blend/*.blend`       |
+| `pnpm voxel:selftest` | Python ops vs TypeScript (bit-identical) plus every UI operator driven headless                 |
+| `pnpm voxel:beauty`   | lit Cycles views from 7 sides plus a voxel cutaway → `.voxel/blender/beauty/<id>/`              |
+| `pnpm voxel:hero`     | product shots of the detailed devices (4K 16:9, 4:5, 1:1; Cycles) → `.voxel/blender/hero/<id>/` |
+| `pnpm voxel:gallery`  | `.voxel/index.html`: book, clone, views and numbers per model                                   |
+| `pnpm voxel:blender`  | open Blender with the add-on (`pnpm voxel:blender devices` loads the device library)            |
 
 - Options: `pnpm voxel:export CDC-001,d_mcp` exports only those ids;
   `node scripts/voxel/blender.mjs verify --only …` and `beauty --only … --samples N --size N`
   restrict a run.
+- `hero` (`voxelgod/hero.py`) is press and social quality. The clone and
+  its materials are unchanged (still exact voxels), and only the photography
+  differs: an 85 mm lens, a studio rig (soft key, cool fill, orange and cyan
+  rims with narrow spreads so the glossy floor stays dark), a dark glossy
+  floor, a backdrop light pool, f/5.6 depth of field, bloom on the emitters,
+  and 384 adaptive samples with denoising, as 16-bit PNGs. It takes about
+  2 min per 4K shot on Metal. Use `--shots hero-16x9`, `--scale 50
+--samples 64` (preview) and `--skip-done`.
 - Blender comes from `$BLENDER` or `/Applications/Blender.app` (5.1).
 - `.voxel/` is gitignored and is rebuilt by the commands above.
 
