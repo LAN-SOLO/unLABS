@@ -24,6 +24,7 @@ import type { DeviceFirmwareEntry } from "@/lib/firmware/types";
 import NXS_FW from "@/devices/tier-2/NXS-01_Nexus/firmware.json";
 import { WORLD_FIRMWARE, MCP_MANIFEST, type WorldFirmwareDef } from "@/lib/world/content/firmware";
 import { isLinked } from "@/lib/world/links";
+import { FEATURE_CLOCK, fwOf } from "@/lib/world/root/model";
 import type { WorldState } from "@/lib/world/types";
 
 export interface FirmwareImage {
@@ -150,6 +151,8 @@ export function features(s: WorldState, id: string): string[] {
 
 /** The installed firmware provides feature `tag`. */
 export function hasFeature(s: WorldState, id: string, tag: string): boolean {
+  // Root lab: an underclocked core has no headroom for its update features.
+  if (fwOf(s, id).clock < FEATURE_CLOCK) return false;
   return features(s, id).includes(tag);
 }
 

@@ -11,6 +11,7 @@
  * flags, device relays, codes) are applied inside `act` with the regular
  * game functions, so the world, the panels and the save stay in sync.
  */
+import { promptFor } from "@/lib/world/root/access";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { CrtButton } from "@/components/world/puzzles/ui";
 import { tr } from "@/lib/i18n";
@@ -226,7 +227,8 @@ export function RoomTerminal({
     [lines],
   );
 
-  const prompt = `jade@${def?.room ?? "unlab"}:~$`;
+  // Root lab: the prompt follows Jade's access ring (jade$ → root# → kernel#).
+  const prompt = promptFor(getState().root?.ring ?? 0, def?.room ?? "unlab");
 
   const submit = useCallback(
     (raw: string) => {

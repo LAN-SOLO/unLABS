@@ -27925,6 +27925,36 @@ const paintLabMap = (line: string): string =>
     .replace(/◇/g, "\x1b[96m◇\x1b[0m")
     .replace(/▒/g, "\x1b[31m▒\x1b[0m");
 
+/** Colour a root-shell report (lib/world/root/shell.ts) for the big terminal. */
+function rootResult(r: { ok: boolean; lines: string[] }): CommandResult {
+  const paint = (l: string): string =>
+    l.startsWith("MCP>")
+      ? `\x1b[36m${l}\x1b[0m`
+      : /^\s*!/.test(l)
+        ? `\x1b[33m${l}\x1b[0m`
+        : l.startsWith("──") || /^─+$/.test(l)
+          ? `\x1b[90m${l}\x1b[0m`
+          : l;
+  return { success: r.ok, output: ["", ...r.lines.map(paint), ""] };
+}
+
+/**
+ * `root` — the lab's system layer from the Main Console (docs/ROOT-LAB.md):
+ * the same root shell as the room terminals (su, sysctl, fw, sensors, cron,
+ * profile, audit, rescue), applied to the active lab-world save.
+ */
+const rootCommand: Command = {
+  name: "root",
+  aliases: ["rootlab", "unroot"],
+  description: tr("Root lab: tune the lab world's system (sysctl, firmware, cron, profiles)"),
+  usage: tr("root [help | su | sysctl … | fw … | sensors | cron … | profile … | audit | rescue]"),
+  execute: async (args) => {
+    const bridge = await import("@/lib/world/bridge");
+    if (!bridge.hasLabWorld()) return { success: false, error: bridge.NO_WORLD_MESSAGE };
+    return rootResult(bridge.labRoot(args.join(" ")));
+  },
+};
+
 const laborCommand: Command = {
   name: "labor",
   aliases: ["welt", "labwelt"],
@@ -28034,6 +28064,9 @@ const laborCommand: Command = {
       case "ask":
       case "frage":
         return wrap(bridge.labMcp(rest.join(" ")).map((l) => `\x1b[36mMCP ›\x1b[0m ${l}`));
+      case "root":
+      case "sys":
+        return rootResult(bridge.labRoot(rest.join(" ")));
       default:
         return {
           success: false,
@@ -28045,6 +28078,7 @@ const laborCommand: Command = {
 
 export const commands: Command[] = [
   helpCommand,
+  rootCommand,
   clearCommand,
   statusCommand,
   invCommand,

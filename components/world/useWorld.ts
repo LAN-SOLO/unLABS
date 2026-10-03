@@ -16,6 +16,7 @@ import { REFINE_RECIPES, WEAR_BY_ID, WEAR_ITEM_PREFIX } from "@/lib/world/conten
 import { LOOK_BY_ID } from "@/lib/world/content/looks";
 import { wardrobeTick, type JobResult } from "@/lib/world/wardrobe";
 import { opsTick, type OpsEvent } from "@/lib/world/ops/schedule";
+import { rootTick } from "@/lib/world/root/cron";
 import { idleTick } from "@/lib/world/ops/idle";
 import type { WorldState } from "@/lib/world/types";
 
@@ -140,6 +141,17 @@ export function useWorld() {
       const ops = opsTick(s);
       if (ops.length) {
         opsToasts(ops.filter((e) => !e.ok || e.who === "jade"));
+        setVersion((v) => v + 1);
+        listeners.current.forEach((l) => l());
+      }
+      // Root lab cron: the player's own jobs (docs/ROOT-LAB.md).
+      const cron = rootTick(s);
+      if (cron.length) {
+        const e = cron[0]!;
+        toastRef.current?.(
+          tr("cron #{id}: {what}", { id: e.id, what: e.changed.join(" · ") }),
+          "info",
+        );
         setVersion((v) => v + 1);
         listeners.current.forEach((l) => l());
       }

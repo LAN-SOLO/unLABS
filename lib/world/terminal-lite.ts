@@ -71,6 +71,9 @@ import {
   uecOutput,
 } from "@/lib/world/game";
 import { objectiveSections } from "@/lib/world/quests";
+import { RING_NAMES, applyRootOp, kernelLoad, type RootOp } from "@/lib/world/root/model";
+import { rootHelp, runRoot, type RootCommand } from "@/lib/world/root/shell";
+import { TUNABLES } from "@/lib/world/root/tunables";
 import {
   SPECTRUM,
   type FloorId,
@@ -82,7 +85,9 @@ import {
 /** A state change a command asks for; applied by `applyTerminalEffects`. */
 export type TerminalAction =
   | { kind: "toggle"; device: string; on: boolean }
-  | { kind: "signal"; code: string };
+  | { kind: "signal"; code: string }
+  /** Root lab system change (lib/world/root/, docs/ROOT-LAB.md). */
+  | { kind: "root"; op: RootOp };
 
 export interface TerminalEffects {
   clear?: boolean;
@@ -921,8 +926,20 @@ function cmdBots(s: WorldState): TerminalResult {
   return { lines };
 }
 
-function cmdWhoami(): TerminalResult {
-  return out("jade", tr("uid=1000(jade) gid=847(unstable) groups=labor,halo,forge"));
+function cmdWhoami(s: WorldState): TerminalResult {
+  const r = s.root.ring;
+  const groups = [
+    "labor",
+    "halo",
+    "forge",
+    ...(r >= 1 ? ["wheel"] : []),
+    ...(r >= 2 ? ["root"] : []),
+  ];
+  return out(
+    r >= 2 ? "root" : "jade",
+    `uid=${r >= 2 ? 0 : 1000}(${r >= 2 ? "root" : "jade"}) gid=847(unstable) groups=${groups.join(",")}`,
+    tr("ring {n} · {name}", { n: r, name: RING_NAMES[r] }),
+  );
 }
 
 function cmdDate(_s: WorldState, _a: string[], ctx: TerminalContext): TerminalResult {
@@ -975,7 +992,12 @@ function cmdHalo(s: WorldState): TerminalResult {
   );
 }
 
-function cmdSudo(_s: WorldState, args: string[]): TerminalResult {
+function cmdSudo(s: WorldState, args: string[], ctx: TerminalContext): TerminalResult {
+  // Root lab: once Jade is in wheel, sudo simply runs the rest of the line.
+  if (s.root.ring >= 1) {
+    if (!args.length) return out(tr("usage: sudo <command>"));
+    return runCommand(s, args.join(" "), { ...ctx, terminalId: undefined });
+  }
   return out(
     tr("[sudo] password for jade: {stars}", {
       stars: "*".repeat(Math.min(8, args.join(" ").length || 4)),
@@ -1064,6 +1086,52 @@ function cmdTerminal(s: WorldState): TerminalResult {
     lines: [tr("Connecting to the Main Console …"), tr("Handing over the session.")],
     effects: { openBigTerminal: true },
   };
+}
+
+function fromRoot(r: { lines: string[]; ops: RootOp[] }): TerminalResult {
+  return r.ops.length
+    ? { lines: r.lines, effects: { actions: r.ops.map((op) => ({ kind: "root", op })) } }
+    : { lines: r.lines };
+}
+
+function rootMan(name: RootCommand): string[] {
+  switch (name) {
+    case "su":
+      return [
+        tr(
+          "Rings: 0 operator · 1 wheel (sudo, cron) · 2 root (firmware, power) · 3 kernel (wide ranges).",
+        ),
+        tr("Without an argument it climbs one ring — and lists what the MCP still needs to see."),
+      ];
+    case "sysctl":
+      return [
+        tr(
+          "Every gameplay constant a root player may change. Each tweak adds kernel load (W on the MCP-000).",
+        ),
+        tr("Example: sysctl research.cooldown=70"),
+      ];
+    case "fw":
+      return [
+        tr(
+          "Draw scales with clock × voltage², output with clock. Heat = clock × voltage must stay under its limit.",
+        ),
+        tr("An undervolted core browns out; below 90 % clock the update features switch off."),
+        tr("Examples: fw UEC-001 115 108 --dry · fw AIC-001 autotune · fw VNT-001 profile eco"),
+      ];
+    case "cron":
+      return [
+        tr(
+          "Metrics for guards: gen, load, balance, starved, kload. Allowed commands: sysctl, fw, profile, switch.",
+        ),
+        tr("Example: cron add 30 when balance<0 profile load eco"),
+      ];
+    case "profile":
+      return [
+        tr("Share codes (UNR1-…) carry a tuning to another save; values are clamped to your ring."),
+      ];
+    default:
+      return [];
+  }
 }
 
 export const COMMANDS: readonly Cmd[] = [
@@ -1237,7 +1305,7 @@ export const COMMANDS: readonly Cmd[] = [
     run: (s, a) => cmdPing(s, a),
   },
   { name: "uptime", help: tr("runtime and load"), run: (s) => cmdUptime(s) },
-  { name: "whoami", help: tr("who am I"), run: cmdWhoami },
+  { name: "whoami", aliases: ["id"], help: tr("who am I"), run: (s) => cmdWhoami(s) },
   { name: "date", aliases: ["datum"], help: tr("system time"), run: cmdDate },
   {
     name: "history",
@@ -1268,7 +1336,17 @@ export const COMMANDS: readonly Cmd[] = [
   { name: "uname", aliases: ["unversion"], help: "", hidden: true, run: cmdUname },
   { name: "847", help: "", hidden: true, run: cmd847 },
   { name: "halo", help: "", hidden: true, run: cmdHalo },
-  { name: "sudo", aliases: ["su"], help: "", hidden: true, run: cmdSudo },
+  { name: "sudo", help: "", hidden: true, run: cmdSudo },
+  // Root lab (docs/ROOT-LAB.md): the system commands every terminal shares.
+  ...rootHelp().map(
+    (h): Cmd => ({
+      name: h.name,
+      help: h.help,
+      usage: h.usage,
+      man: rootMan(h.name),
+      run: (s, a) => fromRoot(runRoot(s, h.name, a)),
+    }),
+  ),
   { name: "rm", help: "", hidden: true, run: cmdRm },
   { name: "damien", aliases: ["fridge"], help: "", hidden: true, run: cmdDamien },
   { name: "listen", aliases: ["zuhoeren", "zuhören"], help: "", hidden: true, run: cmdListen }, // i18n-ignore (German alias)
@@ -1366,7 +1444,15 @@ export function applyTerminalEffects(
   for (const f of fx?.flags ?? []) if (f.startsWith("terminal_")) s.flags[f] = true;
   const lines: string[] = [];
   const via = (terminalId && ROOM_TERMINAL_BY_ID.get(terminalId)?.label) || tr("Room terminal");
+  let rootGrid = false;
   for (const a of fx?.actions ?? []) {
+    if (a.kind === "root") {
+      const what = applyRootOp(s, a.op, via);
+      if (what) log(s, tr("{via}: {what}", { via, what }));
+      if (["fw", "fw-reset", "sysctl", "sysctl-reset", "profile-load", "factory"].includes(a.op.op))
+        rootGrid = true;
+      continue;
+    }
     if (a.kind === "toggle") {
       const d = DEVICE_BY_ID.get(a.device);
       if (!d || !isBuilt(s, a.device) || a.device === "MCP-000") {
@@ -1406,6 +1492,15 @@ export function applyTerminalEffects(
       for (const l of r.lines) lines.push(`${prefix}${l}`);
     }
   }
+  if (rootGrid) {
+    const p = power(s);
+    const grid = { gen: Math.round(p.generation), load: Math.round(p.demand) };
+    lines.push(
+      p.starved.length
+        ? tr("Grid: {gen} W / {load} W · ! {n} without supply", { ...grid, n: p.starved.length })
+        : tr("Grid: {gen} W / {load} W", grid),
+    );
+  }
   return lines;
 }
 
@@ -1432,6 +1527,25 @@ function argPool(s: WorldState, cmd: Cmd, argIndex: number, ctx: TerminalContext
       return argIndex === 0
         ? DEVICES.filter((d) => isBuilt(s, d.id)).map((d) => d.id)
         : ["on", "off"];
+    case "fw":
+      return argIndex === 0
+        ? [
+            "list",
+            ...DEVICES.filter((d) => isBuilt(s, d.id) && d.id !== "MCP-000").map((d) => d.id),
+          ]
+        : argIndex === 1
+          ? ["profile", "autotune", "reset", "--dry"]
+          : ["eco", "balanced", "turbo", "overdrive", "perf"];
+    case "sysctl":
+      return argIndex === 0 ? ["-a", "reset", ...TUNABLES.map((t) => `${t.key}=`)] : [];
+    case "su":
+      return Object.values(RING_NAMES);
+    case "profile":
+      return argIndex === 0
+        ? ["list", "save", "load", "rm", "show", "export", "import"]
+        : Object.keys(s.root.profiles);
+    case "cron":
+      return argIndex === 0 ? ["list", "add", "rm"] : [];
     case "mail":
       return argIndex === 0 ? visibleMail(s, term).map((_m, i) => String(i + 1)) : [];
     default:
@@ -1507,6 +1621,15 @@ export function terminalBanner(s: WorldState, terminalId?: string): string[] {
     if (term.caps?.includes("signal")) caps.push(tr("Signal bus (signal)"));
     if (caps.length) lines.push(tr("Access: {caps}", { caps: caps.join(" · ") }));
   }
+  if (s.root.ring > 0)
+    lines.push(
+      tr("Ring {n} · {name} · kernel load {w} W · {c} cron job(s)", {
+        n: s.root.ring,
+        name: RING_NAMES[s.root.ring],
+        w: Math.round(kernelLoad(s) * 10) / 10,
+        c: s.root.cron.length,
+      }),
+    );
   if (terminalId && !s.flags[terminalUsedFlag(terminalId)])
     lines.push(tr("First login on this terminal. “help” lists the commands."));
   else lines.push(tr("“help” lists the commands."));

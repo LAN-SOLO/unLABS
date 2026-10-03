@@ -67,6 +67,7 @@ import { CORE } from "@/lib/world/content/floorplan";
 import { cloneLook, sanitizeWardrobe } from "@/lib/world/wardrobe";
 import { sanitizeMatrix } from "@/lib/world/matrix/state";
 import { sanitizeOps } from "@/lib/world/ops/state";
+import { sanitizeRoot } from "@/lib/world/root/state";
 import { DEFAULT_LOOK, LEGACY_DEFAULT_LOOK, WEAR_SLOTS } from "@/lib/world/content/wardrobe";
 
 type Raw = Record<string, unknown>;
@@ -158,6 +159,9 @@ export const MIGRATIONS: Readonly<Record<number, Migration>> = {
   // v8 → v9: operations (routines, schedule, bot duties and upgrades, idle life).
   // Old saves start with nothing learned and no tasks.
   8: (raw) => ({ ...raw, ops: isRecord(raw.ops) ? raw.ops : {}, version: 9 }),
+  // v9 → v10: the root lab (terminal access ring, sysctl, firmware tuning, cron).
+  // Old saves start as operator with everything at its rating.
+  9: (raw) => ({ ...raw, root: isRecord(raw.root) ? raw.root : {}, version: 10 }),
 };
 
 /** A raw look equal to `LEGACY_DEFAULT_LOOK` in every slot (item and colourway). */
@@ -464,6 +468,7 @@ export function sanitizeSave(raw: Raw): SanitizeResult {
     wardrobe: sanitizeWardrobe(raw.wardrobe),
     matrix: sanitizeMatrix(raw.matrix),
     ops: sanitizeOps(raw.ops),
+    root: sanitizeRoot(raw.root),
   };
 
   // Position: a known, reachable floor and a spot inside one of its rooms.

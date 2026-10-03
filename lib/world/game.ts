@@ -7,6 +7,19 @@
  * layer calls these and re-renders; the 3D layer only reads the state.
  * Functions mutate the passed state in place and return a small report.
  */
+import {
+  clockFactor,
+  drawFactor,
+  fwFault,
+  fwOf,
+  heatOf,
+  isStable,
+  kernelLoad,
+  rootPowerKey,
+  thermalLimit,
+  tun,
+} from "@/lib/world/root/model";
+import { initialRoot } from "@/lib/world/root/state";
 import { initialOps } from "@/lib/world/ops/state";
 import {
   FIRMWARE,
@@ -98,7 +111,7 @@ export const STARTER_DEVICES = ["MCP-000", "CLK-001", "VNT-001", "BTK-001", "UEC
  * Bump it together with a new migration step whenever the persisted shape
  * or the meaning of a field changes.
  */
-export const SAVE_VERSION = 9;
+export const SAVE_VERSION = 10;
 
 export function initialState(): WorldState {
   const s: WorldState = {
@@ -133,6 +146,7 @@ export function initialState(): WorldState {
     wardrobe: initialWardrobe(),
     matrix: initialMatrix(),
     ops: initialOps(),
+    root: initialRoot(),
   };
   for (const id of STARTER_DEVICES) s.discovered[id] = true;
   log(s, tr("Cold start. Residual charge 0.3 %. Something is humming somewhere."));
@@ -242,7 +256,7 @@ export function power(s: WorldState, dayKey?: string): PowerStatus {
   const puffer = Math.min(PROTO_PUFFER_MAX, s.counters.proto_puffer ?? 0);
   const priority = s.links["PWR-001"] ?? [];
   const cooled = s.links["THM-001"] ?? [];
-  const key = `${JSON.stringify(s.built)}|${JSON.stringify(s.switchedOn)}|${s.flags.geo_routed ? 1 : 0}|${puffer}|${day}|${priority.join(",")}|${JSON.stringify(s.firmware)}|${cooled.join(",")}`;
+  const key = `${JSON.stringify(s.built)}|${JSON.stringify(s.switchedOn)}|${s.flags.geo_routed ? 1 : 0}|${puffer}|${day}|${priority.join(",")}|${JSON.stringify(s.firmware)}|${cooled.join(",")}|${rootPowerKey(s)}`;
   const hit = powerCache.get(s);
   if (hit && hit.key === key) return hit.status;
 
@@ -258,9 +272,29 @@ export function power(s: WorldState, dayKey?: string): PowerStatus {
     generation += puffer;
     sources.push({ label: tr("Prototype buffer"), watts: puffer });
   }
+  // Root lab: the UEC's tuned nominal output (sysctl power.uec.nominal) and firmware clocks.
+  const nominal = tun(s, "power.uec.nominal");
+  const thmRunning = isBuilt(s, "THM-001") && isSwitchedOn(s, "THM-001");
   for (const d of DEVICES) {
     if (d.power >= 0 || !isBuilt(s, d.id) || !isSwitchedOn(s, d.id)) continue;
-    const w = d.id === "UEC-001" ? uecOutput(day) : d.id === "MFR-001" ? fusionOutput(s) : -d.power;
+    const fw = fwOf(s, d.id);
+    const genCooled = thmRunning && cooled.includes(d.id);
+    const heat = heatOf(fw) * (d.id === "UEC-001" ? nominal / UEC_NOMINAL : 1);
+    if (!isStable(fw)) {
+      starved.push({ id: d.id, reason: "strom" });
+      continue;
+    }
+    if (heat > thermalLimit(s, genCooled) + 1e-9) {
+      starved.push({ id: d.id, reason: "hitze" });
+      continue;
+    }
+    const rated =
+      d.id === "UEC-001"
+        ? (uecOutput(day) * nominal) / UEC_NOMINAL
+        : d.id === "MFR-001"
+          ? fusionOutput(s)
+          : -d.power;
+    const w = Math.round(rated * (fw.clock / 100) * 10) / 10;
     generation += w;
     online.add(d.id);
     sources.push({ label: d.name, watts: w });
@@ -278,8 +312,20 @@ export function power(s: WorldState, dayKey?: string): PowerStatus {
       starved.push({ id, reason: "hitze" });
       return;
     }
-    // Firmware and the THM-001 cooling loop can lower the draw.
-    const draw = effectiveDraw(s, id, d.power, online.has("THM-001"));
+    // Root lab firmware tuning: an undervolted core browns out, an overheated one trips.
+    const fault = fwFault(s, id, online.has("THM-001") && cooled.includes(id));
+    if (fault) {
+      starved.push({ id, reason: fault === "hot" ? "hitze" : "strom" });
+      return;
+    }
+    // Firmware, the THM-001 cooling loop and the tuned clock/voltage set the draw;
+    // the MCP-000 also carries the kernel load of every pushed tunable.
+    const draw =
+      Math.round(
+        (effectiveDraw(s, id, d.power, online.has("THM-001")) * drawFactor(fwOf(s, id)) +
+          (id === "MCP-000" ? kernelLoad(s) : 0)) *
+          10,
+      ) / 10;
     if (demand + draw > generation + 1e-9) {
       starved.push({ id, reason: "strom" });
       return;
@@ -296,11 +342,12 @@ export function power(s: WorldState, dayKey?: string): PowerStatus {
       sources.push({ label: tr("Battery buffer"), watts: buffer });
     }
     if (id === "PWD-001") {
-      generation += PWD_BONUS;
-      sources.push({ label: tr("Reactive power compensation (PWD-001)"), watts: PWD_BONUS });
+      const bonus = tun(s, "power.pwd.bonus");
+      generation += bonus;
+      sources.push({ label: tr("Reactive power compensation (PWD-001)"), watts: bonus });
     }
     if (id === "VLT-001" && online.has("UEC-001")) {
-      const dip = UEC_NOMINAL - uecOutput(day);
+      const dip = Math.round((nominal - (uecOutput(day) * nominal) / UEC_NOMINAL) * 10) / 10;
       if (dip > 0) {
         generation += dip;
         sources.push({ label: tr("Voltage stabilisation (VLT-001)"), watts: dip });
@@ -324,9 +371,28 @@ export function power(s: WorldState, dayKey?: string): PowerStatus {
   return status;
 }
 
+/**
+ * Watts a consumer draws right now with its firmware tuning (root lab), the
+ * same formula `power()` uses; the MCP-000 carries the kernel load on top.
+ */
+export function tunedDraw(s: WorldState, id: string): number {
+  const d = DEVICE_BY_ID.get(id);
+  if (!d || d.power < 0) return 0;
+  const thm = isBuilt(s, "THM-001") && isSwitchedOn(s, "THM-001");
+  return (
+    Math.round(
+      (effectiveDraw(s, id, d.power, thm) * drawFactor(fwOf(s, id)) +
+        (id === "MCP-000" ? kernelLoad(s) : 0)) *
+        10,
+    ) / 10
+  );
+}
+
 /** BAT-001's buffer on the grid (W; more with its `fast-charge` update). */
 export function batteryBuffer(s: WorldState): number {
-  return hasFeature(s, "BAT-001", "fast-charge") ? FW_TUNING.batteryBuffer : 40;
+  const base = hasFeature(s, "BAT-001", "fast-charge") ? FW_TUNING.batteryBuffer : 40;
+  // Root lab: sysctl power.battery.buffer moves the buffer from its 40 W rating.
+  return base + tun(s, "power.battery.buffer") - 40;
 }
 
 /** MFR-001's output (W; more with its `fuel-autotune` update). */
@@ -1355,9 +1421,11 @@ export function researchFlag(topic: string): string {
 
 /** Seconds per research cycle (shorter while an updated AIC-001 plans the queue). */
 export function researchCooldown(s: WorldState): number {
-  return hasFeature(s, "AIC-001", "self-optimize") && isOnline(s, "AIC-001")
-    ? FW_TUNING.researchCooldown
-    : RESEARCH_COOLDOWN;
+  const aic = hasFeature(s, "AIC-001", "self-optimize") && isOnline(s, "AIC-001");
+  const base = aic ? FW_TUNING.researchCooldown : RESEARCH_COOLDOWN;
+  // Root lab: sysctl research.cooldown scales the cycle; an overclocked AIC-001 plans faster.
+  const speed = aic ? clockFactor(s, "AIC-001") : 1;
+  return Math.max(10, Math.round((base * tun(s, "research.cooldown")) / RESEARCH_COOLDOWN / speed));
 }
 
 /**
@@ -1371,7 +1439,8 @@ export function researchPerCycle(s: WorldState): number {
   const chain = hasFeature(s, "NXS-01", "prereq-chain") ? FW_TUNING.researchBonus : 0;
   // Perk `research_notes` (course "Research on the Nexus").
   const notes = hasPerk(s, "research_notes") ? PERK_TUNING.research : 0;
-  return RESEARCH_PER_CYCLE + chain + mesh + notes;
+  // Root lab: sysctl research.yield adds deeper analysis passes.
+  return RESEARCH_PER_CYCLE + chain + mesh + notes + tun(s, "research.yield");
 }
 
 export function researchReady(s: WorldState): boolean {
@@ -1846,7 +1915,12 @@ export const DRONE_COOLDOWN = 150;
 
 /** Seconds between drone flights (shorter with EXD-001's `fast-return` update). */
 export function droneCooldown(s: WorldState): number {
-  const base = hasFeature(s, "EXD-001", "fast-return") ? FW_TUNING.droneCooldown : DRONE_COOLDOWN;
+  const rated = hasFeature(s, "EXD-001", "fast-return") ? FW_TUNING.droneCooldown : DRONE_COOLDOWN;
+  // Root lab: sysctl drone.cooldown scales the turnaround; a faster EXD-001 clock shortens it.
+  const base = Math.max(
+    15,
+    Math.round((rated * tun(s, "drone.cooldown")) / DRONE_COOLDOWN / clockFactor(s, "EXD-001")),
+  );
   // Perk `drone_routes` (course "Drone flight"): pre-planned routes.
   return hasPerk(s, "drone_routes") ? Math.round(base * PERK_TUNING.droneCooldown) : base;
 }

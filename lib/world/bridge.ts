@@ -64,6 +64,8 @@ import {
   toggleDevice,
 } from "@/lib/world/game";
 import { topObjective, objectiveSections } from "@/lib/world/quests";
+import { RING_NAMES, applyRootOp, type RootOp } from "@/lib/world/root/model";
+import { rootHelp, runRootLine } from "@/lib/world/root/shell";
 import {
   SAVE_KEY,
   SLOT_NAME,
@@ -604,6 +606,8 @@ export interface TerminalEvent {
   lines: string[];
   /** Set for a device power switch from the terminal (instead of a code). */
   power?: { device: string; on: boolean };
+  /** Root lab ops from the Main Console (`root …`), replayed idempotently. */
+  root?: RootOp[];
 }
 
 function isPowerPayload(v: unknown): v is { device: string; on: boolean } {
@@ -621,7 +625,8 @@ function isTerminalEvent(v: unknown): v is TerminalEvent {
     typeof r.code === "string" &&
     typeof r.title === "string" &&
     Array.isArray(r.lines) &&
-    (r.power === undefined || isPowerPayload(r.power))
+    (r.power === undefined || isPowerPayload(r.power)) &&
+    (r.root === undefined || Array.isArray(r.root))
   );
 }
 
@@ -822,6 +827,11 @@ export function absorbTerminalEvents(
   const events = takeTerminalEvents(slot);
   const reapplied: string[] = [];
   for (const e of events) {
+    if (e.root) {
+      for (const op of e.root)
+        if (isRootOp(op) && applyRootOp(s, op, tr("Main Console"))) reapplied.push(e.code);
+      continue;
+    }
     if (e.power) {
       // Idempotent: the slot write usually landed already.
       if (isBuilt(s, e.power.device) && isSwitchedOn(s, e.power.device) !== e.power.on) {
@@ -991,6 +1001,93 @@ export function labSetDevicePower(id: string, on: boolean): DevicePowerReport {
   return res;
 }
 
+// ── Root lab (docs/ROOT-LAB.md) ───────────────────────────────────
+
+const ROOT_OPS = new Set([
+  "sysctl",
+  "sysctl-reset",
+  "fw",
+  "fw-reset",
+  "factory",
+  "ring",
+  "cron-add",
+  "cron-rm",
+  "profile-save",
+  "profile-load",
+  "profile-put",
+  "profile-rm",
+]);
+
+/** Shape check for ops read back from localStorage (values are re-validated by applyRootOp). */
+function isRootOp(v: unknown): v is RootOp {
+  return typeof v === "object" && v !== null && ROOT_OPS.has(String((v as { op?: unknown }).op));
+}
+
+export interface RootReport {
+  ok: boolean;
+  lines: string[];
+  /** Ops applied to the active slot. */
+  applied: number;
+}
+
+/**
+ * Run a root shell line (`sysctl -a`, `fw UEC-001 110 105`, `su`, …) from
+ * the Main Console on the active slot: the same shell as the room
+ * terminals, applied and saved, plus a terminal event so a running world
+ * replays the ops (lost-write protection, see `absorbTerminalEvents`).
+ */
+export function labRoot(line: string): RootReport {
+  const w = readActiveWorld();
+  if (!w) return { ok: false, lines: [NO_WORLD_MESSAGE], applied: 0 };
+  const { slot, state: s } = w;
+  const t = line.trim();
+  if (!t || t === "help") return { ok: true, lines: rootHelpLines(s), applied: 0 };
+  const res = runRootLine(s, t);
+  if (!res)
+    return {
+      ok: false,
+      lines: [tr("root: unknown command. “root help” lists them.")],
+      applied: 0,
+    };
+  const via = tr("Main Console");
+  const applied = res.ops.filter((op) => applyRootOp(s, op, via));
+  if (!applied.length) return { ok: true, lines: res.lines, applied: 0 };
+  log(s, tr("{via}: {what}", { via, what: s.root.audit.at(-1)?.what ?? t }));
+  if (!saveToSlot(slot, s))
+    return { ok: false, lines: [tr("Storage full or blocked. The change is lost.")], applied: 0 };
+  writeEvents([
+    ...readEvents(),
+    {
+      slot,
+      at: new Date().toISOString(),
+      code: `ROOT:${t.slice(0, 40)}`,
+      title: tr("Main Console · {cmd}", { cmd: t.slice(0, 40) }),
+      lines: res.lines.slice(0, 2),
+      root: res.ops,
+    },
+  ]);
+  const p = power(s);
+  return {
+    ok: true,
+    lines: [
+      ...res.lines,
+      tr("Grid: {gen} W / {load} W", { gen: Math.round(p.generation), load: Math.round(p.demand) }),
+    ],
+    applied: applied.length,
+  };
+}
+
+function rootHelpLines(s: WorldState): string[] {
+  return [
+    tr("── root · the lab's system layer · ring {n} ({name}) ──", {
+      n: s.root.ring,
+      name: RING_NAMES[s.root.ring],
+    }),
+    ...rootHelp().map((h) => `${h.usage.padEnd(44)} ${h.help}`),
+    tr("Room terminals know the same commands. Details: man <command> there."),
+  ];
+}
+
 // ── MCP ──────────────────────────────────────────────────────────
 
 /** Ask the MCP about the lab. Answers are derived from the world state. */
@@ -1145,5 +1242,6 @@ export const LAB_HELP: readonly string[] = [
   tr("labor achievements      Achievements"),
   tr("labor signal <code>     Send a code through the Main Console"),
   tr("labor mcp <question>    Ask the MCP"),
+  tr("labor root <command>    System layer: su, sysctl, fw, cron, profile …"),
   tr("labor world             Back to the lab (/world)"),
 ];

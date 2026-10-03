@@ -9,6 +9,7 @@
  * (no DOM, no three) so it runs in Vitest.
  */
 
+import type { RootState } from "@/lib/world/root/state";
 import type { RoomShape } from "@/lib/world/room-shape";
 import type { JadeLook } from "@/lib/world/content/wardrobe";
 
@@ -516,6 +517,8 @@ export interface WorldState {
   matrix: MatrixState;
   /** Operations: Jade's routines, the task schedule, bot duties / upgrades, idle life (lib/world/ops/). */
   ops: OpsState;
+  /** Root lab: access ring, sysctl, firmware tuning, cron, profiles, audit (docs/ROOT-LAB.md). */
+  root: RootState;
 }
 
 // ── Operations (lib/world/ops/, docs/OPS.md) ─────────────────────

@@ -17,6 +17,7 @@
  * reads `placementLook` for every decor piece and swaps the model when its
  * quantised look changes (lib/world/models/decor-aging.ts builds the grids).
  */
+import { tun } from "@/lib/world/root/model";
 import { CLEAN_ROOMS } from "@/lib/world/doors/airlock";
 import { ROOMS } from "@/lib/world/content/map";
 import { power } from "@/lib/world/game";
@@ -129,20 +130,23 @@ export function agingTick(
   rooms: readonly string[] = ROOMS.map((r) => r.id),
 ): boolean {
   let changed = false;
+  // Root lab: sysctl aging.grow.rate / aging.dust.rate scale growth and dust.
+  const grow = dt * tun(s, "aging.grow.rate");
+  const dust = dt * tun(s, "aging.dust.rate");
   for (const id of rooms) {
     const before = roomStages(s, id);
     const damp = isDamp(id);
     if (damp) s.counters[`damp:${id}`] = Math.min(DAMP_SECONDS, c(s, `damp:${id}`) + dt);
     // Behind an airlock (doors/airlock.ts) the steam and extraction keep the dust out.
     else if (!CLEAN_ROOMS.includes(id))
-      s.counters[`dust:${id}`] = Math.min(DUST_SECONDS, c(s, `dust:${id}`) + dt);
+      s.counters[`dust:${id}`] = Math.min(DUST_SECONDS, c(s, `dust:${id}`) + dust);
     const watered = s.playTime - c(s, `water:${id}`) < WILT_AFTER || c(s, `water:${id}`) === 0;
     if (lit(id) && watered)
-      s.counters[`grow:${id}`] = Math.min(GROW_SECONDS, c(s, `grow:${id}`) + dt);
+      s.counters[`grow:${id}`] = Math.min(GROW_SECONDS, c(s, `grow:${id}`) + grow);
     if (lit(id) && (ALGAE_ROOMS as readonly string[]).includes(id))
       s.counters[`algae:${id}`] = Math.min(ALGAE_SECONDS, c(s, `algae:${id}`) + dt);
     if (lit(id) && watered && id === VINE_ROOMS[0])
-      s.counters.vine = Math.min(VINE_MAX, c(s, "vine") + dt);
+      s.counters.vine = Math.min(VINE_MAX, c(s, "vine") + grow);
     const after = roomStages(s, id);
     if (after !== before) changed = true;
   }
