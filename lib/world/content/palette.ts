@@ -266,6 +266,12 @@ const ENTRIES = {
   lid_silver: ["#eef0f5", "solid"],
   // Jade's eyes (reference photo 2026-10): dark brown. Appended so existing indices stay stable.
   eye_brown: ["#4a2c1c", "solid"],
+  // Lab skins (docs/SKINS.md): dynamic surface channels. The colour here is
+  // only the default; the renderer tints them per room from the skin state.
+  // These are the last three free indices — the palette is now full (255).
+  skin_line: ["#FFB800", "emit"],
+  skin_node: ["#ffffff", "emit"],
+  skin_field: ["#5b6068", "solid"],
 } as const satisfies Record<string, readonly [string, MaterialClass]>;
 
 export type ColorName = keyof typeof ENTRIES;

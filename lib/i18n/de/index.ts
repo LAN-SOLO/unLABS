@@ -17,6 +17,7 @@ import { DE_MENU } from "@/lib/i18n/de/menu";
 import { DE_CLARITY } from "@/lib/i18n/de/clarity";
 import { DE_MATRIX } from "@/lib/i18n/de/matrix";
 import { DE_OPS } from "@/lib/i18n/de/ops";
+import { DE_SKINS } from "@/lib/i18n/de/skins";
 import { DE_DOORS } from "@/lib/i18n/de/doors";
 import { DE_NATIVE } from "@/lib/i18n/de/native";
 import { DE_MERCH } from "@/lib/i18n/de/merch";
@@ -95,6 +96,7 @@ export const DE_AREAS: Readonly<Record<string, Readonly<Record<string, string>>>
   clarity: DE_CLARITY,
   matrix: DE_MATRIX,
   ops: DE_OPS,
+  skins: DE_SKINS,
   doors: DE_DOORS,
   native: DE_NATIVE,
   floorplan: DE_FLOORPLAN,
